@@ -200,9 +200,9 @@ def test_studio_actions_reject_business_ledger_cashflows(seeded_client, seeded_d
     )
     payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": direction,
                "accounting_attribute": attribute, "category": "房租", "amount": "80"}
-    response = seeded_client.put(f"/api/v1/cashflows/{flow.id}", headers=headers, json=payload)
+    response = seeded_client.put(f"/api/cashflows/{flow.id}", headers=headers, json=payload)
     assert response.status_code == 422, response.text
-    response = seeded_client.delete(f"/api/v1/cashflows/{flow.id}", headers=headers)
+    response = seeded_client.delete(f"/api/cashflows/{flow.id}", headers=headers)
     assert response.status_code == 422, response.text
     seeded_db.expire_all()
     saved = seeded_db.get(Cashflow, flow.id)

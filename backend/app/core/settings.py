@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     app_name: str = "宜游轩ERP"
     app_version: str = __version__
     log_level: str = "INFO"
-    api_prefix: str = "/api/v1"
+    api_prefix: str = "/api"
 
     # security
     jwt_secret_key: str = "dev-insecure-secret-not-for-production-use!!"
@@ -110,7 +110,7 @@ class Settings(BaseSettings):
     cors_dev_allow_any_local_port: bool = True
 
     # frontend
-    vite_api_base_url: str = "http://127.0.0.1:8123/api/v1"
+    vite_api_base_url: str = "http://127.0.0.1:8123/api"
 
     # attachments：业务附件独立于数据库文件保存，路径可由部署环境覆盖。
     attachment_storage_dir: str = "data/attachments"

@@ -17,8 +17,8 @@ from app.customers.customer_merge import assert_customer_usable, duplicate_candi
 from app.customers.customers import create_customer, set_customer_status, update_customer
 from app.shared.form_values import get_extra_values, get_extra_values_bulk, set_extra_values
 
-CUSTOMERS = "/api/v1/customers"
-COUNTERPARTIES = "/api/v1/counterparties"
+CUSTOMERS = "/api/customers"
+COUNTERPARTIES = "/api/counterparties"
 
 
 def _user(uid=2, perms=(), pool_ids=(), owner_scope="SELF") -> CurrentUser:

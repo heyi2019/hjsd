@@ -33,8 +33,8 @@ from app.customers.counterparties import (
 )
 from app.customers.customers import create_customer
 
-CUSTOMERS = "/api/v1/customers"
-COUNTERPARTIES = "/api/v1/counterparties"
+CUSTOMERS = "/api/customers"
+COUNTERPARTIES = "/api/counterparties"
 
 
 

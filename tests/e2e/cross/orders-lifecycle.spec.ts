@@ -8,10 +8,10 @@ import { test, expect } from "@playwright/test";
  * tests/backend/integration/business/test_orders_contract.py 中的逐字段契约断言
  * 可降级为状态码 + 关键业务字段的冒烟级。
  *
- * 约定与 business-write.spec.ts 一致：直连 /api/v1，X-Dev-User 头模拟用户，
+ * 约定与 business-write.spec.ts 一致：直连 /api，X-Dev-User 头模拟用户，
  * 默认 http://127.0.0.1:8123，可由 ERP_E2E_API_BASE 覆盖。
  */
-const apiBase = () => process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+const apiBase = () => process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
 const ADMIN = { "X-Dev-User": "admin" };
 const TRADE_DATE = "2026-10-17";
 

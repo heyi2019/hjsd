@@ -12,7 +12,7 @@ import { expect, test } from "@playwright/test";
  * 自给自足：先用 API 建一张 HS 订单（关联在库 RECOVERY 账号），保证台账里有可点的行，
  * 不依赖其他用例的副作用（旧写法依赖 business-write 提前建单，孤立运行会无行可点）。
  */
-const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api/v1";
+const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
 const ADMIN = { "X-Dev-User": "admin" };
 
 test("业务操作弹窗的取消与保存按钮左右边缘对齐", async ({ page, request }) => {

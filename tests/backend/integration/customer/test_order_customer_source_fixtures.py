@@ -58,7 +58,7 @@ def test_customer_source_accepts_free_typed_value(seeded_client, seeded_db, head
     payload = _base_payload(order_type)
     payload["form_extra"] = {key: free_value}
 
-    resp = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    resp = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text
 
     order = seeded_db.get(Order, resp.json()["id"])
@@ -70,7 +70,7 @@ def test_customer_source_accepts_free_typed_value(seeded_client, seeded_db, head
 def test_customer_source_optional_when_omitted(seeded_client, headers, order_type):
     """选填：不传客户来源字段也能成功建单（字段为选填，不因 required=1 在后端拦）。"""
     resp = seeded_client.post(
-        "/api/v1/orders", json=_base_payload(order_type), headers=headers
+        "/api/orders", json=_base_payload(order_type), headers=headers
     )
     assert resp.status_code == 201, resp.text
 
@@ -80,7 +80,7 @@ def test_customer_source_explicit_empty_string_accepted(seeded_client, headers, 
     key = CUSTOMER_SOURCE_KEY[order_type]
     payload = _base_payload(order_type)
     payload["form_extra"] = {key: ""}
-    resp = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    resp = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert resp.status_code == 201, resp.text
 
 # ------------------------------------------------------------------ 三类建单：落库级断言
@@ -97,7 +97,7 @@ def test_order_lands_with_inline_inventory_account(
 ):
     """HS/TH/DG 建单（带 game_account）→ Order 行 + 内联库存 Account 行均落库。"""
     resp = seeded_client.post(
-        "/api/v1/orders", json=_base_payload(order_type), headers=headers
+        "/api/orders", json=_base_payload(order_type), headers=headers
     )
     assert resp.status_code == 201, resp.text
     order_id = resp.json()["id"]
@@ -119,7 +119,7 @@ def test_four_order_types_all_persist_distinct_rows(seeded_client, seeded_db, he
     created = []
     for ot in ("HS", "TH", "DG"):
         resp = seeded_client.post(
-            "/api/v1/orders", json=_base_payload(ot), headers=headers
+            "/api/orders", json=_base_payload(ot), headers=headers
         )
         assert resp.status_code == 201, resp.text
         created.append((ot, resp.json()["order_no"]))
@@ -153,7 +153,7 @@ def test_order_inline_customer_updates_unique_matching_name(
         "phone": "13900000000",
     }
 
-    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    response = seeded_client.post("/api/orders", json=payload, headers=headers)
 
     assert response.status_code == 201, response.text
     customers = seeded_db.scalars(
@@ -168,7 +168,7 @@ def test_order_inline_supplier_updates_existing_contact(seeded_client, seeded_db
     supplier = create_counterparty(seeded_db, display_name="同行甲", type="PEER", phone="旧电话", wechat="原微信", actor="pytest")
     payload = _base_payload("TH")
     payload["counterparty_input"] = {"display_name": "同行甲", "type": "PEER", "role": "PEER", "phone": "新电话"}
-    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    response = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert response.status_code == 201, response.text
     seeded_db.refresh(supplier)
     assert (supplier.phone, supplier.wechat) == ("新电话", "原微信")
@@ -180,7 +180,7 @@ def test_order_rejects_ambiguous_same_name_customer(seeded_client, seeded_db, he
         create_customer(seeded_db, display_name="重名客户", phone=phone, actor="pytest")
     payload = _base_payload("HS")
     payload["customer_input"] = {"display_name": "重名客户", "role": "SELLER", "phone": "333"}
-    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    response = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert response.status_code == 422
     assert sorted(c.phone for c in seeded_db.scalars(select(Customer).where(Customer.display_name == "重名客户")).all()) == ["111", "222"]
 
@@ -199,7 +199,7 @@ def test_order_failure_rolls_back_contact_update(seeded_client, seeded_db, heade
     payload["order_type"] = "UNKNOWN"
     payload.pop("initial_buy")
     payload.pop("initial_costs")
-    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    response = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert response.status_code == 422
     seeded_db.refresh(customer)
     assert customer.phone == "旧电话"
@@ -209,7 +209,7 @@ def test_supplier_update_requires_manage_permission(seeded_client, seeded_db):
     supplier = create_counterparty(seeded_db, display_name="受保护同行", type="PEER", phone="旧电话", actor="pytest")
     payload = _base_payload("TH")
     payload["counterparty_input"] = {"display_name": "受保护同行", "type": "PEER", "role": "PEER", "phone": "新电话"}
-    response = seeded_client.post("/api/v1/orders", json=payload, headers={"X-Dev-User": "operator"})
+    response = seeded_client.post("/api/orders", json=payload, headers={"X-Dev-User": "operator"})
     assert response.status_code == 403
     seeded_db.refresh(supplier)
     assert supplier.phone == "旧电话"
@@ -220,7 +220,7 @@ def test_order_rejects_snapshot_and_existing_account_together(seeded_client, hea
     payload = _base_payload("HS")
     payload["account_id"] = 999999
 
-    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    response = seeded_client.post("/api/orders", json=payload, headers=headers)
 
     assert response.status_code == 422
     assert "账号快照与库存账号不能同时提交" in response.text

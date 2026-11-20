@@ -59,7 +59,7 @@ def rate_user(db: Session) -> User:
 def _login(client: TestClient, username: str, password: str, ip: str | None = None):
     headers = {"X-Forwarded-For": ip} if ip else {}
     return client.post(
-        "/api/v1/auth/login",
+        "/api/auth/login",
         json={"username": username, "password": password},
         headers=headers,
     )

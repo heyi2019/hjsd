@@ -204,7 +204,7 @@ lines += [
     "",
     "- [ ] 发版前回归 `python run_regression.py ci` 退出码 0（发版前允许全量）",
     f"- [ ] 版本三处一致 `scripts/ops/bump_version.sh --check` → `{version}`",
-    f"- [ ] 部署后 `curl /api/v1/health` 的 `app_version` 为 `{version}`；"
+    f"- [ ] 部署后 `curl /api/health` 的 `app_version` 为 `{version}`；"
     "`docker compose ps` 中 backend 为 `Up (healthy)`",
     "",
     "### 回滚",

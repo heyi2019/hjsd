@@ -9,7 +9,7 @@ import { defineConfig, devices } from "@playwright/test";
  *     `X-Dev-User`（默认 admin），后端据此开发态旁路鉴权。故 E2E 全部在开发态跑，
  *     无需真实账号。
  *   - 前端 API 基址由 `VITE_API_BASE` 决定（client.ts: API_BASE = VITE_API_BASE ??
- *     http://127.0.0.1:8123/api/v1）。本配置注入 `VITE_API_BASE=/api/v1`（同源相对路径），
+ *     http://127.0.0.1:8123/api）。本配置注入 `VITE_API_BASE=/api`（同源相对路径），
  *     由 vite 代理到本套 E2E 后端端口（ERP_E2E_BACKEND_PORT=8124）——后端无 CORS 中间件，
  *     必须用同源代理而非跨域直连，否则请求被浏览器拦截。
  *
@@ -28,7 +28,7 @@ const E2E_FRONTEND_BASE = `http://127.0.0.1:${E2E_FRONTEND_PORT}`;
 // 真实后端联调用例（auth-login / business-write / finance-write-ui 等）的 API 基址：
 // 直接打 E2E 独立后端（8124），而非常驻 dev 后端（8123），避免误连业务库。
 // 必须为绝对地址——`request` 夹具不绑定 baseURL，相对路径会失败。
-process.env.ERP_E2E_API_BASE = `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1`;
+process.env.ERP_E2E_API_BASE = `http://127.0.0.1:${E2E_BACKEND_PORT}/api`;
 process.env.ERP_E2E_BACKEND_PORT = E2E_BACKEND_PORT;
 
 export default defineConfig({
@@ -70,17 +70,17 @@ export default defineConfig({
   },
   metadata: {
     backendPort: E2E_BACKEND_PORT,
-    apiBase: E2E_FRONTEND_BASE + "/api/v1",
+    apiBase: E2E_FRONTEND_BASE + "/api",
   },
   webServer: [
     {
       // 前端：vite build --mode e2e（vite.config.ts 在该模式 define import.meta.env.DEV=true，
       // 保留零登录直通——session.tsx 依赖 DEV 为真 → 后端开发态旁路鉴权）→ vite preview
       // 静态产物服务。相较 dev server，preview 无 per-request transform，多浏览器上下文加载
-      // 无竞争，E2E 更稳。VITE_API_BASE=/api/v1 由 preview 代理（preview.proxy）转到本套
+      // 无竞争，E2E 更稳。VITE_API_BASE=/api 由 preview 代理（preview.proxy）转到本套
       // E2E 后端（8124）。reuseExistingServer:false 确保每次新构建的 preview，不误复用
       // 常驻 dev server（5173）或残留实例。
-      command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} VITE_API_BASE=/api/v1 npx vite build --mode e2e && npx vite preview --port ${E2E_FRONTEND_PORT} --strictPort`,
+      command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} VITE_API_BASE=/api npx vite build --mode e2e && npx vite preview --port ${E2E_FRONTEND_PORT} --strictPort`,
       url: E2E_FRONTEND_BASE,
       reuseExistingServer: false,
       timeout: 180000,
@@ -91,7 +91,7 @@ export default defineConfig({
       // 账号，避免每次跑测都 drop+create+重播种子（省 5–15s）。人工/自动化行为一致。
       // reuseExistingServer:false 保证每次强制重启 uvicorn，避免复用错的后端实例。
       command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} bash ../backend/scripts/e2e_backend.sh`,
-      url: `http://127.0.0.1:${E2E_BACKEND_PORT}/api/v1/auth/me`,
+      url: `http://127.0.0.1:${E2E_BACKEND_PORT}/api/auth/me`,
       reuseExistingServer: false,
       timeout: 120000,
     },

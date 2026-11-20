@@ -120,14 +120,14 @@ class TestCreateOrderValidation:
         auth = {"Authorization": f"Bearer {token}"}
 
         buy = seeded_client.post(
-            f"/api/v1/orders/{order.id}/events",
+            f"/api/orders/{order.id}/events",
             headers=auth,
             json={"event_type": "BUY", "amount": "100", "occurred_on": D.isoformat(), "pool_id": 1},
         )
         assert buy.status_code == 201, buy.text
 
         sell = seeded_client.post(
-            f"/api/v1/orders/{order.id}/events",
+            f"/api/orders/{order.id}/events",
             headers=auth,
             json={"event_type": "SELL", "amount": "120", "occurred_on": D.isoformat(), "pool_id": 1},
         )
@@ -143,7 +143,7 @@ class TestCreateOrderValidation:
         seeded_db.commit()
 
         response = seeded_client.post(
-            f"/api/v1/orders/{order.id}/events",
+            f"/api/orders/{order.id}/events",
             headers=headers,
             json={
                 "event_type": "COST",

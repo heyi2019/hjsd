@@ -38,14 +38,14 @@ def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
     _flow(seeded_db, 1, direction="OUT", amount="200.05", note="批量出")
     seeded_db.commit()
 
-    batch = seeded_client.get("/api/v1/pools/balances", headers=headers)
+    batch = seeded_client.get("/api/pools/balances", headers=headers)
     assert batch.status_code == 200, batch.text
     body = batch.json()
 
     assert body["items"], "至少应返回种子里已有的资金账户"
     for item in body["items"]:
         single = seeded_client.get(
-            f"/api/v1/pools/{item['pool_id']}/balance", headers=headers
+            f"/api/pools/{item['pool_id']}/balance", headers=headers
         )
         assert single.status_code == 200, single.text
         assert item["cash_balance"] == single.json()["cash_balance"]
@@ -65,7 +65,7 @@ def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
 
 
 def test_account_without_pool_scope_gets_empty_batch(seeded_client, viewer_headers):
-    response = seeded_client.get("/api/v1/pools/balances", headers=viewer_headers)
+    response = seeded_client.get("/api/pools/balances", headers=viewer_headers)
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["items"] == []

@@ -53,7 +53,7 @@ class TestOrdersApi:
         self, seeded_client, headers
     ):
         response = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "HS",
                 "trade_date": D.isoformat(),
@@ -68,7 +68,7 @@ class TestOrdersApi:
     ):
         """2026-10-28 口径：TH 快照建单即建号（API 契约层）。"""
         created = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "TH",
                 "trade_date": D.isoformat(),
@@ -85,7 +85,7 @@ class TestOrdersApi:
         self, seeded_client, headers
     ):
         created = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "TH",
                 "trade_date": D.isoformat(),
@@ -102,7 +102,7 @@ class TestOrdersApi:
 
     def test_update_and_cancel_order_api(self, seeded_client, headers):
         created = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={"order_type": "HS", "trade_date": D.isoformat()},
             headers=headers,
         )
@@ -110,7 +110,7 @@ class TestOrdersApi:
         order_id = created.json()["id"]
 
         updated = seeded_client.patch(
-            f"/api/v1/orders/{order_id}",
+            f"/api/orders/{order_id}",
             json={"note": "接口补充备注"},
             headers=headers,
         )
@@ -118,7 +118,7 @@ class TestOrdersApi:
         assert updated.json()["note"] == "接口补充备注"
 
         cancelled = seeded_client.post(
-            f"/api/v1/orders/{order_id}/cancel",
+            f"/api/orders/{order_id}/cancel",
             json={"reason": "接口撤单"},
             headers=headers,
         )
@@ -131,7 +131,7 @@ class TestOrdersApi:
         user = _scoped_user()
         scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
         response = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "HS",
                 "trade_date": D.isoformat(),
@@ -146,7 +146,7 @@ class TestOrdersApi:
         """未指定负责人时兜底为操作人本人：owner_id 落 NULL 会让单据在按归属过滤后
         对 SELF 用户永久不可见（历史 153 单曾因此全为 NULL）。"""
         response = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={"order_type": "HS", "trade_date": D.isoformat()},
             headers=headers,
         )
@@ -159,7 +159,7 @@ class TestOrdersApi:
     ):
         # 佣金口径已在建单接口打通，这里只保留「旧结算字段被拒」的断言。
         response = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "DG",
                 "trade_date": D.isoformat(),
@@ -177,7 +177,7 @@ class TestOrdersApi:
         self, seeded_client, headers
     ):
         response = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "TH",
                 "trade_date": D.isoformat(),
@@ -206,20 +206,20 @@ class TestOrdersApi:
             occurred_on=D, actor="pytest",
         )
         listed = seeded_client.get(
-            "/api/v1/orders", params={"order_type": "HS", "status": "ACTIVE"},
+            "/api/orders", params={"order_type": "HS", "status": "ACTIVE"},
             headers=headers,
         )
         assert listed.status_code == 200, listed.text
         assert [item["order_no"] for item in listed.json()["items"]] == [order.order_no]
 
-        fetched = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+        fetched = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
         assert fetched.status_code == 200
         assert fetched.json()["id"] == order.id
         assert len(fetched.json()["events"]) == 1
         assert fetched.json()["events"][0]["event_type"] == "BUY"
         assert fetched.json()["events"][0]["operator"] == "-"
 
-        missing = seeded_client.get("/api/v1/orders/999999", headers=headers)
+        missing = seeded_client.get("/api/orders/999999", headers=headers)
         assert missing.status_code == 404
 
     def test_detail_operator_uses_selected_employee_not_audit_actor(
@@ -236,7 +236,7 @@ class TestOrdersApi:
             operator_user_ids=[9],
         )
 
-        fetched = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+        fetched = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
         assert fetched.status_code == 200, fetched.text
         assert fetched.json()["events"][0]["operator"] == "种子用户9"
         assert fetched.json()["cashflows"][0]["operator"] == "种子用户9"
@@ -281,7 +281,7 @@ class TestOrdersApi:
             actor="pytest",
         )
 
-        response = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
+        response = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
 
         assert response.status_code == 200, response.text
         body = response.json()
@@ -298,11 +298,11 @@ class TestOrdersApi:
 
     def test_pool_balance_endpoint_scope_forbidden(self, seeded_client, viewer_headers):
         # viewer 有 finance.read 但无池授权 → 越权池返回 404（不泄露存在性）
-        response = seeded_client.get("/api/v1/pools/1/balance", headers=viewer_headers)
+        response = seeded_client.get("/api/pools/1/balance", headers=viewer_headers)
         assert response.status_code == 404
 
     def test_pool_balance_endpoint_ok(self, seeded_client, headers):
-        response = seeded_client.get("/api/v1/pools/1/balance", headers=headers)
+        response = seeded_client.get("/api/pools/1/balance", headers=headers)
         assert response.status_code == 200, response.text
         assert "available" in response.json()
 

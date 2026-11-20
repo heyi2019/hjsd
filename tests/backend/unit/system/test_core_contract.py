@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 
 from app.core import database, money, settings as settings_module
-from app import api_v1
+from app import api
 from app.core.errors import AppError, ErrorCode, NotFound, TokenExpired, Validation, require_condition
 from app.core.money import Amount, to_money
 from app.core.ratelimit import RateLimiter
@@ -141,10 +141,10 @@ class TestErrorHelpers:
     def test_framework_http_errors_use_v1_error_shape(self, seeded_client):
         for response, expected_code in (
             (
-                seeded_client.get("/api/v1/does-not-exist"),
+                seeded_client.get("/api/does-not-exist"),
                 ErrorCode.RESOURCE_NOT_FOUND,
             ),
-            (seeded_client.post("/api/v1/health"), ErrorCode.METHOD_NOT_ALLOWED),
+            (seeded_client.post("/api/health"), ErrorCode.METHOD_NOT_ALLOWED),
         ):
             payload = response.json()
             assert payload["code"] == expected_code
@@ -331,7 +331,7 @@ class TestTokenGuards:
 
     def test_authorization_header_must_be_bearer(self, seeded_client):
         response = seeded_client.get(
-            "/api/v1/orders", headers={"Authorization": "Basic abc"}
+            "/api/orders", headers={"Authorization": "Basic abc"}
         )
         assert response.status_code == 401
 
@@ -381,7 +381,7 @@ class TestRequireRole:
     def test_endpoint_permission_denied_for_viewer(self, seeded_client):
         # 端点级：viewer 无 pool.manage → 403
         response = seeded_client.post(
-            "/api/v1/pools",
+            "/api/pools",
             json={"code": "TMPVIEW", "name": "越权池"},
             headers={"X-Dev-User": "viewer"},
         )
@@ -542,7 +542,7 @@ class TestApiV1Health:
         assert root.status_code == 200, root.text
         assert root.json()["docs"] == "/docs"
 
-        health = client.get("/api/v1/health")
+        health = client.get("/api/health")
         assert health.status_code == 200, health.text
         assert health.json()["status"] == "ok"
         assert health.json()["database_status"] == "ok"
@@ -555,8 +555,8 @@ class TestApiV1Health:
             def connect(self):
                 raise RuntimeError("database unavailable")
 
-        monkeypatch.setattr(api_v1, "get_engine", lambda: BrokenEngine())
-        response = client.get("/api/v1/health")
+        monkeypatch.setattr(api, "get_engine", lambda: BrokenEngine())
+        response = client.get("/api/health")
 
         assert response.status_code == 503
         assert response.json() == {

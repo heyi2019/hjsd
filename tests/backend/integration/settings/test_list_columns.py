@@ -21,17 +21,17 @@ def _registry(code: str):
 
 
 def _scope(client, headers, code: str) -> dict:
-    response = client.get("/api/v1/list-columns", headers=headers)
+    response = client.get("/api/list-columns", headers=headers)
     assert response.status_code == 200, response.text
     return next(item for item in response.json() if item["code"] == code)
 
 
 def _save(client, headers, code: str, items: list[dict]):
-    return client.put(f"/api/v1/list-columns/{code}", json={"items": items}, headers=headers)
+    return client.put(f"/api/list-columns/{code}", json={"items": items}, headers=headers)
 
 
 def test_list_scopes_match_registry(seeded_client, headers):
-    response = seeded_client.get("/api/v1/list-columns", headers=headers)
+    response = seeded_client.get("/api/list-columns", headers=headers)
     assert response.status_code == 200, response.text
     payload = response.json()
     assert {item["code"] for item in payload} == {scope.code for scope in LIST_SCOPES}
@@ -181,7 +181,7 @@ def test_reset_restores_registry_default(seeded_client, headers, seeded_db):
     assert _save(seeded_client, headers, "LEDGER", items).status_code == 200
     assert _scope(seeded_client, headers, "LEDGER")["columns"][0]["key"] == "actions"
 
-    response = seeded_client.delete("/api/v1/list-columns/LEDGER", headers=headers)
+    response = seeded_client.delete("/api/list-columns/LEDGER", headers=headers)
     assert response.status_code == 200, response.text
     reset = response.json()
     assert [column["key"] for column in reset["columns"]] == [column.key for column in _registry("LEDGER")]
@@ -197,11 +197,11 @@ def test_reset_restores_registry_default(seeded_client, headers, seeded_db):
     assert AuditAction.LIST_COLUMNS_RESET.value in actions
 
     # 幂等：已无配置时再重置也成功，且不再产生审计
-    again = seeded_client.delete("/api/v1/list-columns/LEDGER", headers=headers)
+    again = seeded_client.delete("/api/list-columns/LEDGER", headers=headers)
     assert again.status_code == 200, again.text
     assert again.json()["columns"] == reset["columns"]
 
 
 def test_reset_unknown_scope_and_permission(seeded_client, headers, viewer_headers):
-    assert seeded_client.delete("/api/v1/list-columns/NOT_A_LIST", headers=headers).status_code == 404
-    assert seeded_client.delete("/api/v1/list-columns/LEDGER", headers=viewer_headers).status_code == 403
+    assert seeded_client.delete("/api/list-columns/NOT_A_LIST", headers=headers).status_code == 404
+    assert seeded_client.delete("/api/list-columns/LEDGER", headers=viewer_headers).status_code == 403

@@ -1,8 +1,8 @@
-"""v1 应用工厂：异常转换 + CORS + `/api/v1` 路由挂载。
+"""应用工厂：异常转换 + CORS + `/api` 路由挂载。
 
 设计要点：
 - 金额/编号/权限相关的业务异常一律走 `AppError` → 统一 JSON `{code, message, details}`；
-- `app.main` 即 v1 入口（唯一入口）。
+- `app.main` 是唯一入口。
 """
 from __future__ import annotations
 
@@ -107,7 +107,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
-        description="宜游轩 ERP v1 当前实现。",
+        description="宜游轩 ERP 当前实现。",
         docs_url=docs_url,
         redoc_url=redoc_url,
         openapi_url=openapi_url,

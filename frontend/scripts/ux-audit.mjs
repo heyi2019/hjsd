@@ -5,7 +5,7 @@
  *      三档视口横向溢出、控制台异常、500 错误可见性、导航状态保持。
  *
  * 用法：
- *   1) cd frontend && VITE_API_BASE=/api/v1 ./node_modules/.bin/vite --port 5180 --strictPort
+ *   1) cd frontend && VITE_API_BASE=/api ./node_modules/.bin/vite --port 5180 --strictPort
  *   2) node scripts/ux-audit.mjs
  * 环境变量：UXP_BASE（默认 http://localhost:5180/）、UXP_OUT（默认 /tmp/ux-audit）
  *
@@ -294,7 +294,7 @@ async function navTo(page, p) {
   // 错误可见性：全站 API 注入 500
   {
     const { page } = await bootPage(context);
-    await page.route("**/api/v1/**", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL", message: "boom", details: {} }) }));
+    await page.route("**/api/**", (route) => route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL", message: "boom", details: {} }) }));
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(5000);
     results.errorVisibility = await page.evaluate(() => {

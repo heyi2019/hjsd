@@ -193,7 +193,7 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     operator, previous_operator = operators
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=D, actor="pytest")
     sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=D, actor="pytest", operator_user_ids=[previous_operator.id])
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "CANCEL", "amount": "150", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "取消售出", "finalize_sale_cancel": True})
+    response = seeded_client.post(f"/api/orders/{order.id}/events", headers=headers, json={"event_type": "CANCEL", "amount": "150", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "取消售出", "finalize_sale_cancel": True})
     assert response.status_code == 201, response.text
     seeded_db.flush()
     pending = seeded_db.scalar(select(Notification).where(Notification.recipient_user_id == previous_operator.id, Notification.notification_type == "PROFIT_PENDING", Notification.entity_id == order.order_no))
@@ -203,7 +203,7 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == -50
     resold, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("220"), occurred_on=date(2026, 10, 31), actor="pytest", operator_user_ids=[operator.id])
     assert resold.event_type == "SELL"
-    response = seeded_client.get("/api/v1/orders", headers=headers, params={"keyword": order.order_no})
+    response = seeded_client.get("/api/orders", headers=headers, params={"keyword": order.order_no})
     assert response.status_code == 200, response.text
     item = next(item for item in response.json()["items"] if item["id"] == order.id)
     assert Decimal(str(item["sale_amount"])) == Decimal("220")
@@ -211,7 +211,7 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert item["sale_operator"] == (operator.display_name or operator.username)
     assert Decimal(str(item["profit_base"])) == Decimal("170")
     for selected, expected_total in ((operator, 1), (previous_operator, 0)):
-        filtered = seeded_client.get("/api/v1/orders", headers=headers, params={"keyword": order.order_no, "sale_operator_ids": selected.id})
+        filtered = seeded_client.get("/api/orders", headers=headers, params={"keyword": order.order_no, "sale_operator_ids": selected.id})
         assert filtered.status_code == 200, filtered.text
         assert filtered.json()["total"] == expected_total
         assert len(filtered.json()["items"]) == expected_total
@@ -221,9 +221,9 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
         assert sum(order_status_counts(seeded_db, user=personal_user, mine=True, trade_date_from=D, trade_date_to=D).values()) == expected_total
 
     old_refund = {"event_type": "CANCEL", "amount": "50", "occurred_on": "2026-11-01", "offset_event_id": sell.id, "pool_id": sell.pool_id, "reason": "补退首次售出余款"}
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={**old_refund, "finalize_sale_cancel": True})
+    response = seeded_client.post(f"/api/orders/{order.id}/events", headers=headers, json={**old_refund, "finalize_sale_cancel": True})
     assert response.status_code == 422, response.text
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json=old_refund)
+    response = seeded_client.post(f"/api/orders/{order.id}/events", headers=headers, json=old_refund)
     assert response.status_code == 201, response.text
     seeded_db.refresh(order)
     account = seeded_db.get(Account, order.account_id)

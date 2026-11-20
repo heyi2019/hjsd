@@ -356,7 +356,7 @@ def test_field_key_and_code_pattern(seeded_db):
 
 def test_router_create_and_list(seeded_client, headers):
     resp = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS",
@@ -372,7 +372,7 @@ def test_router_create_and_list(seeded_client, headers):
     assert body["is_custom"] is True
 
     listing = seeded_client.get(
-        "/api/v1/order-form-fields", headers=headers, params={"order_type_code": "HS"}
+        "/api/order-form-fields", headers=headers, params={"order_type_code": "HS"}
     )
     assert listing.status_code == 200
     assert any(f["field_key"] == "r_tag" for f in listing.json())
@@ -381,7 +381,7 @@ def test_router_duplicate_conflict_409(seeded_client, headers):
     payload = OrderFormFieldCreate(
         order_type_code="HS", field_key="dup_rt", label="Dup", field_type="TEXT"
     ).model_dump(mode="json")
-    first = seeded_client.post("/api/v1/order-form-fields", headers=headers, json=payload)
+    first = seeded_client.post("/api/order-form-fields", headers=headers, json=payload)
     assert first.status_code == 201
-    second = seeded_client.post("/api/v1/order-form-fields", headers=headers, json=payload)
+    second = seeded_client.post("/api/order-form-fields", headers=headers, json=payload)
     assert second.status_code == 409

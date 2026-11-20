@@ -62,7 +62,7 @@ def _cancel(seeded_db, order, *, offset_event_id: int, amount: str):
 
 
 def _detail_events(seeded_client, headers, order_id: int) -> list[dict]:
-    response = seeded_client.get(f"/api/v1/orders/{order_id}", headers=headers)
+    response = seeded_client.get(f"/api/orders/{order_id}", headers=headers)
     assert response.status_code == 200, response.text
     return response.json()["events"]
 
@@ -134,7 +134,7 @@ def test_posted_event_response_carries_the_same_value(seeded_client, seeded_db, 
     order, buy = _order_with_buy(seeded_db, amount="300")
 
     response = seeded_client.post(
-        f"/api/v1/orders/{order.id}/events",
+        f"/api/orders/{order.id}/events",
         headers=headers,
         json={
             "event_type": "CANCEL",

@@ -99,7 +99,7 @@ def test_list_endpoint_ships_remaining_receivable(seeded_client, seeded_db, head
     contract.paid_amount = Decimal("200.00")
     seeded_db.commit()
 
-    response = seeded_client.get("/api/v1/installments", headers=headers)
+    response = seeded_client.get("/api/installments", headers=headers)
     assert response.status_code == 200, response.text
 
     items = [item for item in response.json()["items"] if item["id"] == contract.id]
@@ -116,7 +116,7 @@ def test_export_rows_include_remaining_receivable(seeded_client, seeded_db, head
     contract = _contract(seeded_db)
     seeded_db.commit()
 
-    response = seeded_client.get("/api/v1/installments/export.csv", headers=headers)
+    response = seeded_client.get("/api/installments/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     rows = list(csv.reader(response.text.splitlines()))
     header = rows[0]
@@ -144,8 +144,8 @@ def test_installment_export_uses_same_status_type_and_date_filters_as_list(seede
     seeded_db.get(Order, wrong_date.order_id).trade_date = date(2026, 9, 1)
     seeded_db.flush()
     filters = {"status": "OVERDUE", "contract_type": "STOCK_SALE", "trade_date_from": "2026-10-01", "trade_date_to": "2026-10-31"}
-    listing = seeded_client.get("/api/v1/installments", params=filters, headers=headers)
-    exported = seeded_client.get("/api/v1/installments/export.csv", params=filters, headers=headers)
+    listing = seeded_client.get("/api/installments", params=filters, headers=headers)
+    exported = seeded_client.get("/api/installments/export.csv", params=filters, headers=headers)
     assert listing.status_code == exported.status_code == 200
     assert [item["id"] for item in listing.json()["items"]] == [matching.id]
     assert matching.inst_no in exported.text
@@ -159,7 +159,7 @@ def test_workbench_installment_cards_match_visible_contract_type(seeded_client, 
     visible.status = "OVERDUE"
     other_type.status = "OVERDUE"
     seeded_db.flush()
-    dashboard = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
-    totals = seeded_client.get("/api/v1/installments/totals", params={"contract_type": "STOCK_SALE"}, headers=headers)
+    dashboard = seeded_client.get("/api/dashboard/summary", headers=headers)
+    totals = seeded_client.get("/api/installments/totals", params={"contract_type": "STOCK_SALE"}, headers=headers)
     assert dashboard.status_code == totals.status_code == 200
     assert dashboard.json()["installments"] == {"total_count": totals.json()["total_count"], "overdue_count": totals.json()["overdue_count"]} == {"total_count": 1, "overdue_count": 1}

@@ -13,9 +13,9 @@ installments（backend/.importlinter 契约）。但两处业务行为天然横�
 下游域在**自己模块底部**调用 register_* 完成注册（下游 -> orders 是合法方向）。
 
 加载链保证注册生效：
-- 生产：api_v1 import finance_router / installments_router
+- 生产：api import finance_router / installments_router
   -> finance/cashflows.py、installments/create.py 被 import -> 注册执行；
-- 测试：tests/backend/conftest.py 模块级 import app.api_v1.create_app，
+- 测试：tests/backend/conftest.py 模块级 import app.api.create_app，
   收集阶段即完成注册。
 """
 from __future__ import annotations

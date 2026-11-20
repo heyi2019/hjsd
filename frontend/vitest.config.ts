@@ -46,7 +46,7 @@ export default defineConfig({
   root: REPO,
   plugins: [react()],
   // Never inherit a developer machine's .env.local API address in jsdom.
-  define: { "import.meta.env.VITE_API_BASE": JSON.stringify("http://127.0.0.1:8123/api/v1") },
+  define: { "import.meta.env.VITE_API_BASE": JSON.stringify("http://127.0.0.1:8123/api") },
   resolve: {
     mainFields: ["module", "jsnext:main", "jsnext"],
     alias: {

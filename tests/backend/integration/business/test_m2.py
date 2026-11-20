@@ -370,7 +370,7 @@ class TestM2Api:
             actor="pytest",
         )
         order_response = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
@@ -381,12 +381,12 @@ class TestM2Api:
         assert order_response.status_code == 201, order_response.text
         order = order_response.json()
         seeded_client.post(
-            f"/api/v1/orders/{order['id']}/events",
+            f"/api/orders/{order['id']}/events",
             json={"event_type": "BUY", "amount": "800.00", "occurred_on": TODAY.isoformat()},
             headers=headers,
         )
         contract = seeded_client.post(
-            "/api/v1/installments",
+            "/api/installments",
             json={
                 "order_id": order["id"],
                 "contract_type": "STOCK_SALE",
@@ -402,7 +402,7 @@ class TestM2Api:
         contract_id = contract.json()["id"]
 
         paid = seeded_client.post(
-            f"/api/v1/installments/{contract_id}/payments",
+            f"/api/installments/{contract_id}/payments",
             json={"amount": "100.00", "paid_on": TODAY.isoformat(), "period_no": 0},
             headers=headers,
         )
@@ -410,14 +410,14 @@ class TestM2Api:
         assert paid.json()["schedule"]["status"] == "PAID"
 
         schedules = seeded_client.get(
-            f"/api/v1/installments/{contract_id}/schedules", headers=headers
+            f"/api/installments/{contract_id}/schedules", headers=headers
         ).json()
         assert len(schedules) == 3  # 首付 + 2 期
 
     def test_deposit_and_rebate_endpoints(self, seeded_client, headers, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         deposit = seeded_client.post(
-            "/api/v1/deposits",
+            "/api/deposits",
             json={"pool_id": invest.id, "amount": "2000.00", "paid_on": TODAY.isoformat()},
             headers=headers,
         )
@@ -425,7 +425,7 @@ class TestM2Api:
         assert deposit.json()["status"] == "PAID"
 
         returned = seeded_client.post(
-            f"/api/v1/deposits/{deposit.json()['id']}/returns",
+            f"/api/deposits/{deposit.json()['id']}/returns",
             json={"amount": "500.00", "released_on": TODAY.isoformat()},
             headers=headers,
         )
@@ -440,7 +440,7 @@ class TestM2Api:
             actor="pytest",
         )
         created = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
@@ -450,7 +450,7 @@ class TestM2Api:
         )
         assert created.status_code == 201, created.text
         inventory = seeded_client.get(
-            "/api/v1/stocks/inventory/ledger",
+            "/api/stocks/inventory/ledger",
             params={"limit": 10, "offset": 0},
             headers=headers,
         ).json()

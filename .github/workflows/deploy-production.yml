@@ -284,7 +284,7 @@ jobs:
           # CI 判红，不会静默上线。B4（售出表单三作用域补齐）不在 deploy.sh 内自动执行：
           # 已有库升级须在 ECS 现场按当期执行单手动跑 backend/scripts/split_sale_form_scopes.py。
           ERP_SKIP_BUILD=1 APP_VERSION="$APP_VERSION" bash scripts/deploy.sh
-          curl -fsS http://127.0.0.1/api/v1/health
+          curl -fsS http://127.0.0.1/api/health
           REMOTE
 
       - name: Collect deployment diagnostics

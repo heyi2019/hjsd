@@ -37,8 +37,8 @@ from app.customers.customer_merge import duplicate_candidates, merge_customers
 from app.customers.customers import create_customer, get_customer, list_customers, set_customer_status, update_customer
 from app.shared.form_values import get_extra_values, set_extra_values
 
-CUSTOMERS = "/api/v1/customers"
-COUNTERPARTIES = "/api/v1/counterparties"
+CUSTOMERS = "/api/customers"
+COUNTERPARTIES = "/api/counterparties"
 
 
 

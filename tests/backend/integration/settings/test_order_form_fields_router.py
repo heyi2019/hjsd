@@ -59,7 +59,7 @@ def _seed_conditional_pair(seeded_db) -> tuple[OrderFormField, OrderFormField]:
 
 def test_router_update_required_and_active(seeded_client, headers):
     created = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="rt_u", label="RtU", field_type="TEXT"
@@ -67,7 +67,7 @@ def test_router_update_required_and_active(seeded_client, headers):
     ).json()
 
     upd = seeded_client.patch(
-        f"/api/v1/order-form-fields/{created['id']}",
+        f"/api/order-form-fields/{created['id']}",
         headers=headers,
         json=OrderFormFieldUpdate(required=True, label="RtU2").model_dump(mode="json", exclude_none=True),
     )
@@ -76,7 +76,7 @@ def test_router_update_required_and_active(seeded_client, headers):
     assert upd.json()["label"] == "RtU2"
 
     dis = seeded_client.patch(
-        f"/api/v1/order-form-fields/{created['id']}/active",
+        f"/api/order-form-fields/{created['id']}/active",
         headers=headers,
         params={"active": "false"},
     )
@@ -86,7 +86,7 @@ def test_router_update_required_and_active(seeded_client, headers):
 def test_router_update_flow_direction_accepts_literal_string(seeded_client, headers):
     """编辑器保存资金流向性质时，Literal 值应按字符串传给领域层。"""
     created = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="rt_flow", label="流向字段", field_type="NUMBER"
@@ -94,7 +94,7 @@ def test_router_update_flow_direction_accepts_literal_string(seeded_client, head
     ).json()
 
     upd = seeded_client.patch(
-        f"/api/v1/order-form-fields/{created['id']}",
+        f"/api/order-form-fields/{created['id']}",
         headers=headers,
         json=OrderFormFieldUpdate(flow_direction="OUT").model_dump(mode="json", exclude_none=True),
     )
@@ -119,7 +119,7 @@ def test_router_dynamic_field_rename_with_empty_options(seeded_client, seeded_db
     seeded_db.commit()
 
     resp = seeded_client.patch(
-        f"/api/v1/order-form-fields/{dynamic.id}",
+        f"/api/order-form-fields/{dynamic.id}",
         headers=headers,
         json={"label": "路由动态字段改名", "options": [], "required": False,
               "required_when": None, "sort_order": 0},
@@ -146,7 +146,7 @@ def test_router_dynamic_multiselect_rename_with_empty_options(seeded_client, see
     seeded_db.commit()
 
     resp = seeded_client.patch(
-        f"/api/v1/order-form-fields/{dynamic.id}",
+        f"/api/order-form-fields/{dynamic.id}",
         headers=headers,
         json={"label": "路由动态多选改名", "options": [], "required": False,
               "required_when": None, "sort_order": 0},
@@ -169,7 +169,7 @@ def test_router_locked_delete_rejected_400(seeded_client, seeded_db, headers):
     seeded_db.commit()
 
     resp = seeded_client.delete(
-        f"/api/v1/order-form-fields/{locked.id}", headers=headers
+        f"/api/order-form-fields/{locked.id}", headers=headers
     )
     # 核心字段删除被 Validation 护栏拦截（HTTP 422）
     assert resp.status_code == 422
@@ -178,20 +178,20 @@ def test_router_locked_delete_rejected_400(seeded_client, seeded_db, headers):
 
 def test_router_delete_custom_ok(seeded_client, headers):
     created = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="rt_del", label="RtDel", field_type="TEXT"
         ).model_dump(mode="json"),
     ).json()
     resp = seeded_client.delete(
-        f"/api/v1/order-form-fields/{created['id']}", headers=headers
+        f"/api/order-form-fields/{created['id']}", headers=headers
     )
     assert resp.status_code == 204
 
 def test_router_permission_denied_for_viewer(seeded_client, viewer_headers):
     resp = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=viewer_headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="v_k", label="V", field_type="TEXT"
@@ -209,20 +209,20 @@ def test_router_form_config_readable_by_operator(seeded_client, headers, operato
     """
     # 管理员先配一个自定义字段 + 一个板块标题改名
     created = seeded_client.post(
-        "/api/v1/order-form-fields", headers=headers,
+        "/api/order-form-fields", headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="op_readable", label="经办可见字段", field_type="TEXT",
         ).model_dump(mode="json"),
     )
     assert created.status_code == 201, created.text
     seeded_client.put(
-        "/api/v1/order-form-fields/section-labels", headers=headers,
+        "/api/order-form-fields/section-labels", headers=headers,
         json={"order_type_code": "HS", "labels": {"FINANCE": "资金明细（经办可见）"}},
     )
 
     # 1) 经办人读得到字段定义
     fields = seeded_client.get(
-        "/api/v1/order-form-fields", headers=operator_headers,
+        "/api/order-form-fields", headers=operator_headers,
         params={"order_type_code": "HS"},
     )
     assert fields.status_code == 200, fields.text
@@ -230,27 +230,27 @@ def test_router_form_config_readable_by_operator(seeded_client, headers, operato
 
     # 2) 经办人读得到板块标题
     labels = seeded_client.get(
-        "/api/v1/order-form-fields/section-labels", headers=operator_headers,
+        "/api/order-form-fields/section-labels", headers=operator_headers,
         params={"order_type_code": "HS"},
     )
     assert labels.status_code == 200, labels.text
     assert labels.json().get("FINANCE") == "资金明细（经办可见）"
 
     # 3) 经办人读得到作用域注册表
-    scopes = seeded_client.get("/api/v1/order-form-fields/scopes", headers=operator_headers)
+    scopes = seeded_client.get("/api/order-form-fields/scopes", headers=operator_headers)
     assert scopes.status_code == 200, scopes.text
     assert scopes.json()
 
     # 4) 写仍然被拦：读放开不等于放开配置权
     denied_create = seeded_client.post(
-        "/api/v1/order-form-fields", headers=operator_headers,
+        "/api/order-form-fields", headers=operator_headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="op_write_try", label="越权", field_type="TEXT",
         ).model_dump(mode="json"),
     )
     assert denied_create.status_code == 403
     denied_labels = seeded_client.put(
-        "/api/v1/order-form-fields/section-labels", headers=operator_headers,
+        "/api/order-form-fields/section-labels", headers=operator_headers,
         json={"order_type_code": "HS", "labels": {"FINANCE": "越权改名"}},
     )
     assert denied_labels.status_code == 403
@@ -263,7 +263,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
     """
     # 1) 建一个字段（走与前端相同的创建端点）
     created = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="rt_backfill",
@@ -275,7 +275,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
 
     # 2) GET 列表：前端此刻拿到的就是"原名"（数据源读取验证）
     first = seeded_client.get(
-        "/api/v1/order-form-fields", headers=headers,
+        "/api/order-form-fields", headers=headers,
         params={"order_type_code": "HS", "include_inactive": True},
     )
     assert first.status_code == 200, first.text
@@ -284,7 +284,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
 
     # 3) 改名（走与设置页 submit 相同的 PATCH 端点）
     patched = seeded_client.patch(
-        f"/api/v1/order-form-fields/{fid}", headers=headers,
+        f"/api/order-form-fields/{fid}", headers=headers,
         json={"label": "回填探针新名"},
     )
     assert patched.status_code == 200, patched.text
@@ -292,7 +292,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
 
     # 4) 再次 GET 列表（前端重新拉取时）：新名在、旧名不在 —— 证明无陈旧缓存
     second = seeded_client.get(
-        "/api/v1/order-form-fields", headers=headers,
+        "/api/order-form-fields", headers=headers,
         params={"order_type_code": "HS", "include_inactive": True},
     )
     second_labels = [f["label"] for f in second.json()]
@@ -301,7 +301,7 @@ def test_rename_persists_to_db_and_backfills_via_list_endpoint(seeded_client, he
 
 def test_router_requires_auth(seeded_client):
     resp = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="noauth", label="N", field_type="TEXT"
         ).model_dump(mode="json"),
@@ -412,7 +412,7 @@ def test_required_when_non_mapping_rejected(seeded_db):
 
 def test_router_required_when_roundtrip(seeded_client, headers):
     dep = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="rt_src", label="路由来源", field_type="SELECT",
@@ -421,7 +421,7 @@ def test_router_required_when_roundtrip(seeded_client, headers):
     ).json()
 
     created = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS",
@@ -436,7 +436,7 @@ def test_router_required_when_roundtrip(seeded_client, headers):
 
     # 显式 null → 清除条件（回退纯选填）
     cleared = seeded_client.patch(
-        f"/api/v1/order-form-fields/{created.json()['id']}",
+        f"/api/order-form-fields/{created.json()['id']}",
         headers=headers,
         json={"required_when": None},
     )
@@ -445,7 +445,7 @@ def test_router_required_when_roundtrip(seeded_client, headers):
 
     # 不传 → 保持现状
     kept = seeded_client.patch(
-        f"/api/v1/order-form-fields/{dep['id']}", headers=headers, json={"label": "路由来源2"}
+        f"/api/order-form-fields/{dep['id']}", headers=headers, json={"label": "路由来源2"}
     )
     assert kept.status_code == 200
     assert kept.json()["required_when"] is None

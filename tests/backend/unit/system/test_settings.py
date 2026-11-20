@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.api_v1 import create_app
+from app.api import create_app
 from app.core.settings import (
     PROJECT_ROOT,
     Settings,
@@ -141,7 +141,7 @@ def test_settings_loads_from_root_env():
     settings = get_settings()
     assert settings.env_file_path is not None
     assert settings.env_file_path.parent == PROJECT_ROOT
-    assert settings.api_prefix == "/api/v1"
+    assert settings.api_prefix == "/api"
     assert settings.access_token_expire_minutes >= 1
 
 
@@ -211,7 +211,7 @@ def test_dev_cors_middleware_accepts_frontend_port():
         database_url="postgresql+psycopg://erp_app@127.0.0.1:5432/heijin_erp_test",
     )
     response = TestClient(create_app(settings)).options(
-        "/api/v1/orders",
+        "/api/orders",
         headers={
             "Origin": "http://127.0.0.1:5188",
             "Access-Control-Request-Method": "GET",

@@ -299,7 +299,7 @@ def create_installment(
 
 # P0-A（2026-11-18）：非分期 SELL 完成后的回收处置联动经协作注册点注入，
 # 消灭 orders -> installments 反向依赖（backend/.importlinter 契约）。
-# 本模块由 api_v1 -> installments_router -> installments.router 链路必然加载。
+# 本模块由 api -> installments_router -> installments.router 链路必然加载。
 from app.business.collaboration import register_post_sell_hook  # noqa: E402
 
 register_post_sell_hook(link_recovered_sale)

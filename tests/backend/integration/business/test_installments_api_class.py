@@ -98,14 +98,14 @@ class TestInstallmentsApi:
         order = _order(seeded_db, order_type="HS", account_id=account.id)
         _buy(seeded_db, order.id, "100")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
-        created = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        created = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": pool.id, "operator_user_ids": [1],
         })
         assert created.status_code == 201, created.text
         contract = seeded_db.get(Installment, created.json()["id"])
-        base = f"/api/v1/installments/{contract.id}"
+        base = f"/api/installments/{contract.id}"
         if action in {"default", "recover"}:
             contract.status = "OVERDUE"
         elif action == "resale":
@@ -172,7 +172,7 @@ class TestInstallmentsApi:
         order = _order(seeded_db, order_type="HS", account_id=account.id)
         _buy(seeded_db, order.id, "100")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
-        created = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        created = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": pool.id, "operator_user_ids": [1],
@@ -193,7 +193,7 @@ class TestInstallmentsApi:
             payload = {"paid_on": TODAY.isoformat(), "pool_id": pool.id}
         else:
             payload = {"cancelled_on": TODAY.isoformat(), "reason": "取消"}
-        url = f"/api/v1/installments/{installment_id}/{action}"
+        url = f"/api/installments/{installment_id}/{action}"
         missing = seeded_client.post(url, headers=headers, json=payload)
         assert missing.status_code == 422, missing.text
         assert "本操作凭据" in missing.text
@@ -211,7 +211,7 @@ class TestInstallmentsApi:
                                     label="其他表单凭据", required=True, actor="pytest")
         seeded_db.commit()
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
-        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        response = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": pool.id, "operator_user_ids": [1],
@@ -245,12 +245,12 @@ class TestInstallmentsApi:
         seeded_db.commit()
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
         if installment:
-            url = "/api/v1/installments/stock-sale"
+            url = "/api/installments/stock-sale"
             payload = {"order_id": order.id, "principal": "200", "down_payment": "50",
                        "periods": 1, "per_period": "150", "first_due_on": TODAY.isoformat(),
                        "paid_on": TODAY.isoformat(), "pool_id": pool.id, "operator_user_ids": [1]}
         else:
-            url = f"/api/v1/orders/{order.id}/stock-sale"
+            url = f"/api/orders/{order.id}/stock-sale"
             payload = {"amount": "200", "occurred_on": TODAY.isoformat(),
                        "pool_id": pool.id, "operator_user_ids": [1]}
         payload["delivery_form_extra"] = {"delivery_responsible_ids": [1]}
@@ -264,12 +264,12 @@ class TestInstallmentsApi:
         event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
         assert event.form_extra["sale_receipt"] == "凭据A"
         assert seeded_db.get(Order, order.id).form_extra["sell_delivery_responsible_ids"] == [1]
-        edited = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+        edited = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
             "events": [{"id": event.id, "expected_amount": str(event.amount), "amount": str(event.amount),
                         "form_extra": {**event.form_extra, "sale_receipt": "凭据B"}}],
         })
         assert edited.status_code == 200, edited.text
-        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
         assert detail.status_code == 200, detail.text
         shown = next(item for item in detail.json()["orders"][0]["events"] if item["id"] == event.id)
         assert shown["form_extra"]["sale_receipt"] == "凭据B"
@@ -297,13 +297,13 @@ class TestInstallmentsApi:
         seeded_db.commit()
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
         if installment:
-            url = "/api/v1/installments/stock-sale"
+            url = "/api/installments/stock-sale"
             payload = {"order_id": order.id, "principal": "200", "down_payment": "50",
                        "periods": 1, "per_period": "150", "first_due_on": TODAY.isoformat(),
                        "paid_on": TODAY.isoformat(), "pool_id": pool.id, "operator_user_ids": [1]}
             field_key, expected_label, spoofed_method = "installment_receipt", "分期凭据", "FULL"
         else:
-            url = f"/api/v1/orders/{order.id}/stock-sale"
+            url = f"/api/orders/{order.id}/stock-sale"
             payload = {"amount": "200", "occurred_on": TODAY.isoformat(),
                        "pool_id": pool.id, "operator_user_ids": [1]}
             field_key, expected_label, spoofed_method = "full_receipt", "全款凭据", "INSTALLMENT"
@@ -354,12 +354,12 @@ class TestInstallmentsApi:
                                 required_when={"field": dependency, "op": "filled"}, actor="pytest")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
         if installment:
-            url = "/api/v1/installments/stock-sale"
+            url = "/api/installments/stock-sale"
             payload = {"order_id": order.id, "principal": "200", "down_payment": "50", "periods": 2,
                        "per_period": "75", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
                        "pool_id": pool.id, "operator_user_ids": [1]}
         else:
-            url = f"/api/v1/orders/{order.id}/stock-sale"
+            url = f"/api/orders/{order.id}/stock-sale"
             payload = {"amount": "200", "sale_amount": "250", "occurred_on": TODAY.isoformat(),
                        "pool_id": pool.id, "operator_user_ids": [1], "note": "收款备注"}
         if dependency == "customer_nickname":
@@ -419,11 +419,11 @@ class TestInstallmentsApi:
                                 required_when={"field": "customer_nickname", "op": "filled"}, actor="pytest")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
         if installment:
-            url = "/api/v1/installments/stock-sale"
+            url = "/api/installments/stock-sale"
             payload = {"order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
                        "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(), "pool_id": pool.id}
         else:
-            url = f"/api/v1/orders/{order.id}/stock-sale"
+            url = f"/api/orders/{order.id}/stock-sale"
             payload = {"amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id}
         payload["form_extra"] = {"customer_nickname": "伪造客户"}
         saved = seeded_client.post(url, headers=headers, json=payload)
@@ -459,7 +459,7 @@ class TestInstallmentsApi:
         seeded_db.flush()
         _buy(seeded_db, order.id, "100")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
-        response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
+        response = seeded_client.post(f"/api/orders/{order.id}/stock-sale", headers=headers, json={
             "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
             "operator_user_ids": [1], "customer_input": {"display_name": "完整售出买家", "role": "BUYER"},
             "delivery_form_extra": {"delivery_responsible_ids": [1], "intermediary_platform": "盼之", "intermediary_platform_other": None, "bound_phone": "13900000002", "bound_phone_owner": "卖号绑定人"},
@@ -497,7 +497,7 @@ class TestInstallmentsApi:
                 seeded_db.rollback()
                 raise
         seeded_client.app.dependency_overrides[get_db] = transactional_db
-        response = seeded_client.post(f"/api/v1/orders/{order_id}/stock-sale", headers=headers, json={
+        response = seeded_client.post(f"/api/orders/{order_id}/stock-sale", headers=headers, json={
             "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": 999999999,
             "operator_user_ids": [1], "customer_input": {"display_name": "失败时不留买家", "role": "BUYER"},
             "delivery_form_extra": {"delivery_responsible_ids": [1]},
@@ -517,7 +517,7 @@ class TestInstallmentsApi:
         order = _order(seeded_db, order_type="HS", account_id=account.id)
         _buy(seeded_db, order.id, "100")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
-        response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
+        response = seeded_client.post(f"/api/orders/{order.id}/stock-sale", headers=headers, json={
             "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
             "operator_user_ids": [1], "customer_input": {"display_name": "已拉黑买家", "role": "BUYER"},
         })
@@ -531,7 +531,7 @@ class TestInstallmentsApi:
         account = create_account(seeded_db, game_account="atomic-consignment-sale", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
         order = _order(seeded_db, order_type="DG", account_id=account.id)
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
-        response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
+        response = seeded_client.post(f"/api/orders/{order.id}/stock-sale", headers=headers, json={
             "amount": "20", "sale_amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
             "operator_user_ids": [1], "customer_input": {"display_name": "代挂委托人", "phone": "13800138001", "role": "CONSIGNOR"},
         })
@@ -559,7 +559,7 @@ class TestInstallmentsApi:
                 seeded_db.rollback()
                 raise
         seeded_client.app.dependency_overrides[get_db] = transactional_db
-        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        response = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": pool.id, "operator_user_ids": [1],
@@ -582,51 +582,51 @@ class TestInstallmentsApi:
         assert saved_extra["sell_bound_phone"] == "13900000002"
         seeded_db.refresh(account)
         assert account.bound_phone == "13900000002"
-        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
         assert detail.status_code == 200, detail.text
         assert detail.json()["orders"][0]["extra_values"]["sell_intermediary_platform_other"] == "分期平台"
-        edited = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+        edited = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
             "events": [], "orders": [{"order_id": order.id, "form_extra": {
                 "sell_intermediary_platform_other": "新平台", "bound_phone_owner": "新买号绑定人",
                 "sell_bound_phone": "13900000004", "sell_bound_phone_owner": "新卖号绑定人",
             }}],
         })
         assert edited.status_code == 200, edited.text
-        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
         assert detail.status_code == 200, detail.text
         assert detail.json()["orders"][0]["extra_values"]["sell_intermediary_platform_other"] == "新平台"
         assert detail.json()["orders"][0]["extra_values"]["bound_phone_owner"] == "新买号绑定人"
-        installment_list = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers)
+        installment_list = seeded_client.get("/api/installments", params={"order_id": order.id}, headers=headers)
         assert installment_list.status_code == 200, installment_list.text
         installment_order = installment_list.json()["items"][0]["order"]
         assert installment_order["bound_phone"] == "13900000004"
         assert installment_order["bound_phone_owner"] == "新卖号绑定人"
-        cleared = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+        cleared = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
             "events": [], "orders": [{"order_id": order.id, "form_extra": {
                 "sell_intermediary_platform": "盼之", "sell_intermediary_platform_other": None,
                 "sell_bound_phone": None, "sell_bound_phone_owner": None,
             }}],
         })
         assert cleared.status_code == 200, cleared.text
-        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
         assert detail.status_code == 200, detail.text
         assert detail.json()["orders"][0]["extra_values"]["sell_intermediary_platform_other"] is None
         assert detail.json()["orders"][0]["extra_values"]["intermediary_platform"] == "买号平台"
         assert detail.json()["orders"][0]["extra_values"]["bound_phone_owner"] == "新买号绑定人"
-        installment_list = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers)
+        installment_list = seeded_client.get("/api/installments", params={"order_id": order.id}, headers=headers)
         assert installment_list.status_code == 200, installment_list.text
         installment_order = installment_list.json()["items"][0]["order"]
         assert installment_order["bound_phone"] is None
         assert installment_order["bound_phone_owner"] is None
 
-        settled = seeded_client.post(f"/api/v1/installments/{contract.id}/settle-early", headers=headers, json={"paid_on": TODAY.isoformat()})
+        settled = seeded_client.post(f"/api/installments/{contract.id}/settle-early", headers=headers, json={"paid_on": TODAY.isoformat()})
         assert settled.status_code == 200, settled.text
-        delivered = seeded_client.post(f"/api/v1/installments/{contract.id}/deliver", headers=headers, json={
+        delivered = seeded_client.post(f"/api/installments/{contract.id}/deliver", headers=headers, json={
             "delivered_on": TODAY.isoformat(), "note": "分期结清后换绑",
             "bound_phone": "13900000003", "bound_phone_owner": "实际卖号绑定人",
         })
         assert delivered.status_code == 200, delivered.text
-        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
         assert detail.status_code == 200, detail.text
         extra = detail.json()["orders"][0]["extra_values"]
         assert extra["bound_phone"] == "13700000001"
@@ -649,7 +649,7 @@ class TestInstallmentsApi:
                 seeded_db.rollback()
                 raise
         seeded_client.app.dependency_overrides[get_db] = transactional_db
-        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        response = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order_id, "principal": "200", "down_payment": "50", "periods": 1,
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": 999999999, "operator_user_ids": [1],
@@ -679,7 +679,7 @@ class TestInstallmentsApi:
                 seeded_db.rollback()
                 raise
         seeded_client.app.dependency_overrides[get_db] = transactional_db
-        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        response = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order_id, "principal": "200", "down_payment": "250", "periods": 1,
             "per_period": "0", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "operator_user_ids": [1],
@@ -695,7 +695,7 @@ class TestInstallmentsApi:
         account = create_account(seeded_db, game_account="atomic-sale-zero-down", business_mode="DISTRIBUTION", inventory_type="PICKUP", actor="pytest")
         order = _order(seeded_db, order_type="TH", account_id=account.id)
         _buy(seeded_db, order.id, "100")
-        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+        response = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
             "order_id": order.id, "principal": "200", "down_payment": "0", "periods": 1,
             "per_period": "200", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "operator_user_ids": [1],
@@ -716,18 +716,18 @@ class TestInstallmentsApi:
         )
         scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
-        listing = seeded_client.get("/api/v1/installments", headers=scoped_headers)
+        listing = seeded_client.get("/api/installments", headers=scoped_headers)
         assert listing.status_code == 200
         assert [row["id"] for row in listing.json()["items"]] == [own_contract.id]
 
         schedules = seeded_client.get(
-            f"/api/v1/installments/{other_contract.id}/schedules",
+            f"/api/installments/{other_contract.id}/schedules",
             headers=scoped_headers,
         )
         assert schedules.status_code == 404
 
         payment = seeded_client.post(
-            f"/api/v1/installments/{other_contract.id}/payments",
+            f"/api/installments/{other_contract.id}/payments",
             json={"amount": "1.00", "paid_on": TODAY.isoformat()},
             headers=scoped_headers,
         )
@@ -737,7 +737,7 @@ class TestInstallmentsApi:
         order = _order(seeded_db)
         contract = _contract(seeded_db, order.id, first_due_on=PAST, note="分期备注")
         response = seeded_client.get(
-            "/api/v1/installments", params={"status": "PENDING"}, headers=headers
+            "/api/installments", params={"status": "PENDING"}, headers=headers
         )
         assert response.status_code == 200, response.text
         assert [item["inst_no"] for item in response.json()["items"]] == [contract.inst_no]
@@ -750,7 +750,7 @@ class TestInstallmentsApi:
         contract = _contract(seeded_db, order.id)
 
         response = seeded_client.put(
-            f"/api/v1/installments/{contract.id}/operation-operators/CREATE",
+            f"/api/installments/{contract.id}/operation-operators/CREATE",
             json={"operator_user_ids": [1, 2]},
             headers=headers,
         )
@@ -768,7 +768,7 @@ class TestInstallmentsApi:
         order = _order(seeded_db, order_type="TH", trade_date=PAST)
         contract = _contract(seeded_db, order.id)
 
-        response = seeded_client.get("/api/v1/installments", headers=headers)
+        response = seeded_client.get("/api/installments", headers=headers)
 
         assert response.status_code == 200, response.text
         row = next(item for item in response.json()["items"] if item["id"] == contract.id)
@@ -807,7 +807,7 @@ class TestInstallmentsApi:
             actor="pytest",
         )
 
-        response = seeded_client.get("/api/v1/installments", headers=headers)
+        response = seeded_client.get("/api/installments", headers=headers)
 
         assert response.status_code == 200, response.text
         row = next(item for item in response.json()["items"] if item["id"] == contract.id)
@@ -828,7 +828,7 @@ class TestInstallmentsApi:
             period_no=1, actor="pytest",
         )
         response = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/deliver",
+            f"/api/installments/{contract.id}/deliver",
             json={
                 "delivered_on": TODAY.isoformat(),
                 "note": "平台操作换绑凭证",
@@ -867,7 +867,7 @@ class TestInstallmentsApi:
             per_period="300",
         )
         paid = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/payments",
+            f"/api/installments/{contract.id}/payments",
             json={
                 "amount": "100",
                 "paid_on": TODAY.isoformat(),
@@ -878,7 +878,7 @@ class TestInstallmentsApi:
         assert paid.status_code == 200, paid.text
 
         early = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/settle-early",
+            f"/api/installments/{contract.id}/settle-early",
             json={"paid_on": TODAY.isoformat(), "note": "一次性结清"},
             headers=headers,
         )
@@ -895,7 +895,7 @@ class TestInstallmentsApi:
             first_due_on=PAST,
         )
         overdue_paid = seeded_client.post(
-            f"/api/v1/installments/{overdue_contract.id}/payments",
+            f"/api/installments/{overdue_contract.id}/payments",
             json={
                 "amount": "100",
                 "paid_on": TODAY.isoformat(),
@@ -905,13 +905,13 @@ class TestInstallmentsApi:
         )
         assert overdue_paid.status_code == 200, overdue_paid.text
         marked = seeded_client.post(
-            "/api/v1/installments/mark-overdue",
+            "/api/installments/mark-overdue",
             params={"as_of": TODAY.isoformat()},
             headers=headers,
         )
         assert marked.status_code == 200, marked.text
         defaulted = seeded_client.post(
-            f"/api/v1/installments/{overdue_contract.id}/default",
+            f"/api/installments/{overdue_contract.id}/default",
             json={"reason": "超过约定期限"},
             headers=headers,
         )
@@ -925,7 +925,7 @@ class TestInstallmentsApi:
             first_due_on=PAST,
         )
         response = seeded_client.post(
-            "/api/v1/installments/mark-overdue",
+            "/api/installments/mark-overdue",
             params={"as_of": TODAY.isoformat()},
             headers=headers,
         )
@@ -940,7 +940,7 @@ class TestInstallmentsApi:
             seeded_db, order.id, periods=1, per_period="300", first_due_on=TODAY
         )
         extended = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/schedules/1/extend",
+            f"/api/installments/{contract.id}/schedules/1/extend",
             json={"new_due_on": "2026-12-31", "reason": "客户申请展期"},
             headers=headers,
         )
@@ -948,7 +948,7 @@ class TestInstallmentsApi:
         assert extended.json()["due_on"] == "2026-12-31"
 
         waived = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/schedules/1/waive",
+            f"/api/installments/{contract.id}/schedules/1/waive",
             json={
                 "amount": "300",
                 "waived_on": TODAY.isoformat(),
@@ -971,13 +971,13 @@ class TestInstallmentsApi:
             per_period="900", first_due_on=PAST,
         )
         seeded_client.post(
-            "/api/v1/installments/mark-overdue",
+            "/api/installments/mark-overdue",
             params={"as_of": TODAY.isoformat()},
             headers=headers,
         )
 
         response = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/recover",
+            f"/api/installments/{contract.id}/recover",
             json={"occurred_on": TODAY.isoformat(), "note": "客户逾期回收"},
             headers=headers,
         )
@@ -1004,7 +1004,7 @@ class TestInstallmentsApi:
         scoped_headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
         response = seeded_client.post(
-            "/api/v1/installments/mark-overdue",
+            "/api/installments/mark-overdue",
             params={"as_of": TODAY.isoformat()},
             headers=scoped_headers,
         )

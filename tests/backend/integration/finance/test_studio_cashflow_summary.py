@@ -58,7 +58,7 @@ def _flow(
 
 def _summary(seeded_client, headers, **params) -> dict:
     response = seeded_client.get(
-        "/api/v1/cashflows/studio-summary", headers=headers, params=params
+        "/api/cashflows/studio-summary", headers=headers, params=params
     )
     assert response.status_code == 200, response.text
     return response.json()
@@ -70,9 +70,9 @@ def test_studio_conditional_field_tracks_direction_and_preserves_history(seeded_
         flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="120")
         flow.form_extra = {"other_history": "历史字段"}
         seeded_db.flush()
-        url = f"/api/v1/cashflows/{flow.id}"
+        url = f"/api/cashflows/{flow.id}"
     else:
-        url = "/api/v1/cashflows"
+        url = "/api/cashflows"
     direction = seeded_db.scalar(select(OrderFormField).where(
         OrderFormField.order_type_code == "STUDIOEXP", OrderFormField.field_key == "direction",
     ))
@@ -150,10 +150,10 @@ def test_studio_create_rejects_invisible_flows_and_defaults_income_attribute(see
         {"direction": "OUT", "accounting_attribute": "SELF_REVENUE"},
         {"category": "REBATE", "accounting_attribute": "SELF_REVENUE"},
     ):
-        response = seeded_client.post("/api/v1/cashflows", headers=headers, json={**payload, **changes})
+        response = seeded_client.post("/api/cashflows", headers=headers, json={**payload, **changes})
         assert response.status_code == 422, response.text
     assert _summary(seeded_client, headers)["count"] == 0
-    response = seeded_client.post("/api/v1/cashflows", headers=headers, json=payload)
+    response = seeded_client.post("/api/cashflows", headers=headers, json=payload)
     assert response.status_code == 201, response.text
     assert response.json()["accounting_attribute"] == "SELF_REVENUE"
     summary = _summary(seeded_client, headers)
@@ -170,19 +170,19 @@ def test_studio_create_and_edit_use_studio_custom_field_rules(seeded_client, see
         "direction": "OUT", "ledger_type": "STUDIO", "accounting_attribute": "OPERATING_EXPENSE",
         "category": "房租", "amount": "120.00",
     }
-    missing = seeded_client.post("/api/v1/cashflows", headers=headers, json=payload)
+    missing = seeded_client.post("/api/cashflows", headers=headers, json=payload)
     assert missing.status_code == 422, missing.text
     assert "工作室凭据" in missing.text
-    bypass_create = seeded_client.post("/api/v1/cashflows", headers=headers, json={**payload, "form_extra_scope": "FUNDFLOW", "form_extra": {"business_note": "凭据2"}})
+    bypass_create = seeded_client.post("/api/cashflows", headers=headers, json={**payload, "form_extra_scope": "FUNDFLOW", "form_extra": {"business_note": "凭据2"}})
     assert bypass_create.status_code == 422, bypass_create.text
     assert "工作室凭据" in bypass_create.text
-    created = seeded_client.post("/api/v1/cashflows", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据1"}})
+    created = seeded_client.post("/api/cashflows", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据1"}})
     assert created.status_code == 201, created.text
     assert created.json()["form_extra"] == {"studio_note": "凭据1"}
     flow_id = created.json()["id"]
-    bypass = seeded_client.put(f"/api/v1/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra_scope": "FUNDFLOW", "form_extra": {"business_note": "凭据2"}})
+    bypass = seeded_client.put(f"/api/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra_scope": "FUNDFLOW", "form_extra": {"business_note": "凭据2"}})
     assert bypass.status_code == 422, bypass.text
-    saved = seeded_client.put(f"/api/v1/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据3"}})
+    saved = seeded_client.put(f"/api/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据3"}})
     assert saved.status_code == 200, saved.text
     assert saved.json()["form_extra"] == {"studio_note": "凭据3"}
 
@@ -194,14 +194,14 @@ def test_studio_custom_fields_round_trip_through_list_and_edit(seeded_client, se
     payload = {"pool_id": _pool(seeded_db).id, "occurred_on": TODAY.isoformat(),
                "ledger_type": "STUDIO", "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
                "category": "房租", "amount": "120", "form_extra": {"receipt": "单据A"}}
-    created = seeded_client.post("/api/v1/cashflows", headers=headers, json=payload)
+    created = seeded_client.post("/api/cashflows", headers=headers, json=payload)
     assert created.status_code == 201, created.text
     item = _summary(seeded_client, headers)["items"][0]
     assert item["form_extra"] == {"receipt": "单据A"}
-    listing = seeded_client.get("/api/v1/cashflows", headers=headers, params={"keyword": item["flow_no"]})
+    listing = seeded_client.get("/api/cashflows", headers=headers, params={"keyword": item["flow_no"]})
     assert listing.status_code == 200, listing.text
     assert listing.json()["items"][0]["form_extra"] == {"receipt": "单据A"}
-    saved = seeded_client.put(f"/api/v1/cashflows/{item['id']}", headers=headers,
+    saved = seeded_client.put(f"/api/cashflows/{item['id']}", headers=headers,
                               json={**payload, "amount": "150", "form_extra": item["form_extra"]})
     assert saved.status_code == 200, saved.text
     assert saved.json()["form_extra"] == {"receipt": "单据A"}
@@ -221,7 +221,7 @@ def test_edit_studio_cashflow_saves_operator_and_rejects_invalid_operator(seeded
         "note": "调整",
         "operator_user_ids": [1, 2],
     }
-    response = seeded_client.put(f"/api/v1/cashflows/{flow.id}", headers=headers, json=payload)
+    response = seeded_client.put(f"/api/cashflows/{flow.id}", headers=headers, json=payload)
     assert response.status_code == 200, response.text
     assert response.json()["operator_user_ids"] == [1, 2]
     assert _summary(seeded_client, headers)["items"][0]["operator_user_ids"] == [1, 2]
@@ -234,7 +234,7 @@ def test_edit_studio_cashflow_saves_operator_and_rejects_invalid_operator(seeded
     assert audit.after_json["operator_user_ids"] == [1, 2]
 
     response = seeded_client.put(
-        f"/api/v1/cashflows/{flow.id}", headers=headers,
+        f"/api/cashflows/{flow.id}", headers=headers,
         json={**payload, "operator_user_ids": [999999], "amount": "999"},
     )
     assert response.status_code == 422, response.text
@@ -252,7 +252,7 @@ def test_reversed_flag_survives_date_direction_and_page_filters(seeded_client, s
     by_no = {item["flow_no"]: item for item in studio["items"]}
     assert by_no[reversed_flow.flow_no]["is_reversed"] is True
     assert by_no[live_flow.flow_no]["is_reversed"] is False
-    listing = seeded_client.get("/api/v1/cashflows", headers=headers, params={**params, "direction": "OUT", "keyword": reversed_flow.flow_no, "limit": 1})
+    listing = seeded_client.get("/api/cashflows", headers=headers, params={**params, "direction": "OUT", "keyword": reversed_flow.flow_no, "limit": 1})
     assert listing.status_code == 200, listing.text
     assert listing.json()["items"][0]["is_reversed"] is True
 
@@ -457,7 +457,7 @@ def test_pool_ids_filter(seeded_client, seeded_db, headers):
 
 def test_pool_ids_must_be_integers(seeded_client, headers):
     response = seeded_client.get(
-        "/api/v1/cashflows/studio-summary",
+        "/api/cashflows/studio-summary",
         headers=headers,
         params={"pool_ids": "1,abc"},
     )

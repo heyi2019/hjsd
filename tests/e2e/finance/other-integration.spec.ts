@@ -39,7 +39,7 @@ test("资金中心页面划转后生成一收一支的内部资金流水", async
 });
 
 test("分期页面收款结清后交付，不重复产生流水", async ({ page, request }) => {
-  const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const stocksResponse = await request.get(`${base}/stocks`, { headers });
   expect(stocksResponse.ok()).toBe(true);

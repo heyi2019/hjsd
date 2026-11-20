@@ -100,16 +100,16 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_PENDING", entity_type="other")
     user = CurrentUser.build(id=2, username="seeduser2", roles=["OPERATOR"], owner_scope="SELF")
     auth = {"Authorization": f"Bearer {build_access_token(user)}"}
-    response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
+    response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.status_code == 200, response.text
     assert response.json() == {"order_no": visible.order_no, "order_id": visible.id}
     pending.entity_id = hidden.order_no
     seeded_db.flush()
-    response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
+    response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.status_code == 200, response.text
     assert response.json() == {"order_no": hidden.order_no, "order_id": None}
     notification_service.mark_read_batch(seeded_db, [pending.id], recipient_user_id=2, actor="pytest")
-    response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
+    response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.json() == {"order_no": None, "order_id": None}
 
 
@@ -134,7 +134,7 @@ def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_clie
     second = _make_unread(seeded_db, recipient_user_id=1, entity_id="second")
     other = _make_unread(seeded_db, recipient_user_id=2, entity_id="other")
     payload = {"ids": [first.id, second.id, other.id, 999999]}
-    response = seeded_client.post("/api/v1/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
+    response = seeded_client.post("/api/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
     assert response.status_code == 200, response.text
     assert set(response.json()["read_ids"]) == {first.id, second.id}
     seeded_db.refresh(first)
@@ -143,7 +143,7 @@ def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_clie
     assert first.read_at is not None and second.read_at is not None
     assert other.read_at is None
     initial_read_at = first.read_at
-    repeat = seeded_client.post("/api/v1/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
+    repeat = seeded_client.post("/api/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
     assert set(repeat.json()["read_ids"]) == {first.id, second.id}
     seeded_db.refresh(first)
     assert first.read_at == initial_read_at
@@ -375,7 +375,7 @@ def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, se
     _buy(seeded_db, order)
 
     resp = seeded_client.post(
-        f"/api/v1/orders/{order.id}/events",
+        f"/api/orders/{order.id}/events",
         json={
             "event_type": "SELL",
             "amount": "800",
@@ -390,7 +390,7 @@ def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, se
         id=seller_id, username="seeduser1", roles=["OPERATOR"], owner_scope="SELF"
     )
     inbox = seeded_client.get(
-        "/api/v1/notifications",
+        "/api/notifications",
         params={"unread_only": "true"},
         headers={"Authorization": f"Bearer {build_access_token(seller)}"},
     )
@@ -403,7 +403,7 @@ def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, se
     )
     _make_unread(seeded_db, recipient_user_id=seller_id, notification_type="OTHER", entity_id="newer")
     filtered = seeded_client.get(
-        "/api/v1/notifications",
+        "/api/notifications",
         params={"unread_only": "true", "notification_type": "PROFIT_PENDING", "limit": 1},
         headers={"Authorization": f"Bearer {build_access_token(seller)}"},
     )
@@ -422,12 +422,12 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     other = _make_unread(seeded_db, recipient_user_id=_uid(seeded_db, "seeduser2"), notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
     missing = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id="NO-SUCH-ORDER")
 
-    response = seeded_client.get("/api/v1/notifications/profit-details", params=[("ids", mine.id), ("ids", other.id), ("ids", missing.id)], headers={"X-Dev-User": "admin"})
+    response = seeded_client.get("/api/notifications/profit-details", params=[("ids", mine.id), ("ids", other.id), ("ids", missing.id)], headers={"X-Dev-User": "admin"})
     assert response.status_code == 200, response.text
     assert [item["notification_id"] for item in response.json()] == [mine.id]
     assert response.json()[0]["order_no"] == order.order_no
     assert Decimal(response.json()[0]["sale_amount"]) == Decimal("800")
-    original = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers={"X-Dev-User": "admin"})
+    original = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers={"X-Dev-User": "admin"})
     assert original.status_code == 200, original.text
     execution = original.json()
     detail = response.json()[0]
@@ -441,7 +441,7 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     scoped_account.owner_scope = "SELF"
     seeded_db.flush()
     scoped = CurrentUser.build(id=2, username="seeduser2", roles=["OPERATOR"], owner_scope="SELF")
-    denied = seeded_client.get("/api/v1/notifications/profit-details", params={"ids": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
+    denied = seeded_client.get("/api/notifications/profit-details", params={"ids": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
     assert denied.status_code == 200, denied.text
     assert denied.json() == []
 
@@ -464,10 +464,10 @@ def test_profit_notification_details_batch_does_not_query_per_order(seeded_clien
 
     event.listen(connection, "before_cursor_execute", record)
     try:
-        one = seeded_client.get("/api/v1/notifications/profit-details", params=[("ids", ids[0])], headers={"X-Dev-User": "admin"})
+        one = seeded_client.get("/api/notifications/profit-details", params=[("ids", ids[0])], headers={"X-Dev-User": "admin"})
         one_count = len(statements)
         statements.clear()
-        many = seeded_client.get("/api/v1/notifications/profit-details", params=[("ids", value) for value in ids], headers={"X-Dev-User": "admin"})
+        many = seeded_client.get("/api/notifications/profit-details", params=[("ids", value) for value in ids], headers={"X-Dev-User": "admin"})
         many_count = len(statements)
     finally:
         event.remove(connection, "before_cursor_execute", record)

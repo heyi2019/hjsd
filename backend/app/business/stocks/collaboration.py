@@ -15,9 +15,9 @@
 （stocks 不 import orders）；orders 在**自己模块底部**调用 register_* 完成注册。
 
 加载链保证注册生效：
-- 生产：api_v1 import orders_router -> orders/router.py 顶部 import deletion /
+- 生产：api import orders_router -> orders/router.py 顶部 import deletion /
   router_output / order_detail.view.execution，三个 provider 模块随路由链加载；
-- 测试：tests/backend/conftest.py 模块级 import app.api_v1.create_app，
+- 测试：tests/backend/conftest.py 模块级 import app.api.create_app，
   收集阶段即完成注册。
 """
 from __future__ import annotations

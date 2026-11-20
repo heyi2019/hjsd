@@ -23,7 +23,7 @@ def test_execution_edit_enforces_required_account_custom_fields(seeded_client, s
                             field_type="NUMBER", section="ACCOUNT_PRODUCT", required=True, actor="pytest")
     account.form_extra = {"rank": 3}
     seeded_db.commit()
-    url = f"/api/v1/orders/{order.id}/execution-edit"
+    url = f"/api/orders/{order.id}/execution-edit"
     missing = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"extra_values": {"rank": None}}})
     assert missing.status_code == 422, missing.text
     saved = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"extra_values": {"rank": 12}}})
@@ -37,7 +37,7 @@ def test_execution_edit_uses_inventory_edit_fields_without_blocking_quick_action
     create_order_form_field(seeded_db, order_type_code="INVEDIT", field_key="check_note", label="核对凭据",
                             required=True, actor="pytest")
     seeded_db.commit()
-    url = f"/api/v1/orders/{order.id}/execution-edit"
+    url = f"/api/orders/{order.id}/execution-edit"
     quick = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"account_description": "运营描述"},
         "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [1]}]})
     assert quick.status_code == 200, quick.text
@@ -55,7 +55,7 @@ def test_execution_edit_uses_inventory_edit_fields_without_blocking_quick_action
 def test_execution_edit_saves_more_than_twenty_operations(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="many-operations", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
         "events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": f"2026-10-02T11:{minute:02d}:00", "operator_user_ids": [1]} for minute in range(21)],
     })
     assert response.status_code == 200, response.text
@@ -71,7 +71,7 @@ def test_new_operation_requires_event_permission(seeded_client, seeded_db):
     user = CurrentUser(id=1, username="admin", permissions=frozenset({PERM_ORDER_UPDATE}), owner_scope="ALL")
     seeded_client.app.dependency_overrides[edit_order_detail.dependency] = lambda: user
     try:
-        response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", json={"events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [1]}]})
+        response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", json={"events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [1]}]})
         assert response.status_code == 403, response.text
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "OPERATE")) is None
     finally:
@@ -92,13 +92,13 @@ def test_profile_and_operation_share_one_transaction(seeded_client, seeded_db, h
             raise
     seeded_client.app.dependency_overrides[get_db] = transactional_db
     payload = {"profile": {"account_description": "新描述"}, "events": [], "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [999999999]}]}
-    failed = seeded_client.patch(f"/api/v1/orders/{order_id}/execution-edit", headers=headers, json=payload)
+    failed = seeded_client.patch(f"/api/orders/{order_id}/execution-edit", headers=headers, json=payload)
     assert failed.status_code in (400, 422), failed.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account_id).account_description != "新描述"
     assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "OPERATE")) is None
     payload["new_events"][0]["operator_user_ids"] = [1]
-    success = seeded_client.patch(f"/api/v1/orders/{order_id}/execution-edit", headers=headers, json=payload)
+    success = seeded_client.patch(f"/api/orders/{order_id}/execution-edit", headers=headers, json=payload)
     assert success.status_code == 200, success.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account_id).account_description == "新描述"
@@ -110,7 +110,7 @@ def test_new_unlisting_requires_valid_active_listing_and_stores_event_id(seeded_
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     def submit(extra):
-        return seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": extra}]})
+        return seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": extra}]})
     assert submit({"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]}).status_code == 422
     assert submit({"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": ["平台乙"]}).status_code == 422
     valid = {"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": ["平台甲"]}
@@ -125,7 +125,7 @@ def test_detail_unlisting_normalizes_platform_before_saving(seeded_client, seede
     account = create_account(seeded_db, game_account="whitespace-platform-unlisting", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
-    url = f"/api/v1/orders/{order.id}/execution-edit"
+    url = f"/api/orders/{order.id}/execution-edit"
     def submit(platform):
         return seeded_client.patch(url, headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"platform_unlist_scope": "PLATFORM", "consignment_event_id": listing.id, "consignment_platforms": [platform]}}]})
     assert submit(" 平台甲 ").status_code == 200
@@ -150,10 +150,10 @@ def test_duplicate_platforms_in_single_listing_rejected_on_create_and_edit(seede
     account = create_account(seeded_db, game_account="duplicate-single-listing", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     duplicate = ["平台甲", " 平台甲 "]
-    create = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "CONSIGNMENT", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"consignment_platforms": duplicate}}]})
+    create = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "CONSIGNMENT", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"consignment_platforms": duplicate}}]})
     assert create.status_code == 422, create.text
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台乙"]})
-    edit = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": duplicate}}]})
+    edit = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": duplicate}}]})
     assert edit.status_code == 422, edit.text
 
 
@@ -162,7 +162,7 @@ def test_edit_listing_cannot_change_to_another_active_platform(seeded_client, se
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     first, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台乙"]})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": first.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": first.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]})
     assert response.status_code == 422, response.text
 
 
@@ -175,7 +175,7 @@ def test_existing_listing_operation_type_cannot_be_changed(seeded_client, seeded
     extra = {"consignment_platforms": ["平台甲"]}
     if new_type is not None:
         extra["operation_type"] = new_type
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": extra}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": extra}]})
     assert response.status_code == 422, response.text
     assert active_listings(seeded_db, order.id) == {(listing.id, "平台甲")}
 
@@ -192,7 +192,7 @@ def test_linked_unlisting_target_cannot_be_changed(seeded_client, seeded_db, hea
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     extra = {"operation_type": "UNLIST", "consignment_event_id": listing.id, "consignment_platforms": ["平台甲"], "platform_unlist_scope": "PLATFORM"}
     unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 2), actor="pytest", form_extra=extra)
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "form_extra": {**extra, **change}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "form_extra": {**extra, **change}}]})
     assert response.status_code == 422, response.text
 
 
@@ -202,7 +202,7 @@ def test_unlinked_unlisting_cannot_gain_listing_association(seeded_client, seede
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"], "consignment_event_id": listing.id}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"], "consignment_event_id": listing.id}}]})
     assert response.status_code == 422, response.text
     assert active_listings(seeded_db, order.id) == {(listing.id, "平台甲")}
 
@@ -212,7 +212,7 @@ def test_linked_unlisting_time_remains_editable(seeded_client, seeded_db, header
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["平台甲"], "platform_unlist_scope": "PLATFORM"})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "occurred_at": "2026-10-03T11:00:00"}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": unlisting.id, "expected_amount": "0", "amount": "0", "occurred_at": "2026-10-03T11:00:00"}]})
     assert response.status_code == 200, response.text
     seeded_db.refresh(unlisting)
     assert unlisting.occurred_on == date(2026, 10, 3)
@@ -223,14 +223,14 @@ def test_detail_edit_cannot_create_system_unlisting(seeded_client, seeded_db, he
     inventory_type = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type]
     account = create_account(seeded_db, game_account=f"system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type=inventory_type, actor="pytest")
     order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"platform_unlist_scope": "SYSTEM"}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "new_events": [{"operation_type": "UNLIST", "occurred_at": "2026-10-02T11:00:00", "form_extra": {"platform_unlist_scope": "SYSTEM"}}]})
     assert response.status_code == 422, response.text
 
 
 def test_single_event_endpoint_cannot_fake_system_unlisting(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="direct-system-unlist", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "form_extra": {"platform_unlist_scope": "SYSTEM"}})
+    response = seeded_client.post(f"/api/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "form_extra": {"platform_unlist_scope": "SYSTEM"}})
     assert response.status_code == 422, response.text
 
 
@@ -242,7 +242,7 @@ def test_platform_unlisting_endpoint_requires_active_listing_on_same_order(seede
     other_order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=other_account.id)
     other_listing, _ = post_event(seeded_db, other_order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
     def submit(extra):
-        return seeded_client.post(f"/api/v1/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "reason": "平台停售", "form_extra": {"platform_unlist_scope": "PLATFORM", **extra}})
+        return seeded_client.post(f"/api/orders/{order.id}/events", headers=headers, json={"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-10-02", "reason": "平台停售", "form_extra": {"platform_unlist_scope": "PLATFORM", **extra}})
     assert submit({"consignment_event_id": 999999, "consignment_platforms": ["不存在的平台"]}).status_code == 422
     assert submit({"consignment_event_id": other_listing.id, "consignment_platforms": ["平台甲"]}).status_code == 422
     assert submit({"consignment_event_id": listing.id, "consignment_platforms": ["平台乙"]}).status_code == 422
@@ -259,7 +259,7 @@ def test_edit_platform_unlisting_cannot_be_changed_to_system(seeded_client, seed
     account = create_account(seeded_db, game_account=f"edit-system-unlist-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type={"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type], actor="pytest")
     order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     event, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "SYSTEM"}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "SYSTEM"}}]})
     assert response.status_code == 422, response.text
 
 
@@ -267,7 +267,7 @@ def test_existing_system_unlisting_target_locked_but_time_editable(seeded_client
     account = create_account(seeded_db, game_account="existing-system-unlist", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     event, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"platform_unlist_scope": "SYSTEM"})
-    url = f"/api/v1/orders/{order.id}/execution-edit"
+    url = f"/api/orders/{order.id}/execution-edit"
     response = seeded_client.patch(url, headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "UNLIST", "platform_unlist_scope": "PLATFORM", "consignment_platforms": ["平台甲"]}}]})
     assert response.status_code == 422, response.text
     response = seeded_client.patch(url, headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "occurred_at": "2026-10-03T11:00:00"}]})
@@ -281,7 +281,7 @@ def test_order_edit_updates_event_flow_and_cost_without_changing_time(seeded_cli
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
     original_time = event.occurred_on
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100.00", "amount": "150.00", "note": "修改"}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100.00", "amount": "150.00", "note": "修改"}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).cost_amount == Decimal("150")
@@ -310,7 +310,7 @@ def test_operator_with_order_update_can_save_order_detail(seeded_client, seeded_
     seeded_db.commit()
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=operator_headers,
         json={"profile": {"game_account": "operator-detail-edited"}, "events": []},
     )
@@ -326,7 +326,7 @@ def test_order_edit_saves_profile_and_amount_together(seeded_client, seeded_db, 
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"profile": {"game_account": "after-edit"}, "events": [{"id": event.id, "expected_amount": "100", "amount": "150", "note": "ok"}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"profile": {"game_account": "after-edit"}, "events": [{"id": event.id, "expected_amount": "100", "amount": "150", "note": "ok"}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).game_account == "after-edit"
@@ -339,7 +339,7 @@ def test_stale_amount_rejects_whole_edit(seeded_client, seeded_db, headers):
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"profile": {"game_account": "must-not-save"}, "events": [{"id": event.id, "expected_amount": "99", "amount": "150"}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"profile": {"game_account": "must-not-save"}, "events": [{"id": event.id, "expected_amount": "99", "amount": "150"}]})
     assert response.status_code == 409
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).game_account == "stale-before"
@@ -354,7 +354,7 @@ def test_cannot_edit_event_of_another_account(seeded_client, seeded_db, headers)
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/orders/{first_order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "150"}]})
+    response = seeded_client.patch(f"/api/orders/{first_order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "150"}]})
     assert response.status_code == 404
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).amount == Decimal("100")
@@ -367,14 +367,14 @@ def test_edit_execution_operator_preserves_time_and_records_actual_editor(seeded
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
     timestamp = event.created_at
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     updated = seeded_db.get(OrderEvent, event.id)
     assert updated.created_by == "pytest" and updated.operator_user_ids == [1, 2] and updated.created_at == timestamp
     audit = seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "inventory_event_edit", AuditLog.entity_id == str(event.id)))
     assert audit.actor == "admin" and audit.before_json["operator_user_ids"] is None and audit.after_json["operator_user_ids"] == [1, 2]
-    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["orders"][0]["events"][0]
     assert shown["operator_user_ids"] == [1, 2]
@@ -394,7 +394,7 @@ def test_edit_event_operator_updates_linked_cashflow_operators(seeded_client, se
     assert flow is not None
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [{"id": event.id, "expected_amount": "200.00", "amount": "200.00", "operator_user_ids": [1, 2]}]},
     )
@@ -403,7 +403,7 @@ def test_edit_event_operator_updates_linked_cashflow_operators(seeded_client, se
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).operator_user_ids == [1, 2]
     assert seeded_db.get(Cashflow, flow.id).operator_user_ids == [1, 2]
-    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["detail_view"]["finance_rows"]
     assert any(row["operator_user_ids"] == [1, 2] for row in shown)
@@ -417,7 +417,7 @@ def test_order_detail_edit_updates_cashflow_operators(seeded_client, seeded_db, 
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id))
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [], "cashflows": [{"flow_no": flow.flow_no, "operator_user_ids": [1, 2]}]},
     )
@@ -425,7 +425,7 @@ def test_order_detail_edit_updates_cashflow_operators(seeded_client, seeded_db, 
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Cashflow, flow.id).operator_user_ids == [1, 2]
-    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["detail_view"]["finance_rows"][0]
     assert shown["operator_user_ids"] == [1, 2]
@@ -441,7 +441,7 @@ def test_order_detail_edit_updates_cashflow_amount_and_pool(seeded_client, seede
     assert flow is not None and target_pool is not None
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [], "cashflows": [{"flow_no": flow.flow_no, "amount": "88.50", "pool_id": target_pool.id}]},
     )
@@ -451,7 +451,7 @@ def test_order_detail_edit_updates_cashflow_amount_and_pool(seeded_client, seede
     edited = seeded_db.get(Cashflow, flow.id)
     assert edited.amount == Decimal("88.50")
     assert edited.pool_id == target_pool.id
-    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["detail_view"]["finance_rows"][0]
     assert shown["amount"] == "88.50"
@@ -468,7 +468,7 @@ def test_edit_execution_operator_can_clear_all_selected_users(seeded_client, see
     seeded_db.commit()
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": []}]},
     )
@@ -484,7 +484,7 @@ def test_operator_selection_rejects_unknown_users(seeded_client, seeded_db, head
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     seeded_db.commit()
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id))
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [999999]}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [999999]}]})
     assert response.status_code == 422
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).operator_user_ids is None
@@ -496,7 +496,7 @@ def test_zero_amount_execution_can_change_operators_without_cashflow(seeded_clie
     event = OrderEvent(order_id=order.id, event_no="ZERO-OP-001", event_type="DELIVER", amount=Decimal("0"), portion="GROSS", occurred_on=date(2026, 10, 1), is_posted=True, created_by="pytest", updated_by="pytest")
     seeded_db.add(event)
     seeded_db.commit()
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "operator_user_ids": [1, 2]}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "0", "amount": "0", "operator_user_ids": [1, 2]}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, event.id).operator_user_ids == [1, 2]
@@ -512,7 +512,7 @@ def test_operator_edit_does_not_change_existing_cashflow_amount(seeded_client, s
     ))
     flow.amount = Decimal("90")
     seeded_db.commit()
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": event.id, "expected_amount": "100", "amount": "100", "operator_user_ids": [1, 2]}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Cashflow, flow.id).amount == Decimal("90")
@@ -525,7 +525,7 @@ def test_order_detail_edit_can_clear_order_note_and_business_operators(seeded_cl
     seeded_db.commit()
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": []}, "note": None}]},
     )
@@ -545,7 +545,7 @@ def test_order_detail_edit_updates_inventory_operator_ids(seeded_client, seeded_
     seeded_db.commit()
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": [1, 2]}}]},
     )
@@ -553,7 +553,7 @@ def test_order_detail_edit_updates_inventory_operator_ids(seeded_client, seeded_
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Order, order.id).form_extra["business_responsible_ids"] == [1, 2]
-    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["orders"][0]
     assert shown["operator_user_ids"] == [1, 2]
@@ -567,7 +567,7 @@ def test_order_detail_edit_rejects_unknown_inventory_operator(seeded_client, see
     seeded_db.commit()
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": [999999]}}]},
     )
@@ -582,7 +582,7 @@ def test_order_detail_does_not_use_creator_as_inventory_operator(seeded_client, 
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     seeded_db.commit()
 
-    detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
 
     assert detail.status_code == 200
     assert detail.json()["orders"][0]["operator"] == "-"
@@ -594,7 +594,7 @@ def test_order_detail_edit_can_add_platform_operation_row_with_its_own_time_and_
     seeded_db.commit()
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [], "new_events": [{
             "operation_type": "CONSIGNMENT",
@@ -622,7 +622,7 @@ def test_order_detail_edit_keeps_new_time_when_platform_and_time_change_together
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "OPERATE"))
 
     response = seeded_client.patch(
-        f"/api/v1/orders/{order.id}/execution-edit",
+        f"/api/orders/{order.id}/execution-edit",
         headers=headers,
         json={"events": [{
             "id": event.id,
@@ -646,7 +646,7 @@ def test_edit_single_listed_platform_updates_linked_unlist(seeded_client, seeded
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["旧平台"]})
     unlisting, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["旧平台"], "platform_unlist_scope": "PLATFORM"})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [" 新平台 "]}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [" 新平台 "]}}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, unlisting.id).form_extra["consignment_platforms"] == ["新平台"]
@@ -659,7 +659,7 @@ def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, se
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [" 旧平台 "]})
     unlisting, _ = platform_unlist_consignment(seeded_db, order.id, occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["旧平台"]})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]}}]})
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(OrderEvent, unlisting.id).form_extra["consignment_platforms"] == ["新平台"]
@@ -671,6 +671,6 @@ def test_cannot_reduce_partially_unlisted_multi_platform_record(seeded_client, s
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲", "平台乙"]})
     post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_event_id": listing.id, "consignment_platforms": ["平台甲"], "platform_unlist_scope": "PLATFORM"})
-    response = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]})
     assert response.status_code == 422, response.text
     assert seeded_db.get(OrderEvent, listing.id).form_extra["consignment_platforms"] == ["平台甲", "平台乙"]

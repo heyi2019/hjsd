@@ -6,4 +6,4 @@ def test_main_app_is_ready():
     from app.main import app
 
     paths = {route.path for route in app.routes}
-    assert "/api/v1/health" in paths
+    assert "/api/health" in paths

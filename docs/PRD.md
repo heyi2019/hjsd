@@ -457,7 +457,7 @@ TH 是客户需求驱动的分销买卖：向同行采购形成 `OUT + TH_DIRECT
 
 ## 5. 后端接口域
 
-当前 `/api/v1` 已挂载以下接口域：
+当前 `/api` 已挂载以下接口域：
 
 接口域按后端实际挂载的 router 登记（模块名与 URL 前缀不必一致，如 `field_definitions` 模块沿用 `foundation` 前缀、`customer_center` 模块沿用 `parties` 前缀）。已下线的规则域 `policy`、导入域 `imports` 与账期锁定能力不再挂载，详见业务架构 §9。
 

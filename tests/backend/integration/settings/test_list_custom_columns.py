@@ -53,7 +53,7 @@ def _seed_custom_field(
 
 
 def _columns(client, headers, scope: str = "LEDGER") -> list[dict]:
-    response = client.get("/api/v1/list-columns", headers=headers)
+    response = client.get("/api/list-columns", headers=headers)
     assert response.status_code == 200, response.text
     return next(item for item in response.json() if item["code"] == scope)["columns"]
 
@@ -72,7 +72,7 @@ def test_candidate_fields_only_active_custom(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db, field_key="disabled_tag", label="停用", is_active=False)
     _seed_custom_field(seeded_db, field_key="level", label="等级", scope="HS", field_type="TEXT", options=[])
 
-    response = seeded_client.get("/api/v1/list-columns/custom-fields", headers=headers)
+    response = seeded_client.get("/api/list-columns/custom-fields", headers=headers)
     assert response.status_code == 200, response.text
     rows = [row for row in response.json() if not row.get("data_only")]
     assert {row["field_key"] for row in rows} == {"vip_tag", "level"}
@@ -95,7 +95,7 @@ def test_data_only_keys_become_candidates_and_addable(seeded_client, headers, se
     )
     seeded_db.flush()
 
-    response = seeded_client.get("/api/v1/list-columns/custom-fields", headers=headers)
+    response = seeded_client.get("/api/list-columns/custom-fields", headers=headers)
     assert response.status_code == 200, response.text
     data_rows = [row for row in response.json() if row.get("data_only")]
     qa = next(row for row in data_rows if row["field_key"] == "qa500_note")
@@ -106,7 +106,7 @@ def test_data_only_keys_become_candidates_and_addable(seeded_client, headers, se
     assert "订单" in qa["source_label"]
 
     added = seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom",
+        "/api/list-columns/LEDGER/custom",
         json={"field_key": "qa500_note", "label": "补齐备注"},
         headers=headers,
     )
@@ -118,7 +118,7 @@ def test_data_only_keys_become_candidates_and_addable(seeded_client, headers, se
 
     # 未启用且数据中不存在的键仍拒绝
     unknown = seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom", json={"field_key": "no_such_field"}, headers=headers
+        "/api/list-columns/LEDGER/custom", json={"field_key": "no_such_field"}, headers=headers
     )
     assert unknown.status_code == 422, unknown.text
 
@@ -138,7 +138,7 @@ def test_data_only_key_prefers_definition_label(seeded_client, headers, seeded_d
     )
     seeded_db.flush()
 
-    response = seeded_client.get("/api/v1/list-columns/custom-fields", headers=headers)
+    response = seeded_client.get("/api/list-columns/custom-fields", headers=headers)
     legacy = next(
         row for row in response.json() if row.get("data_only") and row["field_key"] == "legacy_note"
     )
@@ -148,7 +148,7 @@ def test_data_only_key_prefers_definition_label(seeded_client, headers, seeded_d
 def test_add_custom_column_appends_with_source_and_value_labels(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
     response = seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom",
+        "/api/list-columns/LEDGER/custom",
         json={"field_key": "vip_tag"},
         headers=headers,
     )
@@ -169,7 +169,7 @@ def test_add_custom_column_appends_with_source_and_value_labels(seeded_client, h
 def test_add_custom_column_with_custom_label(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
     response = seeded_client.post(
-        "/api/v1/list-columns/CUSTOMER/custom",
+        "/api/list-columns/CUSTOMER/custom",
         json={"field_key": "vip_tag", "label": "会员等级标签"},
         headers=headers,
     )
@@ -180,7 +180,7 @@ def test_add_custom_column_with_custom_label(seeded_client, headers, seeded_db):
 
 def test_add_custom_column_rejects_duplicate_unknown_field_and_scope(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
-    url = "/api/v1/list-columns/LEDGER/custom"
+    url = "/api/list-columns/LEDGER/custom"
     assert seeded_client.post(url, json={"field_key": "vip_tag"}, headers=headers).status_code == 200
     duplicate = seeded_client.post(url, json={"field_key": "vip_tag"}, headers=headers)
     assert duplicate.status_code == 409, duplicate.text
@@ -189,7 +189,7 @@ def test_add_custom_column_rejects_duplicate_unknown_field_and_scope(seeded_clie
     assert unknown.status_code == 422, unknown.text
 
     bad_scope = seeded_client.post(
-        "/api/v1/list-columns/NOT_A_LIST/custom", json={"field_key": "vip_tag"}, headers=headers
+        "/api/list-columns/NOT_A_LIST/custom", json={"field_key": "vip_tag"}, headers=headers
     )
     assert bad_scope.status_code == 404, bad_scope.text
 
@@ -197,7 +197,7 @@ def test_add_custom_column_rejects_duplicate_unknown_field_and_scope(seeded_clie
 def test_add_custom_column_requires_permission(seeded_client, viewer_headers, seeded_db):
     _seed_custom_field(seeded_db)
     response = seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom",
+        "/api/list-columns/LEDGER/custom",
         json={"field_key": "vip_tag"},
         headers=viewer_headers,
     )
@@ -207,7 +207,7 @@ def test_add_custom_column_requires_permission(seeded_client, viewer_headers, se
 def test_save_allows_custom_column_position_and_visibility(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
     assert seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
+        "/api/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
     ).status_code == 200
     columns = _columns(seeded_client, headers)
     # 把自定义列提到第一位并隐藏
@@ -220,7 +220,7 @@ def test_save_allows_custom_column_position_and_visibility(seeded_client, header
         }
         for index, column in enumerate(ordered)
     ]
-    saved = seeded_client.put("/api/v1/list-columns/LEDGER", json={"items": items}, headers=headers)
+    saved = seeded_client.put("/api/list-columns/LEDGER", json={"items": items}, headers=headers)
     assert saved.status_code == 200, saved.text
     by_key = {c["key"]: c for c in saved.json()["columns"]}
     assert by_key["extra:vip_tag"]["is_visible"] is False
@@ -231,16 +231,16 @@ def test_save_allows_custom_column_position_and_visibility(seeded_client, header
 def test_reset_keeps_custom_column_definition(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
     seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
+        "/api/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
     )
     columns = _columns(seeded_client, headers)
     items = [
         {"column_key": c["key"], "is_visible": c["key"] != "extra:vip_tag", "sort_order": i * 10}
         for i, c in enumerate(columns)
     ]
-    assert seeded_client.put("/api/v1/list-columns/LEDGER", json={"items": items}, headers=headers).status_code == 200
+    assert seeded_client.put("/api/list-columns/LEDGER", json={"items": items}, headers=headers).status_code == 200
 
-    reset = seeded_client.delete("/api/v1/list-columns/LEDGER", headers=headers)
+    reset = seeded_client.delete("/api/list-columns/LEDGER", headers=headers)
     assert reset.status_code == 200, reset.text
     reset_columns = reset.json()["columns"]
     custom = next(c for c in reset_columns if c["key"] == "extra:vip_tag")
@@ -251,9 +251,9 @@ def test_reset_keeps_custom_column_definition(seeded_client, headers, seeded_db)
 def test_remove_custom_column(seeded_client, headers, viewer_headers, seeded_db):
     _seed_custom_field(seeded_db)
     seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
+        "/api/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
     )
-    url = "/api/v1/list-columns/LEDGER/custom/extra:vip_tag"
+    url = "/api/list-columns/LEDGER/custom/extra:vip_tag"
     assert seeded_client.delete(url, headers=viewer_headers).status_code == 403
 
     removed = seeded_client.delete(url, headers=headers)
@@ -267,9 +267,9 @@ def test_remove_custom_column(seeded_client, headers, viewer_headers, seeded_db)
 def test_custom_column_writes_audit_actions(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
     seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
+        "/api/list-columns/LEDGER/custom", json={"field_key": "vip_tag"}, headers=headers
     )
-    seeded_client.delete("/api/v1/list-columns/LEDGER/custom/extra:vip_tag", headers=headers)
+    seeded_client.delete("/api/list-columns/LEDGER/custom/extra:vip_tag", headers=headers)
     actions = _audit_actions(seeded_db)
     assert AuditAction.LIST_COLUMN_ADD.value in actions
     assert AuditAction.LIST_COLUMN_REMOVE.value in actions

@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { navItem } from "../support/api-stub";
 
-const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api/v1";
+const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
 const headers = { "X-Dev-User": "admin" };
 
 test("已交付分期订单可从页面登记退款", async ({ page, request }) => {
@@ -226,7 +226,7 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     await saleModal.getByRole("button", { name: "确认售出" }).click();
     const saleRes = await saleResponse;
     expect(saleRes.status()).toBe(201);
-    // URL 形如 /api/v1/orders/<id>/events → 路径段 ["", "api", "v1", "orders", "<id>", "events"]。
+    // URL 形如 /api/orders/<id>/events → 路径段 ["", "api", "v1", "orders", "<id>", "events"]。
     const orderId = Number(new URL(saleRes.url()).pathname.split("/")[4]);
     const detail = await (await request.get(`${base}/orders/${orderId}`, { headers })).json();
     // 库存统一口径：代挂（CONSIGNMENT）售出映射为 DG 订单类型。

@@ -36,7 +36,7 @@ scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
 | `package-lock.json`（仓库根） | workspaces 子包 `packages["frontend"].version` | `npm ci` 结果与 package.json 不符 |
 
 部署侧**无需任何配置**：`deploy.sh` 用 `sed` 从 `version.py` 解析并 `export APP_VERSION`，
-镜像 tag（`heijin-backend:<版本>`）与容器内 `/api/v1/health` 的 `app_version` 自动跟随。
+镜像 tag（`heijin-backend:<版本>`）与容器内 `/api/health` 的 `app_version` 自动跟随。
 
 ---
 

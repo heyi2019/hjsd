@@ -37,7 +37,7 @@ def _first_active_pool(session) -> Pool:
 def _post_hs_recycle(seeded_client, headers, *, game_account: str):
     """建一张 HS 回收单（携带账号快照），返回 (order_id, account_id)。"""
     resp = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": TODAY.isoformat(),
@@ -69,14 +69,14 @@ def test_recycle_flow_buy_event_records_cashflow_and_updates_pool_balance(
     assert pool is not None
     # 基线现金余额（记账前，隔离种子数据）。
     balance_before = float(
-        seeded_client.get(f"/api/v1/pools/{pool.id}/balance", headers=headers).json()[
+        seeded_client.get(f"/api/pools/{pool.id}/balance", headers=headers).json()[
             "cash_balance"
         ]
     )
 
     # 记 BUY 事件 = 采购成本支出，绑定资金账户。
     buy = seeded_client.post(
-        f"/api/v1/orders/{order_id}/events",
+        f"/api/orders/{order_id}/events",
         json={
             "event_type": EventType.BUY.value,
             "amount": "1000.00",
@@ -100,7 +100,7 @@ def test_recycle_flow_buy_event_records_cashflow_and_updates_pool_balance(
 
     # 资金账户现金余额 = 已审核流水有符号和；支出 1000 应使 cash_balance 减少 1000。
     balance_after = float(
-        seeded_client.get(f"/api/v1/pools/{pool.id}/balance", headers=headers).json()[
+        seeded_client.get(f"/api/pools/{pool.id}/balance", headers=headers).json()[
             "cash_balance"
         ]
     )
@@ -112,7 +112,7 @@ def test_recycle_flow_buy_event_records_cashflow_and_updates_pool_balance(
     assert account.cost_amount == 1000
 
     # 订单详情暴露该流水（前端订单页/库存页同源展示）。
-    detail = seeded_client.get(f"/api/v1/orders/{order_id}", headers=headers)
+    detail = seeded_client.get(f"/api/orders/{order_id}", headers=headers)
     assert detail.status_code == 200, detail.text
     cashflow_nos = [c["flow_no"] for c in detail.json().get("cashflows", [])]
     assert cashflow_no in cashflow_nos
@@ -131,13 +131,13 @@ def test_recycle_flow_pool_balance_is_signed_sum_of_cashflows(
     )
     pool = _first_active_pool(seeded_db)
     baseline = float(
-        seeded_client.get(f"/api/v1/pools/{pool.id}/balance", headers=headers).json()[
+        seeded_client.get(f"/api/pools/{pool.id}/balance", headers=headers).json()[
             "cash_balance"
         ]
     )
 
     buy = seeded_client.post(
-        f"/api/v1/orders/{order_id}/events",
+        f"/api/orders/{order_id}/events",
         json={
             "event_type": EventType.BUY.value,
             "amount": "600.00",
@@ -149,7 +149,7 @@ def test_recycle_flow_pool_balance_is_signed_sum_of_cashflows(
     assert buy.status_code == 201, buy.text
 
     after_buy = float(
-        seeded_client.get(f"/api/v1/pools/{pool.id}/balance", headers=headers).json()[
+        seeded_client.get(f"/api/pools/{pool.id}/balance", headers=headers).json()[
             "cash_balance"
         ]
     )

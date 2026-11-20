@@ -24,7 +24,7 @@ import { navItem } from "../support/api-stub";
  *  - 每个用例挂 pageerror 断言，捕获「未崩溃但抛错」类隐患。
  */
 
-const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api/v1";
+const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
 const ADMIN = { "X-Dev-User": "admin" };
 
 /**

@@ -11,7 +11,7 @@ import { expect, test } from "@playwright/test";
  *
  * 自给自足：先用 API 建 HS 单 + BUY 返点，保证明细表里有可点的「编辑」行。
  */
-const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api/v1";
+const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
 const ADMIN = { "X-Dev-User": "admin" };
 
 test("返点弹窗的内层编辑弹窗可关闭，且不连带关闭外层", async ({ page, request }) => {

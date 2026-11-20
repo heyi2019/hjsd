@@ -234,19 +234,19 @@ def test_rebate_conditions_use_real_parent_form_values(seeded_db, seeded_client,
                             actor="pytest", required_when=condition)
     seeded_db.commit()
     payload = {"source_order_id": order_id, "rebate_type": "SELL", "amount": "30", "collected_on": TODAY.isoformat()}
-    response = seeded_client.post("/api/v1/rebates", json=payload, headers=headers)
+    response = seeded_client.post("/api/rebates", json=payload, headers=headers)
     assert response.status_code == 422 and "返点凭据" in response.text
-    spoof = seeded_client.post("/api/v1/rebates", json={**payload, "form_extra": {dependency: ""}}, headers=headers)
+    spoof = seeded_client.post("/api/rebates", json={**payload, "form_extra": {dependency: ""}}, headers=headers)
     assert spoof.status_code == 422 and "返点凭据" in spoof.text
     assert seeded_db.scalar(select(RebateRecord).where(RebateRecord.source_order_id == order_id)) is None
-    saved = seeded_client.post("/api/v1/rebates", json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    saved = seeded_client.post("/api/rebates", json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
     assert saved.status_code == 201, saved.text
     record = seeded_db.scalar(select(RebateRecord).where(RebateRecord.source_order_id == order_id))
     event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == record.rebate_no))
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == event.event_no))
     assert record.form_extra["receipt"] == event.form_extra["receipt"] == flow.form_extra["receipt"] == "凭据A"
     if dependency == "rebate_type":
-        untriggered = seeded_client.post("/api/v1/rebates", json={**payload, "rebate_type": "BUY"}, headers=headers)
+        untriggered = seeded_client.post("/api/rebates", json={**payload, "rebate_type": "BUY"}, headers=headers)
         assert untriggered.status_code == 201, untriggered.text
 
 

@@ -76,41 +76,41 @@ class TestFinanceApi:
             target = _pool(seeded_db, "HJ_PROFIT")
             create_cashflow(seeded_db, pool_id=pool.id, occurred_on=TODAY, direction="IN",
                             category="OTHER", amount=Decimal("200"), actor="pytest")
-            url = "/api/v1/transfers"
+            url = "/api/transfers"
             payload = {"source_pool_id": pool.id, "target_pool_id": target.id,
                        "amount": "10", "occurred_on": TODAY.isoformat()}
         elif action in {"deposit", "deposit-edit"}:
             payload = {"pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat()}
             if action == "deposit":
-                url = "/api/v1/deposits"
+                url = "/api/deposits"
             else:
                 deposit = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("100"),
                                          paid_on=TODAY, actor="pytest")
-                url = f"/api/v1/deposits/{deposit.id}"
+                url = f"/api/deposits/{deposit.id}"
         elif action == "reconcile":
-            url = "/api/v1/reconciliations"
+            url = "/api/reconciliations"
             payload = {"pool_id": pool.id, "reconciled_on": TODAY.isoformat(),
                        "statement_balance": "0", "account_label": "对账账户"}
         elif action == "resolve":
-            created = seeded_client.post("/api/v1/reconciliations", headers=headers, json={
+            created = seeded_client.post("/api/reconciliations", headers=headers, json={
                 "pool_id": pool.id, "reconciled_on": TODAY.isoformat(),
                 "statement_balance": "0", "account_label": "对账账户",
             })
             assert created.status_code == 201, created.text
-            url = f"/api/v1/reconciliations/{created.json()['id']}/resolve"
+            url = f"/api/reconciliations/{created.json()['id']}/resolve"
             payload = {"reason": "核对完成"}
         else:
             deposit = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("100"),
                                      paid_on=TODAY, actor="pytest")
             if action == "return":
-                url = f"/api/v1/deposits/{deposit.id}/returns"
+                url = f"/api/deposits/{deposit.id}/returns"
                 payload = {"amount": "30", "released_on": TODAY.isoformat()}
             elif action == "loss":
-                url = f"/api/v1/deposits/{deposit.id}/losses"
+                url = f"/api/deposits/{deposit.id}/losses"
                 payload = {"amount": "30", "lost_on": TODAY.isoformat(),
                            "category": "违约损失", "reason": "押金未返还"}
             else:
-                url = f"/api/v1/deposits/{deposit.id}/cancel"
+                url = f"/api/deposits/{deposit.id}/cancel"
                 payload = {"reason": "登记错误", "cancelled_on": TODAY.isoformat()}
 
         core_field = seeded_db.scalar(select(OrderFormField).where(
@@ -158,7 +158,7 @@ class TestFinanceApi:
         )
         seeded_db.commit()
         payload = {"pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat()}
-        url = f"/api/v1/deposits/{deposit.id}"
+        url = f"/api/deposits/{deposit.id}"
         saved = seeded_client.put(url, headers=headers, json=payload)
         assert saved.status_code == 200, saved.text
         assert saved.json()["form_extra"] == {"receipt": "原始凭据", "past_action": "历史信息"}
@@ -181,7 +181,7 @@ class TestFinanceApi:
             required_when={"field": "pool_id", "op": "eq", "values": [str(other.id)]},
         )
         seeded_db.commit()
-        response = seeded_client.post("/api/v1/deposits", headers=headers, json={
+        response = seeded_client.post("/api/deposits", headers=headers, json={
             "pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat(),
         })
         assert response.status_code == 201, response.text
@@ -195,7 +195,7 @@ class TestFinanceApi:
         create_order_form_field(seeded_db, order_type_code="FUNDDEPOSIT", field_key="optional_number",
                                 label="可选数字", field_type="NUMBER", actor="pytest")
         seeded_db.commit()
-        saved = seeded_client.put(f"/api/v1/deposits/{deposit.id}", headers=headers, json={
+        saved = seeded_client.put(f"/api/deposits/{deposit.id}", headers=headers, json={
             "pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat(), "form_extra": {},
         })
         assert saved.status_code == 200, saved.text
@@ -207,20 +207,20 @@ class TestFinanceApi:
     def test_finance_action_requires_its_custom_fields(self, seeded_client, seeded_db, headers, action, scope):
         pool = _pool(seeded_db, "HJ_INVEST")
         if action == "resolve":
-            created = seeded_client.post("/api/v1/reconciliations", headers=headers, json={
+            created = seeded_client.post("/api/reconciliations", headers=headers, json={
                 "pool_id": pool.id, "reconciled_on": TODAY.isoformat(), "statement_balance": "0", "account_label": "账户",
             })
             assert created.status_code == 201, created.text
-            url = f"/api/v1/reconciliations/{created.json()['id']}/resolve"
+            url = f"/api/reconciliations/{created.json()['id']}/resolve"
             payload = {"reason": "核对完成"}
         else:
             deposit = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("100"),
                                      paid_on=TODAY, actor="pytest")
             if action == "return":
-                url = f"/api/v1/deposits/{deposit.id}/returns"
+                url = f"/api/deposits/{deposit.id}/returns"
                 payload = {"amount": "30", "released_on": TODAY.isoformat()}
             else:
-                url = f"/api/v1/deposits/{deposit.id}/cancel"
+                url = f"/api/deposits/{deposit.id}/cancel"
                 payload = {"reason": "登记错误", "cancelled_on": TODAY.isoformat()}
         create_order_form_field(seeded_db, order_type_code=scope, field_key="receipt",
                                 label="操作凭据", required=True, actor="pytest")
@@ -250,7 +250,7 @@ class TestFinanceApi:
         seeded_db.flush()
 
         created = seeded_client.post(
-            "/api/v1/reconciliations",
+            "/api/reconciliations",
             json={
                 "pool_id": 1,
                 "reconciled_on": TODAY.isoformat(),
@@ -270,7 +270,7 @@ class TestFinanceApi:
         assert item["created_at"]
 
         listed = seeded_client.get(
-            "/api/v1/reconciliations",
+            "/api/reconciliations",
             params={"pool_id": invest.id},
             headers=headers,
         )
@@ -278,7 +278,7 @@ class TestFinanceApi:
         assert listed.json()[0]["id"] == item["id"]
 
         resolved = seeded_client.post(
-            f"/api/v1/reconciliations/{item['id']}/resolve",
+            f"/api/reconciliations/{item['id']}/resolve",
             json={"reason": "已核实银行手续费"},
             headers=headers,
         )
@@ -302,7 +302,7 @@ class TestFinanceApi:
         )
         seeded_db.flush()
         created = seeded_client.post(
-            "/api/v1/reconciliations",
+            "/api/reconciliations",
             json={
                 "pool_id": invest.id,
                 "reconciled_on": TODAY.isoformat(),
@@ -314,7 +314,7 @@ class TestFinanceApi:
         assert created.status_code == 201, created.text
 
         snaps = seeded_client.get(
-            "/api/v1/balance-snapshots",
+            "/api/balance-snapshots",
             params={"pool_id": invest.id},
             headers=headers,
         )
@@ -328,7 +328,7 @@ class TestFinanceApi:
         self, seeded_client, seeded_db, headers
     ):
         created = seeded_client.post(
-            "/api/v1/cashflows",
+            "/api/cashflows",
             json={
                 "pool_id": 1,
                 "occurred_on": TODAY.isoformat(),
@@ -344,7 +344,7 @@ class TestFinanceApi:
         assert "status" not in flow
 
         reversed_flow = seeded_client.post(
-            f"/api/v1/cashflows/{flow['id']}/reverse",
+            f"/api/cashflows/{flow['id']}/reverse",
             json={"reversed_on": TODAY.isoformat(), "reason": "接口冲销"},
             headers=headers,
         )
@@ -357,7 +357,7 @@ class TestFinanceApi:
     ):
         order_id = _active_order(seeded_db)
         created = seeded_client.post(
-            f"/api/v1/orders/{order_id}/cashflows",
+            f"/api/orders/{order_id}/cashflows",
             json={
                 "pool_id": 1,
                 "occurred_on": TODAY.isoformat(),
@@ -396,8 +396,8 @@ class TestFinanceApi:
         }
 
         for url, order_link in [
-            (f"/api/v1/orders/{order_id}/cashflows", {}),
-            ("/api/v1/cashflows", {"order_id": order_id}),
+            (f"/api/orders/{order_id}/cashflows", {}),
+            ("/api/cashflows", {"order_id": order_id}),
         ]:
             bypass = seeded_client.post(url, headers=headers, json={
                 **payload, **order_link, "form_extra_scope": "FUNDFLOW",
@@ -427,7 +427,7 @@ class TestFinanceApi:
         scoped_headers = {"Authorization": f"Bearer {build_access_token(scoped_finance)}"}
 
         transfer = seeded_client.post(
-            "/api/v1/transfers",
+            "/api/transfers",
             json={
                 "source_pool_id": 2,
                 "target_pool_id": 1,
@@ -439,7 +439,7 @@ class TestFinanceApi:
         assert transfer.status_code == 404
 
         deposits = seeded_client.get(
-            "/api/v1/deposits", params={"pool_id": 2}, headers=scoped_headers
+            "/api/deposits", params={"pool_id": 2}, headers=scoped_headers
         )
         assert deposits.status_code == 200
         assert deposits.json() == []
@@ -510,16 +510,16 @@ class TestFinanceApi:
             collected_on=TODAY, actor="pytest"
         )
 
-        deposits = seeded_client.get("/api/v1/deposits", headers=scoped_headers)
+        deposits = seeded_client.get("/api/deposits", headers=scoped_headers)
         assert deposits.status_code == 200, deposits.text
         assert {row["pool_id"] for row in deposits.json()} == {1}
 
-        rebates = seeded_client.get("/api/v1/rebates", headers=scoped_headers)
+        rebates = seeded_client.get("/api/rebates", headers=scoped_headers)
         assert rebates.status_code == 200, rebates.text
         assert [row["source_order_id"] for row in rebates.json()] == [own_order.id]
 
         create_other_pool = seeded_client.post(
-            "/api/v1/deposits",
+            "/api/deposits",
             json={"pool_id": 2, "amount": "5", "paid_on": TODAY.isoformat()},
             headers=scoped_headers,
         )
@@ -583,7 +583,7 @@ class TestFinanceApi:
         seeded_db.flush()
 
         response = seeded_client.get(
-            "/api/v1/cashflows",
+            "/api/cashflows",
             params={"limit": 2, "offset": 2},
             headers=scoped_headers,
         )
@@ -629,7 +629,7 @@ class TestFinanceApi:
         page_total = None
         while True:
             page = seeded_client.get(
-                "/api/v1/cashflows",
+                "/api/cashflows",
                 params={"limit": 2, "offset": offset},
                 headers=scoped_headers,
             )
@@ -701,12 +701,12 @@ class TestFinanceApi:
         seeded_db.flush()
 
         own = seeded_client.get(
-            "/api/v1/cashflows",
+            "/api/cashflows",
             params={"order_id": own_order.id},
             headers=headers,
         )
         foreign = seeded_client.get(
-            "/api/v1/cashflows",
+            "/api/cashflows",
             params={"order_id": foreign_order.id},
             headers=headers,
         )
@@ -728,7 +728,7 @@ class TestFinanceApi:
         )
 
         response = seeded_client.post(
-            "/api/v1/rebates",
+            "/api/rebates",
             json={
                 "source_order_id": other_order.id,
                 "amount": "10",
@@ -778,7 +778,7 @@ class TestFinanceApi:
         )
 
         response = seeded_client.post(
-            "/api/v1/deposits",
+            "/api/deposits",
             json={
                 "pool_id": 1,
                 "amount": "20",
@@ -810,7 +810,7 @@ class TestFinanceApi:
         target_before = pool_balance(seeded_db, profit.id)
 
         response = seeded_client.post(
-            "/api/v1/transfers",
+            "/api/transfers",
             json={
                 "source_pool_id": invest.id,
                 "target_pool_id": profit.id,
@@ -930,7 +930,7 @@ class TestFinanceApi:
         seeded_db.flush()
 
         response = seeded_client.post(
-            "/api/v1/transfers/TR-REPAIR-API/repair",
+            "/api/transfers/TR-REPAIR-API/repair",
             json={
                 "counterpart_pool_id": profit.id,
                 "reason": "补齐对端流水",
@@ -949,7 +949,7 @@ class TestFinanceApi:
             actor="pytest", source_order_id=order_id,
             expected_release_on=TODAY.replace(day=20), note="押金业务备注",
         )
-        response = seeded_client.get("/api/v1/deposits", headers=headers)
+        response = seeded_client.get("/api/deposits", headers=headers)
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
         assert "deposit_no" not in response.json()[0]
@@ -967,7 +967,7 @@ class TestFinanceApi:
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
         response = seeded_client.post(
-            f"/api/v1/deposits/{deposit.id}/losses",
+            f"/api/deposits/{deposit.id}/losses",
             json={
                 "amount": "40",
                 "lost_on": TODAY.isoformat(),
@@ -987,7 +987,7 @@ class TestFinanceApi:
             collected_on=TODAY, actor="pytest", channel="买号返点",
             note="回收买号返点",
         )
-        response = seeded_client.get("/api/v1/rebates", headers=headers)
+        response = seeded_client.get("/api/rebates", headers=headers)
         assert response.status_code == 200, response.text
         assert len(response.json()) == 1
         assert response.json()[0]["rebate_no"].startswith("HS")
@@ -1000,7 +1000,7 @@ class TestFinanceApi:
     def test_create_rebate_endpoint(self, seeded_client, seeded_db, headers):
         order_id = _active_order(seeded_db)
         response = seeded_client.post(
-            "/api/v1/rebates",
+            "/api/rebates",
             json={
                 "source_order_id": order_id,
                 "amount": "300",

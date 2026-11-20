@@ -1,7 +1,7 @@
 import axios, { type AxiosAdapter, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 
 /** 后端基址：本地联调 8123（8000 被 Docker 占用）；后端绑 0.0.0.0，局域网可直连。 */
-export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/api";
 
 /** dev 直通用户：后端以 `X-Dev-User` 识别；切换角色即可验证权限显隐。 */
 export const DEV_USER_KEY = "hj.dev-user";

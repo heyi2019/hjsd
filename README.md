@@ -1,6 +1,6 @@
 # 宜游轩 ERP
 
-FastAPI + React 的工作室经营系统。**v1 是唯一入口**（`app/main.py`）。
+FastAPI + React 的工作室经营系统。后端入口为 `app/main.py`。
 
 开发、测试和发布按以下三份流程执行：
 [研发流程](docs/研发流程.md)
@@ -34,7 +34,7 @@ cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 
 
 前端代理端口读取 `VITE_BACKEND_PORT`，开发环境固定为前端 `5188` → 后端 `8123`；本地 `main` worktree 使用前端 `5199` → 后端 `8125`。其他测试端口和验证方式见 [研发流程](docs/研发流程.md)。
 
-登录页会先检查 `/api/v1/health`。后端未启动或端口不一致时，会直接提示连接问题，
+登录页会先检查 `/api/health`。后端未启动或端口不一致时，会直接提示连接问题，
 不会再把 Vite 代理错误显示成笼统的 500。
 
 启动后：
@@ -42,8 +42,8 @@ cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 
 | 地址 | 用途 |
 |---|---|
 | http://127.0.0.1:8123/ | 服务信息（库路径、env 路径、版本） |
-| http://127.0.0.1:8123/api/v1/health | 健康检查 |
-| http://127.0.0.1:8123/docs | Swagger，全部 v1 端点 |
+| http://127.0.0.1:8123/api/health | 健康检查 |
+| http://127.0.0.1:8123/docs | Swagger，全部 API 端点 |
 | http://127.0.0.1:5188/ | dev 前端（开发账号 `admin`） |
 
 生产环境进入登录页，使用上一步创建的 `admin` 账号登录；开发环境仍保留角色直通，仅用于本地权限联调。

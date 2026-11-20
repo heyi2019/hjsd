@@ -346,19 +346,19 @@ class TestGetAndListOrders:
             seeded_db.add(OrderCustomerRole(order_id=order.id, customer_id=party.id, role="BUYER"))
         seeded_db.flush()
         params = {"mine_orders": "true", "trade_date_from": D.isoformat(), "trade_date_to": D.isoformat()}
-        listing = seeded_client.get("/api/v1/customers", params=params, headers=headers)
-        dashboard = seeded_client.get("/api/v1/dashboard/summary", params={"from": D.isoformat(), "to": D.isoformat()}, headers=headers)
+        listing = seeded_client.get("/api/customers", params=params, headers=headers)
+        dashboard = seeded_client.get("/api/dashboard/summary", params={"from": D.isoformat(), "to": D.isoformat()}, headers=headers)
         assert listing.status_code == dashboard.status_code == 200
         assert listing.json()["total"] == dashboard.json()["personal_customers"] == 1
         assert [item["id"] for item in listing.json()["items"]] == [customer.id]
-        exported = seeded_client.get("/api/v1/customers/export.csv", params=params, headers=headers)
+        exported = seeded_client.get("/api/customers/export.csv", params=params, headers=headers)
         assert exported.status_code == 200
         assert "当期客户" in exported.text and "其他周期客户" not in exported.text
-        all_customers = seeded_client.get("/api/v1/customers", params={"mine_orders": "true"}, headers=headers)
-        all_dashboard = seeded_client.get("/api/v1/dashboard/summary", params={"all_time": "true"}, headers=headers)
+        all_customers = seeded_client.get("/api/customers", params={"mine_orders": "true"}, headers=headers)
+        all_dashboard = seeded_client.get("/api/dashboard/summary", params={"all_time": "true"}, headers=headers)
         assert all_customers.status_code == 200
         assert all_customers.json()["total"] == all_dashboard.json()["personal_customers"] == 2
-        assert seeded_client.get("/api/v1/customers", params={"mine_orders": "true", "trade_date_from": D.isoformat()}, headers=headers).status_code == 422
+        assert seeded_client.get("/api/customers", params={"mine_orders": "true", "trade_date_from": D.isoformat()}, headers=headers).status_code == 422
 
     def test_list_orders_supports_workbench_date_owner_keyword_filters(
         self, seeded_client, seeded_db, headers
@@ -370,7 +370,7 @@ class TestGetAndListOrders:
         seeded_db.flush()
 
         response = seeded_client.get(
-            "/api/v1/orders",
+            "/api/orders",
             params={
                 "trade_date_from": "2026-10-03",
                 "trade_date_to": "2026-10-03",
@@ -397,7 +397,7 @@ class TestGetAndListOrders:
         seeded_db.flush()
 
         response = seeded_client.get(
-            "/api/v1/orders",
+            "/api/orders",
             params={"keyword": "abc_123", "limit": 10, "offset": 0},
             headers=headers,
         )
@@ -416,7 +416,7 @@ class TestGetAndListOrders:
         seeded_db.flush()
 
         response = seeded_client.get(
-            "/api/v1/orders",
+            "/api/orders",
             params={"keyword": "50%", "limit": 10, "offset": 0},
             headers=headers,
         )

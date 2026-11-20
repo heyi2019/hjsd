@@ -23,7 +23,7 @@ from app.domain.users import User
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",
                  role: str = "VIEWER") -> dict:
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": username,
             "display_name": "测试用户",
@@ -37,7 +37,7 @@ def _create_user(client: TestClient, *, username: str = "alice", password: str =
 
 def _login(client: TestClient, username: str, password: str) -> str:
     response = client.post(
-        "/api/v1/auth/login",
+        "/api/auth/login",
         json={"username": username, "password": password},
     )
     assert response.status_code == 200, response.text
@@ -45,7 +45,7 @@ def _login(client: TestClient, username: str, password: str) -> str:
 
 def test_reset_password_not_found(client: TestClient):
     response = client.post(
-        "/api/v1/users/999/reset-password",
+        "/api/users/999/reset-password",
         json={"password": "resetpass1"},
         headers={"X-Dev-User": "admin"},
     )
@@ -55,7 +55,7 @@ def test_reset_password_not_found(client: TestClient):
 def test_reset_password_success(client: TestClient):
     created = _create_user(client)
     response = client.post(
-        f"/api/v1/users/{created['id']}/reset-password",
+        f"/api/users/{created['id']}/reset-password",
         json={"password": "resetpass1"},
         headers={"X-Dev-User": "admin"},
     )
@@ -64,18 +64,18 @@ def test_reset_password_success(client: TestClient):
     # 重置后的密码可登录，且 must_change_password 重新置位
     token = _login(client, "alice", "resetpass1")
     me = client.get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}
+        "/api/auth/me", headers={"Authorization": f"Bearer {token}"}
     )
     assert me.json()["must_change_password"] is True
 
 def test_list_teams(client: TestClient):
-    response = client.get("/api/v1/teams", headers={"X-Dev-User": "viewer"})
+    response = client.get("/api/teams", headers={"X-Dev-User": "viewer"})
     assert response.status_code == 200
     assert response.json() == []
 
 def test_create_team_success_normalizes_code(client: TestClient):
     response = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": " t1 ", "name": " 一组 ", "description": " desc "},
         headers={"X-Dev-User": "admin"},
     )
@@ -87,15 +87,15 @@ def test_create_team_success_normalizes_code(client: TestClient):
 
 def test_create_team_duplicate_code(client: TestClient):
     headers = {"X-Dev-User": "admin"}
-    assert client.post("/api/v1/teams", json={"code": "T1", "name": "一组"}, headers=headers).status_code == 201
+    assert client.post("/api/teams", json={"code": "T1", "name": "一组"}, headers=headers).status_code == 201
     # 大小写归一化后仍判重
-    response = client.post("/api/v1/teams", json={"code": "t1", "name": "重名"}, headers=headers)
+    response = client.post("/api/teams", json={"code": "t1", "name": "重名"}, headers=headers)
     assert response.status_code == 409
     assert response.json()["message"] == "团队编码已存在"
 
 def test_create_team_blank_name_rejected(client: TestClient):
     response = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": "blank-name", "name": "   "},
         headers={"X-Dev-User": "admin"},
     )
@@ -104,7 +104,7 @@ def test_create_team_blank_name_rejected(client: TestClient):
 
 def test_create_team_non_admin_forbidden(client: TestClient):
     response = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": "t9", "name": "九组"},
         headers={"X-Dev-User": "viewer"},
     )
@@ -112,7 +112,7 @@ def test_create_team_non_admin_forbidden(client: TestClient):
 
 def test_update_team_not_found(client: TestClient):
     response = client.patch(
-        "/api/v1/teams/999",
+        "/api/teams/999",
         json={"name": "无人"},
         headers={"X-Dev-User": "admin"},
     )
@@ -121,13 +121,13 @@ def test_update_team_not_found(client: TestClient):
 
 def test_update_team_success(client: TestClient):
     created = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": "t2", "name": "二组"},
         headers={"X-Dev-User": "admin"},
     )
     assert created.status_code == 201
     response = client.patch(
-        f"/api/v1/teams/{created.json()['id']}",
+        f"/api/teams/{created.json()['id']}",
         json={"name": "二组改名", "is_active": False},
         headers={"X-Dev-User": "admin"},
     )
@@ -138,13 +138,13 @@ def test_update_team_success(client: TestClient):
 
 def test_update_team_explicit_blank_name_rejected(client: TestClient):
     created = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": "t3", "name": "三组"},
         headers={"X-Dev-User": "admin"},
     )
     assert created.status_code == 201
     response = client.patch(
-        f"/api/v1/teams/{created.json()['id']}",
+        f"/api/teams/{created.json()['id']}",
         json={"name": "   "},
         headers={"X-Dev-User": "admin"},
     )
@@ -177,25 +177,25 @@ def test_team_service_rejects_non_boolean_active_state(seeded_db):
 def test_admin_mutations_write_audit(client: TestClient, db: Session):
     created = _create_user(client)
     updated = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"display_name": "Alice Wang"},
         headers={"X-Dev-User": "admin"},
     )
     assert updated.status_code == 200, updated.text
     reset = client.post(
-        f"/api/v1/users/{created['id']}/reset-password",
+        f"/api/users/{created['id']}/reset-password",
         json={"password": "resetpass1"},
         headers={"X-Dev-User": "admin"},
     )
     assert reset.status_code == 200, reset.text
     team = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": "t1", "name": "一组"},
         headers={"X-Dev-User": "admin"},
     )
     assert team.status_code == 201, team.text
     team_update = client.patch(
-        f"/api/v1/teams/{team.json()['id']}",
+        f"/api/teams/{team.json()['id']}",
         json={"name": "一组改名"},
         headers={"X-Dev-User": "admin"},
     )
@@ -217,7 +217,7 @@ def test_update_user_unknown_team_ids_rejected(client: TestClient, db: Session):
     # update 路径同样校验 team_ids（不存在即 422）
     created = _create_user(client)
     response = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"team_ids": [777]},
         headers={"X-Dev-User": "admin"},
     )
@@ -235,7 +235,7 @@ def test_login_user_created_directly_in_db(client: TestClient, db: Session):
     )
     db.flush()
     response = client.post(
-        "/api/v1/auth/login", json={"username": " frank ", "password": "password123"}
+        "/api/auth/login", json={"username": " frank ", "password": "password123"}
     )
     assert response.status_code == 200, response.text
     assert response.json()["user"]["username"] == "frank"
@@ -247,14 +247,14 @@ def test_bearer_permissions_refresh_after_user_role_change(
     token = _login(seeded_client, "live-role", "password123")
 
     updated = seeded_client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"role": "OPERATOR"},
         headers={"X-Dev-User": "admin"},
     )
     assert updated.status_code == 200, updated.text
 
     response = seeded_client.post(
-        "/api/v1/customers",
+        "/api/customers",
         json={"display_name": "权限即时生效"},
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -265,14 +265,14 @@ def test_bearer_permissions_refresh_after_user_deactivation(client: TestClient):
     token = _login(client, "live-active", "password123")
 
     updated = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"is_active": False},
         headers={"X-Dev-User": "admin"},
     )
     assert updated.status_code == 200, updated.text
 
     response = client.get(
-        "/api/v1/auth/me",
+        "/api/auth/me",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 401

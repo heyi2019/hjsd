@@ -223,7 +223,7 @@ if str(BACKEND_DIR) not in sys.path:
 
 os.environ.setdefault("APP_ENV", "development")
 
-from app.api_v1 import create_app  # noqa: E402
+from app.api import create_app  # noqa: E402
 from app.core.database import get_db  # noqa: E402
 from app.domain.base import Base
 from app.core.security import CurrentUser, DEV_USERS, build_access_token  # noqa: E402
@@ -462,7 +462,7 @@ def db(v1_engine):
     `join_transaction_mode="create_savepoint"` 降级为 savepoint release，teardown
     只剩一次 `rollback()`（实测 <2ms）。
 
-    前提已核验：app 内唯一独立连接是 `api_v1.py` 的 healthz 只读探活，业务写路径
+    前提已核验：app 内唯一独立连接是 `api.py` 的 healthz 只读探活，业务写路径
     全部经 `get_db` 注入的会话，不会被绕过。
 
     差异（已确认无影响）：PG 的 `setval` 不受事务回滚影响，因此序列值不再随用例

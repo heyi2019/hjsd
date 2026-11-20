@@ -15,10 +15,10 @@ export default defineConfig(({ mode }) => {
     ?? env.ERP_E2E_BACKEND_PORT
     ?? "8123";
 
-  // dev（server）与 preview 共用同一套 /api/v1 代理：E2E 用 preview 模式（见
+  // dev（server）与 preview 共用同一套 /api 代理：E2E 用 preview 模式（见
   // playwright.config.ts），若只在 server 段配代理，preview 会连不上后端。
   const apiProxy = {
-    "/api/v1": {
+    "/api": {
       target: `http://127.0.0.1:${backendPort}`,
       changeOrigin: true,
     },
@@ -43,7 +43,7 @@ export default defineConfig(({ mode }) => {
       proxy: apiProxy,
     },
     // preview 段代理与 server 完全一致：E2E 走 `vite build + vite preview` 时，
-    // 前端的 /api/v1 请求须同样转发到本套 E2E 后端端口（8124）。
+    // 前端的 /api 请求须同样转发到本套 E2E 后端端口（8124）。
     preview: {
       host: "0.0.0.0",
       proxy: apiProxy,

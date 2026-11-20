@@ -31,7 +31,7 @@ def _first_active_pool(session) -> Pool:
 
 def _post_hs_sell_order(seeded_client, headers, *, game_account: str):
     resp = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": TODAY.isoformat(),
@@ -46,7 +46,7 @@ def _post_hs_sell_order(seeded_client, headers, *, game_account: str):
 
 def _pool_balance(client, headers, pool_id) -> Decimal:
     return Decimal(
-        str(client.get(f"/api/v1/pools/{pool_id}/balance", headers=headers).json()["cash_balance"])
+        str(client.get(f"/api/pools/{pool_id}/balance", headers=headers).json()["cash_balance"])
     )
 
 
@@ -59,7 +59,7 @@ def test_flow_b_hs_sell_end_to_end(seeded_client, headers, seeded_db):
     baseline = _pool_balance(seeded_client, headers, pool.id)
 
     buy = seeded_client.post(
-        f"/api/v1/orders/{order_id}/events",
+        f"/api/orders/{order_id}/events",
         json={
             "event_type": EventType.BUY.value, "amount": "1000.00",
             "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
@@ -75,7 +75,7 @@ def test_flow_b_hs_sell_end_to_end(seeded_client, headers, seeded_db):
     assert _pool_balance(seeded_client, headers, pool.id) == baseline - Decimal("1000.00")
 
     sell = seeded_client.post(
-        f"/api/v1/orders/{order_id}/events",
+        f"/api/orders/{order_id}/events",
         json={
             "event_type": EventType.SELL.value, "amount": "1500.00",
             "occurred_on": TODAY.isoformat(), "pool_id": pool.id,

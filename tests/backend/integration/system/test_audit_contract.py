@@ -23,8 +23,8 @@ MARK = "AUDIT-CONTRACT"  # 本文件专属标记，避免与种子审计混淆
 def test_audit_routes_publish_typed_response_models(app):
     paths = app.openapi()["paths"]
 
-    logs_schema = paths["/api/v1/audit-logs"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
-    actions_schema = paths["/api/v1/audit-logs/actions"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    logs_schema = paths["/api/audit-logs"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+    actions_schema = paths["/api/audit-logs/actions"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
 
     assert logs_schema["$ref"].endswith("/AuditLogListOut")
     assert actions_schema["$ref"].endswith("/AuditActionListOut")
@@ -48,7 +48,7 @@ class TestAuditLogApi:
     ):
         request_id = "audit-trace-20261017"
         response = seeded_client.post(
-            "/api/v1/pools",
+            "/api/pools",
             json={"code": "TRACE_POOL", "name": "审计追踪池"},
             headers={**headers, "X-Request-ID": request_id},
         )
@@ -66,7 +66,7 @@ class TestAuditLogApi:
         assert log is not None
 
         listed = seeded_client.get(
-            "/api/v1/audit-logs",
+            "/api/audit-logs",
             params={"entity_type": "Pool", "entity_id": log.entity_id},
             headers=headers,
         )
@@ -90,7 +90,7 @@ class TestAuditLogApi:
 
         # 动作过滤（action 入参统一转大写）
         by_action = seeded_client.get(
-            "/api/v1/audit-logs", params={"action": "event_post"}, headers=headers
+            "/api/audit-logs", params={"action": "event_post"}, headers=headers
         )
         assert by_action.status_code == 200, by_action.text
         assert "990002" in [item["entity_id"] for item in by_action.json()["items"]]
@@ -98,7 +98,7 @@ class TestAuditLogApi:
 
         # 对象类型 → 只回 order 实体，ledger_probe 必须被排除
         by_type = seeded_client.get(
-            "/api/v1/audit-logs", params={"entity_type": "order"}, headers=headers
+            "/api/audit-logs", params={"entity_type": "order"}, headers=headers
         )
         ids = [item["entity_id"] for item in by_type.json()["items"]]
         assert "990001" in ids and "990002" in ids
@@ -106,11 +106,11 @@ class TestAuditLogApi:
 
         # 对象 ID + 操作人（entity_id 是整型入参，字符串列按 SQLite 亲和性比较）
         by_entity = seeded_client.get(
-            "/api/v1/audit-logs", params={"entity_id": 990001}, headers=headers
+            "/api/audit-logs", params={"entity_id": 990001}, headers=headers
         )
         assert [item["actor"] for item in by_entity.json()["items"]] == ["alice"]
         by_actor = seeded_client.get(
-            "/api/v1/audit-logs", params={"actor": "bob"}, headers=headers
+            "/api/audit-logs", params={"actor": "bob"}, headers=headers
         )
         assert [item["action"] for item in by_actor.json()["items"]] == [
             AuditAction.EVENT_POST.value
@@ -118,7 +118,7 @@ class TestAuditLogApi:
 
         # 时间范围（种子与本用例日志都在今天）
         windowed = seeded_client.get(
-            "/api/v1/audit-logs",
+            "/api/audit-logs",
             params={"from": TODAY.isoformat(), "to": TODAY.isoformat()},
             headers=headers,
         )
@@ -126,20 +126,20 @@ class TestAuditLogApi:
         assert windowed.json()["total"] >= 2
         # 分页：limit=1 时只回一条，offset=1 起换下一批
         first_page = seeded_client.get(
-            "/api/v1/audit-logs",
+            "/api/audit-logs",
             params={"actor": "bob", "limit": 1, "offset": 0},
             headers=headers,
         )
         assert len(first_page.json()["items"]) == 1
         second_page = seeded_client.get(
-            "/api/v1/audit-logs",
+            "/api/audit-logs",
             params={"actor": "bob", "limit": 1, "offset": 1},
             headers=headers,
         )
         assert second_page.json()["items"] == []
 
     def test_actions_endpoint_lists_enum(self, seeded_client, headers):
-        response = seeded_client.get("/api/v1/audit-logs/actions", headers=headers)
+        response = seeded_client.get("/api/audit-logs/actions", headers=headers)
         assert response.status_code == 200, response.text
         assert AuditAction.ORDER_CREATE.value in response.json()["items"]
         # 分润单独成动作（不再混进 EXCEPTION_APPROVE），前端下拉由此清单驱动。
@@ -153,7 +153,7 @@ class TestAuditLogApi:
             entity_id="HS0094",
         )
         response = seeded_client.get(
-            "/api/v1/audit-logs", params={"entity_id": "HS0094"}, headers=headers
+            "/api/audit-logs", params={"entity_id": "HS0094"}, headers=headers
         )
         assert response.status_code == 200, response.text
         assert [row["actor"] for row in response.json()["items"]] == ["numbered-order"]
@@ -167,7 +167,7 @@ class TestAuditStatsApi:
 
     def test_stats_routes_publish_typed_response_model(self, app):
         paths = app.openapi()["paths"]
-        schema = paths["/api/v1/audit-logs/stats"]["get"]["responses"]["200"]["content"][
+        schema = paths["/api/audit-logs/stats"]["get"]["responses"]["200"]["content"][
             "application/json"
         ]["schema"]
 
@@ -186,7 +186,7 @@ class TestAuditStatsApi:
 
         # 列表 total 表示筛选后的总数，而非当前页行数
         listed = seeded_client.get(
-            "/api/v1/audit-logs",
+            "/api/audit-logs",
             params={"entity_type": "cfg_probe_count", "limit": 1},
             headers=headers,
         )
@@ -194,7 +194,7 @@ class TestAuditStatsApi:
         assert listed.json()["total"] == 3
 
         response = seeded_client.get(
-            "/api/v1/audit-logs/stats",
+            "/api/audit-logs/stats",
             params={"entity_types": "cfg_probe_count"},
             headers=headers,
         )
@@ -207,7 +207,7 @@ class TestAuditStatsApi:
 
     def test_unknown_type_returns_zero_with_null_last(self, seeded_client, headers):
         response = seeded_client.get(
-            "/api/v1/audit-logs/stats",
+            "/api/audit-logs/stats",
             params={"entity_types": "cfg_probe_missing"},
             headers=headers,
         )
@@ -228,7 +228,7 @@ class TestAuditStatsApi:
         seeded_db.flush()
 
         response = seeded_client.get(
-            "/api/v1/audit-logs/stats",
+            "/api/audit-logs/stats",
             params={"entity_types": " cfg_probe_ws , , "},
             headers=headers,
         )
@@ -238,6 +238,6 @@ class TestAuditStatsApi:
         assert [row["entity_type"] for row in rows] == ["cfg_probe_ws"]
         assert rows[0]["count"] == 1
 
-        empty = seeded_client.get("/api/v1/audit-logs/stats", headers=headers)
+        empty = seeded_client.get("/api/audit-logs/stats", headers=headers)
         assert empty.status_code == 200, empty.text
         assert empty.json()["items"] == []

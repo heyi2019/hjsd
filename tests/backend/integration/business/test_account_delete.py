@@ -55,7 +55,7 @@ def _account_with_order(seeded_db, name: str = "delete-target") -> tuple[int, in
 def _delete(seeded_client, account_id: int, *, headers: dict[str, str], reason: object = "重复录入"):
     payload = {} if reason is None else {"reason": reason}
     return seeded_client.request(
-        "DELETE", f"/api/v1/stocks/{account_id}", headers=headers, json=payload
+        "DELETE", f"/api/stocks/{account_id}", headers=headers, json=payload
     )
 
 

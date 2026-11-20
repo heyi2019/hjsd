@@ -133,7 +133,7 @@ def main() -> int:
     from fastapi.testclient import TestClient
     from sqlalchemy import event
 
-    from app.api_v1 import create_app
+    from app.api import create_app
     from app.core.database import get_engine
 
     # 1) 建临时库（与源库同版本，空库）
@@ -173,7 +173,7 @@ def main() -> int:
                     path
                     for r in app.routes
                     if "GET" in (getattr(r, "methods", None) or set())
-                    and (path := getattr(r, "path", "")).startswith("/api/v1")
+                    and (path := getattr(r, "path", "")).startswith("/api")
                 }
             )
             for path in routes:

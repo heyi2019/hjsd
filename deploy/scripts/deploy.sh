@@ -221,7 +221,7 @@ echo "==> 后端健康检查"
 health_response=""
 health_ok=0
 for attempt in {1..30}; do
-  if health_response="$(curl -fsS --max-time 5 http://127.0.0.1/api/v1/health 2>/dev/null)"; then
+  if health_response="$(curl -fsS --max-time 5 http://127.0.0.1/api/health 2>/dev/null)"; then
     printf '%s\n' "$health_response"
     echo "  OK（第 ${attempt} 次检查）"
     health_ok=1

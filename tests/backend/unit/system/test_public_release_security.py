@@ -17,7 +17,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.api_v1 import create_app
+from app.api import create_app
 from app.core.settings import Settings
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
 

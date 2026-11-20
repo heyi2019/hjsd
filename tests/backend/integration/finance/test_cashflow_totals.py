@@ -31,7 +31,7 @@ def _create(client, headers, *, direction: str, amount: str, note: str, occurred
         "amount": amount,
         "note": note,
     }
-    response = client.post("/api/v1/cashflows", json=payload, headers=headers)
+    response = client.post("/api/cashflows", json=payload, headers=headers)
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -39,7 +39,7 @@ def _create(client, headers, *, direction: str, amount: str, note: str, occurred
 def _totals(client, headers, **params):
     """取一次列表响应里的合计；默认 limit=1，用来证明合计不吃分页。"""
     response = client.get(
-        "/api/v1/cashflows", params={"limit": 1, **params}, headers=headers
+        "/api/cashflows", params={"limit": 1, **params}, headers=headers
     )
     assert response.status_code == 200, response.text
     body = response.json()
@@ -84,7 +84,7 @@ def test_keyword_matches_note_and_flow_no_and_totals_follow(seeded_client, heade
 
     # 流水号也能搜到，大小写不敏感。
     by_flow_no = seeded_client.get(
-        "/api/v1/cashflows",
+        "/api/cashflows",
         params={"limit": 10, "keyword": created["flow_no"].lower()},
         headers=headers,
     )
@@ -105,19 +105,19 @@ def test_cashflow_list_and_export_display_selected_operator_names(seeded_client,
     payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "ledger_type": "STUDIO",
                "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
                "category": "房租", "amount": "100", "operator_user_ids": [1, 2]}
-    created = seeded_client.post("/api/v1/cashflows", json=payload, headers=headers)
+    created = seeded_client.post("/api/cashflows", json=payload, headers=headers)
     assert created.status_code == 201, created.text
     flow_no = created.json()["flow_no"]
     assert created.json()["operator"] == "种子用户1、种子用户2"
-    listing = seeded_client.get("/api/v1/cashflows", params={"keyword": flow_no}, headers=headers)
+    listing = seeded_client.get("/api/cashflows", params={"keyword": flow_no}, headers=headers)
     assert listing.status_code == 200, listing.text
     assert listing.json()["items"][0]["operator"] == "种子用户1、种子用户2"
-    exported = seeded_client.get("/api/v1/cashflows/export.csv", params={"keyword": flow_no}, headers=headers)
+    exported = seeded_client.get("/api/cashflows/export.csv", params={"keyword": flow_no}, headers=headers)
     assert exported.status_code == 200, exported.text
     assert "种子用户1、种子用户2" in exported.text
-    updated = seeded_client.put(f"/api/v1/cashflows/{created.json()['id']}", json={**payload, "operator_user_ids": [2]}, headers=headers)
+    updated = seeded_client.put(f"/api/cashflows/{created.json()['id']}", json={**payload, "operator_user_ids": [2]}, headers=headers)
     assert updated.status_code == 200, updated.text
-    listing = seeded_client.get("/api/v1/cashflows", params={"keyword": flow_no}, headers=headers)
+    listing = seeded_client.get("/api/cashflows", params={"keyword": flow_no}, headers=headers)
     assert listing.json()["items"][0]["operator"] == "种子用户2"
     legacy = _create(seeded_client, headers, direction="IN", amount="10", note="未选操作人")
     assert legacy["operator"] == "admin"
@@ -132,7 +132,7 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
     created = _create(seeded_client, headers, direction="IN", amount="12.34", note="导出关键字-甲")
 
     hit = seeded_client.get(
-        "/api/v1/cashflows/export.csv",
+        "/api/cashflows/export.csv",
         params={"keyword": created["flow_no"]},
         headers=headers,
     )
@@ -140,7 +140,7 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
     assert created["flow_no"] in hit.text
 
     miss = seeded_client.get(
-        "/api/v1/cashflows/export.csv",
+        "/api/cashflows/export.csv",
         params={"keyword": "绝不可能命中的关键字-zzz"},
         headers=headers,
     )
@@ -151,7 +151,7 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
 def test_cashflow_export_includes_fund_account_name(seeded_client, seeded_db, headers):
     created = _create(seeded_client, headers, direction="OUT", amount="20", note="资金账户导出")
     pool = seeded_db.scalar(select(Pool).where(Pool.id == 1))
-    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers, params={"keyword": created["flow_no"]})
+    response = seeded_client.get("/api/cashflows/export.csv", headers=headers, params={"keyword": created["flow_no"]})
     assert response.status_code == 200, response.text
     rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))
     assert rows[1][rows[0].index("资金账户")] == pool.name
@@ -161,9 +161,9 @@ def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, header
     payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "ledger_type": "STUDIO",
                "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
                "category": "房租", "amount": "100"}
-    created = seeded_client.post("/api/v1/cashflows", json=payload, headers=headers)
+    created = seeded_client.post("/api/cashflows", json=payload, headers=headers)
     assert created.status_code == 201, created.text
-    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers,
+    response = seeded_client.get("/api/cashflows/export.csv", headers=headers,
                                  params={"keyword": created.json()["flow_no"]})
     assert response.status_code == 200, response.text
     rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
@@ -173,11 +173,11 @@ def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, header
     assert rows[0]["核算属性"] == "工作室运营支出"
     assert rows[0]["来源"] == "手工登记"
     assert rows[0]["类别"] == "房租"
-    business = seeded_client.post("/api/v1/cashflows", headers=headers, json={
+    business = seeded_client.post("/api/cashflows", headers=headers, json={
         **payload, "ledger_type": "BUSINESS", "accounting_attribute": "SELF_DIRECT_COST", "category": "BUY",
     })
     assert business.status_code == 201, business.text
-    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers,
+    response = seeded_client.get("/api/cashflows/export.csv", headers=headers,
                                  params={"keyword": business.json()["flow_no"]})
     rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
     assert rows[0]["账簿"] == "业务资金"
@@ -192,7 +192,7 @@ def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, m
     for index in range(3):
         _create(seeded_client, headers, direction="IN", amount="10", note=f"导出测试{index}\n第二行")
     _create(seeded_client, headers, direction="IN", amount="10", note="范围外流水", occurred_on=date(2026, 10, 5))
-    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers)
+    response = seeded_client.get("/api/cashflows/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     assert all(f"导出测试{index}" in response.text for index in range(3))
     assert "范围外流水" in response.text
@@ -200,7 +200,7 @@ def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, m
     assert len(csv_rows) == 5
     assert sum(row[0] == "行类型" for row in csv_rows) == 1
     assert any("导出测试0\n第二行" in row for row in csv_rows)
-    narrowed = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers, params={"occurred_from": "2026-10-04", "occurred_to": "2026-10-04"})
+    narrowed = seeded_client.get("/api/cashflows/export.csv", headers=headers, params={"occurred_from": "2026-10-04", "occurred_to": "2026-10-04"})
     assert narrowed.status_code == 200, narrowed.text
     assert all(f"导出测试{index}" in narrowed.text for index in range(3))
     assert "范围外流水" not in narrowed.text

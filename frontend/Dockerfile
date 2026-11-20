@@ -21,8 +21,8 @@ COPY frontend/ ./frontend/
 COPY backend/app /app/backend/app
 
 WORKDIR /app/frontend
-# 生产使用同源相对路径，由 nginx 反代 /api/v1 到后端，浏览器零跨域
-ENV VITE_API_BASE=/api/v1
+# 生产使用同源相对路径，由 nginx 反代 /api 到后端，浏览器零跨域
+ENV VITE_API_BASE=/api
 RUN npm run build
 
 # 运行阶段用 alpine + apk nginx，17.7MB，替代 nginx:1.27-alpine 的 76.8MB。

@@ -266,7 +266,7 @@ class TestFoundationApi:
     def test_update_order_type_endpoint(self, seeded_client, seeded_db, headers):
         definition = get_order_type_by_code(seeded_db, "DG")
         response = seeded_client.patch(
-            f"/api/v1/order-types/{definition.id}",
+            f"/api/order-types/{definition.id}",
             json={"name": "代挂API", "description": "接口改名", "sort_order": 33},
             headers=headers,
         )
@@ -278,7 +278,7 @@ class TestFoundationApi:
         target = seeded_db.scalar(select(DocumentSequence).order_by(DocumentSequence.sequence_key))
         target.current_value = 10 ** target.padding - 1
         seeded_db.commit()
-        response = seeded_client.get("/api/v1/sequences", headers=headers)
+        response = seeded_client.get("/api/sequences", headers=headers)
         assert response.status_code == 200, response.text
         row = next(item for item in response.json() if item["sequence_key"] == target.sequence_key)
         assert row["next_number"] == f"{target.prefix}{10 ** target.padding}"
@@ -299,7 +299,7 @@ class TestFoundationApi:
         target.current_value = 9999
         seeded_db.commit()
 
-        response = seeded_client.get("/api/v1/sequences", headers=headers)
+        response = seeded_client.get("/api/sequences", headers=headers)
         assert response.status_code == 200, response.text
         row = next(
             item for item in response.json() if item["sequence_key"] == target.sequence_key
@@ -322,7 +322,7 @@ class TestFoundationApi:
         target.current_value = 99999
         seeded_db.commit()
 
-        response = seeded_client.get("/api/v1/sequences", headers=headers)
+        response = seeded_client.get("/api/sequences", headers=headers)
         assert response.status_code == 200, response.text
         row = next(
             item for item in response.json() if item["sequence_key"] == target.sequence_key

@@ -17,8 +17,8 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.customers.customers import create_customer
 
-CUSTOMERS = "/api/v1/customers"
-COUNTERPARTIES = "/api/v1/counterparties"
+CUSTOMERS = "/api/customers"
+COUNTERPARTIES = "/api/counterparties"
 
 
 
@@ -92,7 +92,7 @@ def test_customer_list_query_filters_by_created_by(seeded_client, seeded_db):
 def test_customer_detail_does_not_record_contact_read_audit(seeded_client, seeded_db, headers):
     customer = _customer(seeded_db, "联系方式客户", phone="13800001234")
     response = seeded_client.get(
-        f"/api/v1/customers/{customer.id}/detail",
+        f"/api/customers/{customer.id}/detail",
         headers=headers,
     )
     assert response.status_code == 200, response.text

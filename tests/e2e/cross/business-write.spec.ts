@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 
 /** 严格业务契约的真实写入联调：不使用旧 account 兼容字段。 */
 test("五类业务写入并按业务规则作废测试订单", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const accountsResponse = await request.get(`${apiBase}/stocks`, { headers });
   expect(accountsResponse.ok()).toBe(true);
@@ -41,7 +41,7 @@ test("五类业务写入并按业务规则作废测试订单", async ({ request 
 });
 
 test("自营分期出售：买入、分期收款、结清后交付", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const accountsResponse = await request.get(`${apiBase}/stocks`, { headers });
   expect(accountsResponse.ok()).toBe(true);
@@ -96,7 +96,7 @@ test("自营分期出售：买入、分期收款、结清后交付", async ({ re
 });
 
 test("资金闭环：独立流水审核冲销、资金账户划转与日对账", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const poolsResponse = await request.get(`${apiBase}/pools`, { headers });
   expect(poolsResponse.ok()).toBe(true);
@@ -150,7 +150,7 @@ test("资金闭环：独立流水审核冲销、资金账户划转与日对账",
 });
 
 test("客户需求池：新建、查询与转单", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const customerResponse = await request.post(`${apiBase}/customers`, {
     headers,
@@ -176,7 +176,7 @@ test("客户需求池：新建、查询与转单", async ({ request }) => {
 });
 
 test("系统通知：查询当前用户的未读通知", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const listed = await request.get(`${apiBase}/notifications?unread_only=true`, { headers });
   expect(listed.status()).toBe(200);
@@ -186,7 +186,7 @@ test("系统通知：查询当前用户的未读通知", async ({ request }) => 
 });
 
 test("治理能力：报表导出与订单附件闭环", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const report = await request.get(`${apiBase}/reports/order-profit/export.csv`, { headers, params: { from: "2026-01-01", to: "2026-12-31" } });
   expect(report.status()).toBe(200);
@@ -210,7 +210,7 @@ test("治理能力：报表导出与订单附件闭环", async ({ request }) => 
 });
 
 test("主数据治理：业务类型零本金标记可见", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const types = await request.get(`${apiBase}/order-types`, { headers });
   expect(types.ok()).toBe(true);
@@ -220,7 +220,7 @@ test("主数据治理：业务类型零本金标记可见", async ({ request }) 
 });
 
 test("治理权限：viewer 拒绝报表导出，审计可追溯业务操作", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const viewerExport = await request.get(`${apiBase}/reports/order-profit/export.csv`, { headers: { "X-Dev-User": "viewer" } });
   expect(viewerExport.status()).toBe(403);
   const adminAudit = await request.get(`${apiBase}/audit-logs`, { headers: { "X-Dev-User": "admin" }, params: { entity_type: "order", limit: 20 } });
@@ -229,7 +229,7 @@ test("治理权限：viewer 拒绝报表导出，审计可追溯业务操作", a
 });
 
 test("数据范围：管理员可配置用户资金账户范围", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const pools = await request.get(`${apiBase}/pools`, { headers });
   const pool = (await pools.json())[0];
@@ -241,7 +241,7 @@ test("数据范围：管理员可配置用户资金账户范围", async ({ reque
 });
 
 test("数据范围：非管理员只能看到授权资金账户", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const adminHeaders = { "X-Dev-User": "admin" };
   const pools = await request.get(`${apiBase}/pools`, { headers: adminHeaders });
   const poolList = await pools.json();

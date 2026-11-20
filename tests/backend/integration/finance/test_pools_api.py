@@ -10,7 +10,7 @@ import pytest
 from app.core.errors import ErrorCode
 from app.settings.field_definitions.pools import get_pool_by_code
 
-POOLS = "/api/v1/pools"
+POOLS = "/api/pools"
 
 
 def test_auth_required(client):
@@ -128,7 +128,7 @@ def test_expired_token_returns_token_expired(client):
     assert response.json()["code"] == ErrorCode.TOKEN_EXPIRED
 
 
-@pytest.mark.parametrize("verb,path", [("get", "/api/v1/sequences"), ("get", "/api/v1/order-types")])
+@pytest.mark.parametrize("verb,path", [("get", "/api/sequences"), ("get", "/api/order-types")])
 def test_unknown_dev_user_is_rejected(client, verb, path):
     response = getattr(client, verb)(path, headers={"X-Dev-User": "ghost"})
     assert response.status_code == 401

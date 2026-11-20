@@ -22,10 +22,10 @@ def test_lead_conditional_field_can_depend_on_core_fields(seeded_client, seeded_
     note.required_when = {"field": "request_type", "op": "eq", "values": ["FIND_ACCOUNT"]}
     seeded_db.commit()
     payload = {"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"}
-    missing = seeded_client.post("/api/v1/leads", json=payload, headers=headers)
+    missing = seeded_client.post("/api/leads", json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "request_note" in missing.text
-    saved = seeded_client.post("/api/v1/leads", json={**payload, "extra_values": {"request_note": "指定条件"}}, headers=headers)
+    saved = seeded_client.post("/api/leads", json={**payload, "extra_values": {"request_note": "指定条件"}}, headers=headers)
     assert saved.status_code == 201, saved.text
 
 
@@ -42,7 +42,7 @@ def test_lead_action_conditional_field_can_depend_on_core_fields(seeded_client, 
     note.required_when = {"field": dependency, "op": "filled"}
     seeded_db.commit()
     payload = {"reason": "关闭"} if action == "close" else {"order_no": order.order_no}
-    url = f"/api/v1/leads/{lead.id}/{action}"
+    url = f"/api/leads/{lead.id}/{action}"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     saved = seeded_client.post(url, json={**payload, "extra_values": {"action_note": "已核对"}}, headers=headers)
@@ -61,13 +61,13 @@ def test_lead_actions_validate_only_their_own_fields(seeded_client, seeded_db, h
                                 label=key, required=True, actor="pytest")
     seeded_db.commit()
     payload = {"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"}
-    missing = seeded_client.post("/api/v1/leads", json=payload, headers=headers)
+    missing = seeded_client.post("/api/leads", json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "request_note" in missing.text
-    created = seeded_client.post("/api/v1/leads", json={**payload, "extra_values": {"request_note": "建档凭据"}}, headers=headers)
+    created = seeded_client.post("/api/leads", json={**payload, "extra_values": {"request_note": "建档凭据"}}, headers=headers)
     assert created.status_code == 201, created.text
     lead_id = created.json()["id"]
-    url = f"/api/v1/leads/{lead_id}/{action}"
+    url = f"/api/leads/{lead_id}/{action}"
     action_payload = {"reason": "结束"} if action == "close" else {"order_no": order.order_no}
     missing_action = seeded_client.post(url, json=action_payload, headers=headers)
     assert missing_action.status_code == 422, missing_action.text
@@ -86,16 +86,16 @@ def test_customer_center_creation_period_filters_lists_summaries_and_export(seed
         group[1].created_at = datetime(2026, 12, 16, 0, 0, 0)
     seeded_db.flush()
     params = {"created_from": "2026-11-16", "created_to": "2026-12-15"}
-    for path, target in (("/api/v1/customers", customers[0]), ("/api/v1/counterparties/page", parties[0]), ("/api/v1/leads/page", leads[0])):
+    for path, target in (("/api/customers", customers[0]), ("/api/counterparties/page", parties[0]), ("/api/leads/page", leads[0])):
         response = seeded_client.get(path, params=params, headers=headers)
         assert response.status_code == 200, response.text
         assert response.json()["total"] == 1
         assert [item["id"] for item in response.json()["items"]] == [target.id]
-    summary = seeded_client.get("/api/v1/leads/summary", params=params, headers=headers)
+    summary = seeded_client.get("/api/leads/summary", params=params, headers=headers)
     assert summary.json() == {"total_count": 1, "open_count": 1}
-    exported = seeded_client.get("/api/v1/customers/export.csv", params=params, headers=headers)
+    exported = seeded_client.get("/api/customers/export.csv", params=params, headers=headers)
     assert "周期客户0" in exported.text and "周期客户1" not in exported.text
-    assert seeded_client.get("/api/v1/customers", params={"created_from": "2026-12-16", "created_to": "2026-12-15"}, headers=headers).status_code == 422
+    assert seeded_client.get("/api/customers", params={"created_from": "2026-12-16", "created_to": "2026-12-15"}, headers=headers).status_code == 422
 
 
 def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, headers):
@@ -104,7 +104,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     )
 
     created = seeded_client.post(
-        "/api/v1/leads",
+        "/api/leads",
         json={
             "customer_id": customer.id,
             "request_type": "FIND_ACCOUNT",
@@ -122,7 +122,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert lead["customer_display_name"] == "需求客户"
 
     listed = seeded_client.get(
-        "/api/v1/leads",
+        "/api/leads",
         params={"customer_id": customer.id, "status": "OPEN"},
         headers=headers,
     )
@@ -131,7 +131,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert listed.json()[0]["customer_display_name"] == "需求客户"
 
     paged = seeded_client.get(
-        "/api/v1/leads/page",
+        "/api/leads/page",
         params={"limit": 10, "offset": 0},
         headers=headers,
     )
@@ -144,7 +144,7 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     assert listed.json()[0]["customer_display_name"] == "需求客户"
 
     updated = seeded_client.patch(
-        f"/api/v1/leads/{lead['id']}",
+        f"/api/leads/{lead['id']}",
         json={"budget": "2500.00", "target": "王者荣耀 安卓区 需要可换绑"},
         headers=headers,
     )
@@ -154,12 +154,12 @@ def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, he
     order = create_order(
         seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest"
     )
-    legacy = seeded_client.post(f"/api/v1/leads/{lead['id']}/convert", json={"order_id": order.id}, headers=headers)
+    legacy = seeded_client.post(f"/api/leads/{lead['id']}/convert", json={"order_id": order.id}, headers=headers)
     assert legacy.status_code == 422, legacy.text
-    missing = seeded_client.post(f"/api/v1/leads/{lead['id']}/convert", json={"order_no": "HS-NOT-FOUND"}, headers=headers)
+    missing = seeded_client.post(f"/api/leads/{lead['id']}/convert", json={"order_no": "HS-NOT-FOUND"}, headers=headers)
     assert missing.status_code == 404, missing.text
     converted = seeded_client.post(
-        f"/api/v1/leads/{lead['id']}/convert",
+        f"/api/leads/{lead['id']}/convert",
         json={"order_no": f"  {order.order_no.lower()}  "},
         headers=headers,
     )
@@ -174,19 +174,19 @@ def test_lead_keyword_search_escapes_like_wildcards(seeded_client, seeded_db, he
         seeded_db, display_name="需求搜索客户", owner_id=9, actor="pytest"
     )
     hit = seeded_client.post(
-        "/api/v1/leads",
+        "/api/leads",
         json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "王者_安卓"},
         headers=headers,
     )
     assert hit.status_code == 201, hit.text
     seeded_client.post(
-        "/api/v1/leads",
+        "/api/leads",
         json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "王者X安卓"},
         headers=headers,
     )
 
     listed = seeded_client.get(
-        "/api/v1/leads", params={"keyword": "王者_安卓"}, headers=headers
+        "/api/leads", params={"keyword": "王者_安卓"}, headers=headers
     )
     assert listed.status_code == 200, listed.text
     assert [item["id"] for item in listed.json()] == [hit.json()["id"]]
@@ -197,7 +197,7 @@ def test_lead_close_does_not_create_order_or_cashflow(seeded_client, seeded_db, 
         seeded_db, display_name="关闭需求客户", owner_id=9, actor="pytest"
     )
     created = seeded_client.post(
-        "/api/v1/leads",
+        "/api/leads",
         json={
             "customer_id": customer.id,
             "request_type": "SELL_ACCOUNT",
@@ -208,7 +208,7 @@ def test_lead_close_does_not_create_order_or_cashflow(seeded_client, seeded_db, 
     assert created.status_code == 201, created.text
 
     closed = seeded_client.post(
-        f"/api/v1/leads/{created.json()['id']}/close",
+        f"/api/leads/{created.json()['id']}/close",
         json={"reason": "客户暂缓"},
         headers=headers,
     )
@@ -222,13 +222,13 @@ def test_get_lead_endpoint_returns_lead(seeded_client, seeded_db, headers):
         seeded_db, display_name="查询需求客户", owner_id=9, actor="pytest"
     )
     created = seeded_client.post(
-        "/api/v1/leads",
+        "/api/leads",
         json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"},
         headers=headers,
     )
     assert created.status_code == 201, created.text
     lead_id = created.json()["id"]
-    response = seeded_client.get(f"/api/v1/leads/{lead_id}", headers=headers)
+    response = seeded_client.get(f"/api/leads/{lead_id}", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["lead_no"] == created.json()["lead_no"]
 
@@ -240,7 +240,7 @@ def test_update_lead_rejects_owner_transfer_for_scoped_user(seeded_client, seede
         seeded_db, display_name="转交需求客户", owner_id=9, actor="pytest"
     )
     created = seeded_client.post(
-        "/api/v1/leads",
+        "/api/leads",
         json={"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"},
         headers=headers,
     )
@@ -251,6 +251,6 @@ def test_update_lead_rejects_owner_transfer_for_scoped_user(seeded_client, seede
     )
     op_headers = {"Authorization": f"Bearer {build_access_token(operator)}"}
     response = seeded_client.patch(
-        f"/api/v1/leads/{lead_id}", json={"owner_id": 9}, headers=op_headers
+        f"/api/leads/{lead_id}", json={"owner_id": 9}, headers=op_headers
     )
     assert response.status_code == 403, response.text

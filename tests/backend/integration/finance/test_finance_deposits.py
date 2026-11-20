@@ -146,7 +146,7 @@ class TestDepositQueries:
         seeded_db.flush()
 
         response = seeded_client.get(
-            "/api/v1/cashflows",
+            "/api/cashflows",
             params={"category": "CUSTOMER_RECEIPT"},
             headers=headers,
         )

@@ -112,7 +112,7 @@ def test_empty_selection_returns_zeros(seeded_db):
 
 def test_legacy_inventory_stats_endpoint_is_removed(seeded_client, headers):
     response = seeded_client.post(
-        "/api/v1/stocks/inventory/stats",
+        "/api/stocks/inventory/stats",
         json={"account_ids": []},
         headers=headers,
     )

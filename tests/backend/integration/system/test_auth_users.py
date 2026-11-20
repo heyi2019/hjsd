@@ -22,7 +22,7 @@ from app.domain.users import User
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",
                  role: str = "VIEWER") -> dict:
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": username,
             "display_name": "测试用户",
@@ -36,7 +36,7 @@ def _create_user(client: TestClient, *, username: str = "alice", password: str =
 
 def _login(client: TestClient, username: str, password: str) -> str:
     response = client.post(
-        "/api/v1/auth/login",
+        "/api/auth/login",
         json={"username": username, "password": password},
     )
     assert response.status_code == 200, response.text
@@ -44,7 +44,7 @@ def _login(client: TestClient, username: str, password: str) -> str:
 
 def test_create_user_blank_display_name_rejected(client: TestClient):
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "blank-name",
             "display_name": "   ",
@@ -58,7 +58,7 @@ def test_create_user_blank_display_name_rejected(client: TestClient):
 def test_create_user_duplicate_username(client: TestClient):
     _create_user(client)
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "alice",
             "display_name": "另一个 Alice",
@@ -70,7 +70,7 @@ def test_create_user_duplicate_username(client: TestClient):
 
 def test_create_user_with_unknown_team_ids(client: TestClient):
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "carol",
             "display_name": "Carol",
@@ -84,7 +84,7 @@ def test_create_user_with_unknown_team_ids(client: TestClient):
 
 def test_create_user_with_unknown_pool_ids(client: TestClient):
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "pool-user",
             "display_name": "池授权用户",
@@ -98,13 +98,13 @@ def test_create_user_with_unknown_pool_ids(client: TestClient):
 
 def test_create_user_with_existing_team_ids(client: TestClient):
     team = client.post(
-        "/api/v1/teams",
+        "/api/teams",
         json={"code": "t1", "name": "一组"},
         headers={"X-Dev-User": "admin"},
     )
     assert team.status_code == 201, team.text
     created = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "dave",
             "display_name": "Dave",
@@ -118,7 +118,7 @@ def test_create_user_with_existing_team_ids(client: TestClient):
 
 def test_create_user_non_admin_forbidden(client: TestClient):
     response = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "eve",
             "display_name": "Eve",
@@ -130,7 +130,7 @@ def test_create_user_non_admin_forbidden(client: TestClient):
 
 def test_update_user_not_found(client: TestClient):
     response = client.patch(
-        "/api/v1/users/999",
+        "/api/users/999",
         json={"display_name": "无人"},
         headers={"X-Dev-User": "admin"},
     )
@@ -140,7 +140,7 @@ def test_update_user_not_found(client: TestClient):
 def test_update_user_invalid_role(client: TestClient):
     created = _create_user(client)
     response = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"role": "KING"},
         headers={"X-Dev-User": "admin"},
     )
@@ -150,7 +150,7 @@ def test_update_user_invalid_role(client: TestClient):
 def test_update_user_invalid_owner_scope_rejected(client: TestClient):
     created = _create_user(client)
     response = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"owner_scope": "PUBLIC"},
         headers={"X-Dev-User": "admin"},
     )
@@ -160,7 +160,7 @@ def test_update_user_invalid_owner_scope_rejected(client: TestClient):
 def test_update_user_explicit_blank_display_name_rejected(client: TestClient):
     created = _create_user(client)
     response = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"display_name": "   "},
         headers={"X-Dev-User": "admin"},
     )
@@ -170,7 +170,7 @@ def test_update_user_explicit_blank_display_name_rejected(client: TestClient):
 def test_update_user_success(client: TestClient):
     created = _create_user(client)
     response = client.patch(
-        f"/api/v1/users/{created['id']}",
+        f"/api/users/{created['id']}",
         json={"display_name": "Alice Wang", "phone": "13800000000", "is_active": True},
         headers={"X-Dev-User": "admin"},
     )
@@ -187,12 +187,12 @@ def test_user_phone_is_unique_and_creation_records_hired_on(client: TestClient):
         "role": "OPERATOR",
         "phone": "13800001111",
     }
-    created = client.post("/api/v1/users", json=payload, headers={"X-Dev-User": "admin"})
+    created = client.post("/api/users", json=payload, headers={"X-Dev-User": "admin"})
     assert created.status_code == 201, created.text
     assert created.json()["hired_on"] == date.today().isoformat()
 
     duplicate = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={**payload, "username": "phone-owner-2", "display_name": "重复手机号"},
         headers={"X-Dev-User": "admin"},
     )
@@ -208,7 +208,7 @@ def test_user_phone_is_normalized_and_format_validated(client: TestClient):
     填的脏值（如 8 位）则永远不会生效，且没有任何报错。
     """
     created = client.post(
-        "/api/v1/users",
+        "/api/users",
         json={
             "username": "phone-norm",
             "display_name": "通讯录复制",
@@ -222,7 +222,7 @@ def test_user_phone_is_normalized_and_format_validated(client: TestClient):
     assert created.json()["phone"] == "13900002222"
 
     bad = client.patch(
-        f"/api/v1/users/{created.json()['id']}",
+        f"/api/users/{created.json()['id']}",
         json={"phone": "1390000"},
         headers={"X-Dev-User": "admin"},
     )
@@ -230,7 +230,7 @@ def test_user_phone_is_normalized_and_format_validated(client: TestClient):
     assert "手机号" in bad.json()["message"]
 
     cleared = client.patch(
-        f"/api/v1/users/{created.json()['id']}",
+        f"/api/users/{created.json()['id']}",
         json={"phone": "  "},
         headers={"X-Dev-User": "admin"},
     )

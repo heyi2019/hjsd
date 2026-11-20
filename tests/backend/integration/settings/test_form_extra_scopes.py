@@ -50,7 +50,7 @@ def test_form_values_must_use_registered_scope(seeded_db):
 
 
 def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
-    response = seeded_client.get("/api/v1/order-form-fields/scopes", headers=headers)
+    response = seeded_client.get("/api/order-form-fields/scopes", headers=headers)
     assert response.status_code == 200, response.text
     scopes = response.json()
     expected = {item.code for item in FORM_SCOPES}
@@ -83,14 +83,14 @@ def test_all_registered_long_scopes_can_configure_fields_and_labels(seeded_clien
     assert scopes
     for scope in scopes:
         if scope.group != GROUP_SYSTEM:
-            created = seeded_client.post("/api/v1/order-form-fields", headers=headers, json={
+            created = seeded_client.post("/api/order-form-fields", headers=headers, json={
                 "order_type_code": scope.code, "field_key": "receipt", "label": "凭据", "field_type": "TEXT",
             })
             assert created.status_code == 201, f"{scope.code}: {created.text}"
-        saved = seeded_client.put("/api/v1/order-form-fields/section-labels", headers=headers,
+        saved = seeded_client.put("/api/order-form-fields/section-labels", headers=headers,
                                  json={"order_type_code": scope.code, "labels": {"EXTRA": "扩展信息"}})
         assert saved.status_code == 200, f"{scope.code}: {saved.text}"
-        loaded = seeded_client.get("/api/v1/order-form-fields/section-labels", headers=headers,
+        loaded = seeded_client.get("/api/order-form-fields/section-labels", headers=headers,
                                    params={"order_type_code": scope.code})
         assert loaded.status_code == 200, f"{scope.code}: {loaded.text}"
         assert loaded.json()["EXTRA"] == "扩展信息"
@@ -109,11 +109,11 @@ def test_order_account_custom_fields_do_not_mix_order_types(seeded_client, seede
     payload = {"order_type": order_type, "trade_date": D, "account_snapshot": {
         "game_account": f"scope-test-{order_type}", "extra_values": {"shared_value": value},
     }}
-    created = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    created = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert created.status_code == 201, created.text
     account = seeded_db.get(Account, created.json()["account_id"])
     assert account.form_extra["shared_value"] == value
-    invalid = seeded_client.post("/api/v1/orders", json={**payload, "account_snapshot": {
+    invalid = seeded_client.post("/api/orders", json={**payload, "account_snapshot": {
         "game_account": f"scope-invalid-{order_type}", "extra_values": {"shared_value": other_value},
     }}, headers=headers)
     assert invalid.status_code == 422, invalid.text
@@ -213,7 +213,7 @@ def test_business_responsible_is_required_by_backend(seeded_db, order_type_code,
 
 def _create_order(seeded_client, headers) -> dict:
     response = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": D,
@@ -229,7 +229,7 @@ def _create_order(seeded_client, headers) -> dict:
 def test_post_event_persists_form_extra(seeded_client, seeded_db, headers):
     order = _create_order(seeded_client, headers)
     response = seeded_client.post(
-        f"/api/v1/orders/{order['id']}/events",
+        f"/api/orders/{order['id']}/events",
         json={
             "event_type": "OPERATE",
             "operation_type": "IMAGE",
@@ -250,14 +250,14 @@ def test_post_event_persists_form_extra(seeded_client, seeded_db, headers):
 
 def test_cancel_order_merges_form_extra_into_order(seeded_client, seeded_db, headers):
     response = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={"order_type": "HS", "trade_date": D, "account_snapshot": {"game_account": f"cancel-extra-{D}"}},
         headers=headers,
     )
     assert response.status_code == 201, response.text
     order_id = response.json()["id"]
     cancel = seeded_client.post(
-        f"/api/v1/orders/{order_id}/cancel",
+        f"/api/orders/{order_id}/cancel",
         json={"reason": "误建", "form_extra": {"approved_by": "何一"}},
         headers=headers,
     )
@@ -269,7 +269,7 @@ def test_cancel_order_merges_form_extra_into_order(seeded_client, seeded_db, hea
 def test_patch_order_merges_form_extra(seeded_client, seeded_db, headers):
     order = _create_order(seeded_client, headers)
     response = seeded_client.patch(
-        f"/api/v1/orders/{order['id']}",
+        f"/api/orders/{order['id']}",
         json={"form_extra": {"source_channel": "闲鱼"}},
         headers=headers,
     )
@@ -286,14 +286,14 @@ def test_profit_allocations_merge_form_extra(seeded_client, seeded_db, headers):
                             label="分润备注", required=True, actor="pytest")
     seeded_db.flush()
     missing = seeded_client.put(
-        f"/api/v1/orders/{order['id']}/profit-allocations",
+        f"/api/orders/{order['id']}/profit-allocations",
         json={"items": [{"user_id": None, "role": "OWNER", "allocation_rate": "100", "allocation_amount": "0"}]},
         headers=headers,
     )
     assert missing.status_code == 422, missing.text
     assert "分润备注" in missing.text
     response = seeded_client.put(
-        f"/api/v1/orders/{order['id']}/profit-allocations",
+        f"/api/orders/{order['id']}/profit-allocations",
         json={
             "items": [{"user_id": None, "role": "OWNER", "allocation_rate": "100", "allocation_amount": "0"}],
             "form_extra": {"remark": "按比例全额"},
@@ -306,10 +306,10 @@ def test_profit_allocations_merge_form_extra(seeded_client, seeded_db, headers):
 
 
 def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, headers):
-    pools = seeded_client.get("/api/v1/pools", headers=headers).json()
+    pools = seeded_client.get("/api/pools", headers=headers).json()
     pool_id = pools[0]["id"] if isinstance(pools, list) else pools["items"][0]["id"]
     created = seeded_client.post(
-        "/api/v1/cashflows",
+        "/api/cashflows",
         json={
             "pool_id": pool_id,
             "occurred_on": D,
@@ -329,7 +329,7 @@ def test_cashflow_create_and_reverse_form_extra(seeded_client, seeded_db, header
 
     # 流水创建即已入账，直接冲销，冲销流水携带 form_extra
     reversed_flow = seeded_client.post(
-        f"/api/v1/cashflows/{flow_id}/reverse",
+        f"/api/cashflows/{flow_id}/reverse",
         json={"reversed_on": D, "reason": "录错", "form_extra": {"ticket": "RV-1"}},
         headers=headers,
     )

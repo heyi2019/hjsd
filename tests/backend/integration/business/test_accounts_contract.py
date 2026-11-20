@@ -74,7 +74,7 @@ class TestCreateAccountGuards:
         engine = seeded_db.get_bind()
         event.listen(engine, "after_cursor_execute", record_sql)
         try:
-            response = seeded_client.get("/api/v1/stocks/inventory/ledger", headers=headers)
+            response = seeded_client.get("/api/stocks/inventory/ledger", headers=headers)
         finally:
             event.remove(engine, "after_cursor_execute", record_sql)
 
@@ -231,10 +231,10 @@ class TestCreateAccountGuards:
         boundary.inventory_entry_at = datetime.combine(date.today() - timedelta(days=30), datetime.min.time())
         unlinked.inventory_entry_at = datetime.combine(date.today() - timedelta(days=45), datetime.min.time())
         seeded_db.flush()
-        dashboard = seeded_client.get("/api/v1/dashboard/summary", headers=headers).json()["inventory"]
-        ledger = seeded_client.get("/api/v1/stocks/inventory/ledger", headers=headers).json()
-        overdue = seeded_client.get("/api/v1/stocks/inventory/ledger", params={"age_gt_days": 30}, headers=headers).json()
-        aging = seeded_client.get("/api/v1/stocks/inventory/ledger", params={"age_gt_days": 7}, headers=headers).json()
+        dashboard = seeded_client.get("/api/dashboard/summary", headers=headers).json()["inventory"]
+        ledger = seeded_client.get("/api/stocks/inventory/ledger", headers=headers).json()
+        overdue = seeded_client.get("/api/stocks/inventory/ledger", params={"age_gt_days": 30}, headers=headers).json()
+        aging = seeded_client.get("/api/stocks/inventory/ledger", params={"age_gt_days": 7}, headers=headers).json()
         assert dashboard["account_count"] == ledger["total"] == 3
         assert dashboard["overdue_count"] == overdue["total"] == 1
         assert dashboard["aging_count"] == aging["total"] == 3
@@ -523,25 +523,25 @@ class TestAccountsApi:
     ):
         account = _account(seeded_db, "legacy-route-target")
 
-        listed = seeded_client.get("/api/v1/stocks", headers=headers)
+        listed = seeded_client.get("/api/stocks", headers=headers)
         assert listed.status_code == 404, listed.text
 
         updated = seeded_client.patch(
-            f"/api/v1/stocks/{account.id}",
+            f"/api/stocks/{account.id}",
             json={"note": "不应通过旧接口修改"},
             headers=headers,
         )
         assert updated.status_code in {404, 405}, updated.text
 
     def test_legacy_inventory_endpoint_is_removed(self, seeded_client, headers):
-        response = seeded_client.get("/api/v1/stocks/inventory", headers=headers)
+        response = seeded_client.get("/api/stocks/inventory", headers=headers)
 
         # 路径本身会被账号 PATCH 路由占位，但旧库存 GET 已不再提供。
         assert response.status_code == 405
 
     def test_legacy_inventory_cost_summary_endpoint_is_removed(self, seeded_client, headers):
         response = seeded_client.get(
-            "/api/v1/stocks/inventory/cost-summary",
+            "/api/stocks/inventory/cost-summary",
             headers=headers,
         )
 
@@ -584,12 +584,12 @@ class TestAccountsApi:
         headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
         hidden_detail = seeded_client.get(
-            f"/api/v1/orders/{other_order.id}/execution-detail", headers=headers
+            f"/api/orders/{other_order.id}/execution-detail", headers=headers
         )
         assert hidden_detail.status_code == 404
 
         inventory = seeded_client.get(
-            "/api/v1/stocks/inventory/ledger",
+            "/api/stocks/inventory/ledger",
             params={"limit": 10, "offset": 0},
             headers=headers,
         )
@@ -630,7 +630,7 @@ class TestAccountsApi:
         headers = {"Authorization": f"Bearer {build_access_token(user)}"}
 
         response = seeded_client.get(
-            f"/api/v1/orders/{foreign_order.id}/execution-detail", headers=headers
+            f"/api/orders/{foreign_order.id}/execution-detail", headers=headers
         )
         assert response.status_code == 404
 
@@ -645,7 +645,7 @@ class TestAccountsApi:
         viewer_headers = {"Authorization": f"Bearer {build_access_token(viewer)}"}
 
         detail = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail",
+            f"/api/orders/{order.id}/execution-detail",
             headers=viewer_headers,
         )
         assert detail.status_code == 200, detail.text
@@ -656,7 +656,7 @@ class TestAccountsApi:
         order = _buy(seeded_db, account, amount="300")
 
         response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -668,7 +668,7 @@ class TestAccountsApi:
         order = _buy(seeded_db, account, amount="300")
 
         order_response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert order_response.status_code == 200, order_response.text
@@ -693,7 +693,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -737,7 +737,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -772,7 +772,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -795,7 +795,7 @@ class TestAccountsApi:
         )
 
         response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text
@@ -817,7 +817,7 @@ class TestAccountsApi:
             actor="pytest",
         )
         response = seeded_client.get(
-            f"/api/v1/orders/{order.id}/execution-detail", headers=headers
+            f"/api/orders/{order.id}/execution-detail", headers=headers
         )
 
         assert response.status_code == 200, response.text

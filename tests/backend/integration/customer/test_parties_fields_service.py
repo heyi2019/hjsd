@@ -135,7 +135,7 @@ def test_conditional_counterparty_field_tracks_core_field_on_create_and_edit(see
 def test_customer_extra_fields_can_be_edited_via_api(seeded_client, seeded_db, headers):
     _add_field(seeded_db, "remark")
     customer = create_customer(seeded_db, display_name="字段编辑客户", actor="pytest", extra_values={"remark": "旧值"})
-    saved = seeded_client.patch(f"/api/v1/customers/{customer.id}", headers=headers,
+    saved = seeded_client.patch(f"/api/customers/{customer.id}", headers=headers,
                                 json={"extra_values": {"remark": "新值"}})
     assert saved.status_code == 200, saved.text
     assert saved.json()["extra_values"]["remark"] == "新值"

@@ -4,7 +4,7 @@ from __future__ import annotations
 from app.core.errors import ErrorCode
 from app.settings.field_definitions.classification import classification_for_order_type
 
-ORDER_TYPES = "/api/v1/order-types"
+ORDER_TYPES = "/api/order-types"
 
 
 def test_business_classification_is_fixed_per_order_type():
@@ -49,7 +49,7 @@ def test_new_sequence_created_with_business(client, headers):
     client.post(
         ORDER_TYPES, json={"code": "TB", "name": "同行代收"}, headers=headers
     )
-    sequences = client.get("/api/v1/sequences", headers=headers).json()
+    sequences = client.get("/api/sequences", headers=headers).json()
     assert any(item["sequence_key"] == "ORDER_TB" and item["next_number"] == "TB0001" for item in sequences)
 
 

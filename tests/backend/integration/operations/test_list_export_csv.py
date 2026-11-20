@@ -72,7 +72,7 @@ def _headers(text: str) -> list[str]:
 
 def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seeded_db):
     _seed_order(seeded_db, order_no="HS9801")
-    response = seeded_client.get("/api/v1/orders/export.csv", headers=headers)
+    response = seeded_client.get("/api/orders/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/csv")
     body = response.text
@@ -97,19 +97,19 @@ def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seed
     other_game.account_snapshot = {"game_type": "原神"}
     seeded_db.flush()
 
-    full = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    full = seeded_client.get("/api/orders/export.csv", headers=headers).text
     assert "HSMINE01" in full
     assert "HSFOREIGN01" in full  # 不带 mine 仍是全量
 
     scoped = seeded_client.get(
-        "/api/v1/orders/export.csv", headers=headers, params={"mine": True}
+        "/api/orders/export.csv", headers=headers, params={"mine": True}
     ).text
     assert "HSMINE01" in scoped
     assert "HSFOREIGN01" not in scoped
 
     # XLSX 与 CSV 同口径
     xlsx = seeded_client.get(
-        "/api/v1/orders/export.xlsx", headers=headers, params={"mine": True}
+        "/api/orders/export.xlsx", headers=headers, params={"mine": True}
     )
     assert xlsx.status_code == 200
     workbook = openpyxl.load_workbook(io.BytesIO(xlsx.content))
@@ -126,12 +126,12 @@ def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seed
         "mine": True, "status": "IN_PROGRESS", "trade_date_from": "2026-01-01",
         "trade_date_to": "2026-01-01", "game_type": "王者荣耀", "inventory_operator_ids": [1],
     }
-    filtered_csv = seeded_client.get("/api/v1/orders/export.csv", headers=headers, params=filters)
+    filtered_csv = seeded_client.get("/api/orders/export.csv", headers=headers, params=filters)
     assert filtered_csv.status_code == 200, filtered_csv.text
     assert "HSMINE01" in filtered_csv.text
     assert "HSMINE02" not in filtered_csv.text
     assert "HSFOREIGN01" not in filtered_csv.text
-    filtered_xlsx = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers, params=filters)
+    filtered_xlsx = seeded_client.get("/api/orders/export.xlsx", headers=headers, params=filters)
     assert filtered_xlsx.status_code == 200
     workbook = openpyxl.load_workbook(io.BytesIO(filtered_xlsx.content))
     cells = [str(cell.value) for row in workbook.worksheets[0].iter_rows() for cell in row if cell.value is not None]
@@ -143,7 +143,7 @@ def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seed
 def test_orders_export_keeps_single_row_header(seeded_client, headers, seeded_db):
     """CSV 必须单行表头：导入解析以首个非空行为表头，多行表头会让回流导入错位。"""
     _seed_order(seeded_db, order_no="HS9804")
-    body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    body = seeded_client.get("/api/orders/export.csv", headers=headers).text
     first = body.splitlines()[0].lstrip("\ufeff").split(",")
 
     assert first[0] == "行类型"
@@ -154,7 +154,7 @@ def test_orders_export_keeps_single_row_header(seeded_client, headers, seeded_db
 
 def test_orders_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers, seeded_db):
     _seed_order(seeded_db, order_no="HS9803", form_extra={"delivery_note": "已交付"})
-    body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    body = seeded_client.get("/api/orders/export.csv", headers=headers).text
     header = _headers(body)
     assert "详情" not in header
     assert "账号密码" not in header
@@ -174,7 +174,7 @@ def test_order_detail_export_does_not_include_account_password():
 
 
 def test_installments_export_appends_full_detail_in_the_same_csv_table(seeded_client, headers):
-    body = seeded_client.get("/api/v1/installments/export.csv", headers=headers).text
+    body = seeded_client.get("/api/installments/export.csv", headers=headers).text
     header = _headers(body)
     assert "详情" not in header
     assert "期次明细" in header
@@ -184,7 +184,7 @@ def test_installments_export_appends_full_detail_in_the_same_csv_table(seeded_cl
 def test_orders_export_respects_hidden_column(seeded_client, headers, seeded_db):
     columns = next(
         scope
-        for scope in seeded_client.get("/api/v1/list-columns", headers=headers).json()
+        for scope in seeded_client.get("/api/list-columns", headers=headers).json()
         if scope["code"] == "LEDGER"
     )["columns"]
     items = [
@@ -196,15 +196,15 @@ def test_orders_export_respects_hidden_column(seeded_client, headers, seeded_db)
         for index, column in enumerate(columns)
     ]
     assert seeded_client.put(
-        "/api/v1/list-columns/LEDGER", json={"items": items}, headers=headers
+        "/api/list-columns/LEDGER", json={"items": items}, headers=headers
     ).status_code == 200
 
-    body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    body = seeded_client.get("/api/orders/export.csv", headers=headers).text
     header = _headers(body)
     assert "状态" not in header
     assert "订单号" in header  # 其余可见列仍在
 
-    seeded_client.delete("/api/v1/list-columns/LEDGER", headers=headers)
+    seeded_client.delete("/api/list-columns/LEDGER", headers=headers)
 
 
 def test_orders_export_includes_custom_column_with_translated_value(
@@ -213,12 +213,12 @@ def test_orders_export_includes_custom_column_with_translated_value(
     _seed_select_field(seeded_db)
     _seed_order(seeded_db, order_no="HS9802", form_extra={"trade_role": "BUYER"})
     assert seeded_client.post(
-        "/api/v1/list-columns/LEDGER/custom",
+        "/api/list-columns/LEDGER/custom",
         json={"field_key": "trade_role", "label": "交易角色"},
         headers=headers,
     ).status_code == 200
 
-    body = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
+    body = seeded_client.get("/api/orders/export.csv", headers=headers).text
     header = _headers(body)
     assert "交易角色" in header
     assert "买家" in body  # SELECT 码值翻译成中文
@@ -228,7 +228,7 @@ def test_orders_export_includes_custom_column_with_translated_value(
 def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
     """xlsx 导出：主订单 + 详情 + 操作/资金/返点三类明细，详情表头三级且一级为真合并。"""
     _seed_order(seeded_db, order_no="HS9805", form_extra={"delivery_note": "已交付"})
-    response = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
+    response = seeded_client.get("/api/orders/export.xlsx", headers=headers)
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith(
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -268,7 +268,7 @@ def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_clie
         form_extra={"sell_bound_phone": "13800000002", "sell_intermediary_platform": "其他", "sell_intermediary_platform_other": "分期平台"},
     )
 
-    response = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
+    response = seeded_client.get("/api/orders/export.xlsx", headers=headers)
     workbook = openpyxl.load_workbook(io.BytesIO(response.content))
     sheet = workbook["详情信息"]
 
@@ -320,7 +320,7 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
     """操作 / 资金 / 返点明细拆成独立 sheet 的列，不再塞成单个 JSON 单元格。"""
     _seed_order(seeded_db, order_no="HS9807")
 
-    response = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
+    response = seeded_client.get("/api/orders/export.xlsx", headers=headers)
     workbook = openpyxl.load_workbook(io.BytesIO(response.content))
 
     # 详情 sheet 不再承载这三类 JSON 列
@@ -376,7 +376,7 @@ def test_event_platform_follows_unlist_scope():
 
 
 def test_orders_export_xlsx_writes_list_export_audit(seeded_client, headers, seeded_db):
-    seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
+    seeded_client.get("/api/orders/export.xlsx", headers=headers)
     audits = seeded_db.scalars(
         select(AuditLog).where(AuditLog.entity_type == "list_export")
     ).all()
@@ -389,33 +389,33 @@ def test_orders_export_xlsx_writes_list_export_audit(seeded_client, headers, see
 
 def test_customers_export_returns_full_contact(seeded_client, headers, seeded_db):
     created = seeded_client.post(
-        "/api/v1/customers",
+        "/api/customers",
         json={"display_name": "导出客户甲", "phone": "13800001111"},
         headers=headers,
     )
     assert created.status_code == 201, created.text
 
-    admin_body = seeded_client.get("/api/v1/customers/export.csv", headers=headers).text
+    admin_body = seeded_client.get("/api/customers/export.csv", headers=headers).text
     assert "13800001111" in admin_body
 
 
 
 def test_cashflows_export_chinese_header(seeded_client, headers, seeded_db):
-    response = seeded_client.get("/api/v1/cashflows/export.csv", headers=headers)
+    response = seeded_client.get("/api/cashflows/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     header = _headers(response.text)
     assert header[0] == "行类型"
 
 
 def test_rebates_export_chinese_header(seeded_client, headers, seeded_db):
-    response = seeded_client.get("/api/v1/rebates/export.csv", headers=headers)
+    response = seeded_client.get("/api/rebates/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith("text/csv")
     assert _headers(response.text)[0] == "行类型"
 
 
 def test_export_writes_list_export_audit(seeded_client, headers, seeded_db):
-    seeded_client.get("/api/v1/orders/export.csv", headers=headers)
+    seeded_client.get("/api/orders/export.csv", headers=headers)
     actions = [
         row.action
         for row in seeded_db.scalars(
@@ -448,7 +448,7 @@ def test_order_exports_have_no_total_limit(seeded_client, headers, monkeypatch):
         return list_orders(db, **kwargs)
     monkeypatch.setattr("app.business.export_router.orders_list_orders", spy)
     for suffix in ("csv", "xlsx"):
-        response = seeded_client.get(f"/api/v1/orders/export.{suffix}", headers=headers)
+        response = seeded_client.get(f"/api/orders/export.{suffix}", headers=headers)
         assert response.status_code == 200, response.text
     assert seen == [None, None]
 
@@ -465,7 +465,7 @@ def test_stocks_export_has_no_total_limit(seeded_client, headers, monkeypatch):
         return original(db, **kwargs)
 
     monkeypatch.setattr("app.business.stocks.router.stocks_list_accounts", spy)
-    resp = seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
+    resp = seeded_client.get("/api/stocks/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert "limit" in seen and seen["limit"] is None
 
@@ -481,14 +481,14 @@ def test_customers_export_has_no_total_limit(seeded_client, headers, monkeypatch
         return original(db, **kwargs)
 
     monkeypatch.setattr("app.customers.customers_router.parties_list_customers", spy)
-    resp = seeded_client.get("/api/v1/customers/export.csv", headers=headers)
+    resp = seeded_client.get("/api/customers/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert "limit" in seen and seen["limit"] is None
 
 def test_stocks_export_audit_records_row_count_and_truncated(
     seeded_client, headers, seeded_db
 ):
-    seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
+    seeded_client.get("/api/stocks/export.csv", headers=headers)
     audit = seeded_db.scalars(
         select(AuditLog)
         .where(
@@ -508,5 +508,5 @@ def test_installments_export_all_query_params_explicitly_none(seeded_client, hea
     此前漏传 contract_type，Query(None) 对象被透传进 SQL 触发 psycopg 适配 500。
     本用例锁定「无筛选导出应正常返回」契约。
     """
-    resp = seeded_client.get("/api/v1/installments/export.csv", headers=headers)
+    resp = seeded_client.get("/api/installments/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text

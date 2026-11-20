@@ -90,7 +90,7 @@ class TestOrdersApi:
             actor="pytest",
         )
         created = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
@@ -101,7 +101,7 @@ class TestOrdersApi:
         assert created.status_code == 201, created.text
 
         response = seeded_client.post(
-            f"/api/v1/orders/{created.json()['id']}/events",
+            f"/api/orders/{created.json()['id']}/events",
             json={
                 "event_type": "BUY",
                 "amount": "-1.00",
@@ -122,7 +122,7 @@ class TestOrdersApi:
             actor="pytest",
         )
         created = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={
                 "order_type": "HS",
                 "trade_date": TODAY.isoformat(),
@@ -136,7 +136,7 @@ class TestOrdersApi:
         assert order["account_id"]
 
         buy = seeded_client.post(
-            f"/api/v1/orders/{order['id']}/events",
+            f"/api/orders/{order['id']}/events",
             json={
                 "event_type": "BUY",
                 "amount": "1000.00",
@@ -148,7 +148,7 @@ class TestOrdersApi:
         assert buy.status_code == 201
 
         event = seeded_client.post(
-            f"/api/v1/orders/{order['id']}/events",
+            f"/api/orders/{order['id']}/events",
             json={
                 "event_type": "SELL",
                 "amount": "1400.00",
@@ -180,12 +180,12 @@ class TestOrdersApi:
 
     def test_viewer_cannot_post_event(self, seeded_client, headers, viewer_headers):
         order = seeded_client.post(
-            "/api/v1/orders",
+            "/api/orders",
             json={"order_type": "HS", "trade_date": TODAY.isoformat()},
             headers=headers,
         ).json()
         response = seeded_client.post(
-            f"/api/v1/orders/{order['id']}/events",
+            f"/api/orders/{order['id']}/events",
             json={
                 "event_type": "SELL",
                 "amount": "100.00",
@@ -200,7 +200,7 @@ class TestOrdersApi:
     def test_pool_balance_endpoint(self, seeded_client, headers, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         balance = seeded_client.get(
-            f"/api/v1/pools/{invest.id}/balance", headers=headers
+            f"/api/pools/{invest.id}/balance", headers=headers
         ).json()
         assert balance["pool_code"] == "HJ_INVEST"
         assert balance["cash_balance"] == "0.00"

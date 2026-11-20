@@ -38,7 +38,7 @@ def test_consignment_conditions_use_selected_platform_and_operators(seeded_db, s
                          actor="pytest", account_snapshot={"game_account": f"consignment-condition-{dependency}"})
     _conditional_receipt(seeded_db, "CONSIGN", dependency)
     seeded_db.commit()
-    url = f"/api/v1/orders/{order.id}/events"
+    url = f"/api/orders/{order.id}/events"
     payload = {"event_type": "OPERATE", "operation_type": "CONSIGNMENT", "occurred_on": "2026-11-02",
                "operator_user_ids": [1], "form_extra": {"consignment_platforms": ["测试平台"]}}
     missing = seeded_client.post(url, json=payload, headers=headers)
@@ -72,7 +72,7 @@ def test_inventory_cancellation_conditions_use_parent_form_values(seeded_db, see
         payload["amount"] = amount
     if buy is not None and amount != "0":
         payload.update(pool_id=buy.pool_id, offset_event_id=buy.id)
-    url = f"/api/v1/orders/{order.id}/inventory-offsale"
+    url = f"/api/orders/{order.id}/inventory-offsale"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "条件凭据" in missing.text
@@ -89,7 +89,7 @@ def test_plain_order_cancellation_conditions_use_reason(seeded_db, seeded_client
                          actor="pytest", account_snapshot={"game_account": "plain-conditional-cancel"})
     _conditional_receipt(seeded_db, "ORDERCANC", "reason")
     seeded_db.commit()
-    url = f"/api/v1/orders/{order.id}/cancel"
+    url = f"/api/orders/{order.id}/cancel"
     missing = seeded_client.post(url, json={"reason": "取消交易"}, headers=headers)
     assert missing.status_code == 422 and "条件凭据" in missing.text
     saved = seeded_client.post(url, json={"reason": "取消交易", "form_extra": {"receipt": "凭据A"}}, headers=headers)
@@ -103,7 +103,7 @@ def test_inventory_refund_records_selected_operators(seeded_db, seeded_client, h
     buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100",
                         occurred_on=date(2026, 11, 1), actor="pytest")
     seeded_db.commit()
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/inventory-offsale", headers=headers, json={
+    response = seeded_client.post(f"/api/orders/{order.id}/inventory-offsale", headers=headers, json={
         "reason": "取消交易", "amount": "30", "pool_id": buy.pool_id, "offset_event_id": buy.id,
         "occurred_on": "2026-11-02", "unlisted_at": "2026-11-02T12:00", "operator_user_ids": [1, 2],
     })
@@ -129,7 +129,7 @@ def test_cancel_event_conditions_use_reason_and_amount(seeded_db, seeded_client,
     seeded_db.commit()
     payload = {"event_type": "CANCEL", "amount": "30", "occurred_on": "2026-11-02", "reason": "取消交易",
                "offset_event_id": source.id, "pool_id": source.pool_id, "finalize_sale_cancel": is_sale}
-    url = f"/api/v1/orders/{order.id}/events"
+    url = f"/api/orders/{order.id}/events"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422 and "条件凭据" in missing.text
     saved = seeded_client.post(url, json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
@@ -148,7 +148,7 @@ def test_platform_unlist_conditions_use_original_form_values(seeded_db, seeded_c
     payload = {"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-11-02", "reason": "平台下架",
                "form_extra": {"consignment_event_id": listing.id, "consignment_platforms": ["测试平台"],
                               "platform_unlisted_at": "2026-11-02T12:00", "platform_unlist_scope": "PLATFORM"}}
-    url = f"/api/v1/orders/{order.id}/events"
+    url = f"/api/orders/{order.id}/events"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422 and "条件凭据" in missing.text
     saved = seeded_client.post(url, json={**payload, "form_extra": {**payload["form_extra"], "receipt": "凭据A"}}, headers=headers)
@@ -179,7 +179,7 @@ def test_offsale_uses_its_own_custom_fields(seeded_db, seeded_client, headers, o
         payload["amount"] = amount
     if buy is not None and amount != "0":
         payload.update(pool_id=buy.pool_id, offset_event_id=buy.id)
-    url = f"/api/v1/orders/{order.id}/inventory-offsale"
+    url = f"/api/orders/{order.id}/inventory-offsale"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "取消凭据" in missing.text
@@ -195,7 +195,7 @@ def test_plain_order_cancel_cannot_skip_required_fields(seeded_db, seeded_client
     create_order_form_field(seeded_db, order_type_code="ORDERCANC", field_key="receipt",
                             label="取消凭据", required=True, actor="pytest")
     seeded_db.commit()
-    url = f"/api/v1/orders/{order.id}/cancel"
+    url = f"/api/orders/{order.id}/cancel"
     missing = seeded_client.post(url, json={"reason": "取消", "form_extra_scope": "REFUND"}, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "取消凭据" in missing.text
@@ -218,7 +218,7 @@ def test_sale_cancel_event_cannot_change_field_scope(seeded_db, seeded_client, h
     payload = {"event_type": "CANCEL", "finalize_sale_cancel": True, "amount": "50",
                "occurred_on": "2026-11-02", "offset_event_id": sale.id, "pool_id": sale.pool_id,
                "reason": "退货", "form_extra_scope": "REFUND"}
-    url = f"/api/v1/orders/{order.id}/events"
+    url = f"/api/orders/{order.id}/events"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "取消凭据" in missing.text
@@ -235,7 +235,7 @@ def test_consignment_event_cannot_change_field_scope(seeded_db, seeded_client, h
     seeded_db.commit()
     payload = {"event_type": "OPERATE", "operation_type": "CONSIGNMENT", "occurred_on": "2026-11-02",
                "form_extra_scope": "REFUND", "form_extra": {"consignment_platforms": ["测试平台"]}}
-    url = f"/api/v1/orders/{order.id}/events"
+    url = f"/api/orders/{order.id}/events"
     missing = seeded_client.post(url, json=payload, headers=headers)
     assert missing.status_code == 422, missing.text
     assert "上架凭据" in missing.text
@@ -401,15 +401,15 @@ def test_http_failure_rolls_back_and_retry_succeeds(seeded_db, seeded_client, he
 
     seeded_client.app.dependency_overrides[get_db] = transactional_db
     payload = {"reason": " ", "occurred_on": "2026-11-02", "unlisted_at": "2026-11-02T12:00"}
-    response = seeded_client.post(f"/api/v1/orders/{order_id}/inventory-offsale", json=payload, headers=headers)
+    response = seeded_client.post(f"/api/orders/{order_id}/inventory-offsale", json=payload, headers=headers)
     assert response.status_code >= 400
     events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id)).all()
     assert all((event.form_extra or {}).get("operation_type") != "UNLIST" for event in events)
     payload["reason"] = "结束代挂"
-    response = seeded_client.post(f"/api/v1/orders/{order_id}/inventory-offsale", json=payload, headers=headers)
+    response = seeded_client.post(f"/api/orders/{order_id}/inventory-offsale", json=payload, headers=headers)
     assert response.status_code == 200, response.text
     assert seeded_db.get(Order, order_id).status == "CANCELLED"
-    response = seeded_client.post(f"/api/v1/orders/{order_id}/inventory-offsale", json=payload, headers=headers)
+    response = seeded_client.post(f"/api/orders/{order_id}/inventory-offsale", json=payload, headers=headers)
     assert response.status_code >= 400
     events = seeded_db.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id)).all()
     assert sum((event.form_extra or {}).get("operation_type") == "UNLIST" for event in events) == 1
@@ -419,7 +419,7 @@ def test_http_failure_rolls_back_and_retry_succeeds(seeded_db, seeded_client, he
 def test_http_rejects_invalid_offsale_timestamp(seeded_db, seeded_client, headers, timestamp):
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
         actor="pytest", account_snapshot={"game_account": "invalid-offsale-time", "game_type": "王者荣耀"})
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/inventory-offsale", headers=headers,
+    response = seeded_client.post(f"/api/orders/{order.id}/inventory-offsale", headers=headers,
         json={"reason": "结束代挂", "occurred_on": "2026-11-02", "unlisted_at": timestamp})
     assert response.status_code in (400, 422)
     assert order.status == "ACTIVE"
@@ -428,7 +428,7 @@ def test_http_rejects_invalid_offsale_timestamp(seeded_db, seeded_client, header
 def test_http_requires_order_update_permission(seeded_db, seeded_client):
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
         actor="pytest", account_snapshot={"game_account": "off-sale-no-permission", "game_type": "王者荣耀"})
-    response = seeded_client.post(f"/api/v1/orders/{order.id}/inventory-offsale",
+    response = seeded_client.post(f"/api/orders/{order.id}/inventory-offsale",
         headers={"X-Dev-User": "finance"}, json={"reason": "结束代挂", "occurred_on": "2026-11-02", "unlisted_at": "2026-11-02T12:00"})
     assert response.status_code == 403
     assert order.status == "ACTIVE"

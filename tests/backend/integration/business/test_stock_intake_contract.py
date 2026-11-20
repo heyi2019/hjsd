@@ -5,7 +5,7 @@
 本 ERP 没有独立的「入库」接口：库存账号（Account）由订单建档时**内联创建**
 （orders.create._create_inline_inventory_account）。HS/TH/DG 订单携带 account_snapshot
 建单即生成库存编号并写入 inventory_entry_at（入库时间）。因此「账号入库」的真实入口是
-``POST /api/v1/orders``（HS/TH/DG + account_snapshot）。
+``POST /api/orders``（HS/TH/DG + account_snapshot）。
 
 本文件覆盖入库链路上的**高风险业务规则**（对应验收标准第七阶段·订单与库存）：
 - 入库成功：建单即生成库存账号，且入库时间被写入（DB 状态而非仅响应）；
@@ -74,7 +74,7 @@ def test_hs_intake_creates_inventory_account_and_writes_entry_at(
     白盒补充：该库存行的 inventory_entry_at 不为空、状态非 SOLD（已落入库存）。
     """
     resp = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": TODAY.isoformat(),
@@ -112,7 +112,7 @@ def test_duplicate_intake_of_unsold_account_rejected_and_no_phantom_row(
     assert before == 1
 
     resp = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": TODAY.isoformat(),
@@ -142,7 +142,7 @@ def test_sold_account_repurchase_requires_confirm(seeded_client, headers, seeded
 
     # 未确认 → 拒绝
     rejected = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": TODAY.isoformat(),
@@ -158,7 +158,7 @@ def test_sold_account_repurchase_requires_confirm(seeded_client, headers, seeded
 
     # 确认 → 放行，且为复购回流新建一条库存账号（不覆盖原已售行）
     confirmed = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "HS",
             "trade_date": TODAY.isoformat(),
@@ -179,7 +179,7 @@ def test_sold_account_repurchase_requires_confirm(seeded_client, headers, seeded
 def test_unknown_order_type_rejected(seeded_client, headers):
     """BIZ-INV-INTAKE-004：未知业务类型建单被拒（契约边界）。"""
     resp = seeded_client.post(
-        "/api/v1/orders",
+        "/api/orders",
         json={
             "order_type": "ZZ",
             "trade_date": TODAY.isoformat(),

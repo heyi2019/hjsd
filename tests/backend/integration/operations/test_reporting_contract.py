@@ -31,11 +31,11 @@ from app.operations.r5_business_pnl import r5_business_pnl
 def test_report_viewer_can_read_employee_options_for_operations_filter(
     seeded_client, viewer_headers
 ):
-    response = seeded_client.get("/api/v1/users/options", headers=viewer_headers)
+    response = seeded_client.get("/api/users/options", headers=viewer_headers)
     assert response.status_code == 200, response.text
     assert all(item["is_active"] for item in response.json())
     report = seeded_client.get(
-        "/api/v1/reports/commission",
+        "/api/reports/commission",
         params={"all_people": "true"},
         headers=viewer_headers,
     )
@@ -352,11 +352,11 @@ class TestR3Commission:
 
         personal = r3_commission_reconciliation(seeded_db, user=scoped_user, mine=True)
         assert {person["user_id"] for person in personal["people"]} == {7}
-        response = seeded_client.get("/api/v1/reports/commission", params={"all_people": "true", "user_id": 7}, headers=headers)
+        response = seeded_client.get("/api/reports/commission", params={"all_people": "true", "user_id": 7}, headers=headers)
         assert response.status_code == 200, response.text
         assert _commission_details(response.json())[0]["user_name"] == "离职同事"
         assert {person["user_id"] for person in response.json()["people"]} == {7, 8}
-        options = seeded_client.get("/api/v1/users/options", headers=headers)
+        options = seeded_client.get("/api/users/options", headers=headers)
         assert options.status_code == 200
         assert 7 not in {person["id"] for person in options.json()}
 
@@ -457,7 +457,7 @@ class TestR3Commission:
 
         def exported_user_ids(query: dict, auth: dict) -> set[int]:
             response = seeded_client.get(
-                "/api/v1/reports/commission/export.csv", params=query, headers=auth
+                "/api/reports/commission/export.csv", params=query, headers=auth
             )
             assert response.status_code == 200, response.text
             rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
@@ -481,7 +481,7 @@ class TestR3Commission:
         former_employee.is_active = False
         seeded_db.flush()
         response = seeded_client.get(
-            "/api/v1/reports/commission/export.csv", params={"all_people": "true", "user_id": 7}, headers=headers,
+            "/api/reports/commission/export.csv", params={"all_people": "true", "user_id": 7}, headers=headers,
         )
         assert response.status_code == 200, response.text
         rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
@@ -506,7 +506,7 @@ class TestReportsApiDateParams:
         )
 
         pnl = seeded_client.get(
-            "/api/v1/reports/monthly-pnl?from=2026-10-01&to=2026-10-31",
+            "/api/reports/monthly-pnl?from=2026-10-01&to=2026-10-31",
             headers=headers,
         )
         assert pnl.status_code == 200, pnl.text
@@ -514,7 +514,7 @@ class TestReportsApiDateParams:
         assert months == ["2026-10"]
 
         profit = seeded_client.get(
-            "/api/v1/reports/order-profit?from=2026-10-01&to=2026-10-31",
+            "/api/reports/order-profit?from=2026-10-01&to=2026-10-31",
             headers=headers,
         )
         assert profit.status_code == 200, profit.text
@@ -536,7 +536,7 @@ class TestReportsApiDateParams:
             id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
         )
         operator_headers = {"Authorization": f"Bearer {build_access_token(operator)}"}
-        profit = seeded_client.get("/api/v1/reports/order-profit", headers=operator_headers)
+        profit = seeded_client.get("/api/reports/order-profit", headers=operator_headers)
         assert profit.status_code == 200, profit.text
         assert [row["order_no"] for row in profit.json()["items"]] == [mine.order_no]
 
@@ -548,14 +548,14 @@ class TestReportsApiDateParams:
             pool_ids=frozenset({1}),
         )
         finance_headers = {"Authorization": f"Bearer {build_access_token(finance)}"}
-        funds = seeded_client.get("/api/v1/reports/daily-funds", headers=finance_headers)
+        funds = seeded_client.get("/api/reports/daily-funds", headers=finance_headers)
         assert funds.status_code == 404
 
     def test_report_export_is_csv_and_viewer_cannot_export(
         self, seeded_client, headers, viewer_headers
     ):
         exported = seeded_client.get(
-            "/api/v1/reports/order-profit/export.csv",
+            "/api/reports/order-profit/export.csv",
             params={"from": "2026-10-01", "to": "2026-10-31"},
             headers=headers,
         )
@@ -570,7 +570,7 @@ class TestReportsApiDateParams:
         assert "income" not in header
 
         denied = seeded_client.get(
-            "/api/v1/reports/order-profit/export.csv", headers=viewer_headers
+            "/api/reports/order-profit/export.csv", headers=viewer_headers
         )
         assert denied.status_code == 403
 

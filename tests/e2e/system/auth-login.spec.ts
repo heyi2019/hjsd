@@ -3,17 +3,17 @@ import { test, expect } from "@playwright/test";
 /**
  * 真后端「账号密码登录」E2E（联调用例）。
  *
- * 与 smoke / role-switch 不同：本用例**不拦截** `/api/v1/**`、不走 DEV 态
- * X-Dev-User 直通，而是真实打后端（默认 http://127.0.0.1:8123/api/v1），
+ * 与 smoke / role-switch 不同：本用例**不拦截** `/api/**`、不走 DEV 态
+ * X-Dev-User 直通，而是真实打后端（默认 http://127.0.0.1:8123/api），
  * 用联调管理员账号 `admin / 12345678` 实测：
  *   登录 → 拿 JWT → 带 token 访问受保护接口 → 鉴权通过；
  *   错误密码 / 无 token → 401。
  *
  * 前置：后端必须运行在 8123（8000 被 Docker 占用）。可用环境变量覆盖：
- *   ERP_E2E_API_BASE=http://127.0.0.1:8123/api/v1
+ *   ERP_E2E_API_BASE=http://127.0.0.1:8123/api
  */
 const API_BASE =
-  process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
 
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "12345678";

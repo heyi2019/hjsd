@@ -68,7 +68,7 @@ def test_order_create_uses_account_snapshot_as_the_only_account_input():
 
 
 def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers):
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/dashboard/summary", headers=headers)
 
     assert response.status_code == 200, response.text
     payload = response.json()
@@ -85,8 +85,8 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
     assert set(payload["period"]) == {"from", "to"}
     assert isinstance(payload["alerts"], list)
     assert set(payload["orders"]) == {"total_count"}
-    assert seeded_client.get("/api/v1/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
-    assert seeded_client.get("/api/v1/notifications/summary", headers=headers).status_code in {404, 405}
+    assert seeded_client.get("/api/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
+    assert seeded_client.get("/api/notifications/summary", headers=headers).status_code in {404, 405}
 
 
 def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, headers, monkeypatch):
@@ -98,7 +98,7 @@ def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, 
     monkeypatch.setattr(dashboard_service.installment_queries, "installment_totals", lambda *args, **kwargs: {"total_count": 3, "overdue_count": 3})
     monkeypatch.setattr(dashboard_service.notification_service, "unread_profit_counts", lambda *args, **kwargs: {"pending_profit_count": 1, "allocated_profit_count": 2})
 
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/dashboard/summary", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["alerts"] == [
         {"type": "inventory_aging", "message": "库存订单入库超过 14 天 2 个"},
@@ -107,7 +107,7 @@ def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, 
     ]
     settings["profit_notifications_enabled"] = False
     settings["overdue_installments_enabled"] = True
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/dashboard/summary", headers=headers)
     assert response.json()["alerts"] == [
         {"type": "inventory_aging", "message": "库存订单入库超过 14 天 2 个"},
         {"type": "overdue_installment", "message": "逾期合约 3 个"},
@@ -122,7 +122,7 @@ def test_workbench_personal_earnings_uses_commission_profit_base(
         lambda *args, **kwargs: Decimal("123.45"),
     )
 
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/dashboard/summary", headers=headers)
 
     assert response.status_code == 200, response.text
     assert response.json()["personal_earnings"] == "123.45"
@@ -143,7 +143,7 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, 
 
     monkeypatch.setattr("app.dashboard.service.order_status_counts", fake_order_status_counts)
 
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/dashboard/summary", headers=headers)
 
     assert response.status_code == 200, response.text
     assert len(calls) == 2
@@ -155,23 +155,23 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, 
     assert calls[1]["trade_date_to"] == expected["trade_date_to"]
     assert calls[1]["mine"] is True
     calls.clear()
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"from": "2026-01-02", "to": "2026-02-04"})
+    response = seeded_client.get("/api/dashboard/summary", headers=headers, params={"from": "2026-01-02", "to": "2026-02-04"})
     assert response.status_code == 200, response.text
     assert response.json()["period"] == {"from": "2026-01-02", "to": "2026-02-04"}
     assert all(call["trade_date_from"] == date(2026, 1, 2) and call["trade_date_to"] == date(2026, 2, 4) for call in calls)
-    assert seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"from": "2026-02-04", "to": "2026-01-02"}).status_code == 422
-    assert seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"from": "2026-01-02"}).status_code == 422
+    assert seeded_client.get("/api/dashboard/summary", headers=headers, params={"from": "2026-02-04", "to": "2026-01-02"}).status_code == 422
+    assert seeded_client.get("/api/dashboard/summary", headers=headers, params={"from": "2026-01-02"}).status_code == 422
     calls.clear()
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"all_time": "true"})
+    response = seeded_client.get("/api/dashboard/summary", headers=headers, params={"all_time": "true"})
     assert response.status_code == 200, response.text
     assert response.json()["period"] is None
     assert all(call["trade_date_from"] is None and call["trade_date_to"] is None for call in calls)
-    assert seeded_client.get("/api/v1/dashboard/summary", headers=headers, params={"all_time": "true", "from": "2026-01-02", "to": "2026-02-04"}).status_code == 422
+    assert seeded_client.get("/api/dashboard/summary", headers=headers, params={"all_time": "true", "from": "2026-01-02", "to": "2026-02-04"}).status_code == 422
     from app.domain.options import OptionSet
     setting = OptionSet(code="BUSINESS_PERIOD", label="当期设置", group="BUSINESS", editable=False, options=[{"value": "start_day", "label": "10"}], created_by="pytest", updated_by="pytest")
     seeded_db.add(setting)
     seeded_db.flush()
-    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/dashboard/summary", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["period"] == {"from": "2026-11-10", "to": "2026-12-09"}
     from app.shared.business_period import business_period
@@ -244,7 +244,7 @@ def test_inline_order_creates_inventory_in_one_request(seeded_client, seeded_db,
     if order_type != "DG":
         payload["initial_buy"] = {"amount": "100", "occurred_on": D.isoformat()}
         payload["initial_costs"] = [{"amount": "10", "occurred_on": D.isoformat(), "flow_category": "FEE"}]
-    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    response = seeded_client.post("/api/orders", json=payload, headers=headers)
     assert response.status_code == 201, response.text
     account = seeded_db.get(Account, response.json()["account_id"])
     assert account is not None
@@ -337,7 +337,7 @@ def test_failed_initial_cost_rolls_back_order_and_inventory(app, seeded_db, v1_e
 
     monkeypatch.setattr(database, "get_session_factory", lambda: sessionmaker(bind=v1_engine))
     with TestClient(app) as client:
-        response = client.post("/api/v1/orders", headers=headers, json={
+        response = client.post("/api/orders", headers=headers, json={
             "order_type": "HS", "trade_date": D.isoformat(),
             "account_snapshot": {"game_account": "rollback-inline"},
             "initial_buy": {"amount": "100", "occurred_on": D.isoformat()},

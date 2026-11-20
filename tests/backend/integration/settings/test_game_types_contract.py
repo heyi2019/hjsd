@@ -68,27 +68,27 @@ class TestGameTypeService:
 class TestGameTypeApi:
     @staticmethod
     def _non_default_id(client, headers: dict) -> int:
-        resp = client.get("/api/v1/game-types", headers=headers)
+        resp = client.get("/api/game-types", headers=headers)
         assert resp.status_code == 200, resp.text
         target = next(it for it in resp.json() if not it["is_default"])
         return target["id"]
 
     @staticmethod
     def _first_id(client, headers: dict) -> int:
-        resp = client.get("/api/v1/game-types", headers=headers)
+        resp = client.get("/api/game-types", headers=headers)
         assert resp.status_code == 200, resp.text
         return resp.json()[0]["id"]
 
     def test_list_game_types_endpoint(self, seeded_client, headers):
         resp = seeded_client.get(
-            "/api/v1/game-types", params={"include_inactive": "false"}, headers=headers
+            "/api/game-types", params={"include_inactive": "false"}, headers=headers
         )
         assert resp.status_code == 200, resp.text
         assert all(item["is_active"] for item in resp.json())
 
     def test_create_game_type_endpoint(self, seeded_client, headers):
         resp = seeded_client.post(
-            "/api/v1/game-types",
+            "/api/game-types",
             json={"name": "接口新增类型", "sort_order": 3, "is_default": False},
             headers=headers,
         )
@@ -98,7 +98,7 @@ class TestGameTypeApi:
     def test_update_game_type_endpoint(self, seeded_client, headers):
         gid = self._first_id(seeded_client, headers)
         resp = seeded_client.patch(
-            f"/api/v1/game-types/{gid}",
+            f"/api/game-types/{gid}",
             json={"name": "接口改名", "sort_order": 11},
             headers=headers,
         )
@@ -108,7 +108,7 @@ class TestGameTypeApi:
     def test_set_game_type_active_endpoint(self, seeded_client, headers):
         gid = self._non_default_id(seeded_client, headers)
         resp = seeded_client.patch(
-            f"/api/v1/game-types/{gid}/active",
+            f"/api/game-types/{gid}/active",
             params={"active": "false"},
             headers=headers,
         )
@@ -118,7 +118,7 @@ class TestGameTypeApi:
     def test_set_game_type_default_endpoint(self, seeded_client, headers):
         gid = self._first_id(seeded_client, headers)
         resp = seeded_client.patch(
-            f"/api/v1/game-types/{gid}/default",
+            f"/api/game-types/{gid}/default",
             params={"is_default": "true"},
             headers=headers,
         )
@@ -127,18 +127,18 @@ class TestGameTypeApi:
 
     def test_delete_game_type_endpoint(self, seeded_client, headers):
         gid = self._non_default_id(seeded_client, headers)
-        resp = seeded_client.delete(f"/api/v1/game-types/{gid}", headers=headers)
+        resp = seeded_client.delete(f"/api/game-types/{gid}", headers=headers)
         assert resp.status_code == 204, resp.text
 
         remaining = seeded_client.get(
-            "/api/v1/game-types", params={"include_inactive": "true"}, headers=headers
+            "/api/game-types", params={"include_inactive": "true"}, headers=headers
         )
         assert remaining.status_code == 200, remaining.text
         assert gid not in {item["id"] for item in remaining.json()}
 
     def test_game_type_404_returns_not_found(self, seeded_client, headers):
         resp = seeded_client.patch(
-            "/api/v1/game-types/999999/active",
+            "/api/game-types/999999/active",
             params={"active": "false"},
             headers=headers,
         )

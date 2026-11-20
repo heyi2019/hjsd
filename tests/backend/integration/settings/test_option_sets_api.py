@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from app.settings.field_definitions.catalog_seed import seed_catalog
 
-OPTION_SETS = "/api/v1/option-sets"
+OPTION_SETS = "/api/option-sets"
 
 
 def test_list_empty_initially(client, headers):

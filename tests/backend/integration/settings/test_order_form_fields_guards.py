@@ -85,14 +85,14 @@ def test_dependent_check_is_scoped_by_order_type(seeded_db):
 
 def test_router_rejects_deactivate_dependent(seeded_client, headers):
     dep = seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS", field_key="rt_dep", label="路由依赖", field_type="TEXT"
         ).model_dump(mode="json"),
     ).json()
     seeded_client.post(
-        "/api/v1/order-form-fields",
+        "/api/order-form-fields",
         headers=headers,
         json=OrderFormFieldCreate(
             order_type_code="HS",
@@ -102,7 +102,7 @@ def test_router_rejects_deactivate_dependent(seeded_client, headers):
         ).model_dump(mode="json"),
     )
     blocked = seeded_client.patch(
-        f"/api/v1/order-form-fields/{dep['id']}/active?active=false", headers=headers
+        f"/api/order-form-fields/{dep['id']}/active?active=false", headers=headers
     )
     assert blocked.status_code == 422, blocked.text
     body = blocked.json()
@@ -112,7 +112,7 @@ def test_router_rejects_deactivate_dependent(seeded_client, headers):
 
     # 启用方向不受限
     enabled = seeded_client.patch(
-        f"/api/v1/order-form-fields/{dep['id']}/active?active=true", headers=headers
+        f"/api/order-form-fields/{dep['id']}/active?active=true", headers=headers
     )
     assert enabled.status_code == 200, enabled.text
 
@@ -282,14 +282,14 @@ def test_section_labels_rejects_bad_section_key(seeded_db):
 def test_router_section_labels_roundtrip(seeded_client, headers):
     """路由层闭环：GET 初始为空 → PUT 覆盖 → GET 返回新名 → PUT 空串恢复默认。"""
     base = seeded_client.get(
-        "/api/v1/order-form-fields/section-labels", headers=headers,
+        "/api/order-form-fields/section-labels", headers=headers,
         params={"order_type_code": "TH"},
     )
     assert base.status_code == 200, base.text
     assert base.json() == {}
 
     saved = seeded_client.put(
-        "/api/v1/order-form-fields/section-labels", headers=headers,
+        "/api/order-form-fields/section-labels", headers=headers,
         json=SectionLabelsSaveIn(
             order_type_code="TH", labels={"FINANCE": "资金明细改名"}
         ).model_dump(mode="json"),
@@ -298,21 +298,21 @@ def test_router_section_labels_roundtrip(seeded_client, headers):
     assert saved.json() == {"FINANCE": "资金明细改名"}
 
     reread = seeded_client.get(
-        "/api/v1/order-form-fields/section-labels", headers=headers,
+        "/api/order-form-fields/section-labels", headers=headers,
         params={"order_type_code": "TH"},
     )
     assert reread.json() == {"FINANCE": "资金明细改名"}
 
 def test_router_section_labels_requires_auth(seeded_client):
     resp = seeded_client.put(
-        "/api/v1/order-form-fields/section-labels",
+        "/api/order-form-fields/section-labels",
         json=SectionLabelsSaveIn(order_type_code="TH", labels={"FINANCE": "x"}).model_dump(mode="json"),
     )
     assert resp.status_code in (401, 403)
 
 def test_router_section_labels_rejects_bad_section_key(seeded_client, headers):
     resp = seeded_client.put(
-        "/api/v1/order-form-fields/section-labels", headers=headers,
+        "/api/order-form-fields/section-labels", headers=headers,
         json={"order_type_code": "TH", "labels": {"bad key": "x"}},
     )
     assert resp.status_code == 422, resp.text

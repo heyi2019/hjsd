@@ -163,7 +163,7 @@ class TestCreateInstallmentValidation:
             )
         )
         response = seeded_client.post(
-            f"/api/v1/installments/{contract.id}/payments",
+            f"/api/installments/{contract.id}/payments",
             headers={"Authorization": f"Bearer {token}"},
             json={"amount": "100", "paid_on": TODAY.isoformat(), "pool_id": 1},
         )

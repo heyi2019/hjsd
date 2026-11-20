@@ -55,16 +55,16 @@ def test_rebate_amount_is_explicit(seeded_db):
 
 
 def test_rebate_expected_arrival_route_removed(app):
-    assert "/api/v1/rebates/overdue" not in app.openapi()["paths"]
+    assert "/api/rebates/overdue" not in app.openapi()["paths"]
 
 
 def test_rebate_legacy_action_routes_removed(app):
     paths = app.openapi()["paths"]
-    assert "/api/v1/rebates/{rebate_id}/void" not in paths
-    assert "/api/v1/rebates/{rebate_id}/settlements" not in paths
-    assert "/api/v1/rebates/{rebate_id}/settlements/{settlement_id}/reverse" not in paths
+    assert "/api/rebates/{rebate_id}/void" not in paths
+    assert "/api/rebates/{rebate_id}/settlements" not in paths
+    assert "/api/rebates/{rebate_id}/settlements/{settlement_id}/reverse" not in paths
     # 2026-11-12 裁决：返点登记即确认收入，DELETE 作废入口一并撤销。
-    assert "delete" not in paths.get("/api/v1/rebates/{rebate_id}", {})
+    assert "delete" not in paths.get("/api/rebates/{rebate_id}", {})
 
 
 def test_rebate_delete_service_removed():

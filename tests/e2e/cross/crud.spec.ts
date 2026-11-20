@@ -13,7 +13,7 @@ import { test, expect } from "@playwright/test";
  * 前置：后端运行在 8123（playwright webServer 会自动拉起）。
  */
 const API_BASE =
-  process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+  process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
 const TEST_PREFIX = "联测_CRUD_";
 const AUTH_HEADERS = { "X-Dev-User": "admin" };
 

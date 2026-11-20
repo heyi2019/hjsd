@@ -1,7 +1,7 @@
 import { type Page, type Locator } from "@playwright/test";
 
 /**
- * 统一拦截前端 → 后端 `/api/v1/**` 请求，返回安全 stub。
+ * 统一拦截前端 → 后端 `/api/**` 请求，返回安全 stub。
  *
  * 设计要点（来自组件测试的踩坑经验）：
  *  - 列表类接口（orders / pools / customers / accounts / funds / installments /
@@ -18,7 +18,7 @@ const OBJECT_PATHS = [
 ];
 
 export async function mockApi(page: Page): Promise<void> {
-  await page.route("**/api/v1/**", async (route) => {
+  await page.route("**/api/**", async (route) => {
     const url = route.request().url();
     const path = url.replace(/^https?:\/\/[^/]+/, "");
     const isObject = OBJECT_PATHS.some((p) => path.includes(p));

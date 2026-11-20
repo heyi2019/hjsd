@@ -15,7 +15,7 @@ from app.funds.cashflow_writes.studio import delete_cashflow, update_cashflow
 
 # P0-A（2026-11-18）：orders 创建订单时的初始成本挂账经协作注册点注入，
 # 消灭 orders -> finance 反向依赖（backend/.importlinter 契约）。
-# 本模块由 api_v1 -> finance_router -> cashflows_router 链路必然加载，注册随之生效。
+# 本模块由 api -> finance_router -> cashflows_router 链路必然加载，注册随之生效。
 from app.business.collaboration import register_cost_flow_creator  # noqa: E402
 
 register_cost_flow_creator(create_cashflow)

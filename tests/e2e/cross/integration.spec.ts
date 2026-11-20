@@ -5,7 +5,7 @@ import { navItem } from "../support/api-stub";
  * 真前后端「联调」E2E。
  *
  * 与 smoke / role-switch（DEV 态 + page.route stub）不同：本用例**不拦截**任何
- * `/api/v1/**`，浏览器直接打真实后端（默认 127.0.0.1:8123），验证：
+ * `/api/**`，浏览器直接打真实后端（默认 127.0.0.1:8123），验证：
  *   - 前端发出的真实请求被后端接收并返回 200；
  *   - 真实业务数据（客户 / 资金荷包）经前端渲染出现在 DOM 中。
  * DEV 态下前端自动带 `X-Dev-User: admin`，无需 UI 登录即可读到真实数据。
@@ -18,7 +18,7 @@ test.describe("real frontend<->backend integration", () => {
   }) => {
     const customersResp = page.waitForResponse(
       (r) =>
-        r.url().includes("/api/v1/customers") && r.request().method() === "GET",
+        r.url().includes("/api/customers") && r.request().method() === "GET",
     );
 
     await page.goto("/");
@@ -40,7 +40,7 @@ test.describe("real frontend<->backend integration", () => {
   test("资金中心：真实 /pools 返回荷包且渲染到页面", async ({ page }) => {
     const poolsResp = page.waitForResponse(
       (r) =>
-        r.url().includes("/api/v1/pools") && r.request().method() === "GET",
+        r.url().includes("/api/pools") && r.request().method() === "GET",
     );
 
     await page.goto("/");

@@ -9,11 +9,11 @@ import { test, expect } from "@playwright/test";
  *   2) 业务规则：DG/代挂不允许分期（仅全款）；
  *   3) 提前结清与取消分期（冲销 refund/reversed）两个分期独有动作。
  *
- * 约定与 orders-lifecycle.spec.ts 一致：直连 /api/v1，X-Dev-User 模拟用户，
+ * 约定与 orders-lifecycle.spec.ts 一致：直连 /api，X-Dev-User 模拟用户，
  * 默认 8123，由 ERP_E2E_API_BASE 覆盖（Playwright 跑时指向独立 e2e 库 8124）。
  */
 
-const apiBase = () => process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api/v1";
+const apiBase = () => process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
 const ADMIN = { "X-Dev-User": "admin" };
 const TRADE_DATE = "2026-10-17";
 

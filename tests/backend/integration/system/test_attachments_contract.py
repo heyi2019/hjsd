@@ -16,7 +16,7 @@ def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
     seeded_db.commit()
 
     created = seeded_client.post(
-        "/api/v1/attachments",
+        "/api/attachments",
         json={
             "entity_type": "order",
             "entity_id": order.order_no,
@@ -34,7 +34,7 @@ def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
     assert item["deleted_at"] is None
 
     listed = seeded_client.get(
-        "/api/v1/attachments",
+        "/api/attachments",
         params={"entity_type": "order", "entity_id": order.order_no},
         headers=headers,
     )
@@ -42,26 +42,26 @@ def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
     assert listed.json()["total"] == 1
 
     order_detail = seeded_client.get(
-        f"/api/v1/orders/{order.id}", headers=headers
+        f"/api/orders/{order.id}", headers=headers
     )
     assert order_detail.status_code == 200, order_detail.text
     assert order_detail.json()["attachments"][0]["attachment_no"] == item["attachment_no"]
 
     downloaded = seeded_client.get(
-        f"/api/v1/attachments/{item['id']}/download", headers=headers
+        f"/api/attachments/{item['id']}/download", headers=headers
     )
     assert downloaded.status_code == 200, downloaded.text
     assert downloaded.content == b"png-test"
     assert downloaded.headers["content-type"] == "image/png"
 
     deleted = seeded_client.delete(
-        f"/api/v1/attachments/{item['id']}", headers=headers
+        f"/api/attachments/{item['id']}", headers=headers
     )
     assert deleted.status_code == 200, deleted.text
     assert deleted.json()["deleted_at"] is not None
 
     listed_after_delete = seeded_client.get(
-        "/api/v1/attachments",
+        "/api/attachments",
         params={"entity_type": "order", "entity_id": order.order_no},
         headers=headers,
     )
@@ -70,7 +70,7 @@ def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
 
 def test_attachment_requires_existing_entity_and_read_permission(seeded_client, headers):
     missing = seeded_client.post(
-        "/api/v1/attachments",
+        "/api/attachments",
         json={
             "entity_type": "order",
             "entity_id": "HS9999",
@@ -83,7 +83,7 @@ def test_attachment_requires_existing_entity_and_read_permission(seeded_client, 
     assert missing.status_code == 404, missing.text
 
     no_auth = seeded_client.get(
-        "/api/v1/attachments",
+        "/api/attachments",
         params={"entity_type": "order", "entity_id": "HS9999"},
     )
     assert no_auth.status_code == 401, no_auth.text

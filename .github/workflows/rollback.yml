@@ -70,7 +70,7 @@ jobs:
             fi
           done
           ERP_SKIP_BUILD=1 APP_VERSION="${APP_VERSION}" bash scripts/deploy.sh
-          curl -fsS http://127.0.0.1/api/v1/health
+          curl -fsS http://127.0.0.1/api/health
           REMOTE
 
       - name: Publish rollback summary

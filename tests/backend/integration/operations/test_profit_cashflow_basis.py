@@ -257,7 +257,7 @@ def test_api_order_profit_uses_cashflow_basis(seeded_client, seeded_db, headers)
     _add_flow(seeded_db, order_id, "OUT", "200")
 
     response = seeded_client.get(
-        f"/api/v1/orders/{order_id}/profit-allocations", headers=headers
+        f"/api/orders/{order_id}/profit-allocations", headers=headers
     )
 
     assert response.status_code == 200, response.text
@@ -384,7 +384,7 @@ def test_execution_summary_counts_rebate_income_and_bad_debt_expense(
     _add_bad_debt(seeded_db, order_id, "400")
 
     response = seeded_client.get(
-        f"/api/v1/orders/{order_id}/execution-detail", headers=headers
+        f"/api/orders/{order_id}/execution-detail", headers=headers
     )
 
     assert response.status_code == 200, response.text

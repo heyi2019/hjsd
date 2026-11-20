@@ -137,7 +137,7 @@ def test_export_csv_fills_age_column(seeded_client, seeded_db, headers):
     """
     _account(seeded_db, "age-export", days_ago=12)
 
-    response = seeded_client.get("/api/v1/stocks/export.csv", headers=headers)
+    response = seeded_client.get("/api/stocks/export.csv", headers=headers)
 
     assert response.status_code == 200, response.text
     lines = [line for line in response.text.splitlines() if line.strip()]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 def test_inventory_ledger_export_is_server_owned(seeded_client, headers):
     response = seeded_client.get(
-        "/api/v1/stocks/inventory/ledger/export.csv",
+        "/api/stocks/inventory/ledger/export.csv",
         params={
             "business_mode": "SELF",
             "inventory_type": "RECOVERY",
@@ -30,6 +30,6 @@ def test_inventory_ledger_export_has_no_total_limit(seeded_client, headers, monk
         seen.append(kwargs.get("limit"))
         return inventory_ledger(db, **kwargs)
     monkeypatch.setattr("app.business.stocks.router.stocks_inventory_ledger", spy)
-    response = seeded_client.get("/api/v1/stocks/inventory/ledger/export.csv", headers=headers)
+    response = seeded_client.get("/api/stocks/inventory/ledger/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     assert seen == [None]

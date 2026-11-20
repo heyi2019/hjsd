@@ -27,7 +27,7 @@ def _deposit(seeded_db, amount: str = "500.00") -> Deposit:
 
 
 def _remaining(seeded_client, headers, deposit_id: int) -> Decimal:
-    response = seeded_client.get("/api/v1/deposits", headers=headers)
+    response = seeded_client.get("/api/deposits", headers=headers)
     assert response.status_code == 200, response.text
     row = next(item for item in response.json() if item["id"] == deposit_id)
     return Decimal(row["remaining_amount"])

@@ -85,7 +85,15 @@ def get_customer_detail(
     订单、分期金额和逾期数均从业务事实表实时汇总；这里不保存任何手工汇总值。
     """
     customer = get_customer(session, customer_id, user)
-    role_stmt = select(OrderCustomerRole, Order).join(
+    role_stmt = select(
+        OrderCustomerRole.role,
+        Order.id,
+        Order.order_no,
+        Order.order_type,
+        Order.status,
+        Order.trade_date,
+        Order.owner_id,
+    ).join(
         Order, Order.id == OrderCustomerRole.order_id
     ).where(OrderCustomerRole.customer_id == customer.id)
     scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
@@ -96,21 +104,21 @@ def get_customer_detail(
     ).all()
 
     business_by_order: dict[int, dict[str, Any]] = {}
-    for role_row, order in role_rows:
+    for role, order_id, order_no, order_type, status, trade_date, owner_id in role_rows:
         item = business_by_order.setdefault(
-            order.id,
+            order_id,
             {
-                "order_id": order.id,
-                "order_no": order.order_no,
-                "order_type": order.order_type,
-                "status": order.status,
-                "trade_date": order.trade_date,
-                "owner_id": order.owner_id,
+                "order_id": order_id,
+                "order_no": order_no,
+                "order_type": order_type,
+                "status": status,
+                "trade_date": trade_date,
+                "owner_id": owner_id,
                 "roles": [],
             },
         )
-        if role_row.role not in item["roles"]:
-            item["roles"].append(role_row.role)
+        if role not in item["roles"]:
+            item["roles"].append(role)
 
     orders = list(business_by_order.values())
     order_ids = list(business_by_order)

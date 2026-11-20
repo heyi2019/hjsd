@@ -245,10 +245,14 @@ class TestListAndGetCustomers:
         seeded_db.flush()
         from sqlalchemy import event
         schedule_rows = []
+        order_queries = []
 
         def record_rows(_conn, cursor, statement, _params, _context, _many):
-            if "from installment_schedules" in " ".join(statement.lower().split()):
+            sql = " ".join(statement.lower().split())
+            if "from installment_schedules" in sql:
                 schedule_rows.append(cursor.rowcount)
+            if "from order_customer_roles join orders" in sql:
+                order_queries.append(sql)
 
         connection = seeded_db.connection()
         event.listen(connection, "after_cursor_execute", record_rows)
@@ -265,6 +269,9 @@ class TestListAndGetCustomers:
         assert detail["overview"]["overdue_period_count"] == 2
         assert detail["installments"][0]["overdue_periods"] == 2
         assert schedule_rows == [1]
+        assert len(order_queries) == 1
+        assert "orders.account_snapshot" not in order_queries[0]
+        assert "orders.form_extra" not in order_queries[0]
         assert {item["order_no"] for item in detail["business"]} == {
             dg_order.order_no, th.order_no,
         }

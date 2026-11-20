@@ -106,10 +106,16 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         [event for events in events_by_order.values() for event in events],
     )
 
-    installments = {}
-    if order_ids:
-        for item in db.scalars(select(Installment).where(Installment.order_id.in_(order_ids)).order_by(Installment.id.desc())).all():
-            installments.setdefault(item.order_id, item)
+    installments = {
+        item.order_id: item
+        for item in db.execute(
+            select(Installment.order_id, Installment.principal, Installment.paid_amount,
+                   Installment.periods, Installment.status, Installment.created_at)
+            .where(Installment.order_id.in_(order_ids))
+            .distinct(Installment.order_id)
+            .order_by(Installment.order_id, Installment.id.desc())
+        ).all()
+    } if order_ids else {}
 
     payloads: list[dict] = []
     for order in orders:

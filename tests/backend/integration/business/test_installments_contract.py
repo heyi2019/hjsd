@@ -178,6 +178,7 @@ def test_cancelled_installment_can_be_replaced_without_losing_history(seeded_cli
 
 @pytest.mark.parametrize("order_type", ["HS", "TH"])
 def test_cancel_installment_then_resell_in_installments(seeded_client, seeded_db, headers, order_type):
+    from sqlalchemy import event
     from app.business.router_output import _order_list_payload
     from app.shared.order_amounts import order_cashflow_profit_by_order
     from app.business.stocks.profile import create_account
@@ -196,10 +197,31 @@ def test_cancel_installment_then_resell_in_installments(seeded_client, seeded_db
     assert any(flow.source_id == second.inst_no for flow in flows)
     seeded_db.flush()
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == Decimal("-50")
-    ledger = _order_list_payload(seeded_db, [order])[0]
+    contract_rows = []
+
+    def record_rows(_conn, cursor, statement, _params, _context, _many):
+        sql = " ".join(statement.lower().split())
+        if "from installments where installments.order_id in" in sql:
+            contract_rows.append(cursor.rowcount)
+
+    connection = seeded_db.connection()
+    event.listen(connection, "after_cursor_execute", record_rows)
+    try:
+        ledger = _order_list_payload(seeded_db, [order])[0]
+    finally:
+        event.remove(connection, "after_cursor_execute", record_rows)
+    assert contract_rows == [1]
     assert ledger["installment_principal"] == Decimal("250")
+    assert ledger["installment_paid"] == Decimal("50")
+    assert ledger["installment_periods"] == 1
     assert ledger["installment_status"] == second.status
     assert ledger["profit_base"] == Decimal("-50")
+    other_order = _order(seeded_db)
+    other_contract = _contract(seeded_db, other_order.id, principal="700", down_payment="100", periods=2, per_period="300")
+    both = {item["id"]: item for item in _order_list_payload(seeded_db, [order, other_order])}
+    assert both[order.id]["installment_principal"] == Decimal("250")
+    assert both[other_order.id]["installment_principal"] == Decimal("700")
+    assert both[other_order.id]["installment_status"] == other_contract.status
     response = seeded_client.get(f"/api/v1/orders/{order.id}", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["installment"]["id"] == second.id

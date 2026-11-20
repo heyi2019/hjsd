@@ -203,15 +203,21 @@
        .ant-pagination .ant-pagination-prev,
        .ant-pagination .ant-pagination-next,
        .ant-pagination .ant-pagination-item-link) {
-  width: var(--sz-36) !important;
-  min-width: var(--sz-36) !important;
-  height: var(--ui-control-height-lg) !important;
-  line-height: var(--sz-34) !important;
+  width: var(--sz-30) !important;
+  min-width: var(--sz-30) !important;
+  height: var(--ui-control-height-compact) !important;
+  line-height: var(--sz-28) !important;
   margin-block: 0 !important;
 }
 :where(.ant-pagination .ant-pagination-item a) {
-  line-height: var(--sz-34) !important;
-}:where(.finance-entry-actions) + * {
+  line-height: var(--sz-28) !important;
+}
+:where(.ant-pagination .ant-pagination-options .ant-select,
+       .ant-pagination .ant-pagination-options .ant-select-selector) {
+  min-height: var(--ui-control-height-compact) !important;
+  height: var(--ui-control-height-compact) !important;
+}
+:where(.finance-entry-actions) + * {
   margin-block-start:var(--space-5) !important;
 }
 :where(.finance-entry-actions) {

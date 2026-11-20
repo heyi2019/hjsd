@@ -130,7 +130,7 @@ export function AppShell() {
     }
   }, [location.pathname, navigate]);
   // keep-alive：访问过的页面持续挂载，仅非激活态隐藏（display:none），避免切导航重挂载丢状态。
-  const [visited, setVisited] = useState<Set<string>>(() => new Set(["dashboard"]));
+  const [visited, setVisited] = useState<Set<string>>(() => new Set([active]));
   useEffect(() => {
     setVisited((prev) => (prev.has(active) ? prev : new Set(prev).add(active)));
   }, [active]);

@@ -12,7 +12,23 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.business.create import create_order
 from app.business.events import post_event
+from app.business.form_fields import create_order_form_field
 from app.core.database import get_db
+
+
+def test_execution_edit_enforces_required_account_custom_fields(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="required-account-field", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    create_order_form_field(seeded_db, order_type_code="HS", field_key="rank", label="等级",
+                            field_type="NUMBER", section="ACCOUNT_PRODUCT", required=True, actor="pytest")
+    account.form_extra = {"rank": 3}
+    seeded_db.commit()
+    url = f"/api/v1/orders/{order.id}/execution-edit"
+    missing = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"extra_values": {"rank": None}}})
+    assert missing.status_code == 422, missing.text
+    saved = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"extra_values": {"rank": 12}}})
+    assert saved.status_code == 200, saved.text
+    assert seeded_db.get(Account, account.id).form_extra["rank"] == 12
 
 
 def test_execution_edit_saves_more_than_twenty_operations(seeded_client, seeded_db, headers):

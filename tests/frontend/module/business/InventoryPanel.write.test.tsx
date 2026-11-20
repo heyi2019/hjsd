@@ -9,6 +9,7 @@ import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/busi
 import { InventoryRebateModal } from "@/business/stocks/rebate";
 import { OrderConsignmentModal } from "@/business/operations/consignment";
 import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDetailDeliverySection";
+import { OrderDetailProfileSection } from "@/business/OrderDetailView/OrderDetailProfileSection";
 import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { useInventoryList } from "@/business/stocks/InventoryPanel/useInventoryList";
 import { useExecutionCache } from "@/business/stocks/InventoryPanel/useExecutionCache";
@@ -1248,6 +1249,38 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     // VOID 账号按源码逻辑清空列表；不得渲染平台名
     await waitFor(() => expect(screen.queryByText("寄售平台A")).not.toBeInTheDocument());
   });
+});
+
+it("订单详情编辑账号自定义字段时保留配置的类型", async () => {
+  vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
+    ...allFormFields(),
+    { id: 9001, order_type_code: "HS", field_key: "rank", label: "等级", field_type: "NUMBER", options: [], required: false, is_active: true, sort_order: 90, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+    { id: 9002, order_type_code: "HS", field_key: "verified", label: "已核验", field_type: "BOOLEAN", options: [], required: false, is_active: true, sort_order: 91, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+    { id: 9003, order_type_code: "HS", field_key: "labels", label: "标签", field_type: "MULTI_SELECT", options: [{ value: "A", label: "甲" }, { value: "B", label: "乙" }], required: false, is_active: true, sort_order: 92, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+    { id: 9004, order_type_code: "HS", field_key: "region", label: "地区", field_type: "SELECT", options: [{ value: "N", label: "北区" }, { value: "S", label: "南区" }], required: false, is_active: true, sort_order: 93, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+    { id: 9005, order_type_code: "HS", field_key: "joined_on", label: "登记日期", field_type: "DATE", options: [], required: false, is_active: true, sort_order: 94, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+  ] as never);
+  vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+  function Harness() {
+    const [account, setAccount] = useState({ ...accounts[0], extra_values: { rank: 3, verified: true, labels: ["A"], region: "N", joined_on: "2026-11-01" } } as Account);
+    return <><OrderDetailProfileSection meta={{ sourceOrderNo: "HS-2026-0001" } as never}
+      detail={{ orders: [{ order_no: "HS-2026-0001", order_type: "HS" }] } as never}
+      account={account} editing onProfileChange={(changes) => setAccount((current) => ({ ...current, ...changes }))} />
+      <output data-testid="profile-extra">{JSON.stringify(account.extra_values)}</output></>;
+  }
+  renderLight(<Harness />);
+  const rank = await screen.findByRole("spinbutton", { name: "编辑等级" });
+  await ui.clear(rank);
+  await ui.type(rank, "12");
+  fireEvent.blur(rank);
+  await ui.click(screen.getByRole("switch", { name: "编辑已核验" }));
+  await ui.click(screen.getByRole("combobox", { name: "编辑标签" }));
+  await ui.click(await screen.findByText("乙", { selector: ".ant-select-item-option-content" }));
+  await ui.click(screen.getByRole("combobox", { name: "编辑地区" }));
+  await ui.click(await screen.findByText("南区", { selector: ".ant-select-item-option-content" }));
+  expect(screen.getByLabelText("编辑登记日期")).toHaveValue("2026-11-01");
+  await waitFor(() => expect(JSON.parse(screen.getByTestId("profile-extra").textContent || "{}"))
+    .toEqual({ rank: 12, verified: false, labels: ["A", "B"], region: "S", joined_on: "2026-11-01" }));
 });
 
 // —— 原 OrderDetailDeliverySection.test.tsx ——

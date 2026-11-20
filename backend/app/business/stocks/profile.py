@@ -12,7 +12,7 @@ from app.shared.numbering import allocate_number
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
 from app.domain.trade import Account
-from app.shared.form_values import set_extra_values
+from app.shared.form_values import _validate_required_extras, set_extra_values
 from ._common import (
     _UNSET,
     account_is_visible,
@@ -156,6 +156,9 @@ def update_account_profile(
     user: CurrentUser | None = None,
 ) -> Account:
     account = get_account(session, account_id, user)
+    if extra_values is not _UNSET:
+        _validate_required_extras(session, "account", extra_values or {}, partial=True,
+                                  scope=_ACCOUNT_FORM_SCOPE.get(account.inventory_type))
     before = {
         "game_account": account.game_account,
         "camp_account": account.camp_account,

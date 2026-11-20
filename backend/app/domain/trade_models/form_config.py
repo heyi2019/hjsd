@@ -76,7 +76,7 @@ class OrderFormField(Base, AuditMixin):
     )
     # 字段归属板块：账号/产品、客户/供货方、费用资金、业务方案、交付、运营、其他补充。
     section: Mapped[str] = mapped_column(
-        String(16), nullable=False, server_default="EXTRA"
+        String(32), nullable=False, server_default="EXTRA"
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -99,5 +99,5 @@ class OrderFormSectionLabel(Base, AuditMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     order_type_code: Mapped[str] = mapped_column(String(16), nullable=False)
-    section_key: Mapped[str] = mapped_column(String(16), nullable=False)
+    section_key: Mapped[str] = mapped_column(String(32), nullable=False)
     label: Mapped[str] = mapped_column(String(128), nullable=False)

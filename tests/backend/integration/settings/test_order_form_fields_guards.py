@@ -338,26 +338,27 @@ def test_router_section_labels_roundtrip(seeded_client, seeded_db, headers):
         section="CUSTOM_OLD", actor="admin",
     )
     ff.save_section_labels(seeded_db, order_type_code="TH", labels={"CUSTOM_OLD": "原板块"}, actor="admin")
+    long_section_key = "CUSTOM_" + "A" * 25  # 规则允许的 32 位板块键
     renamed = seeded_client.post(
         "/api/order-form-fields/section-labels/rename", headers=headers,
-        json={"order_type_code": "TH", "from_key": "CUSTOM_OLD", "to_key": "CUSTOM_NEW", "label": "新板块"},
+        json={"order_type_code": "TH", "from_key": "CUSTOM_OLD", "to_key": long_section_key, "label": "新板块"},
     )
     assert renamed.status_code == 200, renamed.text
-    assert renamed.json() == {"FINANCE": "资金明细改名", "CUSTOM_NEW": "新板块"}
+    assert renamed.json() == {"FINANCE": "资金明细改名", long_section_key: "新板块"}
     seeded_db.refresh(first)
     seeded_db.refresh(second)
     seeded_db.refresh(other_scope)
     assert (first.section, first.note, second.section, other_scope.section) == (
-        "CUSTOM_NEW", "原字段备注", "CUSTOM_NEW", "CUSTOM_OLD",
+        long_section_key, "原字段备注", long_section_key, "CUSTOM_OLD",
     )
 
     conflict = seeded_client.post(
         "/api/order-form-fields/section-labels/rename", headers=headers,
-        json={"order_type_code": "TH", "from_key": "CUSTOM_NEW", "to_key": "FINANCE", "label": "重复板块"},
+        json={"order_type_code": "TH", "from_key": long_section_key, "to_key": "FINANCE", "label": "重复板块"},
     )
     assert conflict.status_code in (409, 422), conflict.text
     seeded_db.refresh(first)
-    assert first.section == "CUSTOM_NEW" and first.note == "原字段备注"
+    assert first.section == long_section_key and first.note == "原字段备注"
 
 def test_router_section_labels_requires_auth(seeded_client):
     resp = seeded_client.put(

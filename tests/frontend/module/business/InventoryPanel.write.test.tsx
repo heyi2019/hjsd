@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/business/stocks/InventoryPanel";
+import { InventoryDeleteDialog } from "@/business/stocks/InventoryPanel/InventoryDeleteDialog";
 import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/business/stocks/sale";
 import { InventoryRebateModal } from "@/business/stocks/rebate";
 import { OrderConsignmentModal } from "@/business/operations/consignment";
@@ -778,6 +779,21 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(setError).not.toHaveBeenCalled();
     expect(notifyError).toHaveBeenCalledWith(expect.stringMatching(/HS-2026-0001：.*取消失败/));
     notifyError.mockRestore();
+  });
+
+  it("库存删除等待字段配置时阻止提交，加载完成后允许确认", async () => {
+    let resolveFields!: (value: Awaited<ReturnType<typeof orderFormFieldsApi.list>>) => void;
+    vi.mocked(orderFormFieldsApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveFields = resolve; }));
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    renderLight(<InventoryDeleteDialog account={accounts[0] as Account} submitting={false} onCancel={() => undefined} onConfirm={onConfirm} />);
+    const modal = await screen.findByRole("dialog", { name: "删除" });
+    fireEvent.change(within(modal).getByLabelText("删除原因"), { target: { value: "测试原因" } });
+    await ui.click(within(modal).getByRole("button", { name: "确认删除" }));
+    expect(onConfirm).not.toHaveBeenCalled();
+    await act(async () => { resolveFields([]); });
+    await waitFor(() => expect(within(modal).queryByRole("status")).not.toBeInTheDocument());
+    await ui.click(within(modal).getByRole("button", { name: "确认删除" }));
+    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("测试原因"));
   });
 
   it("库存删除提交中重复确认只发送一次", async () => {

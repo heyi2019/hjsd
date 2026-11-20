@@ -137,17 +137,23 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     }
   }, [queryFilters, ledgerSortDesc, page, pageSize, requestSequence]);
 
+  const initialQueryKey = JSON.stringify([initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId]);
+  const [initializedQueryKey, setInitializedQueryKey] = useState<string | null>(null);
   useEffect(() => {
     if (active) {
       setMineOrders(initialMine);
       setOrderStatusFilter(initialStatus ?? "all");
-      setDateRange(initialTradeDateFrom && initialTradeDateTo ? [dayjs(initialTradeDateFrom), dayjs(initialTradeDateTo)] : null);
+      setDateRange((previous) => {
+        if (previous?.[0].format("YYYY-MM-DD") === initialTradeDateFrom && previous?.[1].format("YYYY-MM-DD") === initialTradeDateTo) return previous;
+        return initialTradeDateFrom && initialTradeDateTo ? [dayjs(initialTradeDateFrom), dayjs(initialTradeDateTo)] : null;
+      });
       const mineOperatorIds = initialMine && myOperatorId !== undefined ? [myOperatorId] : [];
       setInventoryOperatorIds((previous) => previous.length === mineOperatorIds.length && previous.every((id, index) => id === mineOperatorIds[index]) ? previous : mineOperatorIds);
       setSaleOperatorIds((previous) => previous.length === mineOperatorIds.length && previous.every((id, index) => id === mineOperatorIds[index]) ? previous : mineOperatorIds);
       setPage(1);
-    }
-  }, [active, initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId]);
+      setInitializedQueryKey(initialQueryKey);
+    } else setInitializedQueryKey(null);
+  }, [active, initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId, initialQueryKey]);
 
   useEffect(() => {
     if (!active || !initialMine) {
@@ -183,12 +189,12 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
 
   // keep-alive 重新激活、筛选变更、翻页或排序变更时均由后端返回当前页。
   useEffect(() => {
-    if (active) void load();
+    if (active && initializedQueryKey === initialQueryKey) void load();
     return requestSequence.invalidate;
-  }, [active, load, requestSequence]);
+  }, [active, initializedQueryKey, initialQueryKey, load, requestSequence]);
 
   useEffect(() => {
-    if (!active) {
+    if (!active || initializedQueryKey !== initialQueryKey) {
       previousSummaryQuery.current = null;
       return;
     }
@@ -219,7 +225,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [active, queryFilters]);
+  }, [active, initializedQueryKey, initialQueryKey, queryFilters]);
 
   const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
   const filteredOrders = orders;

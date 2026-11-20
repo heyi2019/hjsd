@@ -115,6 +115,25 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it("订单台账翻页时请求并展示后端第二页", async () => {
+    const rows = Array.from({ length: 11 }, (_, index) => ({
+      ...orders[0], id: index + 1, order_no: index === 10 ? "HS-PAGE2" : `HS-PAGE1-${index}`,
+    }));
+    setupLedgerApi(rows);
+    renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
+    await screen.findByText("HS-PAGE1-0");
+    await ui.click(screen.getByTitle("2"));
+    expect(await screen.findByText("HS-PAGE2")).toBeVisible();
+    expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
+    expect(screen.queryByText("HS-PAGE1-0")).toBeNull();
+    await ui.click(screen.getByRole("tab", { name: "库存中心" }));
+    vi.mocked(ordersApi.listPage).mockClear();
+    await ui.click(screen.getByRole("tab", { name: "订单台账" }));
+    expect(await screen.findByText("HS-PAGE1-0")).toBeVisible();
+    expect(ordersApi.listPage).toHaveBeenCalledTimes(1);
+    expect(ordersApi.listPage).toHaveBeenCalledWith(expect.objectContaining({ limit: 10, offset: 0 }));
+  });
+
   it("进入订单台账立即加载统计，输入关键词时合并请求", async () => {
     vi.useFakeTimers();
     try {

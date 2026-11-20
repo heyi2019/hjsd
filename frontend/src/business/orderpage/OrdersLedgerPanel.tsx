@@ -201,6 +201,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
           page={page}
           pageSize={pageSize}
           total={pageTotal}
+          controlledPaging
           emptyText="暂无业务订单"
           className="inventory-table orders-ledger"
           expandable={{

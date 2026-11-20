@@ -17,7 +17,7 @@ import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { orderLedgerSummary, pageResponse, profitAllocationResponse } from "@fixtures/api-responses";
+import { installmentTotals, orderLedgerSummary, pageResponse, profitAllocationResponse } from "@fixtures/api-responses";
 import { today } from "@/shared/lib/format";
 import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
@@ -241,6 +241,7 @@ beforeEach(() => {
     { id: 33, username: "operator", display_name: "运营员", is_active: true },
   ]);
   vi.mocked(installmentsApi.list).mockResolvedValue([installment]);
+  vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals());
   vi.mocked(installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
   vi.mocked(client.currentUser).mockResolvedValue({ id: 9, username: "lisi", role: "operator", display_name: "李四" });
   vi.spyOn(message, "success").mockImplementation((() => undefined) as never);
@@ -461,6 +462,22 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.click(within(tableRow("HS-2026-0001")).getByRole("button", { name: "编辑" }));
     expect(await screen.findByRole("button", { name: "保存修改" })).toBeInTheDocument();
     expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
+  });
+
+  it.each(["分润配置", "资金收支"])("打开%s时订单与辅助数据并行加载", async (action) => {
+    await openLedger();
+    let finish!: (order: Order) => void;
+    const pending = new Promise<Order>((resolve) => { finish = resolve; });
+    vi.mocked(ordersApi.get).mockReturnValueOnce(pending);
+    vi.mocked(employeesApi.list).mockClear();
+    vi.mocked(profitAllocationApi.allocations).mockClear();
+    vi.mocked(poolsApi.list).mockClear();
+    await openRowMenu("HS-2026-0001", action);
+    await waitFor(() => expect(employeesApi.list).toHaveBeenCalled());
+    if (action === "分润配置") expect(profitAllocationApi.allocations).toHaveBeenCalledWith(1);
+    else expect(poolsApi.list).toHaveBeenCalled();
+    await act(async () => finish(order1));
+    expect(await modalOf(action === "分润配置" ? /分润 · HS-2026-0001/ : /资金收支 · HS-2026-0001/)).toBeVisible();
   });
 
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。

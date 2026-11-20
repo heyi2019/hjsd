@@ -75,10 +75,11 @@ export function useOrderActionModals({
   const openAllocations = async (sourceOrder?: Order) => {
     const session = actionRequest.start();
     try {
-      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order || !actionRequest.isCurrent(session)) return;
-      const [result, userResult] = await Promise.all([
-        profitAllocationApi.allocations(order.id),
+      const target = sourceOrder ?? selectedOrder;
+      if (!target) return;
+      const [order, result, userResult] = await Promise.all([
+        sourceOrder ? ordersApi.get(target.id) : Promise.resolve(target),
+        profitAllocationApi.allocations(target.id),
         employeesApi.list(),
       ]);
       if (!actionRequest.isCurrent(session)) return;
@@ -140,9 +141,13 @@ export function useOrderActionModals({
   const openRefund = async (sourceOrder?: Order) => {
     const request = actionRequest.start();
     try {
-      const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order || !actionRequest.isCurrent(request)) return;
-      const [employeeList, poolList] = await Promise.all([employeesApi.list(), poolsApi.list()]);
+      const target = sourceOrder ?? selectedOrder;
+      if (!target) return;
+      const [order, employeeList, poolList] = await Promise.all([
+        sourceOrder ? ordersApi.get(target.id) : Promise.resolve(target),
+        employeesApi.list(),
+        poolsApi.list(),
+      ]);
       if (!actionRequest.isCurrent(request)) return;
       const activeEmployees = employeeList.filter((employee) => employee.is_active);
       setUsers(activeEmployees);

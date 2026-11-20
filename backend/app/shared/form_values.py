@@ -74,7 +74,9 @@ def _validate_extra_value(definition: OrderFormField, value: Any) -> Any:
 
 
 def _validate_required_extras(
-    session: Session, entity_type: str, values: Mapping[str, Any], *, partial: bool = False, scope: str | None = None
+    session: Session, entity_type: str, values: Mapping[str, Any], *, partial: bool = False,
+    scope: str | None = None, context: Mapping[str, Any] | None = None,
+    changed_fields: Iterable[str] = (),
 ) -> None:
     """必填扩展字段缺失即拒绝（BAS-04-04）。
 
@@ -82,13 +84,16 @@ def _validate_required_extras(
     不要求把历史上已填过的必填字段再交一遍。
     """
     definitions = _extra_definitions(session, entity_type, scope=scope)
+    current_values = {**(context or {}), **values}
+    changed = set(changed_fields) | set(values)
     missing = [
         definition.field_key
         for definition in definitions
-        if (not partial or definition.field_key in values)
+        if (not partial or definition.field_key in values
+            or (definition.required_when and definition.required_when.get("field") in changed))
         # 账号字段的条件依赖可能属于订单其他板块，已在建单时按完整表单校验。
-        and (definition.required if entity_type == "account" else field_is_required(definition, values))
-        and not has_field_value(values.get(definition.field_key))
+        and (definition.required if entity_type == "account" else field_is_required(definition, current_values))
+        and not has_field_value(current_values.get(definition.field_key))
     ]
     if missing:
         raise Validation(
@@ -130,6 +135,7 @@ def set_extra_values(
     values: Iterable[tuple[str, Any]],
     require_all: bool = False,
     scope: str | None = None,
+    context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """按启用的字段定义写入扩展值；未启用字段拒绝写入（BAS-04-04）。"""
     if isinstance(entity_id, bool) or not isinstance(entity_id, int) or entity_id <= 0:
@@ -151,7 +157,7 @@ def set_extra_values(
     if len(values_map) != len(values):
         raise Validation("扩展字段不能重复提交", details={"field": "extra_values"})
     if require_all:
-        _validate_required_extras(session, entity_type, values_map, partial=False, scope=scope)
+        _validate_required_extras(session, entity_type, values_map, partial=False, scope=scope, context=context)
     saved = _validate_extra_values(
         session, entity_type=entity_type, entity_id=entity_id, values=values, scope=scope
     )

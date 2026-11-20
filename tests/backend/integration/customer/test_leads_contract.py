@@ -7,9 +7,46 @@ import pytest
 
 from app.business.create import create_order
 from app.business.form_fields import create_order_form_field
+from app.domain.trade import OrderFormField
 from app.customers.customers import create_customer
 from app.customers.counterparties import create_counterparty
 from app.customers.leads import create_lead
+
+
+def test_lead_conditional_field_can_depend_on_core_fields(seeded_client, seeded_db, headers):
+    customer = create_customer(seeded_db, display_name="条件需求客户", actor="pytest")
+    seeded_db.add(OrderFormField(order_type_code="LEAD", field_key="request_type", label="需求类型",
+                                 field_type="SELECT", is_active=True, is_custom=False, created_by="pytest", updated_by="pytest"))
+    note = create_order_form_field(seeded_db, order_type_code="LEAD", field_key="request_note",
+                                   label="需求说明", actor="pytest")
+    note.required_when = {"field": "request_type", "op": "eq", "values": ["FIND_ACCOUNT"]}
+    seeded_db.commit()
+    payload = {"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"}
+    missing = seeded_client.post("/api/v1/leads", json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "request_note" in missing.text
+    saved = seeded_client.post("/api/v1/leads", json={**payload, "extra_values": {"request_note": "指定条件"}}, headers=headers)
+    assert saved.status_code == 201, saved.text
+
+
+@pytest.mark.parametrize(("action", "scope", "dependency"), [
+    ("close", "LEADCLOSE", "reason"), ("convert", "LEADCONVERT", "order_id"),
+])
+def test_lead_action_conditional_field_can_depend_on_core_fields(seeded_client, seeded_db, headers, action, scope, dependency):
+    customer = create_customer(seeded_db, display_name="操作条件客户", actor="pytest")
+    lead = create_lead(seeded_db, customer_id=customer.id, request_type="FIND_ACCOUNT", target="测试", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest")
+    seeded_db.add(OrderFormField(order_type_code=scope, field_key=dependency, label="操作字段", field_type="TEXT",
+                                 is_active=True, is_custom=False, created_by="pytest", updated_by="pytest"))
+    note = create_order_form_field(seeded_db, order_type_code=scope, field_key="action_note", label="操作说明", actor="pytest")
+    note.required_when = {"field": dependency, "op": "filled"}
+    seeded_db.commit()
+    payload = {"reason": "关闭"} if action == "close" else {"order_no": order.order_no}
+    url = f"/api/v1/leads/{lead.id}/{action}"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    saved = seeded_client.post(url, json={**payload, "extra_values": {"action_note": "已核对"}}, headers=headers)
+    assert saved.status_code == 200, saved.text
 
 
 @pytest.mark.parametrize(("action", "scope", "field_key"), [

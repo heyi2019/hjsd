@@ -80,6 +80,8 @@ def create_counterparty(
         entity_id=counterparty.id,
         values=(extra_values or {}).items(),
         require_all=True,
+        context={"display_name": name, "type": type, "contact_name": contact_name, "phone": phone,
+                 "wechat": wechat, "qq": qq, "source": source, "note": note},
     )
     record_audit(
         session,
@@ -162,15 +164,18 @@ def update_counterparty(
                 raise Validation("合作方名称不能清空", details={"field": name})
             value = value.strip()
         normalized_fields[name] = value
+    values = _normalize_extra_values(extra_values) if extra_values is not _UNSET else {}
+    _validate_required_extras(
+        session, EntityType.COUNTERPARTY.value, values, partial=True,
+        context={**{key: getattr(item, key) for key in allowed_fields}, "type": item.type,
+                 **(item.form_extra or {}), **normalized_fields},
+        changed_fields=normalized_fields,
+    )
     for name, value in normalized_fields.items():
         setattr(item, name, value)
     item.updated_by = actor
     session.flush()
     if extra_values is not _UNSET:
-        values = _normalize_extra_values(extra_values)
-        _validate_required_extras(
-            session, EntityType.COUNTERPARTY.value, values, partial=True
-        )
         set_extra_values(
             session,
             entity_type=EntityType.COUNTERPARTY.value,

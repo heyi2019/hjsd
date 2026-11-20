@@ -36,7 +36,10 @@ def create_customer(
     _validate_owner_id(session, owner_id)
 
     extras = _normalize_extra_values(extra_values)
-    _validate_required_extras(session, EntityType.CUSTOMER.value, extras)
+    _validate_required_extras(session, EntityType.CUSTOMER.value, extras, context={
+        "display_name": name, "contact_name": contact_name, "phone": phone, "wechat": wechat,
+        "qq": qq, "source": source, "owner_id": owner_id, "tags": tags, "note": note,
+    })
     if extras:
         _validate_extra_values(
             session,
@@ -99,9 +102,6 @@ def update_customer(
 
     extras = _normalize_extra_values(extra_values)
     if extras:
-        _validate_required_extras(
-            session, EntityType.CUSTOMER.value, extras, partial=True
-        )
         _validate_extra_values(
             session,
             entity_type=EntityType.CUSTOMER.value,
@@ -128,6 +128,13 @@ def update_customer(
                 raise Validation("称呼/昵称不能清空", details={"field": name})
             value = value.strip()
         normalized_fields[name] = value
+
+    _validate_required_extras(
+        session, EntityType.CUSTOMER.value, extras, partial=True,
+        context={**{key: getattr(customer, key) for key in allowed_fields},
+                 **(customer.form_extra or {}), **normalized_fields},
+        changed_fields=normalized_fields,
+    )
 
     before = {name: getattr(customer, name) for name in CONTACT_FIELDS}
     changed_contacts = False

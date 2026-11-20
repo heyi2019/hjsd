@@ -96,6 +96,8 @@ def create_lead(
         values=(extra_values or {}).items(),
         require_all=True,
         scope="LEAD",
+        context={"customer_id": customer_id, "request_type": request_type, "target": target_text,
+                 "budget": budget, "owner_id": owner_id, "note": note},
     )
     record_audit(
         session,
@@ -214,15 +216,19 @@ def update_lead(
             raise Validation("需求预算不能为负数", details={"field": "budget"})
     if "owner_id" in fields:
         _validate_owner_id(session, fields["owner_id"])
+    values = _normalize_extra_values(extra_values) if extra_values is not _UNSET else {}
+    _validate_required_extras(
+        session, EntityType.LEAD.value, values, partial=True, scope="LEAD",
+        context={"customer_id": lead.customer_id, "request_type": lead.request_type,
+                 "target": lead.target, "budget": lead.budget, "owner_id": lead.owner_id,
+                 "note": lead.note, **(lead.form_extra or {}), **fields},
+        changed_fields=fields,
+    )
     for name, value in fields.items():
         setattr(lead, name, value)
     lead.updated_by = actor
     session.flush()
     if extra_values is not _UNSET:
-        values = _normalize_extra_values(extra_values)
-        _validate_required_extras(
-            session, EntityType.LEAD.value, values, partial=True, scope="LEAD"
-        )
         set_extra_values(
             session,
             entity_type=EntityType.LEAD.value,
@@ -279,7 +285,8 @@ def convert_lead(
     if order is None:
         raise NotFound("订单不存在", details={"order_no": normalized_order_no})
     set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id,
-                     values=(extra_values or {}).items(), require_all=True, scope="LEADCONVERT")
+                     values=(extra_values or {}).items(), require_all=True, scope="LEADCONVERT",
+                     context={"order_id": normalized_order_no, "order_no": normalized_order_no})
     lead.status = LeadStatus.CONVERTED.value
     lead.converted_order_id = order.id
     lead.updated_by = actor
@@ -318,7 +325,8 @@ def close_lead(
         raise Conflict("只有 OPEN 需求可以关闭", details={"lead_no": lead.lead_no})
     normalized = _required_text(reason, message="关闭需求必须填写原因", field="reason")
     set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id,
-                     values=(extra_values or {}).items(), require_all=True, scope="LEADCLOSE")
+                     values=(extra_values or {}).items(), require_all=True, scope="LEADCLOSE",
+                     context={"reason": normalized})
     lead.status = LeadStatus.CLOSED.value
     lead.closed_reason = normalized
     lead.updated_by = actor

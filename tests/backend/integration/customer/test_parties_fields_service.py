@@ -10,7 +10,8 @@ import pytest
 from app.core.errors import NotFound, Validation
 from app.domain.trade import OrderFormField
 from app.shared import form_values as fields_module
-from app.customers.customers import create_customer
+from app.customers.customers import create_customer, update_customer
+from app.customers.counterparties import create_counterparty, update_counterparty
 from app.shared.form_values import get_extra_values, get_extra_values_bulk, set_extra_values
 
 
@@ -64,6 +65,34 @@ def test_conditional_customer_field_is_required_when_triggered(seeded_db):
         create_customer(seeded_db, display_name="缺条件字段", actor="pytest", extra_values={"kind": "A"})
     created = create_customer(seeded_db, display_name="不触发条件", actor="pytest", extra_values={"kind": "B"})
     assert created.form_extra == {"kind": "B"}
+
+
+def test_conditional_customer_field_tracks_core_field_on_create_and_edit(seeded_db):
+    _add_field(seeded_db, "source", is_custom=False)
+    note = _add_field(seeded_db, "source_detail")
+    note.required_when = {"field": "source", "op": "eq", "values": ["其他"]}
+    seeded_db.flush()
+    with pytest.raises(Validation, match="source_detail"):
+        create_customer(seeded_db, display_name="缺来源说明", source="其他", actor="pytest")
+    customer = create_customer(seeded_db, display_name="有来源客户", source="微信", actor="pytest")
+    with pytest.raises(Validation, match="source_detail"):
+        update_customer(seeded_db, customer.id, source="其他", actor="pytest")
+    saved = update_customer(seeded_db, customer.id, source="其他", extra_values={"source_detail": "朋友介绍"}, actor="pytest")
+    assert saved.form_extra["source_detail"] == "朋友介绍"
+
+
+def test_conditional_counterparty_field_tracks_core_field_on_create_and_edit(seeded_db):
+    _add_field(seeded_db, "source", is_custom=False, scope="COUNTERPARTY")
+    note = _add_field(seeded_db, "source_detail", scope="COUNTERPARTY")
+    note.required_when = {"field": "source", "op": "eq", "values": ["其他"]}
+    seeded_db.flush()
+    with pytest.raises(Validation, match="source_detail"):
+        create_counterparty(seeded_db, display_name="缺来源合作方", type="PEER", source="其他", actor="pytest")
+    party = create_counterparty(seeded_db, display_name="合作方", type="PEER", source="微信", actor="pytest")
+    with pytest.raises(Validation, match="source_detail"):
+        update_counterparty(seeded_db, party.id, source="其他", actor="pytest")
+    saved = update_counterparty(seeded_db, party.id, source="其他", extra_values={"source_detail": "朋友介绍"}, actor="pytest")
+    assert saved.form_extra["source_detail"] == "朋友介绍"
 
 
 def test_customer_extra_fields_can_be_edited_via_api(seeded_client, seeded_db, headers):

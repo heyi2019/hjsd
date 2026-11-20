@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -152,20 +152,22 @@ def validate_event_edits(
             raise NotFound("关联资金流水不存在")
         if Decimal(str(flow.amount)) != Decimal(str(event.amount)):
             raise Validation("执行记录与关联流水金额不一致，请先核对")
-        if (
-            event.offset_event_id is not None
-            or flow.source_type == CashflowSourceType.REVERSAL.value
-            or db.scalar(select(OrderEvent.id).where(OrderEvent.offset_event_id == event.id)) is not None
-            or db.scalar(select(Cashflow.id).where(
-                Cashflow.source_type == CashflowSourceType.REVERSAL.value,
-                Cashflow.source_id == flow.flow_no,
-            )) is not None
-        ):
+        if event.offset_event_id is not None or flow.source_type == CashflowSourceType.REVERSAL.value:
             raise Validation("已冲销或被冲销的记录不能直接修改")
-        if db.scalar(select(Installment.id).where(Installment.order_id == order.id)) is not None:
+        # 事件和资金流水仍按请求顺序逐条加锁；冲销、分期和返点检查合并为一次往返。
+        event_reversed, flow_reversed, has_installment, has_rebate = db.execute(select(
+            exists().where(OrderEvent.offset_event_id == event.id),
+            exists().where(Cashflow.source_type == CashflowSourceType.REVERSAL.value, Cashflow.source_id == flow.flow_no),
+            exists().where(Installment.order_id == order.id),
+            exists().where(RebateRecord.source_order_id == order.id),
+        )).one()
+        if event_reversed or flow_reversed:
+            raise Validation("已冲销或被冲销的记录不能直接修改")
+        if has_installment:
             raise Validation("关联分期的记录不能直接修改，请先处理分期")
-        if db.scalar(select(RebateRecord.id).where(RebateRecord.source_order_id == order.id)) is not None:
+        if has_rebate:
             raise Validation("关联返点的记录不能直接修改，请先核对返点")
+        # 对账创建不锁订单或原流水，继续在其他检查完成后读取，避免扩大漏检窗口。
         if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on)) is not None:
             raise Validation("资金账户已有后续对账记录，不能直接修改")
         if event.event_type == "BUY":

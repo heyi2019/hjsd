@@ -485,11 +485,15 @@ describe("OrdersPage：四类订单台账", () => {
     await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenLastCalledWith(
       expect.objectContaining({ mine: true }),
     ));
-    await waitFor(() => {
-      for (const label of ["入库负责人筛选", "售出操作人筛选"]) {
-        expect(screen.getByRole("combobox", { name: label }).closest(".ant-select")?.textContent).toContain("管理员");
-      }
-    });
+    for (const label of ["入库负责人筛选", "售出操作人筛选"]) {
+      const filter = screen.getByRole("combobox", { name: label });
+      await ui.click(filter);
+      await waitFor(() => {
+        const listboxes = screen.getAllByRole("listbox");
+        expect(within(listboxes[listboxes.length - 1]).getByRole("option", { name: "管理员" })).toHaveAttribute("aria-selected", "true");
+      });
+      await ui.click(filter);
+    }
   });
 
   it("订单台账提供入库负责人和售出操作人多选筛选", async () => {

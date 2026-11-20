@@ -124,6 +124,61 @@ class TestPartiesActivitySummary:
         result = get_customer_activity_summary(seeded_db, [cust.id])
         assert result[cust.id]["last_interaction_at"] is not None
 
+    def test_latest_event_is_aggregated_per_customer(self, seeded_db):
+        from sqlalchemy import event
+
+        customer = _customer(seeded_db)
+        order = _order(seeded_db)
+        order.created_at = datetime(2026, 1, 1)
+        seeded_db.add_all([
+            OrderCustomerRole(order_id=order.id, customer_id=customer.id, role=role)
+            for role in ("BUYER", "SELLER")
+        ])
+        for day in (2, 3, 4):
+            seeded_db.add(OrderEvent(
+                event_no=f"EV-ACTIVITY-{day}", order_id=order.id, event_type="BUY", amount=100,
+                occurred_on=date(2026, 1, day), is_posted=True, created_at=datetime(2026, 1, day),
+                created_by="pytest", updated_by="pytest",
+            ))
+        seeded_db.flush()
+        returned_rows = []
+
+        def record_rows(_conn, cursor, statement, _params, _context, _many):
+            if "order_events" in statement.lower():
+                returned_rows.append(cursor.rowcount)
+
+        connection = seeded_db.connection()
+        event.listen(connection, "after_cursor_execute", record_rows)
+        try:
+            result = get_customer_activity_summary(seeded_db, [customer.id])
+        finally:
+            event.remove(connection, "after_cursor_execute", record_rows)
+
+        assert result[customer.id]["last_interaction_at"] == datetime(2026, 1, 4)
+        assert result[customer.id]["order_roles"] == ["BUYER", "SELLER"]
+        assert result[customer.id]["active_order_count"] == 1
+        assert returned_rows == [1]
+
+    def test_latest_event_respects_order_owner_scope(self, seeded_db):
+        customer = _customer(seeded_db)
+        user = _non_admin_user(seeded_db)
+        visible, hidden = _order(seeded_db), _order(seeded_db)
+        visible.owner_id = user.id
+        hidden.owner_id = None
+        visible.created_at = hidden.created_at = datetime(2026, 1, 1)
+        for order, day in ((visible, 2), (hidden, 4)):
+            seeded_db.add(OrderCustomerRole(order_id=order.id, customer_id=customer.id, role="BUYER"))
+            seeded_db.add(OrderEvent(
+                event_no=f"EV-SCOPE-{day}", order_id=order.id, event_type="BUY", amount=100,
+                occurred_on=date(2026, 1, day), is_posted=True, created_at=datetime(2026, 1, day),
+                created_by="pytest", updated_by="pytest",
+            ))
+        seeded_db.flush()
+
+        scoped = get_customer_activity_summary(seeded_db, [customer.id], _scoped_user(user))
+        assert scoped[customer.id]["last_interaction_at"] == datetime(2026, 1, 2)
+        assert scoped[customer.id]["active_order_count"] == 1
+
 
 class TestPartiesMerge:
     def test_merge_reassigns_leads(self, seeded_db):

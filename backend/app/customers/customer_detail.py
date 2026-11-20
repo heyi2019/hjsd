@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
@@ -59,13 +59,14 @@ def get_customer_activity_summary(
         ):
             item["last_interaction_at"] = order.created_at
 
-    event_stmt = select(OrderCustomerRole.customer_id, OrderEvent.created_at).join(
+    event_stmt = select(OrderCustomerRole.customer_id, func.max(OrderEvent.created_at)).join(
         OrderEvent, OrderEvent.order_id == OrderCustomerRole.order_id
     ).join(Order, Order.id == OrderCustomerRole.order_id).where(
         OrderCustomerRole.customer_id.in_(ids)
     )
     if scope is not None:
         event_stmt = event_stmt.where(scope)
+    event_stmt = event_stmt.group_by(OrderCustomerRole.customer_id)
     event_rows = session.execute(
         event_stmt
     ).all()

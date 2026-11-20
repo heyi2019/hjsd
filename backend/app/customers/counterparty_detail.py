@@ -19,27 +19,34 @@ def get_counterparty_detail(session: Session, counterparty_id: int) -> dict[str,
     """按合作方历史参与关系汇总订单数、利润和成单明细。"""
     counterparty = get_counterparty(session, counterparty_id)
     rows = session.execute(
-        select(OrderCounterpartyRole, Order)
+        select(
+            OrderCounterpartyRole.role,
+            Order.id,
+            Order.order_no,
+            Order.order_type,
+            Order.status,
+            Order.trade_date,
+        )
         .join(Order, Order.id == OrderCounterpartyRole.order_id)
         .where(OrderCounterpartyRole.counterparty_id == counterparty.id)
         .order_by(Order.trade_date.desc(), Order.id.desc())
     ).all()
 
     orders_by_id: OrderedDict[int, dict[str, Any]] = OrderedDict()
-    for role_row, order in rows:
+    for role, order_id, order_no, order_type, status, trade_date in rows:
         item = orders_by_id.setdefault(
-            order.id,
+            order_id,
             {
-                "order_id": order.id,
-                "order_no": order.order_no,
-                "order_type": order.order_type,
-                "status": order.status,
-                "trade_date": order.trade_date,
+                "order_id": order_id,
+                "order_no": order_no,
+                "order_type": order_type,
+                "status": status,
+                "trade_date": trade_date,
                 "roles": [],
             },
         )
-        if role_row.role not in item["roles"]:
-            item["roles"].append(role_row.role)
+        if role not in item["roles"]:
+            item["roles"].append(role)
 
     orders = list(orders_by_id.values())
     profits = order_cashflow_profit_by_order(session, order_ids=list(orders_by_id))

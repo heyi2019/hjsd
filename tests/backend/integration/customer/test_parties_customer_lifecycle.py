@@ -329,6 +329,13 @@ class TestListAndGetCustomers:
             counterparty_roles=[(counterparty["id"], "PEER")],
             actor="pytest",
         )
+        older_order = create_order(
+            seeded_db,
+            order_type="TH",
+            trade_date=date(2026, 10, 17),
+            counterparty_roles=[(counterparty["id"], "PEER")],
+            actor="pytest",
+        )
         post_event(
             seeded_db, order.id, event_type="BUY", amount=100, occurred_on=date(2026, 10, 18), actor="pytest", pool_id=1
         )
@@ -336,16 +343,38 @@ class TestListAndGetCustomers:
             seeded_db, order.id, event_type="SELL", amount=450, occurred_on=date(2026, 10, 18), actor="pytest", pool_id=1
         )
 
+        from sqlalchemy import event
+        from app.customers.counterparty_detail import get_counterparty_detail
+        order_queries = []
+
+        def record_query(_conn, _cursor, statement, _params, _context, _many):
+            sql = " ".join(statement.lower().split())
+            if "from order_counterparty_roles join orders" in sql:
+                order_queries.append(sql)
+
+        connection = seeded_db.connection()
+        event.listen(connection, "after_cursor_execute", record_query)
+        try:
+            detail = get_counterparty_detail(seeded_db, counterparty["id"])
+        finally:
+            event.remove(connection, "after_cursor_execute", record_query)
+        assert detail["overview"]["cumulative_profit"] == Decimal("350.00")
+        assert len(order_queries) == 1
+        assert "orders.account_snapshot" not in order_queries[0]
+        assert "orders.form_extra" not in order_queries[0]
+
         response = seeded_client.get(
             f"{COUNTERPARTIES}/{counterparty['id']}", headers={"X-Dev-User": "employee"}
         )
 
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["overview"]["order_count"] == 1
+        assert body["overview"]["order_count"] == 2
+        assert body["overview"]["active_order_count"] == 1
         assert body["overview"]["completed_order_count"] == 1
         assert body["overview"]["cumulative_profit"] == "350.00"
         assert body["orders"][0]["order_no"] == order.order_no
+        assert body["orders"][1]["order_no"] == older_order.order_no
         assert body["orders"][0]["roles"] == ["PEER"]
         assert body["orders"][0]["profit"] == "350.00"
 

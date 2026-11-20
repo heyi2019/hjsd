@@ -1,8 +1,14 @@
 {
   "name": "yiyouxuan-erp",
   "private": true,
-  "description": "宜游轩 ERP 单仓根。唯一作用是让仓库根成为 npm 包根：tests/ 下的前端与 E2E 测试需要能解析前端依赖。",
+  "description": "宜游轩 ERP npm 工作区及依赖修补入口。",
   "workspaces": [
     "frontend"
-  ]
+  ],
+  "scripts": {
+    "postinstall": "patch-package --error-on-fail"
+  },
+  "devDependencies": {
+    "patch-package": "8.0.1"
+  }
 }

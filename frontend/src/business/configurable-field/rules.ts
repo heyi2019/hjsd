@@ -1,5 +1,6 @@
 /** 配置驱动的标签 / 必填 / 条件校验规则；拆分自 ConfigurableField.tsx。 */
 import { Form } from "antd";
+import { useCallback, useRef } from "react";
 import type { Rule } from "antd/es/form";
 import type { RequiredWhen } from "../../shared/api/types/forms";
 import { fieldConfigFor, useFieldConfig } from "./context";
@@ -84,13 +85,22 @@ export function resolveRules(
 /** 条件可以依赖普通字段，也可以依赖 form_extra 中的自定义字段。 */
 export function useConditionFieldValue(condField: string | undefined): unknown {
   const form = Form.useFormInstance();
-  const field = condField ?? "__no_required_when__";
-  const directValue = Form.useWatch(field, form);
-  const customValue = Form.useWatch(["form_extra", field], form);
-  return directValue === undefined ? customValue : directValue;
+  const fieldRef = useRef(condField);
+  fieldRef.current = condField;
+  const selectValue = useCallback((values: Record<string, unknown>) => {
+    const field = fieldRef.current;
+    if (!field) return undefined;
+    const directValue = values?.[field];
+    const extra = values?.form_extra as Record<string, unknown> | undefined;
+    return { field, value: directValue === undefined ? extra?.[field] : directValue };
+  }, []);
+  Form.useWatch(selectValue, form);
+  if (!condField || !form) return undefined;
+  const directValue = form.getFieldValue(condField);
+  return directValue === undefined ? form.getFieldValue(["form_extra", condField]) : directValue;
 }
 
-/** 订阅条件依赖字段的当前值；无条件时不订阅（用占位键，antd useWatch 对未知字段返回 undefined）。 */
+/** 订阅条件依赖字段的当前值；无条件时返回 undefined。 */
 export function useConditionValues(cfg: FieldConfigMap, key: string): Record<string, unknown> | undefined {
   const condField = fieldConfigFor(cfg, key)?.required_when?.field;
   const depValue = useConditionFieldValue(condField);

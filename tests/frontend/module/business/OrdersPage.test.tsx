@@ -164,8 +164,10 @@ describe("OrdersPage：四类订单台账", () => {
       await act(async () => { renderLight(<OrdersPage initialTab="ledger" />); });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
       expect(ordersApi.listPage).toHaveBeenCalledTimes(1);
-      fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "H" } });
-      fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "HS" } });
+      await act(async () => {
+        fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "H" } });
+        fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "HS" } });
+      });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
       expect(ordersApi.listPage).toHaveBeenCalledTimes(1);
       await act(async () => { await vi.advanceTimersByTimeAsync(249); });
@@ -175,7 +177,7 @@ describe("OrdersPage：四类订单台账", () => {
       expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS" }));
       expect(ordersApi.listPage).toHaveBeenCalledTimes(2);
       expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS", offset: 0 }));
-      fireEvent.click(screen.getByRole("radio", { name: "回收 1" }));
+      await act(async () => { fireEvent.click(screen.getByRole("radio", { name: "回收 1" })); });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(3);
       expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS", order_type: "HS" }));
       expect(ordersApi.listPage).toHaveBeenCalledTimes(3);

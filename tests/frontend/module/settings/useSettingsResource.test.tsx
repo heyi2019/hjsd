@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useSettingsResource } from "@/shared/state/useSettingsResource";
 
@@ -25,7 +25,7 @@ describe("useSettingsResource", () => {
     await waitFor(() => expect(result.current.error?.message).toBe("Error: settings unavailable"));
     expect(result.current.data).toBeNull();
 
-    await result.current.reload();
+    await act(async () => { await result.current.reload(); });
 
     await waitFor(() => expect(result.current.data).toEqual(["recovered"]));
     expect(result.current.error).toBeNull();

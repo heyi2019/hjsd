@@ -5,6 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listColumnsApi } from "@/shared/api/orders.api";
 import type { ListColumnConfig, ListScopeConfig } from "@/shared/api/types/forms";
+import { appMessage } from "@/shared/ui/appFeedback";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -284,6 +285,7 @@ describe("ListColumnsPanel", () => {
   });
 
   it("删除自定义列：二次确认后调用 removeCustom 并从列表移除", async () => {
+    const success = vi.spyOn(appMessage, "success").mockImplementation(() => undefined as never);
     vi.mocked(listColumnsApi.all).mockResolvedValue([ledgerWithCustom, inventory]);
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("VIP 标签")).toBeInTheDocument());
@@ -298,6 +300,8 @@ describe("ListColumnsPanel", () => {
       ),
     );
     await waitFor(() => expect(screen.queryByText("VIP 标签")).not.toBeInTheDocument());
+    expect(success).toHaveBeenCalledWith("自定义列已删除");
+    success.mockRestore();
   });
 
   it("批量隐藏：勾选后「隐藏所选」一次整表提交，所有列均可勾选", async () => {

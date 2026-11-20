@@ -1,0 +1,110 @@
+diff --git a/node_modules/rc-field-form/es/Field.js b/node_modules/rc-field-form/es/Field.js
+index 9c2444a..22a8b38 100644
+--- a/node_modules/rc-field-form/es/Field.js
++++ b/node_modules/rc-field-form/es/Field.js
+@@ -21,6 +21,7 @@ import { toArray } from "./utils/typeUtil";
+ import { validateRules } from "./utils/validateUtil";
+ import { containsNamePath, defaultGetValueFromEvent, getNamePath, getValue } from "./utils/valueUtil";
+ var EMPTY_ERRORS = [];
++var EMPTY_WARNINGS = [];
+ function requireUpdate(shouldUpdate, prev, next, prevValue, nextValue, info) {
+   if (typeof shouldUpdate === 'function') {
+     return shouldUpdate(prev, next, 'source' in info ? {
+@@ -61,7 +62,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+     _defineProperty(_assertThisInitialized(_this), "validatePromise", void 0);
+     _defineProperty(_assertThisInitialized(_this), "prevValidating", void 0);
+     _defineProperty(_assertThisInitialized(_this), "errors", EMPTY_ERRORS);
+-    _defineProperty(_assertThisInitialized(_this), "warnings", EMPTY_ERRORS);
++    _defineProperty(_assertThisInitialized(_this), "warnings", EMPTY_WARNINGS);
+     _defineProperty(_assertThisInitialized(_this), "cancelRegister", function () {
+       var _this$props = _this.props,
+         preserve = _this$props.preserve,
+@@ -142,7 +143,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+         _this.dirty = true;
+         _this.validatePromise = null;
+         _this.errors = EMPTY_ERRORS;
+-        _this.warnings = EMPTY_ERRORS;
++        _this.warnings = EMPTY_WARNINGS;
+         _this.triggerMetaEvent();
+       }
+       switch (info.type) {
+@@ -153,7 +154,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+             _this.dirty = false;
+             _this.validatePromise = undefined;
+             _this.errors = EMPTY_ERRORS;
+-            _this.warnings = EMPTY_ERRORS;
++            _this.warnings = EMPTY_WARNINGS;
+             _this.triggerMetaEvent();
+             onReset === null || onReset === void 0 || onReset();
+             _this.refresh();
+@@ -189,7 +190,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+                 _this.errors = data.errors || EMPTY_ERRORS;
+               }
+               if ('warnings' in data) {
+-                _this.warnings = data.warnings || EMPTY_ERRORS;
++                _this.warnings = data.warnings || EMPTY_WARNINGS;
+               }
+               _this.dirty = true;
+               _this.triggerMetaEvent();
+@@ -339,5 +340,5 @@ var Field = /*#__PURE__*/function (_React$Component) {
+       _this.validatePromise = rootPromise;
+       _this.dirty = true;
+       _this.errors = EMPTY_ERRORS;
+-      _this.warnings = EMPTY_ERRORS;
++      _this.warnings = EMPTY_WARNINGS;
+       _this.triggerMetaEvent();
+diff --git a/node_modules/rc-field-form/lib/Field.js b/node_modules/rc-field-form/lib/Field.js
+index 122b91c..19b31e3 100644
+--- a/node_modules/rc-field-form/lib/Field.js
++++ b/node_modules/rc-field-form/lib/Field.js
+@@ -29,6 +29,7 @@ var _validateUtil = require("./utils/validateUtil");
+ var _valueUtil = require("./utils/valueUtil");
+ var _excluded = ["name"];
+ var EMPTY_ERRORS = [];
++var EMPTY_WARNINGS = [];
+ function requireUpdate(shouldUpdate, prev, next, prevValue, nextValue, info) {
+   if (typeof shouldUpdate === 'function') {
+     return shouldUpdate(prev, next, 'source' in info ? {
+@@ -69,7 +70,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+     (0, _defineProperty2.default)((0, _assertThisInitialized2.default)(_this), "validatePromise", void 0);
+     (0, _defineProperty2.default)((0, _assertThisInitialized2.default)(_this), "prevValidating", void 0);
+     (0, _defineProperty2.default)((0, _assertThisInitialized2.default)(_this), "errors", EMPTY_ERRORS);
+-    (0, _defineProperty2.default)((0, _assertThisInitialized2.default)(_this), "warnings", EMPTY_ERRORS);
++    (0, _defineProperty2.default)((0, _assertThisInitialized2.default)(_this), "warnings", EMPTY_WARNINGS);
+     (0, _defineProperty2.default)((0, _assertThisInitialized2.default)(_this), "cancelRegister", function () {
+       var _this$props = _this.props,
+         preserve = _this$props.preserve,
+@@ -150,7 +151,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+         _this.dirty = true;
+         _this.validatePromise = null;
+         _this.errors = EMPTY_ERRORS;
+-        _this.warnings = EMPTY_ERRORS;
++        _this.warnings = EMPTY_WARNINGS;
+         _this.triggerMetaEvent();
+       }
+       switch (info.type) {
+@@ -161,7 +162,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+             _this.dirty = false;
+             _this.validatePromise = undefined;
+             _this.errors = EMPTY_ERRORS;
+-            _this.warnings = EMPTY_ERRORS;
++            _this.warnings = EMPTY_WARNINGS;
+             _this.triggerMetaEvent();
+             onReset === null || onReset === void 0 || onReset();
+             _this.refresh();
+@@ -197,7 +198,7 @@ var Field = /*#__PURE__*/function (_React$Component) {
+                 _this.errors = data.errors || EMPTY_ERRORS;
+               }
+               if ('warnings' in data) {
+-                _this.warnings = data.warnings || EMPTY_ERRORS;
++                _this.warnings = data.warnings || EMPTY_WARNINGS;
+               }
+               _this.dirty = true;
+               _this.triggerMetaEvent();
+@@ -347,5 +348,5 @@ var Field = /*#__PURE__*/function (_React$Component) {
+       _this.validatePromise = rootPromise;
+       _this.dirty = true;
+       _this.errors = EMPTY_ERRORS;
+-      _this.warnings = EMPTY_ERRORS;
++      _this.warnings = EMPTY_WARNINGS;
+       _this.triggerMetaEvent();

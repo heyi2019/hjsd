@@ -1,5 +1,6 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
+import { Form } from "antd";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -294,7 +295,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(ordersApi.updateExecution).mockRejectedValueOnce(new Error("保存失败"));
     function Probe() {
       const ledger = useLedgerInlineEdit();
-      return <><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
+      return <><Form form={ledger.invEditExtraForm} /><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
         <button onClick={() => void ledger.openLedgerEditor(secondOrder)}>编辑乙</button>
         <button onClick={() => ledger.updateEditingAccount({ account_description: "甲的草稿" })}>修改甲</button>
         <button onClick={() => void ledger.saveInline()}>保存甲</button>
@@ -319,7 +320,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 1 ? first : Promise.resolve(snapshot(2)));
     function Probe() {
       const ledger = useLedgerInlineEdit();
-      return <><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
+      return <><Form form={ledger.invEditExtraForm} /><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
         <button onClick={() => void ledger.openLedgerEditor(secondOrder)}>编辑乙</button>
         <span>{`展开:${ledger.expandedOrderIds.join(",")},编辑:${ledger.inlineEditId ?? "无"},草稿:${ledger.editingAccount?.id ?? "无"}`}</span></>;
     }
@@ -340,7 +341,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 1 ? first : Promise.resolve(snapshot(2)));
     function Probe() {
       const ledger = useLedgerInlineEdit();
-      return <><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
+      return <><Form form={ledger.invEditExtraForm} /><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
         <button onClick={() => ledger.handleLedgerExpand(true, secondOrder)}>展开乙</button>
         <span>{`展开:${ledger.expandedOrderIds.join(",")},编辑:${ledger.inlineEditId ?? "无"}`}</span></>;
     }
@@ -847,10 +848,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     await ui.type(within(modal).getByLabelText("金额"), "500");
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
     const form = within(modal).getByLabelText("金额").closest("form")!;
-    fireEvent.submit(form);
+    await act(async () => { fireEvent.submit(form); });
     await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await act(async () => { fireEvent.submit(form); });
     expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1);
     expect(within(modal).getByRole("button", { name: /确定/ })).toHaveClass("ant-btn-loading");
   });
@@ -1062,28 +1062,39 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/取消 · HS-2026-0001/);
     fireEvent.change(within(modal).getByLabelText("取消原因"), { target: { value: "取消交易" } });
     const form = within(modal).getByLabelText("取消原因").closest("form")!;
-    fireEvent.submit(form);
+    await act(async () => { fireEvent.submit(form); });
     await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => { fireEvent.submit(form); });
     expect(ordersApi.inventoryOffsale).toHaveBeenCalledTimes(1);
     await act(async () => finish({ ok: true }));
+    await waitFor(() => expect(modal).not.toBeVisible());
   });
 
   it("订单删除提交中重复确认只发送一次", async () => {
     let finish!: () => void;
+    let finishLabels!: (labels: Record<string, string>) => void;
+    let finishFields!: (fields: ReturnType<typeof allFormFields>) => void;
+    const labelsReady = new Promise<Record<string, string>>((resolve) => { finishLabels = resolve; });
+    const fieldsReady = new Promise<ReturnType<typeof allFormFields>>((resolve) => { finishFields = resolve; });
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockImplementation((scope) => scope === "ORDDELETE" ? labelsReady : Promise.resolve({}));
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "ORDDELETE" ? fieldsReady : allFormFields().filter((field) => field.order_type_code === scope));
     vi.mocked(ordersApi.deleteOrder).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     await openLedger();
     await openRowMenu("HS-2026-0001", "删除");
     const modal = await screen.findByRole("dialog", { name: "删除" });
+    await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("ORDDELETE", true));
     fireEvent.change(within(modal).getByLabelText("删除原因"), { target: { value: "删除测试" } });
     const form = within(modal).getByLabelText("删除原因").closest("form")!;
-    fireEvent.submit(form);
+    await act(async () => { fireEvent.submit(form); });
+    expect(ordersApi.deleteOrder).not.toHaveBeenCalled();
+    await act(async () => { finishFields([]); finishLabels({}); await Promise.all([fieldsReady, labelsReady]); });
+    await waitFor(() => expect(within(modal).queryByText("正在加载字段配置…")).not.toBeInTheDocument());
+    await act(async () => { fireEvent.submit(form); });
     await waitFor(() => expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await act(async () => { await Promise.resolve(); });
+    await act(async () => { fireEvent.submit(form); });
     expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1);
     await act(async () => finish());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "删除" })).not.toBeInTheDocument());
   });
 
   it("上一笔取消成功后不关闭新订单的取消弹窗", async () => {

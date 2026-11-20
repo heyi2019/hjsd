@@ -122,10 +122,9 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await ui.click(await screen.findByText("找号", { selector: ".ant-select-item-option-content" }));
     await ui.type(within(modal).getByLabelText("需求目标"), "需求测试");
     const form = modal.querySelector("form") as HTMLFormElement;
-    fireEvent.submit(form);
+    await act(async () => { fireEvent.submit(form); });
     await waitFor(() => expect(leadsApi.create).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await act(async () => { fireEvent.submit(form); });
     expect(leadsApi.create).toHaveBeenCalledTimes(1);
     await act(async () => { finish(leads[0]); await pending; });
   });

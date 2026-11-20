@@ -10,6 +10,7 @@ WORKDIR /app
 # 装完 node_modules 在 /app 根，frontend 通过 workspace 链接复用，不必重复安装。
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
+COPY patches/ ./patches/
 # 使用锁文件保证生产构建可重复；ECS 直连 npmjs.org 较慢，使用 npmmirror。
 RUN npm ci --registry=https://registry.npmmirror.com
 

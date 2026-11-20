@@ -3,10 +3,11 @@
  *  - CustomFormField 按类型渲染并把值归集到 form_extra.<field_key>；
  *  - CfgItem 在 FieldConfigContext 驱动下：停用字段不渲染、启用字段读配置标签。
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactElement } from "react";
+import { useState } from "react";
 import { Form, Input, Radio } from "antd";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { Select } from "@/shared/ui";
@@ -22,6 +23,7 @@ import {
   fieldLabel,
   injectOptionsIfMissing,
   isConditionActive,
+  useConditionFieldValue,
   resolveOptionItems,
   resolveRules,
   sectionLabel,
@@ -61,6 +63,42 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
+});
+
+it("切换条件依赖后，即使新值等于旧字段值也能更新", async () => {
+  function Probe() {
+    const [field, setField] = useState("first");
+    const value = useConditionFieldValue(field);
+    return <><button type="button" onClick={() => setField("second")}>切换依赖</button><span>{`当前:${value}`}</span></>;
+  }
+  renderLight(<Form initialValues={{ first: "1", second: "2" }}>
+    <Form.Item name="first"><Input /></Form.Item>
+    <Form.Item name="second"><Input aria-label="第二字段" /></Form.Item>
+    <Probe />
+  </Form>);
+  expect(await screen.findByText("当前:1")).toBeInTheDocument();
+  await ui.click(screen.getByRole("button", { name: "切换依赖" }));
+  expect(screen.getByText("当前:2")).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("第二字段"), { target: { value: "1" } });
+  expect(await screen.findByText("当前:1")).toBeInTheDocument();
+});
+
+it("设置字段状态时不误报循环引用", async () => {
+  const consoleError = vi.spyOn(console, "error");
+  function Probe() {
+    const [form] = Form.useForm();
+    return <Form form={form}>
+      <Form.Item name="note" label="说明" rules={[{ required: true, message: "请填写说明" }]}><Input /></Form.Item>
+      <button type="button" onClick={() => form.setFieldsValue({ note: "初值" })}>初始化</button>
+      <button type="button" onClick={() => form.setFields([{ name: "note", value: "已填写", errors: [], warnings: [] }])}>设置值</button>
+    </Form>;
+  }
+  renderLight(<Probe />);
+  await ui.click(screen.getByRole("button", { name: "初始化" }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "设置值" })); });
+  expect(screen.getByLabelText("说明")).toHaveValue("已填写");
+  expect(consoleError.mock.calls.flat().join(" ")).not.toContain("There may be circular references");
+  consoleError.mockRestore();
 });
 
 it.each([

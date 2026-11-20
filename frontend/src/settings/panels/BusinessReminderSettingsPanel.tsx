@@ -56,28 +56,30 @@ export function BusinessReminderSettingsPanel() {
       <Typography.Paragraph type="secondary">
         控制工作台业务总览中的提醒规则。库存提醒按入库天数计算，分润和逾期合约提醒可单独关闭。
       </Typography.Paragraph>
-      <PermissionGate permission="option-set.manage">
-        <FieldConfigScope scope="SYSREMIND" active={true}><BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} form={form} onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || Boolean(error)}>
-          <CfgItem
-            name="inventoryAgingDays"
-            label="库存订单超过多少天提醒"
-            rules={[{ required: true, message: "请输入提醒天数" }]}
-          >
-            <InputNumber min={1} max={365} precision={0} suffix="天" />
-          </CfgItem>
-          <CfgItem name="profitNotificationsEnabled" label="新的分润通知" valuePropName="checked">
-            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-          </CfgItem>
-          <CfgItem name="overdueInstallmentsEnabled" label="逾期合约提醒" valuePropName="checked">
-            <Switch checkedChildren="开启" unCheckedChildren="关闭" />
-          </CfgItem>
-          <PermissionButton permission="option-set.manage" type="primary" htmlType="submit">保存配置</PermissionButton>
-        </BusinessRegistrationForm></FieldConfigScope>
-      </PermissionGate>
+      <BusinessRegistrationForm
+        layout="horizontal"
+        labelAlign="left"
+        labelCol={{ flex: "108px" }}
+        wrapperCol={{ flex: "auto" }} form={form} onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || Boolean(error)}>
+        <PermissionGate permission="option-set.manage">
+          <FieldConfigScope scope="SYSREMIND" active={true}>
+            <CfgItem
+              name="inventoryAgingDays"
+              label="库存订单超过多少天提醒"
+              rules={[{ required: true, message: "请输入提醒天数" }]}
+            >
+              <InputNumber min={1} max={365} precision={0} suffix="天" />
+            </CfgItem>
+            <CfgItem name="profitNotificationsEnabled" label="新的分润通知" valuePropName="checked">
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+            </CfgItem>
+            <CfgItem name="overdueInstallmentsEnabled" label="逾期合约提醒" valuePropName="checked">
+              <Switch checkedChildren="开启" unCheckedChildren="关闭" />
+            </CfgItem>
+            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit">保存配置</PermissionButton>
+          </FieldConfigScope>
+        </PermissionGate>
+      </BusinessRegistrationForm>
     </section>
   );
 }

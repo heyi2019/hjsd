@@ -269,6 +269,7 @@ it("代挂必填客户昵称不能仅由空格组成", async () => {
 });
 
 it.each(["必填", "条件必填"])("提号供货方昵称配置为%s时不能仅填空格", async (mode) => {
+  const consoleError = vi.spyOn(console, "error");
   vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
     ...allFormFields().filter((field) => field.order_type_code === scope),
     { id: 9999, order_type_code: scope, field_key: "supplier_nickname", label: "供货方昵称", field_type: "TEXT",
@@ -286,6 +287,8 @@ it.each(["必填", "条件必填"])("提号供货方昵称配置为%s时不能�
   await ui.click(screen.getByRole("button", { name: /创建订单/ }));
   expect(await screen.findByText("供货方昵称必填")).toBeInTheDocument();
   expect(ordersApi.create).not.toHaveBeenCalled();
+  expect(consoleError.mock.calls.flat().join(" ")).not.toContain("useWatch` is not support dynamic");
+  consoleError.mockRestore();
 });
 
 it("关闭并重新打开建单时不保留上一单的校验错误", async () => {

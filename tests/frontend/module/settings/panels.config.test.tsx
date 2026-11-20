@@ -1,5 +1,5 @@
 /** 配置类只读面板——编号序列与业务提醒。 */
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { sequencesApi } from "@/shared/api/misc.api";
@@ -100,11 +100,19 @@ describe("BusinessReminderSettingsPanel", () => {
   });
 
   it("业务提醒读取失败时锁定保存按钮并提供重试入口（L1659）", async () => {
+    let resolveFields!: (value: Awaited<ReturnType<typeof orderFormFieldsApi.list>>) => void;
+    vi.mocked(orderFormFieldsApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveFields = resolve; }));
+    const consoleError = vi.spyOn(console, "error");
     vi.mocked(optionSetsApi).get.mockRejectedValue(new Error("提醒配置读取失败"));
-    renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
+    const { container } = renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
 
     // 错误态可见，不应误导用户为「已加载可编辑」
     expect(await screen.findByText(/提醒配置读取失败/)).toBeInTheDocument();
+    expect(container.querySelector("form")).toBeInTheDocument();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+    expect(consoleError).not.toHaveBeenCalledWith(expect.stringContaining("Instance created by `useForm`"));
+    consoleError.mockRestore();
+    await act(async () => { resolveFields([]); });
     // 读取失败时保存按钮被禁用，避免用默认值覆盖真实配置
     expect(screen.getByRole("button", { name: /保存配置/ })).toBeDisabled();
     // 保留重试入口，重试成功后恢复可编辑
@@ -143,10 +151,9 @@ describe("BusinessPeriodSettingsPanel", () => {
     const input = await screen.findByRole("spinbutton", { name: "每月起始日" });
     await waitFor(() => expect(input).toHaveValue("16"));
     const form = input.closest("form")!;
-    fireEvent.submit(form);
+    await act(async () => { fireEvent.submit(form); });
     await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await act(async () => { fireEvent.submit(form); });
     expect(screen.getByRole("button", { name: /保存当期设置/ })).toHaveClass("ant-btn-loading");
     expect(optionSetsApi.update).toHaveBeenCalledTimes(1);
   });

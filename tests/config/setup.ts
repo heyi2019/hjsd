@@ -14,6 +14,20 @@ console.error = (...args: unknown[]) => {
 };
 
 afterEach(async () => {
+  // 静态消息和通知不随测试容器卸载，先关闭以清除自动关闭定时器。
+  await act(async () => {
+    // 静态提示可能仍在异步队列中，先让其挂载再清理。
+    for (let i = 0; i < 6; i++) {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    }
+    const hasMessages = Boolean(document.querySelector(".ant-message-notice"));
+    const hasNotifications = Boolean(document.querySelector(".ant-notification-notice"));
+    if (hasMessages || hasNotifications) {
+      const { message, notification } = await import("antd");
+      if (hasMessages) message.destroy();
+      if (hasNotifications) notification.destroy();
+    }
+  });
   // 清空所有 mock 的调用记录与一次性返回值队列（mockResolvedValueOnce 等），
   // 为后续启用 isolate:false 复用模块图扫清 mock 共享泄漏；配合各文件 beforeEach 重新设定返回值。
   vi.resetAllMocks();

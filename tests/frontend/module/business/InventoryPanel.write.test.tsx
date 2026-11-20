@@ -216,7 +216,7 @@ describe("InventoryPanel：写入与长路径", () => {
     const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
     function EditorProbe() {
       const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
-      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑甲</button>
+      return <><Form form={editor.invEditExtraForm} /><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑甲</button>
         <button onClick={() => void editor.openEditor(accounts[1] as Account)}>编辑乙</button>
         <span>{`编辑行:${editor.inlineEditId ?? "无"},草稿:${editor.editingAccount?.id ?? "无"}`}</span></>;
     }
@@ -234,7 +234,7 @@ describe("InventoryPanel：写入与长路径", () => {
     const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
     function EditorProbe() {
       const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
-      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+      return <><Form form={editor.invEditExtraForm} /><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
         <button onClick={editor.cancelInlineEdit}>取消</button>
         <span>{`编辑行:${editor.inlineEditId ?? "无"},草稿:${editor.editingAccount?.id ?? "无"}`}</span></>;
     }
@@ -255,7 +255,7 @@ describe("InventoryPanel：写入与长路径", () => {
     const onRefreshFailed = vi.fn();
     function EditorProbe() {
       const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved, onRefreshFailed });
-      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑甲</button>
+      return <><Form form={editor.invEditExtraForm} /><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑甲</button>
         <button onClick={() => void editor.openEditor(accounts[1] as Account)}>编辑乙</button>
         <button onClick={() => editor.updateEditingAccount({ account_description: "甲的新草稿" })}>修改甲</button>
         <button onClick={editor.cancelInlineEdit}>取消</button>
@@ -433,6 +433,7 @@ describe("InventoryPanel：写入与长路径", () => {
     function EditorProbe() {
       const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: refreshFailed });
       return <>
+        <Form form={editor.invEditExtraForm} />
         <button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
         <button onClick={() => editor.addOperationDraft("DESCRIPTION")}>新增描述</button>
         <button onClick={() => editor.updateOperationDraft(Object.keys(editor.operationDrafts)[0], { occurred_at: "2026-11-20T10:00:00" })}>填写时间</button>
@@ -460,6 +461,7 @@ describe("InventoryPanel：写入与长路径", () => {
     function EditorProbe() {
       const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: refreshFailed });
       return <>
+        <Form form={editor.invEditExtraForm} />
         <button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
         <button onClick={() => editor.updateEditingAccount({ account_description: "修改的描述" })}>修改</button>
         <button onClick={() => void editor.saveInline()}>保存</button>
@@ -1014,10 +1016,9 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     await ui.type(await screen.findByLabelText("返点金额"), "350");
     const form = screen.getByLabelText("返点金额").closest("form")!;
-    fireEvent.submit(form);
+    await act(async () => { fireEvent.submit(form); });
     await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await act(async () => { fireEvent.submit(form); });
     expect(rebatesApi.create).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "确认登记" })).toHaveClass("ant-btn-loading");
   });
@@ -1697,9 +1698,9 @@ it.each([RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal])("已选售�
   vi.mocked(employeesApi.list).mockReturnValue(new Promise(() => {}));
   vi.mocked(ordersApi.stockSale).mockReturnValue(new Promise(() => {}));
   const form = screen.getByLabelText(amountLabel).closest("form")!;
-  fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: /确认售出/ })); });
   await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledTimes(1));
-  fireEvent.submit(form);
+  await act(async () => { fireEvent.submit(form); });
   expect(employeesApi.list).toHaveBeenCalledTimes(1);
   expect(screen.getByRole("button", { name: /确认售出/ })).toHaveClass("ant-btn-loading");
   expect(ordersApi.stockSale).toHaveBeenCalledTimes(1);

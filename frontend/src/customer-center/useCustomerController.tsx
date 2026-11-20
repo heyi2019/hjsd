@@ -45,6 +45,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
   const requestRef = useRef(0);
+  const summaryRequestRef = useRef(0);
   const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -75,11 +76,9 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     }
   };
 
-  const load = useCallback(async () => {
+  const loadList = useCallback(async () => {
     const request = ++requestRef.current;
     setLoading(true);
-    setSummaryLoading(true);
-    setSummaryError(null);
     const params = {
       ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
@@ -89,15 +88,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       limit: pageSize,
       offset: (page - 1) * pageSize,
     };
-    const summaryParams = {
-      today_date: today(),
-      ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-      ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
-      ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
-    };
-    const listRequest = customersApi.page(params).then((customerPage) => {
+    await customersApi.page(params).then((customerPage) => {
       if (request !== requestRef.current) return;
       setRows(customerPage.items);
       setTotal(customerPage.total);
@@ -107,15 +98,31 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     }).finally(() => {
       if (request === requestRef.current) setLoading(false);
     });
-    const summaryRequest = customersApi.summary(summaryParams).then((customerSummary) => {
-      if (request === requestRef.current) setSummary(customerSummary);
-    }).catch((err) => {
-      if (request === requestRef.current) setSummaryError(normalizeError(err));
-    }).finally(() => {
-      if (request === requestRef.current) setSummaryLoading(false);
-    });
-    await Promise.all([listRequest, summaryRequest]);
   }, [creatorFilter, keyword, page, pageSize, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
+
+  const loadSummary = useCallback(async () => {
+    const request = ++summaryRequestRef.current;
+    setSummaryLoading(true);
+    setSummaryError(null);
+    const params = {
+      today_date: today(),
+      ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+      ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
+      ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+    };
+    await customersApi.summary(params).then((customerSummary) => {
+      if (request === summaryRequestRef.current) setSummary(customerSummary);
+    }).catch((err) => {
+      if (request === summaryRequestRef.current) setSummaryError(normalizeError(err));
+    }).finally(() => {
+      if (request === summaryRequestRef.current) setSummaryLoading(false);
+    });
+  }, [creatorFilter, keyword, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
+  const load = useCallback(async () => {
+    await Promise.all([loadList(), loadSummary()]);
+  }, [loadList, loadSummary]);
 
   const resetKey = JSON.stringify([Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
   const previousResetKey = useRef(resetKey);
@@ -129,9 +136,14 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
         return;
       }
     }
-    void load();
+    void loadList();
     return () => { requestRef.current += 1; };
-  }, [active, load, page, resetKey]);
+  }, [active, loadList, page, resetKey]);
+  useEffect(() => {
+    if (!active) return;
+    void loadSummary();
+    return () => { summaryRequestRef.current += 1; };
+  }, [active, loadSummary]);
 
   useEffect(() => {
     // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页

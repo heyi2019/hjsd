@@ -124,9 +124,13 @@ describe("CustomersPage：客户档案", () => {
     let finish!: (value: ReturnType<typeof customerSummary>) => void;
     const pending = new Promise<ReturnType<typeof customerSummary>>((resolve) => { finish = resolve; });
     vi.mocked(customersApi.summary).mockReturnValueOnce(pending);
+    vi.mocked(customersApi.page).mockResolvedValueOnce(pageResponse(customers, { total: 11, limit: 10 }));
     renderLight(<CustomersPage />, { user: "admin" });
     expect(await screen.findByText("CUS-0001")).toBeVisible();
     expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("-");
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByTitle("2"));
+    await waitFor(() => expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 10 })));
+    expect(customersApi.summary).toHaveBeenCalledTimes(1);
     await act(async () => { finish(customerSummary({ month_count: 3, today_count: 1 })); await pending; });
     expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("3");
   });
@@ -167,7 +171,7 @@ describe("CustomersPage：客户档案", () => {
     await user.click(screen.getByRole("button", { name: "重新加载" }));
     expect(await screen.findByText("CP-0001")).toBeInTheDocument();
   });
-  it("客户档案翻页时加载后台下一页", async () => {
+  it("客户档案翻页时保留统计且不重复请求汇总", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(customersApi.page).mockImplementation(async (params) => pageResponse(
       params?.offset === 10 ? [{ ...customers[1], customer_no: "CUS-PAGE2" }] : [customers[0]],
@@ -175,7 +179,14 @@ describe("CustomersPage：客户档案", () => {
     ));
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("CUS-0001");
+    await waitFor(() => expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("1"));
+    let finish!: (value: ReturnType<typeof pageResponse>) => void;
+    const pending = new Promise<ReturnType<typeof pageResponse>>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.page).mockReturnValueOnce(pending as never);
     await user.click(screen.getByTitle("2"));
+    expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("1");
+    expect(customersApi.summary).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(pageResponse([{ ...customers[1], customer_no: "CUS-PAGE2" }], { total: 11, limit: 10, offset: 10 })); await pending; });
     expect(await screen.findByText("CUS-PAGE2")).toBeInTheDocument();
     expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
   });
@@ -828,6 +839,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     await ui.click(screen.getByRole("button", { name: /建\s*档/ }));
     await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
     expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五" });
+    await waitFor(() => expect(customersApi.summary).toHaveBeenCalledTimes(2));
   });
 
   it("重复候选不拦截，只提示（创建仍成功）", async () => {

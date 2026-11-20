@@ -100,8 +100,8 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       <StatRow
         items={[
           { label: "客户总数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(total) },
-          { label: "本月新增客户数", kind: "count", amount: loading || summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
-          { label: "今日新增客户数", kind: "count", amount: loading || summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newTodayCount ?? 0) },
+          { label: "本月新增客户数", kind: "count", amount: summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
+          { label: "今日新增客户数", kind: "count", amount: summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
       />
       <Space wrap className="customer-list-filters customer-list-filters--separated">

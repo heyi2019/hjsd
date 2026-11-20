@@ -89,24 +89,25 @@ def installment_order_context(
     account_ids = [order.account_id for order in orders if order.account_id is not None]
     accounts = {
         account.id: account
-        for account in session.scalars(
-            select(Account).where(Account.id.in_(account_ids))
+        for account in session.execute(
+            select(Account.id, Account.game_type, Account.game_account, Account.business_mode, Account.bound_phone)
+            .where(Account.id.in_(account_ids))
         ).all()
     } if account_ids else {}
 
     parties: dict[int, str] = {}
-    for role, customer in session.execute(
-        select(OrderCustomerRole, Customer)
+    for order_id, name in session.execute(
+        select(OrderCustomerRole.order_id, Customer.display_name)
         .join(Customer, Customer.id == OrderCustomerRole.customer_id)
         .where(OrderCustomerRole.order_id.in_(order_ids))
     ).all():
-        parties.setdefault(role.order_id, customer.display_name)
-    for role, counterparty in session.execute(
-        select(OrderCounterpartyRole, Counterparty)
+        parties.setdefault(order_id, name)
+    for order_id, name in session.execute(
+        select(OrderCounterpartyRole.order_id, Counterparty.display_name)
         .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
         .where(OrderCounterpartyRole.order_id.in_(order_ids))
     ).all():
-        parties.setdefault(role.order_id, counterparty.display_name)
+        parties.setdefault(order_id, name)
 
     result: dict[int, dict[str, object]] = {}
     for order in orders:

@@ -14,6 +14,7 @@ import { OrderSectionHeading, OPERATION_KEY_BY_TYPE, OPERATION_TYPE_BY_KEY, type
 import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
 import { currentDevUser } from "../../shared/api/client";
 import { activeConsignmentListings } from "../operations/consignment-logic";
+import "../../shared/ui/AdaptiveFormGrid/MoneyInput.css";
 
 const OPERATION_COLUMNS: ColumnsType<OrderOperationRow> = [
   { title: "动作", dataIndex: "action", key: "action", width: 88 },
@@ -167,7 +168,7 @@ function editableOperationColumns(
             const takenByDraft = Object.entries(operationDrafts ?? {}).some(([key, candidate]) => key !== row.key && candidate?.operation_type === "CONSIGNMENT" && platformValues(candidate.form_extra?.consignment_platforms).includes(String(option.value)));
             return !takenByListing && !takenByDraft;
           });
-          return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={choices} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min={0} precision={2} value={Number.isFinite(currentPrice) ? currentPrice : null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
+          return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={choices} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber className="money-input" aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min={0} precision={2} suffix="元" value={Number.isFinite(currentPrice) ? currentPrice : null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
         }
         const currentPlatforms = platformValues(extra.consignment_platforms);
         if (!row.event) {

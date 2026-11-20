@@ -121,7 +121,7 @@ export function AuditPanel() {
             }}
             options={entityTypeOptions}
           />
-          <Input className="audit-filter-input" placeholder="对象编号" value={entityId} onChange={(event) => setEntityId(event.target.value)} onPressEnter={() => void load()} />
+          <label className="audit-filter-field">对象编号<Input className="audit-filter-input" placeholder="对象编号" value={entityId} onChange={(event) => setEntityId(event.target.value)} onPressEnter={() => void load()} /></label>
           <Select
             allowClear
             showSearch
@@ -133,7 +133,7 @@ export function AuditPanel() {
               ? actionOptions.map((value) => ({ value, label: configurableLabel("AUDIT_ACTION", value, AUDIT_ACTION_LABEL) }))
               : ACTION_FALLBACK}
           />
-          <Input className="audit-filter-input" placeholder="操作人" value={actor} onChange={(event) => setActor(event.target.value)} onPressEnter={() => void load()} />
+          <label className="audit-filter-field">操作人<Input className="audit-filter-input" placeholder="操作人" value={actor} onChange={(event) => setActor(event.target.value)} onPressEnter={() => void load()} /></label>
           <DateField
             className="audit-filter-date"
             aria-label="审计开始日期"

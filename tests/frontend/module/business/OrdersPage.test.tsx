@@ -121,6 +121,18 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it("点击搜索立即查询当前关键词和统计", async () => {
+    vi.useFakeTimers();
+    try {
+      await act(async () => { renderLight(<OrdersPage initialTab="ledger" />); });
+      vi.mocked(ordersApi.listPage).mockClear();
+      vi.mocked(ordersApi.ledgerSummary).mockClear();
+      fireEvent.change(screen.getByRole("searchbox", { name: "搜索订单" }), { target: { value: "HS" } });
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: "执行订单搜索" })); });
+      expect(ordersApi.listPage).toHaveBeenCalledWith(expect.objectContaining({ keyword: "HS" }));
+      expect(ordersApi.ledgerSummary).toHaveBeenCalledWith(expect.objectContaining({ keyword: "HS" }));
+    } finally { vi.useRealTimers(); }
+  });
   it("分期页仅在业务中心激活时加载并在返回时刷新", async () => {
     vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals());
     const view = renderLight(<OrdersPage initialTab="collections" active={false} />);

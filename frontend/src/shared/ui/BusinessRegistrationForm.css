@@ -79,7 +79,7 @@
   font-size: var(--fs-caption-1);
 }
 
-.business-registration-modal:not(.compact-form-modal) .business-registration-form :is(.ant-input, .ant-input-affix-wrapper, .ant-input-number, .ant-select, .ant-select-selector, .ant-picker, textarea.ant-input) {
+.business-registration-modal:not(.compact-form-modal) .business-registration-form :is(.ant-input:not(.ant-input-affix-wrapper > .ant-input), .ant-input-affix-wrapper, .ant-input-number, .ant-select, .ant-select-selector, .ant-picker, textarea.ant-input) {
   min-height: var(--ui-control-height-lg);
   border-radius: var(--radius-sm);
   font-size: var(--fs-callout);

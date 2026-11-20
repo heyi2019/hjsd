@@ -533,6 +533,7 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("combobox", { name: "编辑上架平台" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "编辑上架平台 2" })).toBeInTheDocument();
     expect(screen.getByRole("spinbutton", { name: "编辑寄售价格" })).toBeInTheDocument();
+    expect(screen.getByRole("spinbutton", { name: "编辑寄售价格" }).closest(".ant-input-number-affix-wrapper")).toHaveTextContent("元");
     expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "编辑下架平台" })).toBeInTheDocument();
     expect(screen.getByLabelText("编辑上架平台时间")).toBeInTheDocument();

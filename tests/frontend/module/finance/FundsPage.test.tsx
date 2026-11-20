@@ -770,6 +770,9 @@ describe("FundsPage：资金流水", () => {
     await waitFor(() => expect(vi.mocked(cashflowsApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "SELL" })));
     expect(screen.getByText("SR00001")).toBeInTheDocument();
     expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
+    vi.mocked(cashflowsApi.list).mockClear();
+    await ui.click(screen.getByRole("button", { name: "搜索流水" }));
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenCalledWith(expect.objectContaining({ keyword: "SELL" })));
   });
 
   it("资金流水导出使用当前日期和搜索条件", async () => {

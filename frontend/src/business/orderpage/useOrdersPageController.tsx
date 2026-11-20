@@ -151,6 +151,7 @@ export function useOrdersPageController(params: {
     inventoryOperatorIds: inventoryOperatorIds,
     inventoryStatusOptions: inventoryStatusOptions,
     keyword: keyword,
+    submitSearch: list.submitSearch,
     ledgerColumns: visibleLedgerColumns,
     ledgerExporting: ledgerExporting,
     ledgerSortDesc: ledgerSortDesc,

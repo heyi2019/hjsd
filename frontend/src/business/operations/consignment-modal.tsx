@@ -18,6 +18,7 @@ import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { activeConsignmentListings } from "./consignment-logic";
 import "./consignment-modal.css";
+import "../../shared/ui/AdaptiveFormGrid/MoneyInput.css";
 
 type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
 
@@ -196,9 +197,10 @@ export function OrderConsignmentModal(props: {
           <CfgItem name="consignment_price" label="寄售价格">
             <InputNumber
               aria-label="寄售价格"
+              className="money-input"
               min={0}
               precision={2}
-              prefix="¥"
+              suffix="元"
               placeholder="本次挂牌价，选填"
             />
           </CfgItem>

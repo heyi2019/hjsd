@@ -30,6 +30,8 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   const [inventoryOperatorIds, setInventoryOperatorIds] = useState<number[]>([]);
   const [ageGtDays, setAgeGtDays] = useState<number | undefined>(initialAgeGtDays);
   const [keyword, setKeyword] = useState("");
+  const [searchRevision, setSearchRevision] = useState(0);
+  const submitSearch = () => setSearchRevision((value) => value + 1);
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -81,7 +83,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
 
   const wasActiveRef = useRef(false);
   const previousInitialAgeRef = useRef(initialAgeGtDays);
-  const previousSearchRef = useRef<{ keyword: string | undefined; filters: string; refreshKey: number } | null>(null);
+  const previousSearchRef = useRef<{ keyword: string | undefined; filters: string; refreshKey: number; revision: number } | null>(null);
   useEffect(() => {
     if (!active) {
       wasActiveRef.current = false;
@@ -99,16 +101,16 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     const { keyword: searchKeyword, ...otherFilters } = filters;
     const filterKey = JSON.stringify(otherFilters);
     const previous = previousSearchRef.current;
-    const debounceSearch = previous !== null && previous.filters === filterKey
+    const debounceSearch = previous !== null && previous.revision === searchRevision && previous.filters === filterKey
       && previous.refreshKey === refreshKey && previous.keyword !== searchKeyword;
-    previousSearchRef.current = { keyword: searchKeyword, filters: filterKey, refreshKey };
+    previousSearchRef.current = { keyword: searchKeyword, filters: filterKey, refreshKey, revision: searchRevision };
     const timer = debounceSearch ? window.setTimeout(() => void load(), 250) : undefined;
     if (!debounceSearch) void load();
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
       loadSequence.invalidate();
     };
-  }, [active, ageGtDays, filters, initialAgeGtDays, load, loadSequence, page, refreshKey]);
+  }, [active, ageGtDays, filters, initialAgeGtDays, load, loadSequence, page, refreshKey, searchRevision]);
 
   const countInventoryRows = useCallback((type?: string) => {
     if (type) return typeCounts[type] ?? 0;
@@ -133,7 +135,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     inventoryType, setInventoryType, gameTypeFilter, setGameTypeFilter,
     inventoryOperatorIds, setInventoryOperatorIds,
     ageGtDays, setAgeGtDays,
-    keyword, setKeyword, dateRange, setDateRange, sortDesc, setSortDesc,
+    keyword, setKeyword, submitSearch, dateRange, setDateRange, sortDesc, setSortDesc,
     page, setPage, pageSize, setPageSize, error, setError,
     businessOptions, inventoryTypeOptions, gameTypeOptions, load,
     countInventoryRows, totalCount, setTotalCount,

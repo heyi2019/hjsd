@@ -112,10 +112,10 @@ export function UsersPanel() {
       ]}
     />
     <BusinessRegistrationForm name="createUser" form={form} layout="inline" onFinish={submit}>
-      <Form.Item name="username" rules={[{ required: true }]}><Input placeholder="用户名" /></Form.Item>
-      <Form.Item name="display_name" rules={[{ required: true }]}><Input placeholder="姓名" /></Form.Item>
-      <Form.Item name="phone" rules={PHONE_RULES}><Input placeholder="手机号（用于免密登录）" autoComplete="tel" /></Form.Item>
-      <Form.Item name="password" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
+      <Form.Item name="username" label="用户名" rules={[{ required: true }]}><Input placeholder="用户名" /></Form.Item>
+      <Form.Item name="display_name" label="姓名" rules={[{ required: true }]}><Input placeholder="姓名" /></Form.Item>
+      <Form.Item name="phone" label="手机号" rules={PHONE_RULES}><Input placeholder="手机号（用于免密登录）" autoComplete="tel" /></Form.Item>
+      <Form.Item name="password" label="初始密码" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
       <Form.Item name="role" initialValue="VIEWER"><Select options={roleOptions} aria-label="角色" className="ui-control-width-140" /></Form.Item>
       <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} aria-label="数据范围" className="ui-control-width-100" /></Form.Item>
       <Form.Item name="team_ids"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>

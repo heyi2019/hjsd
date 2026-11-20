@@ -1,5 +1,5 @@
 import { Button, Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Tag, Typography } from "antd";
-import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import { ArrowDownOutlined, ArrowUpOutlined, SearchOutlined } from "@ant-design/icons";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetailView/OrderDetail";
@@ -104,8 +104,10 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
       ]} />
       <Card className="glass orders-ledger-card">
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
-          <Input
+          <Input.Search
             allowClear
+            enterButton={<span aria-label="执行订单搜索"><SearchOutlined /></span>}
+            onSearch={(_value, _event, info) => { if (info?.source !== "clear") controller.submitSearch(); }}
             value={keyword}
             placeholder="搜索订单号 / 游戏账号/产品 / 对方 / 备注"
             aria-label="搜索订单"

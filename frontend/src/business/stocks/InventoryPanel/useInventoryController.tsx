@@ -272,6 +272,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     setInventoryOperatorIds,
     setAgeGtDays,
     setKeyword,
+    submitSearch: list.submitSearch,
     setPage,
     setPageSize,
     setPlatformOffsaleTarget,

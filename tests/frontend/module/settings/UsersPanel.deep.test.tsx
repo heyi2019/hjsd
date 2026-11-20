@@ -47,6 +47,7 @@ describe("UsersPanel.deep：写路径与失败分支", () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<UsersPanel />, { user: "admin" });
     await screen.findByText("operator01");
+    expect(screen.getByText("用户名", { selector: "label" })).toBeVisible();
     await ui.type(screen.getByPlaceholderText("用户名"), "newuser");
     await ui.type(screen.getByPlaceholderText("姓名"), "新同事");
     await ui.type(screen.getByPlaceholderText("初始密码（至少 8 位）"), "password123");

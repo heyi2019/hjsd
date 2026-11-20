@@ -3,6 +3,15 @@
   align-items: center;
 }
 
+.audit-filter-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 var(--col-w-220);
+  max-width: var(--control-inline-field-width);
+  white-space: nowrap;
+}
+
 .audit-filter-bar .audit-filter-select {
   flex: 0 0 var(--control-filter-select-width);
   width: var(--control-filter-select-width);
@@ -23,7 +32,7 @@
 
 @media (--bp-sm) {
   .audit-filter-bar > .audit-filter-select,
-  .audit-filter-bar > .audit-filter-input,
+  .audit-filter-bar > .audit-filter-field,
   .audit-filter-bar > .audit-filter-date {
     flex: 1 1 100%;
     width: 100%;

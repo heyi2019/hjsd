@@ -1,5 +1,5 @@
 import { Button, Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
-import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
+import { ArrowDownOutlined, ArrowUpOutlined, SearchOutlined } from "@ant-design/icons";
 import { DataTable, PermissionButton, Select } from "../../../shared/ui";
 import { OrderDetail } from "../../OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
@@ -66,8 +66,10 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
   return (
     <Card className="glass">
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
-        <Input
+        <Input.Search
           allowClear
+          enterButton={<span aria-label="搜索库存账号"><SearchOutlined /></span>}
+          onSearch={(_value, _event, info) => { if (info?.source !== "clear") controller.submitSearch(); }}
           value={keyword}
           placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 渠道区服"
           aria-label="搜索库存账号"

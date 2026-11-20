@@ -143,13 +143,18 @@
    small / 表格紧凑态由业务选择器显式覆盖（如 .ant-btn-sm 走 antd 24px、紧凑弹窗 textarea 交回 rows）。
    历史：Issue #17(b5635fed) 曾把此值由 36px 抬到 44px 以满足触控目标；现按 11-12 裁决回退，
    触控目标低于 44pt 属知情取舍。 */
-:where(.ant-input:not(.ant-input-affix-wrapper > .ant-input):not(textarea), .ant-input-number, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
+:where(.ant-input:not(.ant-input-affix-wrapper > .ant-input):not(textarea), .ant-input-number:not(.ant-input-number-affix-wrapper > .ant-input-number), .ant-input-number-affix-wrapper, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
   min-height: var(--ui-control-height) !important;
   height: var(--ui-control-height) !important;
   /* 静止态：三层全透明白阴影，与聚焦态 --focus-glow 同层数，保证 box-shadow 平滑过渡
      （层数不对齐时 CSS 走离散跳变而非插值，光环会"啪"地出现而非绽放）。 */
   box-shadow: 0 0 0 0 transparent, 0 0 0 0 transparent, 0 0 0 0 transparent !important;
   transition: border-color 160ms var(--ease-spring), box-shadow 220ms var(--ease-spring);
+}
+
+:where(.ant-input-number-affix-wrapper > .ant-input-number) {
+  height: 100% !important;
+  min-height: 0 !important;
 }
 
 /* 普通按钮同样锁定 36px 高（与控件口径一致，11-12 裁决）；.ant-btn-sm 由 antd 默认 24px 覆盖。 */

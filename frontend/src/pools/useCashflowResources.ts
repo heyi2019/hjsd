@@ -23,6 +23,8 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   const [cashflowLoading, setCashflowLoading] = useState(false);
   const [cashflowError, setCashflowError] = useState<{ message: string; code?: string } | null>(null);
   const [cashflowKeyword, setCashflowKeyword] = useState("");
+  const [searchRevision, setSearchRevision] = useState(0);
+  const submitCashflowSearch = () => setSearchRevision((value) => value + 1);
   const [cashflowPoolId, setCashflowPoolId] = useState<number | undefined>();
   const [cashflowDirection, setCashflowDirection] = useState<string | undefined>();
   const cashflowFrom = periodState.period?.from ?? "";
@@ -101,7 +103,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     }
   }, []);
 
-  const lastFilterRef = useRef<{ base: string; keyword: string } | null>(null);
+  const lastFilterRef = useRef<{ base: string; keyword: string; revision: number } | null>(null);
   useEffect(() => {
     if (!active) {
       lastFilterRef.current = null;
@@ -109,8 +111,8 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     }
     const base = JSON.stringify([cashflowFrom, cashflowTo, cashflowPoolId, cashflowDirection, cashflowLedgerType, cashflowAttribute, cashflowCategory]);
     const previous = lastFilterRef.current;
-    const keywordOnly = previous !== null && previous.base === base && previous.keyword !== cashflowKeyword;
-    lastFilterRef.current = { base, keyword: cashflowKeyword };
+    const keywordOnly = previous !== null && previous.revision === searchRevision && previous.base === base && previous.keyword !== cashflowKeyword;
+    lastFilterRef.current = { base, keyword: cashflowKeyword, revision: searchRevision };
     cashflowListRequestRef.current += 1;
     setCashflowsReady(false);
     setCashflowLoading(true);
@@ -134,6 +136,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     cashflowTo,
     cashflowPage,
     cashflowPageSize,
+    searchRevision,
     fetchCashflows,
   ]);
 
@@ -172,6 +175,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     cashflowError,
     cashflowKeyword,
     setCashflowKeyword,
+    submitCashflowSearch,
     cashflowPoolId,
     setCashflowPoolId,
     cashflowDirection,

@@ -38,6 +38,7 @@ describe("AuditPanel：审计记录", () => {
 
     const filterBar = document.querySelector(".audit-filter-bar");
     expect(filterBar).toBeInTheDocument();
+    expect(screen.getByText("对象编号", { selector: "label" })).toBeVisible();
     expect(filterBar?.querySelectorAll(".audit-filter-select")).toHaveLength(3);
     expect(document.querySelector(".audit-config-item-select")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("对象编号")).toHaveClass("audit-filter-input");

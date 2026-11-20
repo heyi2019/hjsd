@@ -38,8 +38,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const [gameTypes, setGameTypes] = useState<string[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
-  const previousSummaryQuery = useRef<{ keyword: string | undefined; filters: string } | null>(null);
-  const previousListQuery = useRef<{ keyword: string | undefined; filters: string } | null>(null);
+  const previousSummaryQuery = useRef<{ keyword: string | undefined; filters: string; revision: number } | null>(null);
+  const previousListQuery = useRef<{ keyword: string | undefined; filters: string; revision: number } | null>(null);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -99,6 +99,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     [gameTypes],
   );
   const [keyword, setKeyword] = useState("");
+  const [searchRevision, setSearchRevision] = useState(0);
+  const submitSearch = () => setSearchRevision((value) => value + 1);
 
   const queryFilters = useMemo(() => ({
     mine: mineOrders,
@@ -196,8 +198,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     const { keyword: searchKeyword, ...otherFilters } = queryFilters;
     const filters = JSON.stringify(otherFilters);
     const previous = previousListQuery.current;
-    const debounceSearch = previous !== null && previous.filters === filters && previous.keyword !== searchKeyword;
-    previousListQuery.current = { keyword: searchKeyword, filters };
+    const debounceSearch = previous !== null && previous.revision === searchRevision && previous.filters === filters && previous.keyword !== searchKeyword;
+    previousListQuery.current = { keyword: searchKeyword, filters, revision: searchRevision };
     if (debounceSearch) setLoading(true);
     const timer = debounceSearch ? window.setTimeout(() => void load(), 250) : undefined;
     if (!debounceSearch) void load();
@@ -205,7 +207,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
       if (timer !== undefined) window.clearTimeout(timer);
       requestSequence.invalidate();
     };
-  }, [active, initializedQueryKey, initialQueryKey, load, queryFilters, requestSequence]);
+  }, [active, initializedQueryKey, initialQueryKey, load, queryFilters, requestSequence, searchRevision]);
 
   useEffect(() => {
     if (!active || initializedQueryKey !== initialQueryKey) {
@@ -218,8 +220,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     const { keyword: searchKeyword, ...otherFilters } = queryFilters;
     const filters = JSON.stringify(otherFilters);
     const previous = previousSummaryQuery.current;
-    const debounceSearch = previous !== null && previous.filters === filters && previous.keyword !== searchKeyword;
-    previousSummaryQuery.current = { keyword: searchKeyword, filters };
+    const debounceSearch = previous !== null && previous.revision === searchRevision && previous.filters === filters && previous.keyword !== searchKeyword;
+    previousSummaryQuery.current = { keyword: searchKeyword, filters, revision: searchRevision };
     const fetchSummary = () => {
       void ordersApi.ledgerSummary(queryFilters).then((result) => {
         if (cancelled) return;
@@ -239,7 +241,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [active, initializedQueryKey, initialQueryKey, queryFilters]);
+  }, [active, initializedQueryKey, initialQueryKey, queryFilters, searchRevision]);
 
   const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
   const filteredOrders = orders;
@@ -288,6 +290,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     setDateRange,
     keyword,
     setKeyword,
+    submitSearch,
     orderBusinessOptions,
     orderBusinessModeOptions,
     inventoryStatusOptions,

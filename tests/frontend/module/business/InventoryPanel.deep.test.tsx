@@ -159,13 +159,17 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   it("连续输入库存搜索词只查询最终内容", async () => {
     await openPanel([inStockRow]);
     vi.mocked(stocksApi.inventoryLedger).mockClear();
-    const search = screen.getByRole("textbox", { name: "搜索库存账号" });
+    expect(screen.getByRole("button", { name: "搜索库存账号" })).toBeEnabled();
+    const search = screen.getByRole("searchbox", { name: "搜索库存账号" });
     fireEvent.change(search, { target: { value: "a" } });
     fireEvent.change(search, { target: { value: "ac" } });
     fireEvent.change(search, { target: { value: "acc" } });
     expect(stocksApi.inventoryLedger).not.toHaveBeenCalled();
     await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(1));
     expect(stocksApi.inventoryLedger).toHaveBeenCalledWith(expect.objectContaining({ keyword: "acc", offset: 0 }));
+    vi.mocked(stocksApi.inventoryLedger).mockClear();
+    await ui.click(screen.getByRole("button", { name: "搜索库存账号" }));
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledWith(expect.objectContaining({ keyword: "acc" })));
   });
 
   it("输入搜索词后等待期间忽略旧库存结果", async () => {
@@ -174,7 +178,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     vi.mocked(stocksApi.inventoryLedger).mockReturnValueOnce(oldRequest).mockResolvedValue(inventoryLedgerResponse([]) as never);
     renderLight(<InventoryPanel />, { user: "admin" });
     await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(1));
-    fireEvent.change(screen.getByRole("textbox", { name: "搜索库存账号" }), { target: { value: "新条件" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索库存账号" }), { target: { value: "新条件" } });
     await act(async () => finishOld(inventoryLedgerResponse([{
       account: inStockRow,
       order: { id: 21, order_no: "HS-2026-0001", order_type: "HS", account_id: 1, status: "ACTIVE" },

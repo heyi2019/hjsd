@@ -13,9 +13,40 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import event
+
+from app.domain.trade import Cashflow
+from app.funds.balances import pool_balances
 from app.funds.cashflows import create_cashflow
 
 TODAY = date(2026, 10, 4)
+
+
+def test_balance_aggregates_attributes_before_returning_rows(seeded_db):
+    """同方向同来源的不同属性应合并，减少聚合结果且保持金额。"""
+    for number, attribute, amount in [(1, "SELF_REVENUE", "10.10"), (2, "OTHER_INCOME", "20.20")]:
+        seeded_db.add(Cashflow(
+            flow_no=f"TEST-AGG-{number}", pool_id=1, occurred_on=TODAY,
+            direction="IN", source_type="MANUAL", accounting_attribute=attribute,
+            category="OTHER", amount=Decimal(amount), created_by="pytest", updated_by="pytest",
+        ))
+    seeded_db.flush()
+    row_counts = []
+
+    def record_rows(_conn, cursor, statement, _params, _context, _many):
+        sql = statement.lower()
+        if "from cashflow" in sql and "group by" in sql:
+            row_counts.append(cursor.rowcount)
+
+    connection = seeded_db.connection()
+    event.listen(connection, "after_cursor_execute", record_rows)
+    try:
+        balance = pool_balances(seeded_db, [1])[1]
+    finally:
+        event.remove(connection, "after_cursor_execute", record_rows)
+    assert balance["income"] == Decimal("30.30")
+    assert balance["cash_balance"] == Decimal("30.30")
+    assert row_counts == [1]
 
 
 def _flow(seeded_db, pool_id: int, *, direction: str, amount: str, note: str):

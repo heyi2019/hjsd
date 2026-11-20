@@ -32,13 +32,12 @@ def pool_balances(
         if pool_id not in pools or (user is not None and not user.can_see_pool(pool_id)):
             raise NotFound(f"资金账户 {pool_id} 不存在", details={"pool_id": pool_id})
 
-    cells: dict[int, dict[tuple[str, str | None, str | None], Decimal]] = {}
-    for pool_id, direction, source_type, attribute, amount in session.execute(
+    cells: dict[int, dict[tuple[str, str | None], Decimal]] = {}
+    for pool_id, direction, source_type, amount in session.execute(
         select(
             Cashflow.pool_id,
             Cashflow.direction,
             Cashflow.source_type,
-            Cashflow.accounting_attribute,
             func.coalesce(func.sum(Cashflow.amount), 0),
         )
         .where(
@@ -49,10 +48,9 @@ def pool_balances(
             Cashflow.pool_id,
             Cashflow.direction,
             Cashflow.source_type,
-            Cashflow.accounting_attribute,
         )
     ):
-        cells.setdefault(pool_id, {})[(direction, source_type, attribute)] = to_money(amount or 0)
+        cells.setdefault(pool_id, {})[(direction, source_type)] = to_money(amount or 0)
 
     deposits = {
         pool_id: to_money(amount or 0)
@@ -81,7 +79,7 @@ def pool_balances(
             return sum(
                 (
                     amount
-                    for (item_direction, item_source_type, _attribute), amount in bucket.items()
+                    for (item_direction, item_source_type), amount in bucket.items()
                     if item_direction == direction
                     and (source_type is None or item_source_type == source_type)
                 ),

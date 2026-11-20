@@ -28,6 +28,7 @@ import {
 interface OrderActionModalsDeps {
   selectedOrder: Order | null;
   load: () => Promise<void> | void;
+  loadLedgerDetail: (order: Pick<Order, "id" | "account_id">, force?: boolean) => Promise<void>;
   actionRequest: LatestRequest;
 }
 
@@ -38,6 +39,7 @@ interface OrderActionModalsDeps {
 export function useOrderActionModals({
   selectedOrder,
   load,
+  loadLedgerDetail,
   actionRequest,
 }: OrderActionModalsDeps) {
   const { username } = useSession();
@@ -242,6 +244,13 @@ export function useOrderActionModals({
     }
   };
 
+  const refreshOffsale = async (target: typeof orderOffsaleTarget) => {
+    await Promise.all([
+      load(),
+      target ? loadLedgerDetail({ id: target.orderId, account_id: target.account.id }, true) : undefined,
+    ]);
+  };
+
   const handleOrderSystemOffsale = async (payload: { reason: string; unlisted_at: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const target = orderOffsaleTarget;
     if (!target) return;
@@ -254,7 +263,7 @@ export function useOrderActionModals({
         form_extra: payload.form_extra,
       });
       appMessage.success("寄售记录已下架，账号已出库");
-      void Promise.resolve().then(load).catch(() => appMessage.warning("已出库，但刷新失败，请手动刷新"));
+      void refreshOffsale(target).catch(() => appMessage.warning("已出库，但刷新失败，请手动刷新"));
     } catch (error) {
       appMessage.error(normalizeError(error).message);
       throw error;
@@ -262,7 +271,7 @@ export function useOrderActionModals({
   };
 
   const handleOrderOffsaleChanged = async () => {
-    await load();
+    await refreshOffsale(orderOffsaleTarget);
   };
 
   const submitOrderDelete = async (reason: string) => {

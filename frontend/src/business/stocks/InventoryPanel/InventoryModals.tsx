@@ -154,9 +154,8 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         onChanged={async () => {
           const account = platformOffsaleTarget?.account;
           if (!account?.source_order_id) return;
+          refreshExecution(account);
           await load();
-          const detail = await ordersApi.executionDetail(account.source_order_id);
-          setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
         }}
       />
       <BusinessActionModal

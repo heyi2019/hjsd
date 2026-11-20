@@ -391,6 +391,43 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "平台停售" })));
   });
 
+  it("平台下架后已展开的库存订单详情显示新的下架记录", async () => {
+    const updatedDetail = {
+      ...consignmentDetail,
+      orders: [{
+        ...consignmentDetail.orders[0],
+        events: [
+          ...consignmentDetail.orders[0].events,
+          { id: 802, event_type: "OPERATE", operation_type: "UNLIST", reason: "平台停售", form_extra: { consignment_event_id: 801, consignment_platforms: ["千寻"], platform_unlist_scope: "PLATFORM" } },
+        ],
+      }],
+    } as AccountExecutionDetail;
+    let unlisted = false;
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async () => unlisted ? updatedDetail : consignmentDetail);
+    vi.mocked(ordersApi.postEvent).mockImplementationOnce(async () => { unlisted = true; return {} as never; });
+    await openPanel([consignmentRow]);
+    fireEvent.click(rowOf(1).querySelector(".ant-table-row-expand-icon") as Element);
+    const operationSection = await waitFor(() => {
+      const section = document.querySelector<HTMLElement>(".order-detail__section--operation");
+      expect(section).toBeTruthy();
+      return section!;
+    });
+    await waitFor(() => expect(within(operationSection).getByText("千寻")).toBeInTheDocument());
+
+    await clickOperation(rowOf(1), "下架");
+    const modal = await screen.findByRole("dialog");
+    await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+    await ui.click(await screen.findByText(/千寻（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "平台停售");
+    await ui.click(screen.getByRole("button", { name: "确认下架" }));
+
+    await waitFor(() => {
+      const section = document.querySelector<HTMLElement>(".order-detail__section--operation");
+      expect(section).toBeTruthy();
+      expect(within(section!).getByText("千寻 / 下架原因：平台停售")).toBeInTheDocument();
+    });
+  });
+
   it("平台下架原因不能只填写空格", async () => {
     vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
     await openPanel([consignmentRow]);

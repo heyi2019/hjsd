@@ -644,6 +644,59 @@ describe("OrdersPage：四类订单台账", () => {
     await waitFor(() => expect(screen.getByRole("menuitem", { name: "下架" })).toBeInTheDocument());
   });
 
+  it("平台下架后已展开的订单台账详情显示新的下架记录", async () => {
+    const account = { id: 1, source_order_id: 1, source_order_no: "HS-2026-0001", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "100.00" };
+    const listing = { id: 29, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-01T10:00" } };
+    const order = { order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" };
+    const before = { account, orders: [{ ...order, events: [listing] }] };
+    const after = { account, orders: [{ ...order, events: [listing, {
+      id: 30, event_type: "OPERATE", operation_type: "UNLIST", reason: "平台停售", form_extra: { consignment_event_id: 29, consignment_platforms: ["千寻"], platform_unlist_scope: "PLATFORM" },
+    }] }] };
+    let unlisted = false;
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async () => (unlisted ? after : before) as never);
+    vi.mocked(ordersApi.postEvent).mockImplementationOnce(async () => { unlisted = true; return {} as never; });
+    setupLedgerApi([{ ...orders[0], account_id: 1 }]);
+    await openLedger("admin");
+
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await waitFor(() => expect(document.querySelector(".order-detail__section--operation")).toHaveTextContent("千寻"));
+    await ui.click(within(row).getByRole("button", { name: "运营" }));
+    await ui.click(await screen.findByRole("menuitem", { name: "下架" }));
+    await ui.click(await screen.findByRole("combobox", { name: "下架平台" }));
+    await ui.click(await screen.findByText(/千寻（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "平台停售");
+    await ui.click(screen.getByRole("button", { name: "确认下架" }));
+
+    await waitFor(() => expect(document.querySelector(".order-detail__section--operation")).toHaveTextContent("千寻 / 下架原因：平台停售"));
+  });
+
+  it("代挂从本系统出库后已展开的订单台账详情显示出库记录", async () => {
+    const account = { id: 9, source_order_id: 3, source_order_no: "DG-2026-0003", inventory_type: "CONSIGNMENT", status: "WAITING", created_at: "2026-10-03T10:00:00" };
+    const order = { order_id: 3, order_no: "DG-2026-0003", order_type: "DG", trade_date: "2026-10-03", status: "ACTIVE" };
+    const before = { account, orders: [{ ...order, events: [] }] };
+    const after = { account: { ...account, status: "VOID" }, orders: [{ ...order, status: "CANCELLED", events: [{
+      id: 31, event_type: "OPERATE", operation_type: "UNLIST", reason: "代挂结束", form_extra: { platform_unlist_scope: "SYSTEM" },
+    }] }] };
+    let unlisted = false;
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async () => (unlisted ? after : before) as never);
+    vi.mocked(ordersApi.inventoryOffsale).mockImplementationOnce(async () => { unlisted = true; return { ok: true }; });
+    setupLedgerApi([...orders, { id: 3, order_no: "DG-2026-0003", order_type: "DG", trade_date: "2026-10-03", status: "ACTIVE", account_id: 9, account_status: "WAITING" }]);
+    await openLedger("admin");
+
+    const row = screen.getAllByText("DG-2026-0003").find((element) => element.closest("tr"))!.closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await waitFor(() => expect(document.querySelector(".order-detail__section--operation")).toBeInTheDocument());
+    await ui.click(within(row).getByRole("button", { name: "运营" }));
+    await ui.click(await screen.findByRole("menuitem", { name: "下架" }));
+    await ui.click(await screen.findByRole("combobox", { name: "下架平台" }));
+    await ui.click(await screen.findByText(/本系统（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "代挂结束");
+    await ui.click(screen.getByRole("button", { name: "确认出库" }));
+
+    await waitFor(() => expect(document.querySelector(".order-detail__section--operation")).toHaveTextContent("本系统 / 下架原因：代挂结束"));
+  });
+
   it("已售代挂改走取消，不再引导到下架", async () => {
     const soldConsignment = {
       id: 4,

@@ -19,6 +19,8 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
   const [reconciliationsReady, setReconciliationsReady] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [fundsReady, setFundsReady] = useState(false);
+  const [fundsLoading, setFundsLoading] = useState(false);
+  const [fundsError, setFundsError] = useState<{ message: string; code?: string } | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
   const loadRequest = useLatestRequest();
@@ -39,10 +41,18 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
     const isCurrent = () => loadRequest.isCurrent(requestId);
     setLoading(true);
     setFundsReady(false);
+    setFundsLoading(true);
+    setFundsError(null);
     setReconciliationsReady(false);
     try {
       const results = await Promise.allSettled([
-        poolResources.loadPools(isCurrent),
+        poolResources.loadPools(isCurrent).then(
+          () => { if (isCurrent()) setFundsReady(true); },
+          (err) => {
+            if (isCurrent()) setFundsError(normalizeError(err));
+            throw err;
+          },
+        ).finally(() => { if (isCurrent()) setFundsLoading(false); }),
         depositResources.loadDeposits(isCurrent),
         reconciliationResources.loadReconciliations(isCurrent),
         ...(includeCashflow && periodState.ready ? [cashflow.fetchCashflows()] : []),
@@ -52,7 +62,6 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
       if (failure?.status === "rejected") throw failure.reason;
       setReconciliationsReady(true);
       setError(null);
-      setFundsReady(true);
     } catch (err) {
       if (isCurrent()) setError(normalizeError(err));
     } finally {
@@ -64,7 +73,7 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
   useReloadOnActive(active, () => load(false));
 
   // 四张统计卡全部取服务端汇总（Decimal 聚合）：前端不再对卡片浮点累加，也不再有 N+1。
-  const unavailableAmount = error ? "不可用" : "—";
+  const unavailableAmount = fundsError ? "不可用" : "—";
   const balanceTotals = poolResources.balanceTotals;
   const totalCash = fundsReady && balanceTotals ? balanceTotals.cash_balance : unavailableAmount;
   const totalAvailable = fundsReady && balanceTotals ? balanceTotals.available : unavailableAmount;
@@ -84,6 +93,8 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
     loading,
     error,
     fundsReady,
+    fundsLoading,
+    fundsError,
     load,
     totalCash,
     totalAvailable,

@@ -8,7 +8,7 @@ import type { FundsPageController } from "../useFundsPageController";
 import type { Pool } from "../../shared/api/types/finance";
 
 export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
-  const { pools, balances, totalCash, totalAvailable, totalDeposit, transferForm, setTransferOpen, loading, fundsReady, error } = ctrl;
+  const { pools, balances, totalCash, totalAvailable, totalDeposit, transferForm, setTransferOpen, fundsLoading, fundsReady, fundsError } = ctrl;
   const { arrange: arrangeFundPoolColumns } = useListViewColumns("FUND_POOLS");
   const poolColumns: ColumnsType<Pool> = [
     {
@@ -30,7 +30,7 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
       className="glass"
       title="资金账户卡片"
       extra={
-        <PermissionButton permission="finance.transfer" type="primary" disabled={!fundsReady || loading || Boolean(error)} onClick={() => { transferForm.setFieldsValue({ occurred_on: today() }); setTransferOpen(true); }}>
+        <PermissionButton permission="finance.transfer" type="primary" disabled={!fundsReady || fundsLoading || Boolean(fundsError)} onClick={() => { transferForm.setFieldsValue({ occurred_on: today() }); setTransferOpen(true); }}>
           资金账户划转
         </PermissionButton>
       }
@@ -48,8 +48,8 @@ export function OverviewTab({ ctrl }: { ctrl: FundsPageController }) {
         page={1}
         pageSize={10}
         total={pools.length}
-        emptyText={error ? "资金数据不可用，请点击重新加载" : "尚未配置资金账户"}
-        loading={loading}
+        emptyText={fundsError ? "资金数据不可用，请点击重新加载" : "尚未配置资金账户"}
+        loading={fundsLoading}
         onPageChange={() => undefined}
       />
     </Card>

@@ -197,6 +197,54 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("押金和对账尚未完成时，资金总览先显示余额并允许划转", async () => {
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
+    const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
+    const pendingReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finishReconciliations = resolve; });
+    vi.mocked(depositsApi.list).mockReturnValueOnce(pendingDeposits);
+    vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pendingReconciliations);
+    renderLight(<FundsPage />, { user: "admin" });
+
+    try {
+      await waitFor(() => expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("1,600.00"));
+      expect(screen.getByRole("cell", { name: "经营主池" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
+    } finally {
+      await act(async () => {
+        finishDeposits(deposits);
+        finishReconciliations([]);
+        await Promise.all([pendingDeposits, pendingReconciliations]);
+      });
+    }
+  });
+
+  it.each(["押金", "对账"])("%s列表加载失败时，已成功的资金总览仍可用", async (kind) => {
+    if (kind === "押金") vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
+    else vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
+    renderLight(<FundsPage />, { user: "admin" });
+
+    await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
+    expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("1,600.00");
+    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
+  });
+
+  it("账户读取失败时，无需等押金列表即可提示总览不可用", async () => {
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
+    const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
+    vi.mocked(poolsApi.list).mockRejectedValueOnce(new Error("账户加载失败"));
+    vi.mocked(depositsApi.list).mockReturnValueOnce(pendingDeposits);
+    renderLight(<FundsPage />, { user: "admin" });
+
+    try {
+      await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
+      expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
+      expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
+    } finally {
+      await act(async () => { finishDeposits(deposits); await pendingDeposits; });
+    }
+  });
+
   it("旧一轮资金请求晚返回时，不覆盖重新进入后的账户、押金和对账", async () => {
     let finishPools!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
     let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
@@ -290,8 +338,7 @@ describe("FundsPage：资金账户卡片", () => {
     vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pending);
     renderLight(<FundsPage />, { user: "admin" });
 
-    await act(async () => { await Promise.resolve(); });
-    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled());
     expect(screen.queryByRole("button", { name: "重新加载" })).not.toBeInTheDocument();
     await act(async () => { finish([]); await pending; });
     await ui.click(await screen.findByRole("button", { name: "重新加载" }));

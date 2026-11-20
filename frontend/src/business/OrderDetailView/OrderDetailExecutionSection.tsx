@@ -100,7 +100,7 @@ export function OrderDetailExecutionSection({
       render: (value: string, item) => {
         const event = item.event;
         if (!editing) return value;
-        if (!event) {
+        if (!event || item.category === "INBOUND") {
           const storedIds = (orderDrafts?.[item.orderId]?.form_extra?.business_responsible_ids as number[] | undefined) ?? item.operatorUserIds ?? [];
           const operatorIds = storedIds.length ? storedIds : defaultOperatorIds;
           return (

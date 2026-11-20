@@ -240,6 +240,39 @@ describe("OrderDetail", () => {
     expect(within(operationSection).queryByText("当前运营状态")).toBeNull();
   });
 
+  it.each([
+    ["HS", "回收操作人"],
+    ["TH", "提号操作人"],
+    ["DG", "代挂操作人"],
+  ])("%s 账号资料展示本单%s，不混入交付或其他订单人员", async (orderType, label) => {
+    const detail = {
+      account,
+      orders: [
+        { order_id: 2, order_no: "HS0002", order_type: "HS", operator: "其他订单人员", events: [] },
+        {
+          order_id: 1,
+          order_no: `${orderType}0001`,
+          order_type: orderType,
+          operator: "何一、何二",
+          operator_user_ids: [1, 2],
+          extra_values: { business_responsible_ids: [1, 2], delivery_responsible_ids: [3] },
+          events: [{ id: 1, event_type: "SELL", operator: "售出人员" }],
+        },
+      ],
+      detail_view: { operation_rows: [], execution_rows: [], finance_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={1} loading={false} />);
+    await settleFieldConfig();
+
+    const profile = document.querySelector(".order-detail__section--profile") as HTMLElement;
+    expect(within(profile).getByText(label)).toBeInTheDocument();
+    expect(within(profile).getByText("何一、何二")).toBeInTheDocument();
+    expect(within(profile).queryByText("售出人员")).toBeNull();
+    expect(within(profile).queryByText("其他订单人员")).toBeNull();
+  });
+
   it("编辑执行明细时操作员选择器保持可读宽度", async () => {
     const detail = {
       orders: [{
@@ -323,7 +356,7 @@ describe("OrderDetail", () => {
     renderApp(<OrderDetail row={account} detail={detail} loading={false} editing={account} employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }]} />);
     await settleFieldConfig();
 
-    expect(screen.getByRole("combobox", { name: "编辑执行操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
+    expect(screen.getByRole("combobox", { name: "编辑执行操作人 回收入库" }).closest(".ant-select")?.textContent).toContain("管理员");
     expect(screen.getByRole("combobox", { name: "编辑上架平台操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
     expect(screen.getByRole("combobox", { name: "编辑资金明细操作人 CF0001" }).closest(".ant-select")?.textContent).toContain("管理员");
     expect(screen.getByRole("combobox", { name: "编辑交付操作人" }).closest(".ant-select")?.textContent).toContain("管理员");
@@ -384,6 +417,59 @@ describe("OrderDetail", () => {
     await userEvent.click(operator);
     await userEvent.click(await screen.findByText("李四", { selector: ".ant-select-item-option-content" }));
     expect(onOrderExtraChange).toHaveBeenCalledWith(1, "business_responsible_ids", [7, 8]);
+  });
+
+  it("有买入事件时编辑入库操作人仍更新建单业务操作人", async () => {
+    const onOrderExtraChange = vi.fn();
+    const onEventEdit = vi.fn();
+    const detail = {
+      orders: [{
+        order_id: 1,
+        order_no: "HS0001",
+        order_type: "HS",
+        operator: "张三",
+        extra_values: { business_responsible_ids: [7] },
+        events: [{ id: 1, event_type: "BUY", operator_user_ids: [8] }],
+      }],
+      detail_view: {
+        operation_rows: [],
+        execution_rows: [{ key: "buy", order_id: 1, category: "INBOUND", action: "回收入库", operator: "张三", operator_user_ids: [7], event_id: 1 }],
+        finance_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [],
+      },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={1} loading={false} editing={account}
+      employees={[
+        { id: 7, username: "zhangsan", display_name: "张三", is_active: true },
+        { id: 8, username: "lisi", display_name: "李四", is_active: true },
+      ]} onOrderExtraChange={onOrderExtraChange} onEventEdit={onEventEdit} />);
+    await settleFieldConfig();
+
+    const operator = screen.getByRole("combobox", { name: "编辑执行操作人 回收入库" });
+    expect(operator.closest(".ant-select")).toHaveTextContent("张三");
+    await userEvent.click(operator);
+    await userEvent.click(await screen.findByText("李四", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(1, "business_responsible_ids", [7, 8]);
+    expect(onEventEdit).not.toHaveBeenCalled();
+  });
+
+  it("编辑入库操作人时账号资料同步展示未保存的人员", async () => {
+    const detail = {
+      orders: [{ order_id: 1, order_no: "HS0001", order_type: "HS", operator: "张三", operator_user_ids: [7], events: [] }],
+      detail_view: { operation_rows: [], execution_rows: [], finance_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0.00", total_income: "0.00" },
+    } as unknown as AccountExecutionDetail;
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={1} loading={false} editing={account}
+      employees={[
+        { id: 7, username: "zhangsan", display_name: "张三", is_active: true },
+        { id: 8, username: "lisi", display_name: "李四", is_active: true },
+      ]}
+      orderDrafts={{ 1: { order_id: 1, occurred_at: "", note: "", form_extra: { business_responsible_ids: [7, 8] } } }} />);
+    await settleFieldConfig();
+
+    const profile = document.querySelector(".order-detail__section--profile") as HTMLElement;
+    expect(within(profile).getByText("张三、李四")).toBeInTheDocument();
   });
 
   it("编辑态账号输入与运营动作字段都绑定可编辑状态", async () => {

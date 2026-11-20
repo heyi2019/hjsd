@@ -5,8 +5,10 @@ import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { OrderFormField } from "../../shared/api/types/forms";
+import type { OrderDraft } from "./editing/use-order-detail-editor";
 import {
   OrderSectionHeading,
+  type OrderEmployeeOption,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
@@ -57,6 +59,12 @@ function channelRegionValue({ account }: AccountProfileValueSource) {
 }
 
 const COPYABLE_PROFILE_KEYS = new Set<AccountProfileKey>(["gameAccount", "campAccount", "password"]);
+
+const BUSINESS_OPERATOR_LABELS: Record<string, string> = {
+  HS: "回收操作人",
+  TH: "提号操作人",
+  DG: "代挂操作人",
+};
 
 function CopyableProfileValue({ label, value }: { label: string; value: string }) {
   const canCopy = value !== "-" && value.trim().length > 0;
@@ -135,18 +143,27 @@ export function OrderDetailProfileSection({
   detail,
   editing = false,
   onProfileChange,
+  orderDrafts,
+  employees = [],
 }: {
   meta: OrderDetailMeta;
   account?: Account | null;
   detail?: AccountExecutionDetail | null;
   editing?: boolean;
   onProfileChange?: (changes: Partial<Account>) => void;
+  orderDrafts?: Record<number, OrderDraft>;
+  employees?: OrderEmployeeOption[];
 }) {
   const creationOrder = useMemo(
     () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
     [detail, meta.sourceOrderNo],
   );
   const creationOrderType = creationOrder?.order_type ?? undefined;
+  const businessOperatorLabel = creationOrderType ? BUSINESS_OPERATOR_LABELS[creationOrderType] : undefined;
+  const draftOperatorIds = creationOrder ? orderDrafts?.[creationOrder.order_id]?.form_extra?.business_responsible_ids : undefined;
+  const businessOperator = Array.isArray(draftOperatorIds)
+    ? draftOperatorIds.map((id: unknown) => employees.find((employee) => employee.id === id)?.display_name ?? "未知员工").join("、") || "-"
+    : creationOrder?.operator || "-";
   const { config: creationConfig, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(creationOrderType);
   const { labels: sectionLabels } = useOrderFormSectionLabels(creationOrderType);
   // 编辑态必须以本地草稿 account 为唯一受控源；详情快照只用于只读展示。
@@ -195,6 +212,11 @@ export function OrderDetailProfileSection({
                   ) : field.value}
                 </Descriptions.Item>
               ))}
+            {businessOperatorLabel ? (
+              <Descriptions.Item label={fieldLabel(creationConfig, "business_responsible_ids", businessOperatorLabel)}>
+                {businessOperator}
+              </Descriptions.Item>
+            ) : null}
           </Descriptions>
           <Descriptions className="order-detail__meta-table" size="small" bordered column={2}>
             <Descriptions.Item label="二次图片（选填）">

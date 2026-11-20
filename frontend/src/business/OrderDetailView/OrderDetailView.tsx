@@ -102,7 +102,7 @@ export function OrderDetailView({
       <ConfigProvider componentDisabled={saving}>
         <div className="order-detail order-detail--editing">
           <fieldset className="order-detail__editable" disabled={saving}>
-            <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onProfileChange={onProfileChange} />
+            <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onProfileChange={onProfileChange} orderDrafts={orderDrafts} employees={employees} />
             <BusinessRegistrationForm
               layout="horizontal"
               labelAlign="left"

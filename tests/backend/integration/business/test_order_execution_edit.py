@@ -560,6 +560,45 @@ def test_order_detail_edit_updates_inventory_operator_ids(seeded_client, seeded_
     assert shown["operator"] == "种子用户1、种子用户2"
 
 
+@pytest.mark.parametrize(
+    ("order_type", "business_mode", "inventory_type", "has_buy_event"),
+    [
+        ("HS", "SELF", "RECOVERY", True),
+        ("TH", "DISTRIBUTION", "PICKUP", True),
+        ("DG", "DISTRIBUTION", "CONSIGNMENT", False),
+    ],
+)
+def test_inventory_execution_operator_tracks_business_responsibles(
+    seeded_client, seeded_db, headers, order_type, business_mode, inventory_type, has_buy_event
+):
+    account = create_account(seeded_db, game_account=f"entry-operator-{order_type}", business_mode=business_mode, inventory_type=inventory_type, actor="pytest")
+    order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [2]}
+    seeded_db.flush()
+    if has_buy_event:
+        event, _ = post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest", operator_user_ids=[2])
+    seeded_db.commit()
+
+    def inbound():
+        response = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
+        assert response.status_code == 200, response.text
+        return next(row for row in response.json()["detail_view"]["execution_rows"] if row["category"] == "INBOUND")
+
+    assert inbound()["operator"] == "种子用户1"
+    assert inbound()["operator_user_ids"] == [1]
+    edited = seeded_client.patch(
+        f"/api/orders/{order.id}/execution-edit",
+        headers=headers,
+        json={"events": [], "orders": [{"order_id": order.id, "form_extra": {"business_responsible_ids": [1, 2]}}]},
+    )
+    assert edited.status_code == 200, edited.text
+    assert inbound()["operator"] == "种子用户1、种子用户2"
+    assert inbound()["operator_user_ids"] == [1, 2]
+    if has_buy_event:
+        seeded_db.refresh(event)
+        assert event.operator_user_ids == [2]
+
+
 def test_order_detail_edit_rejects_unknown_inventory_operator(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="invalid-inventory-operator", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

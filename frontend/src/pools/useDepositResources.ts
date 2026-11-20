@@ -6,8 +6,9 @@ import type { Deposit } from "../shared/api/types/finance";
 export function useDepositResources() {
   const [deposits, setDeposits] = useState<Deposit[]>([]);
 
-  const loadDeposits = useCallback(async () => {
-    setDeposits(await depositsApi.list());
+  const loadDeposits = useCallback(async (isCurrent: () => boolean) => {
+    const items = await depositsApi.list();
+    if (isCurrent()) setDeposits(items);
   }, []);
 
   return { deposits, loadDeposits };

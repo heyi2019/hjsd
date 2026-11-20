@@ -8,8 +8,9 @@ export function usePoolResources() {
   const [balances, setBalances] = useState<Record<number, PoolBalance>>({});
   const [balanceTotals, setBalanceTotals] = useState<PoolBalanceTotals | null>(null);
 
-  const loadPools = useCallback(async () => {
+  const loadPools = useCallback(async (isCurrent: () => boolean) => {
     const [list, overview] = await Promise.all([poolsApi.list(), poolsApi.balances()]);
+    if (!isCurrent()) return;
     setPools(list);
     setBalances(Object.fromEntries(overview.items.map((item) => [item.pool_id, item])));
     setBalanceTotals(overview.totals);

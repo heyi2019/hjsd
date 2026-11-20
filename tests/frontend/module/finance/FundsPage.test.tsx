@@ -197,6 +197,77 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("旧一轮资金请求晚返回时，不覆盖重新进入后的账户、押金和对账", async () => {
+    let finishPools!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
+    const oldPools = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishPools = resolve; });
+    const oldDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
+    const oldReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finishReconciliations = resolve; });
+    const reconciliation = { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "新对账账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "OPEN" };
+    vi.mocked(poolsApi.list).mockReturnValueOnce(oldPools);
+    vi.mocked(poolsApi.balances).mockResolvedValueOnce(poolBalancesResponse(
+      [{ ...balance, pool_id: 1, pool_code: "POOL-A" }],
+      { pool_count: 1, cash_balance: "9999.00", available: "9900.00", deposit_held: "99.00" },
+    ));
+    vi.mocked(depositsApi.list).mockReturnValueOnce(oldDeposits);
+    vi.mocked(reconciliationsApi.list).mockResolvedValue([reconciliation]).mockReturnValueOnce(oldReconciliations);
+
+    const { rerender } = renderLight(<FundsPage active />, { user: "admin" });
+    await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(1));
+    rerender(<FundsPage active={false} />);
+    rerender(<FundsPage active />);
+    expect(await screen.findByRole("cell", { name: "经营主池" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled());
+
+    await act(async () => {
+      finishPools([{ ...pools[0], name: "旧资金账户" }]);
+      finishDeposits([{ ...deposits[0], counterparty_id: 888 }]);
+      finishReconciliations([{ ...reconciliation, account_label: "旧对账账户" }]);
+      await Promise.all([oldPools, oldDeposits, oldReconciliations]);
+    });
+    expect(screen.getByRole("cell", { name: "经营主池" })).toBeInTheDocument();
+    expect(screen.queryByText("旧资金账户")).not.toBeInTheDocument();
+    expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("1,600.00");
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    expect(screen.getByText("#99")).toBeInTheDocument();
+    expect(screen.queryByText("#888")).not.toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    expect(screen.getByText("新对账账户")).toBeInTheDocument();
+    expect(screen.queryByText("旧对账账户")).not.toBeInTheDocument();
+  });
+
+  it("旧一轮加载完成时，新一轮未完成不能提前启用划转", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
+    let finishNew!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishOld = resolve; });
+    const newRequest = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishNew = resolve; });
+    vi.mocked(poolsApi.list).mockReturnValueOnce(oldRequest).mockReturnValueOnce(newRequest);
+    const { rerender } = renderLight(<FundsPage active />, { user: "admin" });
+    await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(1));
+    rerender(<FundsPage active={false} />);
+    rerender(<FundsPage active />);
+    await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(2));
+    await act(async () => { finishOld(pools); await oldRequest; });
+    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
+    await act(async () => { finishNew(pools); await newRequest; });
+    await waitFor(() => expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled());
+  });
+
+  it("旧一轮加载失败不能覆盖已成功的新一轮", async () => {
+    let failOld!: (reason: Error) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((_resolve, reject) => { failOld = reject; });
+    vi.mocked(poolsApi.list).mockReturnValueOnce(oldRequest);
+    const { rerender } = renderLight(<FundsPage active />, { user: "admin" });
+    await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(1));
+    rerender(<FundsPage active={false} />);
+    rerender(<FundsPage active />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled());
+    await act(async () => { failOld(new Error("旧请求失败")); await oldRequest.catch(() => undefined); });
+    expect(screen.queryByText("旧请求失败")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
+  });
+
   it("后端不可达 → 错误条落地", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<FundsPage />, { user: "admin" });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { normalizeError } from "../shared/api/client";
+import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useCashflowResources } from "./useCashflowResources";
 import { useDepositResources } from "./useDepositResources";
@@ -20,6 +21,7 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
   const [fundsReady, setFundsReady] = useState(false);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const loadRequest = useLatestRequest();
   const cashflow = useCashflowResources(active && periodState.ready, periodState);
 
   useEffect(() => {
@@ -33,27 +35,30 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
   }, []);
 
   const load = useCallback(async (includeCashflow = true) => {
+    const requestId = loadRequest.start();
+    const isCurrent = () => loadRequest.isCurrent(requestId);
     setLoading(true);
     setFundsReady(false);
     setReconciliationsReady(false);
     try {
       const results = await Promise.allSettled([
-        poolResources.loadPools(),
-        depositResources.loadDeposits(),
-        reconciliationResources.loadReconciliations(),
+        poolResources.loadPools(isCurrent),
+        depositResources.loadDeposits(isCurrent),
+        reconciliationResources.loadReconciliations(isCurrent),
         ...(includeCashflow && periodState.ready ? [cashflow.fetchCashflows()] : []),
       ]);
+      if (!isCurrent()) return;
       const failure = results.find((result) => result.status === "rejected");
       if (failure?.status === "rejected") throw failure.reason;
       setReconciliationsReady(true);
       setError(null);
       setFundsReady(true);
     } catch (err) {
-      setError(normalizeError(err));
+      if (isCurrent()) setError(normalizeError(err));
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [cashflow.fetchCashflows, depositResources.loadDeposits, poolResources.loadPools, reconciliationResources.loadReconciliations, periodState.ready]);
+  }, [cashflow.fetchCashflows, depositResources.loadDeposits, loadRequest, poolResources.loadPools, reconciliationResources.loadReconciliations, periodState.ready]);
 
   // keep-alive：建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
   useReloadOnActive(active, () => load(false));

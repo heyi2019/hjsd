@@ -6,8 +6,9 @@ import type { Reconciliation } from "../shared/api/types/finance";
 export function useReconciliationResources() {
   const [reconciliations, setReconciliations] = useState<Reconciliation[]>([]);
 
-  const loadReconciliations = useCallback(async () => {
-    setReconciliations(await reconciliationsApi.list());
+  const loadReconciliations = useCallback(async (isCurrent: () => boolean) => {
+    const items = await reconciliationsApi.list();
+    if (isCurrent()) setReconciliations(items);
   }, []);
 
   return { reconciliations, loadReconciliations };

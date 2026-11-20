@@ -49,6 +49,12 @@ const accounts = [
   { id: 2, source_order_id: 22, source_order_no: "TH-2026-0002", game_account: "acc-2", platform: "B平台", status: "SOLD", inventory_type: "PICKUP", cost_amount: "200.00", buy_date: "2026-10-02", created_by: "admin", created_at: "2026-10-02T09:30:00" },
 ];
 
+async function loadStandaloneActionExecution(account: Account, isActive: () => boolean) {
+  if (account.source_order_id == null) return null;
+  const detail = await ordersApi.executionDetail(account.source_order_id);
+  return isActive() ? { detail, isCurrent: isActive } : null;
+}
+
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -140,10 +146,9 @@ describe("InventoryPanel：写入与长路径", () => {
       const [editing, setEditing] = useState<number | null>(null);
       const [, setRows] = useState<InventoryOrderRow[]>([]);
       const [, setError] = useState<{ message: string; code?: string } | null>(null);
-      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
       const actions = useInventoryActions({
         load: async () => undefined, setRows, setError,
-        executionDetails: details, setExecutionDetails: setDetails,
+        loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution,
         dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
         removeFromInventory: () => undefined,
@@ -175,10 +180,9 @@ describe("InventoryPanel：写入与长路径", () => {
       const [editing, setEditing] = useState<number | null>(null);
       const [, setRows] = useState<InventoryOrderRow[]>([]);
       const [, setError] = useState<{ message: string; code?: string } | null>(null);
-      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
       const actions = useInventoryActions({
         load: async () => undefined, setRows, setError,
-        executionDetails: details, setExecutionDetails: setDetails,
+        loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution,
         dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
         removeFromInventory: () => undefined,
@@ -508,10 +512,9 @@ describe("InventoryPanel：写入与长路径", () => {
       const [expanded, setExpanded] = useState<Key[]>([]);
       const [, setRows] = useState<InventoryOrderRow[]>([]);
       const [, setError] = useState<{ message: string; code?: string } | null>(null);
-      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
       const actions = useInventoryActions({
         load: async () => undefined, setRows, setError,
-        executionDetails: details, setExecutionDetails: setDetails,
+        loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
         dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
         removeFromInventory: () => undefined, editorOpenEditor: async () => true,
@@ -544,6 +547,115 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(within(modal).getByRole("table", { name: "资金明细表" })).toHaveTextContent("100.00");
     expect(within(modal).getByRole("table", { name: "资金明细表" })).toHaveTextContent("admin");
     expect(within(modal).getByLabelText("操作人")).toBeInTheDocument();
+  });
+
+  it.each(["取消", "资金收支", "下架"])("打开库存%s时读取最新订单详情，不沿用之前展开的缓存", async (action) => {
+    const detail = (amount: string, platform: string) => ({
+      account: accounts[0],
+      orders: [{
+        order_id: 21, order_no: "HS0001", order_type: "HS", status: "ACTIVE",
+        cashflows: [{ flow_no: "CF0001", occurred_on: "2026-10-15", direction: "OUT", amount }],
+        events: [
+          { id: 31, event_type: "BUY", amount, cancellable_amount: amount, portion: "PRINCIPAL", is_posted: true },
+          { id: 32, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: [platform], listed_at: "2026-10-15T10:00" } },
+        ],
+      }],
+    }) as never;
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail("100.00", "千寻"));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    const row = (await screen.findByText("acc-1")).closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await screen.findByText("千寻");
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail("250.00", "盼之"));
+
+    if (action === "下架") {
+      await ui.click(within(row).getByRole("button", { name: "运营" }));
+      await ui.click(within(await screen.findByRole("menu")).getByText("下架"));
+      const modal = await screen.findByRole("dialog", { name: "下架" });
+      expect(await within(modal).findByText("盼之")).toBeInTheDocument();
+      expect(within(modal).queryByText("千寻")).toBeNull();
+    } else {
+      await ui.click(within(row).getByRole("button", { name: action }));
+      const modal = await screen.findByRole("dialog", { name: action === "取消" ? /取消入库登记/ : /资金收支/ });
+      if (action === "取消") expect(within(modal).getByLabelText("退回金额")).toHaveValue("250.00");
+      else expect(within(modal).getByRole("table", { name: "资金明细表" })).toHaveTextContent("250.00");
+    }
+  });
+
+  it.each([
+    { change: "新增上架", before: false, after: true },
+    { change: "取消上架", before: true, after: false },
+  ])("库存运营菜单：$change 后显示当前可执行动作", async ({ before, after }) => {
+    const detail = (listed: boolean) => ({ account: accounts[0], orders: [{
+      order_id: 21, order_no: "HS0001", order_type: "HS", status: "ACTIVE",
+      events: listed ? [{ id: 32, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"] } }] : [],
+    }] }) as never;
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail(before));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    const row = (await screen.findByText("acc-1")).closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    await screen.findByText("运营信息");
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail(after));
+
+    await ui.click(within(row).getByRole("button", { name: "运营" }));
+    const menu = await screen.findByRole("menu");
+    await waitFor(() => {
+      if (after) expect(within(menu).getByText("下架")).toBeInTheDocument();
+      else expect(within(menu).queryByText("下架")).toBeNull();
+    });
+    const section = document.querySelector<HTMLElement>(".order-detail__section--operation")!;
+    await waitFor(() => {
+      if (after) expect(within(section).getByText("千寻")).toBeInTheDocument();
+      else expect(within(section).queryByText("千寻")).toBeNull();
+    });
+  });
+
+  it.each(["订单详情", "资金账户", "过时请求失败"])("库存资金收支等待%s期间详情被刷新，仍使用最新流水", async (pending) => {
+    let finishDetail!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    let rejectDetail!: (error: Error) => void;
+    let finishPools!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
+    const delayedDetail = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve, reject) => { finishDetail = resolve; rejectDetail = reject; });
+    const delayedPools = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishPools = resolve; });
+    const detail = (amount: string) => ({ account: accounts[0], orders: [{
+      order_id: 21, order_no: "HS0001", events: [],
+      cashflows: [{ flow_no: "CF0001", occurred_on: "2026-10-15", direction: "OUT", amount }],
+    }] }) as never;
+    if (pending !== "资金账户") vi.mocked(ordersApi.executionDetail).mockReturnValueOnce(delayedDetail).mockResolvedValue(detail("250.00"));
+    else {
+      vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce(detail("100.00")).mockResolvedValue(detail("250.00"));
+      vi.mocked(poolsApi.list).mockReturnValueOnce(delayedPools);
+    }
+    function Probe() {
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+      const removed = useRef(new Set<number>());
+      const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef: removed });
+      const actions = useInventoryActions({
+        ...cache, load: async () => undefined, setRows, setError,
+        editorOpenEditor: async () => true, editorCancelInlineEdit: () => undefined,
+        editorCancelPendingOpen: () => undefined, editorIsSaving: () => false,
+        editorSaveInline: async () => undefined, inlineEditId: null,
+      });
+      return <><button onClick={() => void actions.openCashflow(accounts[0] as Account)}>资金收支</button>
+        <button onClick={() => cache.refreshExecution(accounts[0] as Account)}>刷新</button>
+        <span data-testid="opened-amount">{actions.cashflowTarget?.cashflows?.[0]?.amount ?? "未打开"}</span>
+        <span data-testid="cached-amount">{cache.executionDetails[1]?.orders[0]?.cashflows?.[0]?.amount ?? "无缓存"}</span>
+        <span data-testid="action-error">{error?.message ?? "无错误"}</span>
+        <Form form={actions.voidForm} /></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "资金收支" }));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "刷新" }));
+    await waitFor(() => expect(screen.getByTestId("cached-amount")).toHaveTextContent("250.00"));
+    await act(async () => {
+      if (pending === "订单详情") finishDetail(detail("100.00"));
+      else if (pending === "资金账户") finishPools([{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }] as never);
+      else rejectDetail(new Error("过时请求失败"));
+    });
+    await waitFor(() => expect(screen.getByTestId("opened-amount")).toHaveTextContent("250.00"));
+    expect(screen.getByTestId("cached-amount")).toHaveTextContent("250.00");
+    expect(screen.getByTestId("action-error")).toHaveTextContent("无错误");
   });
 
   it("连续取消不同库存订单时，旧详情不能覆盖订单和退款金额", async () => {
@@ -621,10 +733,9 @@ describe("InventoryPanel：写入与长路径", () => {
     function Probe() {
       const [expanded, setExpanded] = useState<Key[]>([]);
       const [, setRows] = useState<InventoryOrderRow[]>([]);
-      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
       const actions = useInventoryActions({
         load: async () => undefined, setRows, setError,
-        executionDetails: details, setExecutionDetails: setDetails,
+        loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
         dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
         removeFromInventory: () => undefined, editorOpenEditor: async () => true,
@@ -672,10 +783,9 @@ describe("InventoryPanel：写入与长路径", () => {
       const [expanded, setExpanded] = useState<Key[]>(["21:1"]);
       const [, setRows] = useState<InventoryOrderRow[]>([]);
       const [, setError] = useState<{ message: string; code?: string } | null>(null);
-      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
       const actions = useInventoryActions({
         load: async () => undefined, setRows, setError,
-        executionDetails: details, setExecutionDetails: setDetails,
+        loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
         dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
         removeFromInventory: () => undefined, editorOpenEditor: async () => true,

@@ -6,6 +6,11 @@ import { normalizeError } from "../../../shared/api/client";
 import type { InventoryOrderRow } from "./types";
 import { useKeyedLatestRequest } from "../../../shared/hooks/useLatestRequest";
 
+export type ActionExecution = {
+  detail: AccountExecutionDetail;
+  isCurrent: () => boolean;
+};
+
 export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   setRows: Dispatch<SetStateAction<InventoryOrderRow[]>>;
   setError: Dispatch<SetStateAction<{ message: string; code?: string } | null>>;
@@ -68,6 +73,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       const detail = await ordersApi.executionDetail(orderId);
       if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(row.id, accountVersion)) return;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
+      setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
     } catch (err) {
       if (orderVersions.isCurrent(orderId, version) && accountVersions.isCurrent(row.id, accountVersion)) setError(normalizeError(err));
     } finally {
@@ -103,6 +109,42 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       }
     }
   }
+
+  /** 动作弹窗读取最新订单；刷新抢先完成时重读，避免旧快照回写或用于交易。 */
+  async function loadActionExecution(row: Account, isActive: () => boolean): Promise<ActionExecution | null> {
+    const orderId = row.source_order_id;
+    if (orderId == null) return null;
+    while (isActive()) {
+      orderAccountIds.current[orderId] = row.id;
+      const version = startOrderRequest(orderId);
+      const accountVersion = accountVersions.current(row.id);
+      const isCurrent = () => isActive()
+        && orderVersions.isCurrent(orderId, version)
+        && accountVersions.isCurrent(row.id, accountVersion);
+      const token = Symbol();
+      orderLoadingTokens.current[orderId] = token;
+      setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
+      try {
+        const detail = await ordersApi.executionDetail(orderId);
+        if (!isActive()) return null;
+        if (!isCurrent()) continue;
+        setExecutionDetails((current) => isCurrent() ? { ...current, [row.id]: detail } : current);
+        setOrderExecutionDetails((current) => isCurrent() ? { ...current, [orderId]: detail } : current);
+        return { detail, isCurrent };
+      } catch (err) {
+        if (!isActive()) return null;
+        if (!isCurrent()) continue;
+        throw err;
+      } finally {
+        if (orderLoadingTokens.current[orderId] === token) {
+          delete orderLoadingTokens.current[orderId];
+          setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+        }
+      }
+    }
+    return null;
+  }
+
   /** 编辑入口同时需要账号详情与当前订单详情，两者是同一份订单执行快照。 */
   async function loadEditorExecution(row: Account, orderId: number): Promise<AccountExecutionDetail | null> {
     const cached = executionDetails[row.id] ?? orderExecutionDetails[orderId];
@@ -196,6 +238,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     orderExecutionLoading,
     setOrderExecutionDetails,
     loadOrderExecution,
+    loadActionExecution,
     loadEditorExecution,
     dropOrderExecutionCache,
     dropExecutionCache,

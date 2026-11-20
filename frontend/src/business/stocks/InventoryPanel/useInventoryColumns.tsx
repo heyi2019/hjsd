@@ -94,11 +94,12 @@ export function useInventoryColumns(params: {
           {operationItems.length > 0 ? <Dropdown
             trigger={["click"]}
             placement="bottomLeft"
-            onOpenChange={(open) => { if (open) void loadExecution(account); }}
+            onOpenChange={(open) => { if (open) void loadExecution(account, true); }}
             menu={{
               className: "inventory-operation-menu",
               items: operationItems,
-              onClick: ({ key }) => {
+              onClick: ({ key, domEvent }) => {
+                domEvent.stopPropagation();
                 if (key === "consignment") setConsignmentTarget(account);
                 if (key === "offsale") void openPlatformOffsale(account);
                 if (key === "description" || key === "images") handleInventoryAction(key, account);

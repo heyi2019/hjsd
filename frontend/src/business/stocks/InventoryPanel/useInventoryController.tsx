@@ -59,6 +59,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   expandedOrderIds,
   loadExecution,
   loadOrderExecution,
+  loadActionExecution,
   loadEditorExecution,
   executionDetails,
   setExecutionDetails,
@@ -126,7 +127,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
-    executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
+    loadExecution, loadOrderExecution, loadActionExecution, loadEditorExecution, dropExecutionCache,
     expandTo, expandedOrderIds,
     removeFromInventory: (accountId, orderId) => {
       const wasVisible = rows.some((row) => row.account.id === accountId);

@@ -12,14 +12,16 @@ import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
 import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
 import { ToolbarMultiSelect } from "../../shared/ui/ToolbarMultiSelect";
 import "./OrdersLedgerPanel.css";
+import type { ReactNode } from "react";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
  *  「游戏账号/产品」而非入库操作人。本次保持默认隐藏目标不变，只把序号换成稳定 key，
  *  避免「设置 → 列表字段」过滤/调序后隐藏错列。 */
 const LEDGER_MOBILE_HIDDEN_KEYS = ["account_game_account"] as const;
 
-export function OrdersLedgerPanel({ controller, onNavigate }: {
+export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
   controller: OrdersPageController;
+  createAction?: ReactNode;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 }) {
   const {
@@ -99,7 +101,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
 
   return (
     <section className="ui-stack orders-ledger-panel">
-      <Card className="glass orders-ledger-card" title="订单台账">
+      <Card className="glass orders-ledger-card" title="订单台账" extra={createAction}>
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
           <Input.Search
             allowClear

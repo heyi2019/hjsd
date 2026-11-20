@@ -34,7 +34,7 @@ vi.mock("@/shared/api/stocks.api");;
 
 // 订单台账测试不覆盖库存面板本身；库存面板有独立回归，主页面测试用轻量桩避免重复挂载整套库存依赖。
 vi.mock("@/business/stocks/InventoryPanel", () => ({
-  InventoryPanel: ({ active = true }: { active?: boolean }) => active ? <div data-testid="inventory-panel-test-stub" /> : null,
+  InventoryPanel: ({ active = true, createAction }: { active?: boolean; createAction?: import("react").ReactNode }) => active ? <div data-testid="inventory-panel-test-stub"><div className="ant-card-head">库存中心{createAction}</div></div> : null,
 }));
 
 const orders = [
@@ -848,6 +848,14 @@ describe("OrdersPage：四类订单台账", () => {
     for (const label of ["新建回收订单", "新建提号订单", "新建代挂订单"]) {
       expect(await screen.findByText(label)).toBeInTheDocument();
     }
+  });
+
+  it("库存中心和订单台账的新建订单位于容器标题右侧", async () => {
+    renderLight(<OrdersPage />, { user: "admin" });
+    const trigger = await screen.findByRole("button", { name: "新建订单" });
+    expect(trigger.closest(".ant-card-head")).toHaveTextContent("库存中心");
+    await ui.click(screen.getByRole("tab", { name: "订单台账" }));
+    expect((await screen.findByRole("button", { name: "新建订单" })).closest(".ant-card-head")).toHaveTextContent("订单台账");
   });
 
   it("移除没有明确业务含义的通用登记事件入口", async () => {

@@ -6,8 +6,9 @@ import { DataTable, ExportButton, StatRow } from "../../../shared/ui";
 import { OrderDetail } from "../../OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
 import { ToolbarMultiSelect } from "../../../shared/ui/ToolbarMultiSelect";
+import type { ReactNode } from "react";
 
-export function InventoryLedger({ controller }: { controller: InventoryController }) {
+export function InventoryLedger({ controller, createAction }: { controller: InventoryController; createAction?: ReactNode }) {
   const {
     businessMode,
     businessOptions,
@@ -67,7 +68,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
   } = controller;
 
   return (
-    <Card className="glass" title="库存中心">
+    <Card className="glass" title="库存中心" extra={createAction}>
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
         <Input.Search
           allowClear

@@ -45,7 +45,7 @@ vi.mock("@/shared/api/stocks.api");;
 
 // 操作流只验证订单台账与分期入口；库存面板由 InventoryPanel 专项测试覆盖。
 vi.mock("@/business/stocks/InventoryPanel", () => ({
-  InventoryPanel: ({ active = true }: { active?: boolean }) => active ? <div data-testid="inventory-panel-test-stub" /> : null,
+  InventoryPanel: ({ active = true, createAction }: { active?: boolean; createAction?: import("react").ReactNode }) => active ? <div data-testid="inventory-panel-test-stub"><div className="ant-card-head">库存中心{createAction}</div></div> : null,
 }));
 
 // openAllocations 会调用 api.get("/users") 拉取收益人；normalizeError 必须保留真实实现。

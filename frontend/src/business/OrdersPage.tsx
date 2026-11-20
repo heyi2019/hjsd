@@ -54,6 +54,22 @@ export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilte
       setMarkingOverdue(false);
     }
   };
+  const createOrderAction = (
+    <Dropdown
+      open={createMenuOpen}
+      onOpenChange={setCreateMenuOpen}
+      menu={{
+        items: BUSINESS_CREATE_ITEMS,
+        onClick: ({ key }) => {
+          setCreateMenuOpen(false);
+          setCreateType(key as BusinessOrderType);
+        },
+      }}
+      trigger={["click"]}
+    >
+      <PermissionButton permission="order.create" type="primary">新建订单</PermissionButton>
+    </Dropdown>
+  );
 
   return (
     <section className="ui-stack orders-page">
@@ -66,32 +82,17 @@ export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilte
           <PermissionButton permission="order.event.post" size="small" loading={markingOverdue} onClick={() => void markOverdue()}>
             标记逾期
           </PermissionButton>
-        ) : (
-          <Dropdown
-            open={createMenuOpen}
-            onOpenChange={setCreateMenuOpen}
-            menu={{
-              items: BUSINESS_CREATE_ITEMS,
-              onClick: ({ key }) => {
-                setCreateMenuOpen(false);
-                setCreateType(key as BusinessOrderType);
-              },
-            }}
-            trigger={["click"]}
-          >
-            <PermissionButton permission="order.create" type="primary">新建订单</PermissionButton>
-          </Dropdown>
-        )}
+        ) : undefined}
         items={[
           {
             key: "inventory",
             label: "库存中心",
-            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} initialAgeGtDays={initialInventoryAgeGtDays} onNavigate={onNavigate} />,
+            children: <InventoryPanel active={active} refreshKey={inventoryRefreshKey} initialAgeGtDays={initialInventoryAgeGtDays} onNavigate={onNavigate} createAction={createOrderAction} />,
           },
           {
             key: "ledger",
             label: "订单台账",
-            children: <OrdersLedgerPanel controller={controller} onNavigate={onNavigate} />,
+            children: <OrdersLedgerPanel controller={controller} onNavigate={onNavigate} createAction={createOrderAction} />,
           },
           {
             key: "collections",

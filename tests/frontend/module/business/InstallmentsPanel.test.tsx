@@ -148,7 +148,7 @@ describe("InstallmentsPanel：分期合约", () => {
     expect(installmentsApi.totals).toHaveBeenCalledTimes(1);
     await act(async () => { finishTotals(installmentTotals({ total_count: 11 })); await pendingTotals; });
     expect(screen.getByText("合约数").closest(".ui-stat")).toHaveTextContent("11");
-    await userEvent.click(screen.getByRole("radio", { name: "最旧在前" }));
+    await userEvent.click(screen.getByRole("button", { name: "最旧在前" }));
     await waitFor(() => expect(installmentsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0, sort_desc: false })));
     expect(await screen.findByText("INS-1")).toBeVisible();
   });

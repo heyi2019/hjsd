@@ -12,6 +12,16 @@ vi.mock("antd", () => ({
 }));
 
 import { Select } from "@/shared/ui/Select";
+import { toolbarSelectionWidth } from "@/shared/ui/toolbarSelectionWidth";
+
+describe("工具栏多选宽度", () => {
+  it("随已选姓名增长，清空后恢复，并限制最大宽度", () => {
+    expect(toolbarSelectionWidth([])).toBe(120);
+    expect(toolbarSelectionWidth(["何一", "何二"])).toBeGreaterThan(toolbarSelectionWidth(["何一"]));
+    expect(toolbarSelectionWidth(["何一", "何二", "何三"])).toBeGreaterThan(toolbarSelectionWidth(["何一", "何二"]));
+    expect(toolbarSelectionWidth(["很长的员工姓名", "另一个很长的员工姓名", "第三个员工"])).toBe(240);
+  });
+});
 
 describe("Select 公共弹层宽度", () => {
   it("默认按选项内容展开，避免长选项被触发器宽度截断", () => {

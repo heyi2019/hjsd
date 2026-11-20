@@ -870,6 +870,7 @@ describe("CustomersPage：行内动作", () => {
     renderLight(<CustomerPanel />, { user: "admin" });
 
     await screen.findByText("CUS-0001");
+    expect(screen.getByRole("button", { name: "导出客户数据" }).closest(".customer-list-filters")).not.toBeNull();
     await keeper.click(screen.getByRole("button", { name: "导出客户数据" }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户数据已导出"));
     createObjectURLSpy.mockRestore();

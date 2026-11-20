@@ -50,7 +50,7 @@ def _customer_list_stmt(
 def list_customers(
     session: Session, *, keyword: str | None = None, status: str | None = None,
     created_by: Sequence[str] | None = None, user: CurrentUser | None = None,
-    limit: int | None = None, offset: int = 0, mine_orders: bool = False,
+    limit: int | None = None, offset: int = 0, mine_orders: bool = False, sort_desc: bool = False,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
     created_from: date | None = None, created_to: date | None = None,
 ) -> list[Customer]:
@@ -61,7 +61,7 @@ def list_customers(
     )
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
-    return list(session.scalars(stmt.order_by(Customer.id)).all())
+    return list(session.scalars(stmt.order_by(Customer.created_at.desc() if sort_desc else Customer.created_at.asc(), Customer.id.desc() if sort_desc else Customer.id.asc())).all())
 
 
 def count_customers(

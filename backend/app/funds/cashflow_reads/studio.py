@@ -59,6 +59,7 @@ def studio_summary(
     occurred_from: date | None = None,
     occurred_to: date | None = None,
     category: str | None = None,
+    sort_desc: bool = True,
     limit: int = 200,
     offset: int = 0,
     user: CurrentUser | None = None,
@@ -113,7 +114,7 @@ def studio_summary(
     ).where(*conditions)
     rows: list[dict[str, Any]] = []
     for flow, order_no in session.execute(
-        list_stmt.order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc()).limit(limit).offset(offset)
+        list_stmt.order_by(Cashflow.occurred_on.desc() if sort_desc else Cashflow.occurred_on.asc(), Cashflow.id.desc() if sort_desc else Cashflow.id.asc()).limit(limit).offset(offset)
     ).all():
         rows.append(_flow_row(flow, order_no))
 

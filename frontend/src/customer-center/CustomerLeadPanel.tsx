@@ -1,3 +1,4 @@
+import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
 import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
@@ -27,6 +28,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [total, setTotal] = useState(0);
+  const [sortDesc, setSortDesc] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const requestRef = useRef(0);
@@ -49,14 +51,14 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     const request = ++requestRef.current;
     setLoading(true);
     const dates = createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {};
-    await leadsApi.page({ ...dates, limit: pageSize, offset: (page - 1) * pageSize }).then((leadPage) => {
+    await leadsApi.page({ ...dates, ...(sortDesc ? {} : { sort_desc: false }), limit: pageSize, offset: (page - 1) * pageSize }).then((leadPage) => {
       if (request !== requestRef.current) return;
       setRows(leadPage.items);
       setTotal(leadPage.total);
       setError(null);
     }).catch((err) => { if (request === requestRef.current) setError(normalizeError(err)); })
       .finally(() => { if (request === requestRef.current) setLoading(false); });
-  }, [page, pageSize, createdPeriod?.from, createdPeriod?.to]);
+  }, [page, pageSize, sortDesc, createdPeriod?.from, createdPeriod?.to]);
   const loadSummary = useCallback(async () => {
     const request = ++summaryRequestRef.current;
     setSummaryLoading(true);
@@ -157,8 +159,8 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <ErrorBanner error={summaryError} onRetry={() => void load()} />
+      <Space wrap className="customer-list-filters--separated">{createdPicker}<TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} /></Space>
       <StatRow items={[{ label: "需求总数", kind: "count", amount: summaryLoading ? null : summaryError ? "不可用" : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: summaryLoading ? null : summaryError ? "不可用" : String(summary?.open_count ?? 0), tone: "warn" }]} />
-      {createdPicker ? <Space wrap className="customer-list-filters--separated">{createdPicker}</Space> : null}
       <DataTable<Lead>
         columns={arrangeColumns(columns)}
         rows={error ? [] : rows}

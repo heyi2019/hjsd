@@ -788,6 +788,7 @@ describe("FundsPage：资金流水", () => {
     const previous = previousReportPeriod();
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
     await waitFor(() => expect(screen.getByRole("button", { name: "导出" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "导出" })).toHaveClass("ui-export-button");
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.exportCsv)).toHaveBeenCalledWith(
       expect.objectContaining({ keyword: "SELL", occurred_from: previous.from, occurred_to: previous.to }),

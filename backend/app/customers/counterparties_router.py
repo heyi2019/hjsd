@@ -62,6 +62,7 @@ def list_counterparties_page(
     type: str | None = Query(default=None),
     status: str | None = Query(default=None),
     created_by: list[str] | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     created_filter: dict = Depends(created_date_filter),
@@ -69,7 +70,7 @@ def list_counterparties_page(
     user: CurrentUser = read_counterparties,
 ) -> PageOut[schemas.CounterpartyOut]:
     items = parties_list_counterparties(
-        db, type=type, status=status, created_by=created_by, limit=limit, offset=offset, **created_filter
+        db, type=type, status=status, created_by=created_by, limit=limit, offset=offset, sort_desc=sort_desc, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="counterparty", entity_ids=[item.id for item in items]

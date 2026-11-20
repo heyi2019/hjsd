@@ -23,6 +23,7 @@ def list_cashflows(
     category: str | None = None,
     created_by: str | None = None,
     keyword: str | None = None,
+    sort_desc: bool = True,
     limit: int = 100,
     offset: int = 0,
     user: CurrentUser | None = None,
@@ -54,7 +55,7 @@ def list_cashflows(
     total = session.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     rows: list[dict[str, Any]] = []
     for flow, order_no in session.execute(
-        stmt.order_by(Cashflow.occurred_on.desc(), Cashflow.id.desc())
+        stmt.order_by(Cashflow.occurred_on.desc() if sort_desc else Cashflow.occurred_on.asc(), Cashflow.id.desc() if sort_desc else Cashflow.id.asc())
         .limit(limit)
         .offset(offset)
     ).all():

@@ -2,24 +2,6 @@
   align-items: center;
 }
 
-.ledger-sort-actions .ant-btn {
-  min-width: var(--sz-24);
-  width: var(--sz-24);
-  height: var(--sz-24);
-  padding-inline: 0;
-  font-size: var(--fs-caption-2);
-  color: var(--color-text-primary);
-  background: transparent;
-  border-color: transparent;
-  box-shadow: none;
-}
-.ledger-sort-actions .ant-btn:hover,
-.ledger-sort-actions .ant-btn:focus-visible {
-  color: var(--color-text-primary);
-  background: transparent;
-  border-color: transparent;
-}
-
 /* 桌面端表格外层贴合容器，横向溢出交给 DataTable 的内容层承载。
    外层若使用 max-content，会让空态/重排时整张表反复按理想宽度测量，库存编号等列随之漂移。 */
 @media (min-width: 768px) {

@@ -1,13 +1,14 @@
+import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 /** 分期：按业务合约类型分列，展示库存分期出售的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Button, Card, DatePicker, Segmented, Space, Typography } from "antd";
+import { Card, DatePicker, Space, Typography } from "antd";
 import { useEffect, useState } from "react";
 import type { Dayjs } from "dayjs";
 import { installmentsApi } from "../../shared/api/installments.api";
 import type { Installment, Schedule } from "../../shared/api/types/installments";
 import { INSTALLMENT_STATUS_LABEL, today } from "../../shared/lib/format";
 import { configurableLabel } from "../../shared/lib/optionSets";
-import { DataTable, ErrorBanner, PermissionButton, Select, StatRow } from "../../shared/ui";
+import { DataTable, ErrorBanner, ExportButton, PermissionButton, Select, StatRow } from "../../shared/ui";
 
 
 import { DISPOSITION_LABEL } from "./InstallmentsPanel.fragments";
@@ -97,30 +98,8 @@ function ContractTable({
       <ErrorBanner error={error} onRetry={() => void load()} />
       <ErrorBanner error={totalsError ? { ...totalsError, message: `合计加载失败：${totalsError.message}` } : null} onRetry={() => void load()} />
 
-      <StatRow
-        items={[
-          { label: "合约数", kind: "count", amount: totalsLoading || totalsError ? null : String(totalCount) },
-          { label: "总应收", amount: totalsLoading || totalsError ? null : totalReceivable },
-          { label: "已收合计", amount: totalsLoading || totalsError ? null : totalPaid },
-          {
-            label: "逾期合约",
-            kind: "count",
-            amount: totalsLoading || totalsError ? null : String(overdueCount),
-            tone: !totalsLoading && !totalsError && overdueCount > 0 ? "warn" : "plain",
-          },
-        ]}
-      />
-
-      <Card
-        className="glass"
-        extra={
-          <Space size={8} wrap>
-            {status ? <Space size={4}>
-              <Typography.Text>合约状态：{configurableLabel("INSTALLMENT_STATUS", status, INSTALLMENT_STATUS_LABEL)}</Typography.Text>
-              <Typography.Link role="button" tabIndex={0} onClick={() => setStatus(undefined)} onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setStatus(undefined); }
-              }}>查看全部合约</Typography.Link>
-            </Space> : null}
+      <Card className="glass" title="分期与回款">
+          <Space size={8} wrap className="ui-filter-bar ui-filter-bar--spaced">
             <DatePicker.RangePicker
               aria-label="分期日期区间"
               placeholder={["开始日期", "结束日期"]}
@@ -131,27 +110,32 @@ function ContractTable({
               value={dateRange}
               onChange={(value) => setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null)}
             />
-            <Typography.Text type="secondary">排序</Typography.Text>
-            <Segmented
-              aria-label="分期合约排序"
-              value={sortDesc ? "desc" : "asc"}
-              options={[
-                { value: "desc", label: "最新在前" },
-                { value: "asc", label: "最旧在前" },
-              ]}
-              onChange={(value) => setSortDesc(value === "desc")}
-            />
-            <Button
-              size="small"
+            {status ? <Space size={4}>
+              <Typography.Text>合约状态：{configurableLabel("INSTALLMENT_STATUS", status, INSTALLMENT_STATUS_LABEL)}</Typography.Text>
+              <Typography.Link role="button" tabIndex={0} onClick={() => setStatus(undefined)} onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setStatus(undefined); }
+              }}>查看全部合约</Typography.Link>
+            </Space> : null}
+            <TimeOrderControl descending={sortDesc} onChange={setSortDesc} />
+            <ExportButton
               aria-label="导出分期与回款数据"
               loading={exporting}
               onClick={() => void exportCsv()}
-            >
-              导出
-            </Button>
+            />
           </Space>
-        }
-      >
+        <StatRow
+          items={[
+            { label: "合约数", kind: "count", amount: totalsLoading || totalsError ? null : String(totalCount) },
+            { label: "总应收", amount: totalsLoading || totalsError ? null : totalReceivable },
+            { label: "已收合计", amount: totalsLoading || totalsError ? null : totalPaid },
+            {
+              label: "逾期合约",
+              kind: "count",
+              amount: totalsLoading || totalsError ? null : String(overdueCount),
+              tone: !totalsLoading && !totalsError && overdueCount > 0 ? "warn" : "plain",
+            },
+          ]}
+        />
         <DataTable<Installment>
           columns={arrangeColumns(columns)}
           rows={rows}

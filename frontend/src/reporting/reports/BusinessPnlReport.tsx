@@ -36,7 +36,7 @@ export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; 
   return (
     <Card className="glass" title="业务级损益">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      {showPicker && <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>}
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{showPicker && picker}<ReportExportButton name="business-pnl" params={params} /></Space>
       <StatRow
         items={[
           { label: "主营收入", amount: data?.total.main_income ?? "-" },
@@ -54,7 +54,6 @@ export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; 
          emptyText="所选区间无业务数据"
          onPageChange={() => undefined}
       />
-      <ReportExportButton name="business-pnl" params={params} />
     </Card>
   );
 }

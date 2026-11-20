@@ -247,12 +247,6 @@
 }
 .party-preview strong { color: var(--color-text-primary); }
  .dashboard-summary { display: grid; gap: var(--space-3); }
-.dashboard-summary__title {
-  margin: 0;
-  font: var(--font-section);
-  color: var(--color-text-primary);
-  letter-spacing: -0.03em;
-}
 .dashboard-summary .ui-stat {
   min-height: 96px;
   justify-content: center;

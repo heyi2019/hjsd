@@ -1,6 +1,7 @@
 /** 工作台：优先动作 + 当前登录用户的轻量关注卡片。
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useState } from "react";
+import { Card } from "antd";
 import { normalizeError } from "../shared/api/client";
 import { notificationsApi } from "../shared/api/misc.api";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
@@ -96,8 +97,8 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
       </EntryRow>
 
       <div className="dashboard-summary">
-        <h2 id="dashboard-summary-title" className="dashboard-summary__title">我的业务总览</h2>
-        <BusinessPeriodPicker state={periodState} showAll />
+        <Card className="glass" title="我的业务总览">
+        <div className="ui-filter-bar ui-filter-bar--spaced"><BusinessPeriodPicker state={periodState} showAll /></div>
         <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
         <ErrorBanner error={error} onRetry={() => void loadSummary()} />
         <BusinessOverview
@@ -122,6 +123,7 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
           onOverdueInstallmentsClick={() => openDashboardPath("/business/collections?status=OVERDUE")}
           onInventoryOverdueClick={() => openDashboardPath("/business/inventory?age_gt_days=30")}
         />
+        </Card>
         <BusinessAlerts
           alerts={alerts}
           loading={loading}

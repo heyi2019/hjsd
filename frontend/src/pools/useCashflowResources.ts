@@ -16,6 +16,9 @@ const FLOW_DIRECTION_OPTIONS = [
 
 /** 资金流水查询域：筛选、服务端汇总、导出和列表状态集中在这里。 */
 export function useCashflowResources(active: boolean, periodState: PeriodState) {
+  const [cashflowSortDesc, setCashflowSortDesc] = useState(true);
+  const cashflowSortRef = useRef(cashflowSortDesc);
+  cashflowSortRef.current = cashflowSortDesc;
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
   const [cashflowTotals, setCashflowTotals] = useState({ income: "0.00", expense: "0.00" });
@@ -33,7 +36,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   const [cashflowAttribute, setCashflowAttribute] = useState("");
   const [cashflowCategory, setCashflowCategory] = useState("");
   const [cashflowExporting, setCashflowExporting] = useState(false);
-  const filterKey = JSON.stringify([cashflowFrom, cashflowTo, cashflowPoolId, cashflowDirection, cashflowLedgerType, cashflowAttribute, cashflowCategory, cashflowKeyword]);
+  const filterKey = JSON.stringify([cashflowFrom, cashflowTo, cashflowPoolId, cashflowDirection, cashflowLedgerType, cashflowAttribute, cashflowCategory, cashflowKeyword, cashflowSortDesc]);
   const [paging, setPaging] = useState({ filterKey, page: 1, pageSize: 10 });
   const cashflowPage = paging.filterKey === filterKey ? paging.page : 1;
   const cashflowPageSize = paging.pageSize;
@@ -80,6 +83,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
         accounting_attribute: cashflowAttributeRef.current || undefined,
         category: cashflowCategoryRef.current.trim() || undefined,
         keyword: cashflowKeywordRef.current.trim() || undefined,
+        sort_desc: cashflowSortRef.current,
         limit: requestedPage.pageSize,
         offset: (requestedPage.page - 1) * requestedPage.pageSize,
       });
@@ -136,6 +140,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     cashflowTo,
     cashflowPage,
     cashflowPageSize,
+    cashflowSortDesc,
     searchRevision,
     fetchCashflows,
   ]);
@@ -164,6 +169,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
   };
 
   return {
+    cashflowSortDesc, setCashflowSortDesc,
     cashflows,
     cashflowTotal,
     cashflowPage,

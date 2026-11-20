@@ -1,9 +1,9 @@
-/** 报表页底部的单报表导出按钮：按当前页筛选导出该报表 CSV（替代原顶部统一导出卡）。 */
+/** 报表导出按钮：按当前页筛选导出该报表 CSV。 */
 
 import { useState } from "react";
 import { reportsApi } from "../../shared/api/reports.api";
 import { normalizeError } from "../../shared/api/client";
-import { PermissionButton } from "../../shared/ui";
+import { ExportButton } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
 
 type ReportExportParams = {
@@ -51,8 +51,6 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
   };
 
   return (
-    <PermissionButton permission="report.export" loading={exporting} onClick={() => void exportCsv()}>
-      导出
-    </PermissionButton>
+    <ExportButton permission="report.export" loading={exporting} onClick={() => void exportCsv()} />
   );
 }

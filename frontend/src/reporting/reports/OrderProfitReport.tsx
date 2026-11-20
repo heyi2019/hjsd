@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 /** OrderProfit：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
 import { Card, Space } from "antd";
@@ -7,15 +9,17 @@ import type { OrderProfitReport, OrderProfitRow } from "../../shared/api/types/r
 import { ORDER_TYPE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow, StatusTag } from "../../shared/ui";
-import { Note, type ReportRange, useReport } from "./shared";
+import { type ReportRange, useReport } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 
 export function OrderProfit({ range }: { range: ReportRange }) {
   const { params, picker } = range;
+  const [sortDesc, setSortDesc] = useState(true);
   const { data, loading, error, reload } = useReport<OrderProfitReport>(
     () => reportsApi.orderProfit(params),
     [params.from, params.to],
   );
+  const sortedRows = [...(data?.items ?? [])].sort((a, b) => (sortDesc ? -1 : 1) * (a.trade_date.localeCompare(b.trade_date) || a.order_id - b.order_id));
   const { arrange: arrangeOrderProfit } = useListViewColumns("RPT_ORDER_PROFIT");
   const columns: ColumnsType<OrderProfitRow> = [
     { title: "订单号", dataIndex: "order_no", width: 160 },
@@ -35,8 +39,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
   return (
     <Card className="glass" title="订单利润明细">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>
-      <Note>按订单日期筛选，金额包含该订单全部收支。</Note>
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{picker}<TimeOrderControl descending={sortDesc} onChange={setSortDesc} /><ReportExportButton name="order-profit" params={params} /></Space>
       <StatRow
         items={[
           { label: "收入合计", amount: data?.total.income ?? "-" },
@@ -47,7 +50,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
       />
              <DataTable<OrderProfitRow>
          columns={arrangeOrderProfit(columns)}
-         rows={data?.items ?? []}
+         rows={sortedRows}
          loading={loading}
          page={1}
          pageSize={10}
@@ -55,7 +58,6 @@ export function OrderProfit({ range }: { range: ReportRange }) {
          emptyText="所选区间无订单"
          onPageChange={() => undefined}
       />
-      <ReportExportButton name="order-profit" params={params} />
     </Card>
   );
 }

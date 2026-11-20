@@ -1,8 +1,10 @@
+import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
+import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
 /** 资金明细 Tab：从 FundsPage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
 import { Card, Input, Typography } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
-import { DataTable, ErrorBanner, MoneyText, PermissionButton, Select, StatRow } from "../../shared/ui";
+import { DataTable, ErrorBanner, ExportButton, MoneyText, StatRow } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { formatDateTimeMinute } from "../../shared/lib/format";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
@@ -25,6 +27,7 @@ const LEDGER_TYPE_LABEL: Record<string, string> = {
 
 export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; periodState: PeriodState }) {
   const {
+    cashflowSortDesc, setCashflowSortDesc,
     cashflows, cashflowKeyword, setCashflowKeyword, pools, cashflowPoolId, setCashflowPoolId,
     cashflowDirection, setCashflowDirection,
     cashflowLedgerType, setCashflowLedgerType,
@@ -79,11 +82,12 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     <Card className="glass" title="资金明细">
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input.Search aria-label="流水搜索" enterButton={<span aria-label="搜索流水"><SearchOutlined /></span>} onSearch={(_value, _event, info) => { if (info?.source !== "clear") ctrl.submitCashflowSearch(); }} allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
-        <Select aria-label="流水资金账户" allowClear disabled={filtersDisabled || !fundsReady} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
-        <Select aria-label="流水方向" allowClear disabled={filtersDisabled} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
-        <Select aria-label="流水账簿" allowClear disabled={filtersDisabled} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
-        <Select aria-label="流水核算属性" allowClear disabled={filtersDisabled} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
-        <Select
+        <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
+        <ToolbarSelect aria-label="流水资金账户" allowClear disabled={filtersDisabled || !fundsReady} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+        <ToolbarSelect aria-label="流水方向" allowClear disabled={filtersDisabled} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
+        <ToolbarSelect aria-label="流水账簿" allowClear disabled={filtersDisabled} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
+        <ToolbarSelect aria-label="流水核算属性" allowClear disabled={filtersDisabled} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
+        <ToolbarSelect
           aria-label="流水中类别筛选"
           showSearch
           optionFilterProp="label"
@@ -94,19 +98,15 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
           options={cashflowCategoryOptions}
           onChange={(value) => setCashflowCategory(value ?? "")}
         />
-        <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
-        <PermissionButton permission="finance.read" size="small" disabled={cashflowUnavailable || cashflowLoading} loading={cashflowExporting} onClick={() => void exportCashflows()}>
-          导出
-        </PermissionButton>
+        <TimeOrderControl descending={cashflowSortDesc} onChange={setCashflowSortDesc} />
+        <ExportButton permission="finance.read" disabled={cashflowUnavailable || cashflowLoading} loading={cashflowExporting} onClick={() => void exportCashflows()} />
       </div>
       <ErrorBanner error={cashflowError} onRetry={() => void fetchCashflows()} retrying={cashflowLoading} />
       {cashflowLoading ? (
         <Typography.Text type="secondary">正在加载资金流水…</Typography.Text>
       ) : cashflowUnavailable ? (
         <Typography.Text type="warning">资金流水数据不可用，请点击“重新加载”。</Typography.Text>
-      ) : (
-        <Typography.Text type="secondary">共 {cashflowTotal} 笔资金流水。</Typography.Text>
-      )}
+      ) : null}
       <StatRow
         items={[
           { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },

@@ -102,6 +102,7 @@ def list_counterparties(
     created_by: Sequence[str] | None = None,
     limit: int | None = None,
     offset: int = 0,
+    sort_desc: bool = False,
     created_from: date | None = None,
     created_to: date | None = None,
 ) -> list[Counterparty]:
@@ -114,7 +115,7 @@ def list_counterparties(
         stmt = stmt.where(Counterparty.created_by.in_(created_by))
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
-    return list(session.scalars(stmt.order_by(Counterparty.id)).all())
+    return list(session.scalars(stmt.order_by(Counterparty.created_at.desc() if sort_desc else Counterparty.created_at.asc(), Counterparty.id.desc() if sort_desc else Counterparty.id.asc())).all())
 
 
 def count_counterparties(

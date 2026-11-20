@@ -8,6 +8,7 @@ export const studioExpensesApi = {
     occurred_from?: string;
     occurred_to?: string;
     category?: string;
+    sort_desc?: boolean;
     limit?: number;
     offset?: number;
   }) =>

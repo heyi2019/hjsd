@@ -1,4 +1,4 @@
-import { Space, Tabs, Typography } from "antd";
+import { Tabs } from "antd";
 import { useEffect, useState } from "react";
 import { CustomerLeadPanel } from "./CustomerLeadPanel";
 import "./CustomersPage.css";
@@ -37,7 +37,7 @@ export function CustomersPage({
     usePreviousPeriod: () => { setOrderEntryAll(false); periodState.usePreviousPeriod(); },
     useAllPeriods: () => { setOrderEntryAll(false); periodState.useAllPeriods(); },
   };
-  const createdPicker = <Space wrap><Typography.Text>创建日期</Typography.Text><BusinessPeriodPicker label="客户中心创建日期区间" state={createdPeriodState} showAll /></Space>;
+  const createdPicker = <BusinessPeriodPicker label="客户中心创建日期区间" state={createdPeriodState} showAll />;
   const [activeTab, setActiveTab] = useState(focusedCounterpartyId ? "counterparties" : "customers");
   useEffect(() => {
     if (focusedCounterpartyId) setActiveTab("counterparties");

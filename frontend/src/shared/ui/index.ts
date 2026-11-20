@@ -8,6 +8,7 @@ export { EntryCard, EntryRow } from "./EntryCard";
 export { MoneyText } from "./MoneyText";
 export { StatusTag } from "./StatusTag";
 export { PermissionButton, PermissionGate } from "./PermissionButton";
+export { ExportButton } from "./ExportButton";
 export { ConfirmButton } from "./ConfirmButton";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { InlineError } from "./InlineError";

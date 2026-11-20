@@ -37,6 +37,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [candidateError, setCandidateError] = useState<{ message: string; code?: string } | null>(null);
   const write = useAsyncAction();
   const [loading, setLoading] = useState(false);
+  const [sortDesc, setSortDesc] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchInput, setSearchInput] = useState("");
@@ -89,6 +90,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
       limit: pageSize,
       offset: (page - 1) * pageSize,
+      ...(sortDesc ? {} : { sort_desc: false }),
     };
     await customersApi.page(params).then((customerPage) => {
       if (request !== requestRef.current) return;
@@ -100,7 +102,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     }).finally(() => {
       if (request === requestRef.current) setLoading(false);
     });
-  }, [creatorFilter, keyword, page, pageSize, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
+  }, [creatorFilter, keyword, page, pageSize, sortDesc, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
 
   const loadSummary = useCallback(async () => {
     const request = ++summaryRequestRef.current;
@@ -350,6 +352,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   };
 
   return {
+    sortDesc, setSortDesc,
     activeDefs,
     actionError: write.error ?? candidateError,
     actionPending: write.pending,

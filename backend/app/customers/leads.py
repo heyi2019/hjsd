@@ -158,13 +158,13 @@ def _lead_list_stmt(
 
 def list_leads(session: Session, *, customer_id: int | None = None, status: str | None = None,
                keyword: str | None = None, user: CurrentUser | None = None,
-               limit: int | None = None, offset: int = 0,
+               limit: int | None = None, offset: int = 0, sort_desc: bool = True,
                created_from: date | None = None, created_to: date | None = None) -> list[CustomerLead]:
     stmt = _lead_list_stmt(session, customer_id=customer_id, status=status, keyword=keyword, user=user,
                            created_from=created_from, created_to=created_to)
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
-    return list(session.scalars(stmt.order_by(CustomerLead.id.desc())).all())
+    return list(session.scalars(stmt.order_by(CustomerLead.created_at.desc() if sort_desc else CustomerLead.created_at.asc(), CustomerLead.id.desc() if sort_desc else CustomerLead.id.asc())).all())
 
 
 def summarize_leads(session: Session, *, user: CurrentUser | None = None, customer_id: int | None = None,

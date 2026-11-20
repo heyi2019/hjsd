@@ -1,5 +1,5 @@
 /** 数据中心：订单、三类成本与利润构成总览；资金明细仍归资金中心负责。 */
-import { Space } from "antd";
+import { Card, Space } from "antd";
 import { useCallback } from "react";
 import { reportsApi } from "../shared/api/reports.api";
 import type { DataCenterSummary } from "../shared/api/types/reporting";
@@ -38,10 +38,11 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   };
 
   return (
+    <Card className="glass" title="数据中心">
     <section className="ui-stack">
       <ErrorBanner error={loadError} onRetry={reload} retrying={loading} />
 
-      {range ? <Space className="ui-filter-bar ui-filter-bar--spaced">{range.picker}</Space> : null}
+      {range ? <Space className="ui-filter-bar">{range.picker}</Space> : null}
 
       <EntryRow>
         <EntryCard
@@ -76,5 +77,6 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
         利润 = 账号售出利润 + 工作室其他收入；资金账户余额和流水请进入资金中心查看。
       </Space>
     </section>
+    </Card>
   );
 }

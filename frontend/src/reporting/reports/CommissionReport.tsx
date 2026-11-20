@@ -1,3 +1,5 @@
+import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
+import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
 /** Commission：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
 import { Card, Space } from "antd";
@@ -8,13 +10,14 @@ import { reportsApi } from "../../shared/api/reports.api";
 import type { CommissionOrderGroup, CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
 import { normalizeError } from "../../shared/api/client";
 import { useListViewColumns } from "../../shared/lib/listColumns";
-import { DataTable, ErrorBanner, MoneyText, Select, StatRow } from "../../shared/ui";
+import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
 import { Note, type ReportRange, useReport } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 import "./CommissionReport.css";
 
 export function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
   const { params, picker } = range;
+  const [sortDesc, setSortDesc] = useState(true);
   const { employees, error: employeeCause } = useEmployeeOptions();
   const employeeError = employeeCause ? normalizeError(employeeCause) : null;
   const [selectedUserId, setSelectedUserId] = useState<number>(0);
@@ -29,11 +32,15 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
     () => reportsApi.commission(commissionParams),
     [params.from, params.to, mine, selectedUserId],
   );
-  const orderRows = data?.order_groups ?? [];
+  const orderRows = [...(data?.order_groups ?? [])].sort((a, b) => (sortDesc ? -1 : 1) * ((a.outbound_date ?? a.inventory_date ?? "").localeCompare(b.outbound_date ?? b.inventory_date ?? "") || a.order_id - b.order_id));
   const employeeOptions = new Map(employees.map((employee) => [employee.id, { name: employee.display_name, isActive: employee.is_active }]));
   for (const person of data?.people ?? []) {
     employeeOptions.set(person.user_id, { name: person.user_name, isActive: person.is_active });
   }
+  const personOptions = [
+    { value: 0, label: "全部" },
+    ...Array.from(employeeOptions, ([id, employee]) => ({ value: id, label: `${employee.name}${employee.isActive ? "" : "（已停用）"}` })),
+  ];
   const personName = (row: CommissionRow) => row.user_id == null ? "公司" : row.user_name || employeeOptions.get(row.user_id)?.name || `人员${row.user_id}`;
   const peopleText = (row: CommissionOrderGroup) => Array.from(new Set(row.orders.map(personName))).join("、");
   const dateText = (value?: string | null) => value || "—";
@@ -48,19 +55,17 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
   return (
     <Card className="glass" title={mine ? "我的收益" : "分润对账"}>
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space className="ui-filter-bar ui-filter-bar--spaced">
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">
+        {picker}
         {!mine ? (
-          <Select
+          <ToolbarSelect
             value={selectedUserId}
             onChange={(value) => setSelectedUserId((value as number) || 0)}
-            options={[
-              { value: 0, label: "全部" },
-              ...Array.from(employeeOptions, ([id, employee]) => ({ value: id, label: `${employee.name}${employee.isActive ? "" : "（已停用）"}` })),
-            ]}
-            className="ui-control-width-import"
+            options={personOptions}
           />
         ) : null}
-        {picker}
+        <TimeOrderControl descending={sortDesc} onChange={setSortDesc} />
+        <ReportExportButton name="commission" params={commissionParams} />
       </Space>
       <ErrorBanner error={employeeError} />
       {mine ? <Note>仅展示当前登录用户在分润配置中获得的收益。</Note> : null}
@@ -101,8 +106,6 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          emptyText="所选区间无分润记录"
          onPageChange={() => undefined}
       />
-      {/* 复用与列表完全相同的筛选对象，确保「我的收益/指定员工」导出与页面同口径（#8）。 */}
-      <ReportExportButton name="commission" params={commissionParams} />
     </Card>
   );
 }

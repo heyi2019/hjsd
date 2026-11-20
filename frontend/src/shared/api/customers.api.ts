@@ -4,7 +4,7 @@ import type { Counterparty, Customer, CustomerDetail, CustomerSummary, Duplicate
 
 type CreatedDateFilter = { created_from?: string; created_to?: string };
 type CustomerFilterParams = CreatedDateFilter & { keyword?: string; status?: string; created_by?: string[]; mine_orders?: boolean; trade_date_from?: string; trade_date_to?: string };
-type CustomerListParams = CustomerFilterParams & { limit?: number; offset?: number };
+type CustomerListParams = CustomerFilterParams & { limit?: number; offset?: number; sort_desc?: boolean };
 
 const customerPage = (params?: CustomerListParams) =>
   api.get<PageResponse<Customer>>("/customers", {
@@ -54,7 +54,7 @@ export const customersApi = {
 export const counterpartiesApi = {
   list: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[] }) =>
     api.get<Counterparty[]>("/counterparties", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
-  page: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[]; limit?: number; offset?: number }) =>
+  page: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[]; limit?: number; offset?: number; sort_desc?: boolean }) =>
     api.get<PageResponse<Counterparty>>("/counterparties/page", {
       params: { limit: 10, offset: 0, ...params },
       paramsSerializer: { indexes: null },
@@ -69,7 +69,7 @@ export const counterpartiesApi = {
 };
 
 export const leadsApi = {
-  page: (params?: CreatedDateFilter & { limit?: number; offset?: number; status?: string; keyword?: string; customer_id?: number }) =>
+  page: (params?: CreatedDateFilter & { limit?: number; offset?: number; status?: string; keyword?: string; customer_id?: number; sort_desc?: boolean }) =>
     api.get<PageResponse<Lead>>("/leads/page", {
       params: { limit: 10, offset: 0, ...params },
     }).then((r) => r.data),

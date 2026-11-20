@@ -56,6 +56,7 @@ def studio_summary(
     occurred_from: date | None = Query(default=None),
     occurred_to: date | None = Query(default=None),
     category: str | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
     limit: int = Query(default=200, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -81,6 +82,7 @@ def studio_summary(
         occurred_from=occurred_from,
         occurred_to=occurred_to,
         category=category.strip().upper() if category else None,
+        sort_desc=sort_desc,
         limit=limit,
         offset=offset,
         user=user,
@@ -106,6 +108,7 @@ def list_cashflows(
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
     keyword: str | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
     limit: int = Query(default=100, ge=1, le=2000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -138,7 +141,7 @@ def list_cashflows(
         "keyword": keyword,
         "user": user,
     }
-    items, total = finance_list_cashflows(db, limit=limit, offset=offset, **filters)
+    items, total = finance_list_cashflows(db, limit=limit, offset=offset, sort_desc=sort_desc, **filters)
     # 合计与明细同条件、同源：前端不再对当页求和，超 limit 也不会少算。
     total_in, total_out = cashflow_totals(db, **filters)
     return schemas.CashflowListOut(

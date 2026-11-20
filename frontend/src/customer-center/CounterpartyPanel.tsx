@@ -1,3 +1,5 @@
+import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
+import { ToolbarSelect } from "../shared/ui/ToolbarSelect";
 import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +14,7 @@ import { orderTypeLabel } from "../shared/lib/labels";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, InlineError, ConfirmButton, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
+import { ToolbarMultiSelect } from "../shared/ui/ToolbarMultiSelect";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import { collectExtras } from "./CustomersPage.fragments";
@@ -27,6 +30,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [rows, setRows] = useState<Counterparty[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
+  const [sortDesc, setSortDesc] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const { config: fieldConfig, ready: fieldConfigReady, error: fieldConfigError, retry: retryFieldConfig } = useOrderFormConfig("COUNTERPARTY");
@@ -57,6 +61,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
         ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+        ...(sortDesc ? {} : { sort_desc: false }),
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
@@ -69,7 +74,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     } finally {
       if (request === requestRef.current) setLoading(false);
     }
-  }, [creatorFilter, page, pageSize, statusFilter, createdPeriod?.from, createdPeriod?.to]);
+  }, [creatorFilter, page, pageSize, sortDesc, statusFilter, createdPeriod?.from, createdPeriod?.to]);
 
   const resetKey = JSON.stringify([createdPeriod?.from, createdPeriod?.to]);
   const previousResetKey = useRef(resetKey);
@@ -218,9 +223,10 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Select allowClear placeholder="按状态筛选" className="ui-control-width-inventory" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
-        <Select mode="multiple" allowClear placeholder="创建操作人" aria-label="合作方创建操作人筛选" value={creatorFilter} options={creatorOptions ?? []} maxTagCount={2} disabled={creatorOptions === null || rows === null} onChange={(value) => { setCreatorFilter(value as string[]); setPage(1); }} />
+        <ToolbarSelect allowClear placeholder="按状态筛选" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
+        <ToolbarMultiSelect allowClear placeholder="创建操作人" aria-label="合作方创建操作人筛选" selectedLabels={creatorFilter.map((value) => creatorOptions?.find((option) => option.value === value)?.label ?? value)} value={creatorFilter} options={creatorOptions ?? []} disabled={creatorOptions === null || rows === null} onChange={(value) => { setCreatorFilter(value as string[]); setPage(1); }} />
         {createdPicker}
+        <TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} />
       </Space>
       <DataTable<Counterparty>
         columns={arrangeColumns(columns)}

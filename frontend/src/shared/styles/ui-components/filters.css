@@ -122,18 +122,6 @@
 
 .studio-expense-filters {
   gap: var(--space-3);
-}
-
-/* 工作室支出：让统计卡片与筛选栏分段，并保持筛选项的横向顺序。 */
-.studio-expense-card .ant-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-.studio-expense-card .studio-expense-filters {
-  margin: 0;
-}
-.studio-expense-card .studio-expense-filters {
   align-items: center;
 }
 .studio-expense-filters--single-row {
@@ -144,13 +132,18 @@
     flex-wrap: wrap;
   }
 
-  .studio-expense-card .studio-expense-filters {
+  .studio-expense-filters {
     align-items: stretch;
   }
 }
 
 /* 筛选栏内的枚举下拉：按语义宽度收敛，避免被 flex 拉满或缩成选项宽度。 */
 .ui-filter-select { width: var(--col-w-160); }
+.ui-filter-multi {
+  width: max-content;
+  min-width: var(--col-w-120);
+  max-width: min(var(--col-w-240), 100%);
+}
 
 /* 资金流水筛选项较多：桌面端按语义宽度收敛，避免每个字段被 flex 拉满；窄屏再自然堆叠。 */
 .funds-cashflow-filters {
@@ -168,6 +161,12 @@
   max-width: var(--col-w-140);
 }
 .funds-cashflow-filters .ant-select { width: 100%; }
+.funds-cashflow-filters > .ui-toolbar-select { flex: 0 0 auto; max-width: 100%; }
+.funds-cashflow-filters > .ant-space {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 100%;
+}
 /* 日期范围控件（与工作室经营同款）：140px 放不下两个日期输入，按 240px 档收敛。 */
 .funds-cashflow-filters .ant-picker-range {
   flex: 0 1 var(--col-w-240);
@@ -187,6 +186,16 @@
 }
 @media (--bp-sm) {
   .funds-cashflow-filters > * { flex-basis: 100%; }
+}
+.funds-cashflow-filters > .ui-export-button {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+}
+.ui-filter-bar > .ui-export-button,
+.ui-filter-bar > .ant-space-item:has(> .ui-export-button) {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 .ui-admin-table .ant-table-wrapper { margin-block: 0; }

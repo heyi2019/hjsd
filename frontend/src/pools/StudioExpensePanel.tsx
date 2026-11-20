@@ -1,3 +1,5 @@
+import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
+import { ToolbarSelect } from "../shared/ui/ToolbarSelect";
 import { appMessage } from "../shared/ui/appFeedback";
 /** 工作室收支：在指定资金账户上快速登记日常开销与零星收入（房租 / 日用 / 水电 …）。
  *
@@ -94,6 +96,7 @@ async function readOptionSet(code: string): Promise<OptionItem[]> {
 export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }: { pools: Pool[]; ctrl?: FundsPageController; periodState?: PeriodState }) {
   const fallbackPeriod = useBusinessPeriod();
   const periodState = suppliedPeriod ?? fallbackPeriod;
+  const [sortDesc, setSortDesc] = useState(true);
   const [flows, setFlows] = useState<Cashflow[]>([]);
   const [summary, setSummary] = useState<{
     income: string;
@@ -117,7 +120,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
 
   const from = periodState.period?.from ?? "";
   const to = periodState.period?.to ?? "";
-  const filterKey = JSON.stringify([from, to, category]);
+  const filterKey = JSON.stringify([from, to, category, sortDesc]);
   const [paging, setPaging] = useState({ filterKey, page: 1, pageSize: 10 });
   const page = paging.filterKey === filterKey ? paging.page : 1;
   const pageSize = paging.pageSize;
@@ -143,6 +146,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
           occurred_from: from || undefined,
           occurred_to: to || undefined,
           category,
+          sort_desc: sortDesc,
           limit: pageSize,
           offset: (page - 1) * pageSize,
         }),
@@ -161,7 +165,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     } finally {
       if (seq === loadSeqRef.current) setLoading(false);
     }
-  }, [category, from, to, filterKey, page, pageSize]);
+  }, [category, from, to, filterKey, page, pageSize, sortDesc]);
   const loadRef = useRef(load);
   loadRef.current = load;
 
@@ -322,6 +326,18 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
       {!registerOpen && <InlineError error={write.error} />}
+      <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
+        <BusinessPeriodPicker label="工作室支出日期区间" state={periodState} showAll />
+        <ToolbarSelect
+          aria-label="工作室收支科目"
+          allowClear
+          value={category}
+          placeholder="全部科目"
+          options={categoryOptions}
+          onChange={setCategory}
+        />
+        <TimeOrderControl descending={sortDesc} onChange={setSortDesc} />
+      </div>
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
@@ -331,31 +347,18 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
           { label: "笔数", kind: "count", amount: loading || error ? null : flowCount },
         ]}
       />
-      <Card className="glass studio-expense-card">
-        <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
-          <BusinessPeriodPicker label="工作室支出日期区间" state={periodState} showAll />
-          <Select
-            aria-label="工作室收支科目"
-            allowClear
-            value={category}
-            placeholder="全部科目"
-            options={categoryOptions}
-            onChange={setCategory}
-          />
-        </div>
-        <DataTable<Cashflow>
-          columns={columns}
-          rows={error ? [] : flows}
-          page={page}
-          pageSize={pageSize}
-          total={flowCount}
-          controlledPaging
-          emptyText={error ? "工作室收支数据不可用，请点击重新加载" : "暂无工作室收支"}
-          loading={loading}
-          pagination={error ? false : undefined}
-          onPageChange={(nextPage, nextPageSize) => setPaging({ filterKey, page: nextPageSize === pageSize ? nextPage : 1, pageSize: nextPageSize })}
-       />
-      </Card>
+      <DataTable<Cashflow>
+        columns={columns}
+        rows={error ? [] : flows}
+        page={page}
+        pageSize={pageSize}
+        total={flowCount}
+        controlledPaging
+        emptyText={error ? "工作室收支数据不可用，请点击重新加载" : "暂无工作室收支"}
+        loading={loading}
+        pagination={error ? false : undefined}
+        onPageChange={(nextPage, nextPageSize) => setPaging({ filterKey, page: nextPageSize === pageSize ? nextPage : 1, pageSize: nextPageSize })}
+      />
 
       {/* 6 个字段的操作弹窗：compact 560 宽比 full 1200 更贴合体量；
           studio-ledger-modal 是视觉稿的唯一作用域锚点（样式见 StudioExpensePanel.css）。 */}

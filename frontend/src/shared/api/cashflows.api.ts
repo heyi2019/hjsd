@@ -19,6 +19,7 @@ export const cashflowsApi = {
     keyword?: string;
     limit?: number;
     offset?: number;
+    sort_desc?: boolean;
   }) =>
     // total_in / total_out 由服务端按同一套筛选聚合，不受 limit 影响；前端不再对当页求和。
     api

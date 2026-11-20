@@ -1,8 +1,11 @@
-import { Button, Card, DatePicker, Input, Segmented, Space, Typography } from "antd";
-import { ArrowDownOutlined, ArrowUpOutlined, SearchOutlined } from "@ant-design/icons";
-import { DataTable, PermissionButton, Select } from "../../../shared/ui";
+import { TimeOrderControl } from "../../../shared/ui/TimeOrderControl";
+import { ToolbarSelect } from "../../../shared/ui/ToolbarSelect";
+import { Card, DatePicker, Input, Segmented, Space } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+import { DataTable, ExportButton, StatRow } from "../../../shared/ui";
 import { OrderDetail } from "../../OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
+import { ToolbarMultiSelect } from "../../../shared/ui/ToolbarMultiSelect";
 
 export function InventoryLedger({ controller }: { controller: InventoryController }) {
   const {
@@ -64,7 +67,7 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
   } = controller;
 
   return (
-    <Card className="glass">
+    <Card className="glass" title="库存中心">
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
         <Input.Search
           allowClear
@@ -89,27 +92,25 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
             setPage(1);
           }}
         />
-        <Select
+        <ToolbarSelect
           aria-label="游戏类型筛选"
-          className="ui-filter-select"
+
           value={gameTypeFilter ?? "all"}
           options={[{ value: "all", label: "全部游戏类型" }, ...gameTypeOptions]}
           onChange={(value) => { setGameTypeFilter(value === "all" ? undefined : value); setPage(1); }}
         />
-        <Select
-          mode="multiple"
+        <ToolbarMultiSelect
           allowClear
-          maxTagCount="responsive"
           aria-label="入库负责人筛选"
-          className="ui-filter-select"
+          selectedLabels={inventoryOperatorIds.map((id) => employees.find((employee) => employee.id === id)?.display_name ?? String(id))}
           placeholder="入库负责人"
           value={inventoryOperatorIds}
           options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}
           onChange={(values) => { setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
         />
-        <Select
+        <ToolbarSelect
           aria-label="库存库龄筛选"
-          className="ui-filter-select"
+
           value={ageGtDays ?? "all"}
           options={[{ value: "all", label: "全部库龄" }, { value: 7, label: "超过 7 天" }, { value: 30, label: "超过 30 天" }]}
           onChange={(value) => { setAgeGtDays(value === "all" ? undefined : Number(value)); setPage(1); }}
@@ -129,27 +130,15 @@ export function InventoryLedger({ controller }: { controller: InventoryControlle
           options={[{ value: "all", label: "全部业务" }, ...(businessOptions ?? []).map((item) => ({ value: item.value, label: item.label }))]}
           onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
         />
-        <Typography.Text strong>排序</Typography.Text>
-        <Space.Compact className="ledger-sort-actions" aria-label="库存排序">
-          <Button
-            size="small"
-            type="text"
-            icon={<ArrowDownOutlined />}
-            aria-label="最新在前"
-            title="最新在前"
-            onClick={() => { setSortDesc(true); setPage(1); }}
-          />
-          <Button
-            size="small"
-            type="text"
-            icon={<ArrowUpOutlined />}
-            aria-label="最旧在前"
-            title="最旧在前"
-            onClick={() => { setSortDesc(false); setPage(1); }}
-          />
-        </Space.Compact>
-        <PermissionButton permission="report.read" aria-label="导出" size="small" loading={exporting} onClick={() => void handleExport()}>导出</PermissionButton>
+        <TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} />
+        <ExportButton permission="report.read" aria-label="导出" loading={exporting} onClick={() => void handleExport()} />
       </Space>
+      <StatRow items={[
+        { label: "在库账号", kind: "count", amount: controller.inventoryStats ? String(controller.inventoryStats.account_count) : "—" },
+        { label: "占用成本合计", amount: controller.inventoryStats?.occupied_cost ?? "—" },
+        { label: "超7天库存账号", kind: "count", amount: controller.inventoryStats ? String(controller.inventoryStats.over_7d_count) : "—" },
+        { label: "超30天库存账号", kind: "count", amount: controller.inventoryStats ? String(controller.inventoryStats.over_30d_count) : "—" },
+      ]} />
       <DataTable
         className="inventory-table"
         columns={arrangeColumns(columns)}

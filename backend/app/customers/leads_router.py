@@ -55,6 +55,7 @@ def list_leads_page(
     customer_id: int | None = Query(default=None, gt=0),
     status: str | None = Query(default=None),
     keyword: str | None = Query(default=None, max_length=128),
+    sort_desc: bool = Query(default=True),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     created_filter: dict = Depends(created_date_filter),
@@ -69,6 +70,7 @@ def list_leads_page(
         user=user,
         limit=limit,
         offset=offset,
+        sort_desc=sort_desc,
         **created_filter,
     )
     summary = parties_summarize_leads(db, user=user, customer_id=customer_id, status=status, keyword=keyword, **created_filter)
@@ -77,6 +79,7 @@ def list_leads_page(
         total=summary["total_count"],
         limit=limit,
         offset=offset,
+        sort_desc=sort_desc,
     )
 
 

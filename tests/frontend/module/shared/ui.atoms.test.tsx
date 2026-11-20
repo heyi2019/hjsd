@@ -10,6 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { renderLight } from "@fixtures/render";
+import { TimeOrderControl } from "@/shared/ui/TimeOrderControl";
 import { MoneyText } from "@/shared/ui/MoneyText";
 import { StatusTag } from "@/shared/ui/StatusTag";
 import { statusColor } from "@/shared/lib/format";
@@ -382,5 +383,20 @@ describe("DateField value mapping", () => {
   it("将日期控件值转换回接口需要的日期字符串", () => {
     expect(dateValueFromEvent({ format: () => "2026-11-02" } as never)).toBe("2026-11-02");
     expect(dateValueFromEvent(null)).toBeUndefined();
+  });
+});
+
+describe("时序控件", () => {
+  it("显示当前方向并可切换到最旧或最新在前", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    const { rerender } = render(<TimeOrderControl descending onChange={onChange} />);
+    expect(screen.getByRole("button", { name: "最新在前" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "最旧在前" }));
+    expect(onChange).toHaveBeenLastCalledWith(false);
+    rerender(<TimeOrderControl descending={false} onChange={onChange} />);
+    expect(screen.getByRole("button", { name: "最旧在前" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByRole("button", { name: "最新在前" }));
+    expect(onChange).toHaveBeenLastCalledWith(true);
   });
 });

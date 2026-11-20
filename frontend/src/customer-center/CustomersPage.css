@@ -1,6 +1,6 @@
-/* Keep the filter controls visually separate from the summary cards above. */
+/* 工具栏位于统计卡片上方，保持区块间距。 */
 .customer-list-filters--separated {
-  margin-block-start: var(--space-4);
+  margin-block-end: var(--space-4);
 }
 
 .customer-order-filter {

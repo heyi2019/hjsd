@@ -1,13 +1,16 @@
-import { Button, Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Tag, Typography } from "antd";
-import { ArrowDownOutlined, ArrowUpOutlined, SearchOutlined } from "@ant-design/icons";
+import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
+import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
+import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Tag, Typography } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
 import type { BusinessCenterEntryTab } from "../businessCenter";
-import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
+import { DataTable, ExportButton, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetailView/OrderDetail";
 import type { OrderPartyLink } from "../OrderDetailView/OrderDetail.shared";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
 import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
+import { ToolbarMultiSelect } from "../../shared/ui/ToolbarMultiSelect";
 import "./OrdersLedgerPanel.css";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
@@ -96,13 +99,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
 
   return (
     <section className="ui-stack orders-ledger-panel">
-      <StatRow items={[
-        { label: "订单总量", kind: "count", amount: statValue(ledgerSummary?.total_count) },
-        { label: "进行中订单", kind: "count", amount: statValue((ledgerSummary?.status_counts.ACTIVE ?? 0) + (ledgerSummary?.status_counts.INSTALLMENT ?? 0)) },
-        { label: "完成订单量", kind: "count", amount: statValue(ledgerSummary?.status_counts.COMPLETED) },
-        { label: "已取消订单", kind: "count", amount: statValue(ledgerSummary?.status_counts.CANCELLED) },
-      ]} />
-      <Card className="glass orders-ledger-card">
+      <Card className="glass orders-ledger-card" title="订单台账">
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
           <Input.Search
             allowClear
@@ -133,25 +130,21 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
               订单状态：{orderStatusFilter === "IN_PROGRESS" ? "进行中" : ORDER_STATUS_LABEL[orderStatusFilter] ?? orderStatusFilter}
             </Tag>
           ) : null}
-          <Select aria-label="游戏类型筛选" className="ui-filter-select" value={gameTypeFilter} options={gameTypeOptions} onChange={(value) => { setGameTypeFilter(value); setPage(1); }} />
-          <Select aria-label="库存状态筛选" className="ui-filter-select" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
-          <Select
-            mode="multiple"
+          <ToolbarSelect aria-label="游戏类型筛选" value={gameTypeFilter} options={gameTypeOptions} onChange={(value) => { setGameTypeFilter(value); setPage(1); }} />
+          <ToolbarSelect aria-label="库存状态筛选" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
+          <ToolbarMultiSelect
             allowClear
-            maxTagCount={2}
             aria-label="入库负责人筛选"
-            className="ui-filter-select"
+            selectedLabels={inventoryOperatorIds.map((id) => operatorOptions.find((option) => option.value === id)?.label ?? String(id))}
             placeholder="入库负责人"
             value={inventoryOperatorIds}
             options={operatorOptions}
             onChange={(values) => { setMineOrders(false); setInventoryOperatorIds((values as number[]).map(Number)); setPage(1); }}
           />
-          <Select
-            mode="multiple"
+          <ToolbarMultiSelect
             allowClear
-            maxTagCount={2}
             aria-label="售出操作人筛选"
-            className="ui-filter-select"
+            selectedLabels={saleOperatorIds.map((id) => operatorOptions.find((option) => option.value === id)?.label ?? String(id))}
             placeholder="售出操作人"
             value={saleOperatorIds}
             options={operatorOptions}
@@ -170,25 +163,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             options={[{ value: "all", label: "全部业务" }, ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label }))]}
             onChange={(value) => { setBusinessModeFilter(value as BusinessModeFilterKey); setPage(1); }}
           />
-          <Typography.Text strong className="orders-ledger-filter-label">排序</Typography.Text>
-          <Space.Compact className="ledger-sort-actions" aria-label="台账排序">
-            <Button
-              size="small"
-              type="text"
-              icon={<ArrowDownOutlined />}
-              aria-label="最新在前"
-              title="最新在前"
-              onClick={() => { setLedgerSortDesc(true); setPage(1); }}
-            />
-            <Button
-              size="small"
-              type="text"
-              icon={<ArrowUpOutlined />}
-              aria-label="最旧在前"
-              title="最旧在前"
-              onClick={() => { setLedgerSortDesc(false); setPage(1); }}
-            />
-          </Space.Compact>
+          <TimeOrderControl descending={ledgerSortDesc} onChange={(value) => { setLedgerSortDesc(value); setPage(1); }} />
           {/* 导出格式靠下拉选择，触发按钮保持「导出」两字：UI 规范要求筛选栏文案简短 */}
           <Dropdown
             disabled={ledgerExporting}
@@ -204,10 +179,16 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
               },
             }}
           >
-            <PermissionButton permission="finance.read" size="small" loading={ledgerExporting}>导出</PermissionButton>
+            <ExportButton permission="finance.read" loading={ledgerExporting} />
           </Dropdown>
 
         </Space>
+        <StatRow items={[
+          { label: "订单总量", kind: "count", amount: statValue(ledgerSummary?.total_count) },
+          { label: "进行中订单", kind: "count", amount: statValue((ledgerSummary?.status_counts.ACTIVE ?? 0) + (ledgerSummary?.status_counts.INSTALLMENT ?? 0)) },
+          { label: "完成订单量", kind: "count", amount: statValue(ledgerSummary?.status_counts.COMPLETED) },
+          { label: "已取消订单", kind: "count", amount: statValue(ledgerSummary?.status_counts.CANCELLED) },
+        ]} />
         <DataTable
           columns={markMobileHiddenColumns(arrangeLedgerColumns(ledgerColumns), LEDGER_MOBILE_HIDDEN_KEYS)}
           rows={filteredOrders}

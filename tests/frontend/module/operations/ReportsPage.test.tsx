@@ -209,6 +209,7 @@ describe("ReportsPage：经营中心报表", () => {
     });
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     await setAntdDateRange(pane, ui, "2026-01-01", "2026-01-31");
+    expect(screen.getByRole("button", { name: "导出" }).closest(".ui-filter-bar")).not.toBeNull();
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ user_id: 9, from: "2026-01-01", to: "2026-01-31" })));
     expect(await within(pane).findByTitle("离职同事（已停用）")).toBeInTheDocument();
   });
@@ -305,7 +306,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
-    expect(screen.getByText("按收支发生日期统计。")).toBeInTheDocument();
     expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
@@ -318,7 +318,6 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");
     expect(await screen.findByText("HS-2026-0010")).toBeInTheDocument();
-    expect(screen.getByText("按订单日期筛选，金额包含该订单全部收支。")).toBeInTheDocument();
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
   });
 

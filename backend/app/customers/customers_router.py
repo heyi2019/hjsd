@@ -68,6 +68,7 @@ def list_customers(
     keyword: str | None = Query(default=None),
     status: str | None = Query(default=None),
     created_by: list[str] | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     order_filter: dict = Depends(mine_order_filter),
@@ -76,7 +77,7 @@ def list_customers(
     user: CurrentUser = read_customers,
 ) -> PageOut[schemas.CustomerOut]:
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=limit, offset=offset, **order_filter, **created_filter
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=limit, offset=offset, sort_desc=sort_desc, **order_filter, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 /** MonthlyPnl：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
 import { Card, Space } from "antd";
@@ -11,10 +13,12 @@ import { ReportExportButton } from "./ReportExportButton";
 
 export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; showPicker?: boolean }) {
   const { params, picker } = range;
+  const [sortDesc, setSortDesc] = useState(true);
   const { data, loading, error, reload } = useReport<MonthlyPnlReport>(
     () => reportsApi.monthlyPnl(params),
     [params.from, params.to],
   );
+  const sortedRows = [...(data?.items ?? [])].sort((a, b) => (sortDesc ? -1 : 1) * (a.month.localeCompare(b.month)));
   const { arrange: arrangeMonthlyPnl } = useListViewColumns("RPT_MONTHLY_PNL");
   const columns: ColumnsType<MonthlyPnlRow> = [
     { title: "月份", dataIndex: "month", width: 110 },
@@ -32,7 +36,7 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
   return (
     <Card className="glass" title="月度经营损益">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      {showPicker && <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>}
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{showPicker && picker}<TimeOrderControl descending={sortDesc} onChange={setSortDesc} /><ReportExportButton name="monthly-pnl" params={params} /></Space>
       <StatRow
         items={[
           { label: "销售收入", amount: data?.total.sales_income ?? "-" },
@@ -41,7 +45,7 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
       />
              <DataTable<MonthlyPnlRow>
          columns={arrangeMonthlyPnl(columns)}
-         rows={data?.items ?? []}
+         rows={sortedRows}
          loading={loading}
          page={1}
          pageSize={10}
@@ -49,7 +53,6 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
          emptyText="所选区间无数据"
          onPageChange={() => undefined}
       />
-      <ReportExportButton name="monthly-pnl" params={params} />
     </Card>
   );
 }

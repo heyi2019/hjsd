@@ -196,6 +196,37 @@ def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db
 
 # --------------------------------------------------------------------- R3 提成
 class TestR3Commission:
+    def test_personal_commission_total_reuses_rounding_without_detail_queries(self, seeded_db):
+        from sqlalchemy import event
+        from app.dashboard.service import dashboard_summary
+
+        for sale in ("100.01", "90.00"):
+            order = _order(seeded_db)
+            post_event(seeded_db, order.id, event_type="BUY", amount="100.00", occurred_on=D, actor="pytest")
+            post_event(seeded_db, order.id, event_type="SELL", amount=sale, occurred_on=D, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=[
+                {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+                {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+            ], actor="pytest")
+
+        user = CurrentUser.build(id=7, username="seeduser7", roles=["OPERATOR"], owner_scope="SELF")
+        report = r3_commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
+        statements = []
+        connection = seeded_db.connection()
+
+        def record(_connection, _cursor, statement, _params, _context, _executemany):
+            if statement.lstrip().upper().startswith("SELECT"):
+                statements.append(" ".join(statement.lower().split()))
+
+        event.listen(connection, "before_cursor_execute", record)
+        try:
+            summary = dashboard_summary(seeded_db, user=user, from_date=MID_GATE, to_date=D)
+        finally:
+            event.remove(connection, "before_cursor_execute", record)
+        assert summary["personal_earnings"] == report["total"]["profit_base"] == Decimal("-4.99")
+        assert not any("from accounts where accounts.id in" in sql for sql in statements)
+        assert not any("select order_events.order_id, order_events.occurred_on" in sql for sql in statements)
+
     def test_commission_limits_profit_calculation_to_order_date_range(self, seeded_db, monkeypatch):
         import app.operations.r3_commission as commission_service
 

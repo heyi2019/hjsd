@@ -51,12 +51,10 @@ def _allocation_bases(rows: list[OrderProfitAllocation], profit: Decimal) -> dic
     return {**fixed, **rounded}
 
 
-def r3_commission_reconciliation(
+def _commission_rows_and_bases(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
-    user_id: int | None = None,
-) -> dict[str, Any]:
-    """分润对账：按订单汇总，展开订单查看人员明细。"""
+) -> tuple[list[tuple[OrderProfitAllocation, Order]], dict[int, Decimal]]:
     _validate_date_range(from_date, to_date)
     personal_scope = mine and user is not None
     order_scope = None if all_people or personal_scope else user
@@ -81,6 +79,46 @@ def r3_commission_reconciliation(
     rows = session.execute(
         _apply_order_scope(stmt, order_scope, session)
     ).all()
+    # 利润 = 该订单所有收入 − 所有支出（2026-11-05 用户裁决）。
+    # 走报表唯一取数口，与分润弹窗同源：收入含返点记录、支出含分期坏账；
+    # 不再由 SELL/BUY 事件单独推导，也不按「是否生成流水」排除有资金走向的事实。
+    per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)
+    scoped_order_ids = {order.id for _, order in rows}
+    if scoped_order_ids:
+        for order_id, (income, expense, _buy) in cashflow_totals_by_order(
+            session, order_ids=scoped_order_ids
+        ).items():
+            per_order_profit[order_id] = to_money_or_zero(income - expense)
+
+    allocations_by_order: dict[int, list[OrderProfitAllocation]] = defaultdict(list)
+    for allocation, order in rows:
+        allocations_by_order[order.id].append(allocation)
+    base_by_allocation = {
+        allocation_id: amount
+        for order_id, allocations in allocations_by_order.items()
+        for allocation_id, amount in _allocation_bases(allocations, per_order_profit[order_id]).items()
+    }
+    return rows, base_by_allocation
+
+
+def personal_commission_total(
+    session: Session, *, user: CurrentUser,
+    from_date: date | None = None, to_date: date | None = None,
+) -> Decimal:
+    """本人收益总额，复用整单分润与尾差口径，不装配报表明细。"""
+    rows, bases = _commission_rows_and_bases(session, from_date=from_date, to_date=to_date, user=user, mine=True)
+    return sum((bases[allocation.id] for allocation, _ in rows if allocation.user_id == user.id), ZERO)
+
+
+def r3_commission_reconciliation(
+    session: Session, *, from_date: date | None = None, to_date: date | None = None,
+    user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
+    user_id: int | None = None,
+) -> dict[str, Any]:
+    """分润对账：按订单汇总，展开订单查看人员明细。"""
+    rows, base_by_allocation = _commission_rows_and_bases(
+        session, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people,
+    )
     order_ids = {order.id for _, order in rows}
     account_ids = {order.account_id for _, order in rows if order.account_id is not None}
     accounts = {
@@ -104,26 +142,6 @@ def r3_commission_reconciliation(
             )
         ).all():
             outbound_dates.setdefault(order_id, occurred_on)
-
-    # 利润 = 该订单所有收入 − 所有支出（2026-11-05 用户裁决）。
-    # 走报表唯一取数口，与分润弹窗同源：收入含返点记录、支出含分期坏账；
-    # 不再由 SELL/BUY 事件单独推导，也不按「是否生成流水」排除有资金走向的事实。
-    per_order_profit: dict[int, Decimal] = defaultdict(lambda: ZERO)
-    scoped_order_ids = {order.id for _, order in rows}
-    if scoped_order_ids:
-        for order_id, (income, expense, _buy) in cashflow_totals_by_order(
-            session, order_ids=scoped_order_ids
-        ).items():
-            per_order_profit[order_id] = to_money_or_zero(income - expense)
-
-    allocations_by_order: dict[int, list[OrderProfitAllocation]] = defaultdict(list)
-    for allocation, order in rows:
-        allocations_by_order[order.id].append(allocation)
-    base_by_allocation = {
-        allocation_id: amount
-        for order_id, allocations in allocations_by_order.items()
-        for allocation_id, amount in _allocation_bases(allocations, per_order_profit[order_id]).items()
-    }
     if mine and user is not None:
         rows = [row for row in rows if row[0].user_id == user.id]
     if user_id is not None:

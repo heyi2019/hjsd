@@ -120,6 +120,26 @@ beforeEach(() => {
   }));
 });
 describe("CustomersPage：客户档案", () => {
+  it("切换创建日期只刷新当前客户页签", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenCalledTimes(1));
+    vi.mocked(customersApi.page).mockClear();
+    vi.mocked(customersApi.summary).mockClear();
+    vi.mocked(counterpartiesApi.page).mockClear();
+    await user.click(screen.getByRole("button", { name: "上期" }));
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenCalledTimes(1));
+    const period = vi.mocked(counterpartiesApi.page).mock.calls[0][0];
+    expect(customersApi.page).not.toHaveBeenCalled();
+    expect(customersApi.summary).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("tab", { name: "客户档案" }));
+    await waitFor(() => expect(customersApi.page).toHaveBeenCalledTimes(1));
+    expect(customersApi.page).toHaveBeenCalledWith(expect.objectContaining({ created_from: period?.created_from, created_to: period?.created_to }));
+    expect(customersApi.summary).toHaveBeenCalledTimes(1);
+  });
+
   it("统计尚未返回时先展示已返回的客户列表", async () => {
     let finish!: (value: ReturnType<typeof customerSummary>) => void;
     const pending = new Promise<ReturnType<typeof customerSummary>>((resolve) => { finish = resolve; });

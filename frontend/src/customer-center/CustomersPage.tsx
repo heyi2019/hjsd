@@ -50,9 +50,9 @@ export function CustomersPage({
         activeKey={activeTab}
         onChange={setActiveTab}
         items={[
-          { key: "customers", label: "客户档案", children: <CustomerPanel active={active && periodState.ready} focusId={focusedCustomerId} orderFilter={customerOrderFilter} onClearOrderFilter={onClearCustomerOrderFilter} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
-          { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active && periodState.ready} focusId={focusedCounterpartyId} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
-          { key: "leads", label: "客户需求池", children: <CustomerLeadPanel active={active && periodState.ready} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
+          { key: "customers", label: "客户档案", children: <CustomerPanel active={active && periodState.ready && activeTab === "customers"} focusId={focusedCustomerId} orderFilter={customerOrderFilter} onClearOrderFilter={onClearCustomerOrderFilter} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
+          { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active && periodState.ready && activeTab === "counterparties"} focusId={focusedCounterpartyId} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
+          { key: "leads", label: "客户需求池", children: <CustomerLeadPanel active={active && periodState.ready && activeTab === "leads"} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
         ]}
       />
     </section>

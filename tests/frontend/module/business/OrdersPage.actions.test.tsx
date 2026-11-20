@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
+import { useLedgerInlineEdit } from "@/business/orderpage/useLedgerInlineEdit";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
@@ -273,6 +274,27 @@ async function clickModalOk(modal: HTMLElement) {
 }
 
 describe("OrdersPage：操作与筛选分支", () => {
+  it.each(["success", "failure"])("订单详情强制刷新后忽略更早请求的%s结果", async (oldResult) => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    let rejectOld!: (error: Error) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve, reject) => { resolveOld = resolve; rejectOld = reject; });
+    const detail = (description: string) => ({ account: { id: 1, account_description: description }, orders: [] }) as never;
+    vi.mocked(ordersApi.executionDetail).mockReturnValueOnce(oldRequest).mockResolvedValueOnce(detail("最新详情"));
+    function Probe() {
+      const ledger = useLedgerInlineEdit();
+      return <><button onClick={() => void ledger.loadLedgerOrderDetail(1)}>读取</button>
+        <button onClick={() => void ledger.loadLedgerOrderDetail(1, true)}>刷新</button>
+        <span>{ledger.ledgerOrderDetails[1]?.account.account_description}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "读取" }));
+    await ui.click(screen.getByRole("button", { name: "刷新" }));
+    expect(await screen.findByText("最新详情")).toBeInTheDocument();
+    await act(async () => { if (oldResult === "failure") rejectOld(new Error("过时请求失败")); else resolveOld(detail("过时详情")); });
+    expect(screen.getByText("最新详情")).toBeInTheDocument();
+    expect(screen.queryByText("过时详情")).not.toBeInTheDocument();
+    expect(message.error).not.toHaveBeenCalled();
+  });
   it("分期订单展示售出金额而不是买入金额合计", async () => {
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
     await openLedger();

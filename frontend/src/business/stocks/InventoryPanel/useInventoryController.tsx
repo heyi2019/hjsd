@@ -67,6 +67,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   orderExecutionLoading,
   setOrderExecutionDetails,
   dropExecutionCache,
+  dropOrderExecutionCache,
   removeFromInventory,
   refreshExecution,
   expandTo,
@@ -76,6 +77,8 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   const orderDetailEditor = useOrderDetailEditor({
     getExecutionDetail: (accountId) => executionDetails[accountId],
     onSaved: (accountId, detail) => {
+      dropExecutionCache(accountId);
+      detail.orders.forEach((order) => dropOrderExecutionCache(order.order_id));
       setExecutionDetails((current) => ({ ...current, [accountId]: detail }));
       setOrderExecutionDetails((current) => Object.fromEntries(
         Object.entries(current).map(([orderId, cached]) => cached.account.id === accountId ? [orderId, detail] : [orderId, cached]),
@@ -83,7 +86,9 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
       setRows((current) => current.map((row) => row.account.id === accountId ? mergeInventoryAccount(row, detail.account) : row));
       void load();
     },
-    onRefreshFailed: (accountId) => {
+    onRefreshFailed: (accountId, orderId) => {
+      dropExecutionCache(accountId);
+      dropOrderExecutionCache(orderId);
       setExecutionDetails((current) => Object.fromEntries(
         Object.entries(current).filter(([id]) => Number(id) !== accountId),
       ));

@@ -15,6 +15,27 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   const [orderExecutionDetails, setOrderExecutionDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [orderExecutionLoading, setOrderExecutionLoading] = useState<Record<number, boolean>>({});
   const [expandedOrderIds, setExpandedOrderIds] = useState<Key[]>([]);
+  const orderVersions = useRef<Record<number, number>>({});
+  const accountVersions = useRef<Record<number, number>>({});
+  const accountLoadingTokens = useRef<Record<number, symbol>>({});
+  const orderLoadingTokens = useRef<Record<number, symbol>>({});
+  const accountLoadingByOrder = useRef<Record<number, number>>({});
+  const orderAccountIds = useRef<Record<number, number>>({});
+  const startOrderRequest = (orderId: number) => {
+    const previousAccount = accountLoadingByOrder.current[orderId];
+    if (previousAccount !== undefined) {
+      delete accountLoadingByOrder.current[orderId];
+      delete accountLoadingTokens.current[previousAccount];
+      setExecutionLoading((current) => ({ ...current, [previousAccount]: false }));
+    }
+    if (orderLoadingTokens.current[orderId]) {
+      delete orderLoadingTokens.current[orderId];
+      setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+    }
+    const version = (orderVersions.current[orderId] ?? 0) + 1;
+    orderVersions.current[orderId] = version;
+    return version;
+  };
   // 横向滚动记忆：手风琴展开/收起会以 key 重建整张 Table，旧滚动位置归零。
   // 展开前抓取 .ant-table-body 的 scrollLeft，重建后用 useLayoutEffect 还原（绘制前写回，无闪烁）。
   const scrollLeftRef = useRef(0);
@@ -36,29 +57,51 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       setError({ message: "当前账号没有绑定来源订单，无法读取详情" });
       return;
     }
+    const orderId = row.source_order_id;
+    orderAccountIds.current[orderId] = row.id;
+    const version = startOrderRequest(orderId);
+    const accountVersion = accountVersions.current[row.id] ?? 0;
+    const token = Symbol();
+    accountLoadingTokens.current[row.id] = token;
+    accountLoadingByOrder.current[orderId] = row.id;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
-      const detail = await ordersApi.executionDetail(row.source_order_id);
+      const detail = await ordersApi.executionDetail(orderId);
+      if (orderVersions.current[orderId] !== version || (accountVersions.current[row.id] ?? 0) !== accountVersion) return;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
     } catch (err) {
-      setError(normalizeError(err));
+      if (orderVersions.current[orderId] === version && (accountVersions.current[row.id] ?? 0) === accountVersion) setError(normalizeError(err));
     } finally {
-      setExecutionLoading((current) => ({ ...current, [row.id]: false }));
+      if (accountLoadingTokens.current[row.id] === token) {
+        delete accountLoadingTokens.current[row.id];
+        delete accountLoadingByOrder.current[orderId];
+        setExecutionLoading((current) => ({ ...current, [row.id]: false }));
+      }
     }
   }
   async function loadOrderExecution(orderId: number, force = false): Promise<AccountExecutionDetail | null> {
     if (!force && (orderExecutionDetails[orderId] || orderExecutionLoading[orderId])) return orderExecutionDetails[orderId] ?? null;
+    const version = startOrderRequest(orderId);
+    const accountSnapshot = { ...accountVersions.current };
+    const token = Symbol();
+    orderLoadingTokens.current[orderId] = token;
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
+      if (orderVersions.current[orderId] !== version || (accountVersions.current[detail.account.id] ?? 0) !== (accountSnapshot[detail.account.id] ?? 0)) return null;
+      orderAccountIds.current[orderId] = detail.account.id;
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
       setExecutionDetails((current) => ({ ...current, [detail.account.id]: detail }));
       return detail;
     } catch (err) {
-      setError(normalizeError(err));
+      const accountId = orderAccountIds.current[orderId];
+      if (orderVersions.current[orderId] === version && (accountId === undefined || (accountVersions.current[accountId] ?? 0) === (accountSnapshot[accountId] ?? 0))) setError(normalizeError(err));
       return null;
     } finally {
-      setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+      if (orderLoadingTokens.current[orderId] === token) {
+        delete orderLoadingTokens.current[orderId];
+        setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+      }
     }
   }
   /** 编辑入口同时需要账号详情与当前订单详情，两者是同一份订单执行快照。 */
@@ -70,23 +113,41 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       return cached;
     }
     if (executionLoading[row.id] || orderExecutionLoading[orderId]) return null;
+    orderAccountIds.current[orderId] = row.id;
+    const version = startOrderRequest(orderId);
+    const accountVersion = accountVersions.current[row.id] ?? 0;
+    const token = Symbol();
+    accountLoadingTokens.current[row.id] = token;
+    accountLoadingByOrder.current[orderId] = row.id;
+    orderLoadingTokens.current[orderId] = token;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
+      if (orderVersions.current[orderId] !== version || (accountVersions.current[row.id] ?? 0) !== accountVersion) return null;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
       return detail;
     } catch (err) {
-      setError(normalizeError(err));
+      if (orderVersions.current[orderId] === version && (accountVersions.current[row.id] ?? 0) === accountVersion) setError(normalizeError(err));
       return null;
     } finally {
-      setExecutionLoading((current) => ({ ...current, [row.id]: false }));
-      setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+      if (accountLoadingTokens.current[row.id] === token) {
+        delete accountLoadingTokens.current[row.id];
+        delete accountLoadingByOrder.current[orderId];
+        setExecutionLoading((current) => ({ ...current, [row.id]: false }));
+      }
+      if (orderLoadingTokens.current[orderId] === token) {
+        delete orderLoadingTokens.current[orderId];
+        setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
+      }
     }
   }
   /** 只丢弃详情缓存：用于账号已离开在库列表（售出/下架）的场景，重拉已无展示方，纯属浪费请求。 */
   function dropExecutionCache(accountId: number) {
+    accountVersions.current[accountId] = (accountVersions.current[accountId] ?? 0) + 1;
+    delete accountLoadingTokens.current[accountId];
+    setExecutionLoading((current) => ({ ...current, [accountId]: false }));
     setExecutionDetails((current) => {
       if (!(accountId in current)) return current;
       const next = { ...current };
@@ -95,6 +156,9 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     });
   }
   function dropOrderExecutionCache(orderId: number) {
+    startOrderRequest(orderId);
+    delete orderLoadingTokens.current[orderId];
+    setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
     setOrderExecutionDetails((current) => {
       if (!(orderId in current)) return current;
       const next = { ...current };
@@ -113,6 +177,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   /** 写操作后让详情缓存失效并立即重拉，避免展开区停在写之前的快照。
    *  必须 force：此时 useState 尚未提交，闭包里的 executionDetails 仍是旧值，不加 force 会被命中缓存直接 return。 */
   function refreshExecution(row: Account, orderId = row.source_order_id) {
+    if (orderId != null) orderAccountIds.current[orderId] = row.id;
     dropExecutionCache(row.id);
     if (orderId != null) {
       dropOrderExecutionCache(orderId);

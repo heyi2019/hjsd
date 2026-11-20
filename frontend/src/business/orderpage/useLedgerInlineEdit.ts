@@ -27,6 +27,12 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
   const detailRequestsRef = useRef<Partial<Record<number, Promise<AccountExecutionDetail | null>>>>({});
+  const detailVersionsRef = useRef<Record<number, number>>({});
+  const invalidateDetailRequest = (orderId: number) => {
+    detailVersionsRef.current[orderId] = (detailVersionsRef.current[orderId] ?? 0) + 1;
+    delete detailRequestsRef.current[orderId];
+    setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
+  };
   const loadLedgerDetail = async (order: Pick<Order, "id" | "account_id">, force = false) => {
     if (order.account_id == null) return;
     await loadLedgerOrderDetail(order.id, force);
@@ -34,18 +40,22 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const loadLedgerOrderDetail = async (orderId: number, force = false): Promise<AccountExecutionDetail | null> => {
     if (!force && ledgerOrderDetails[orderId]) return ledgerOrderDetails[orderId];
     if (!force && detailRequestsRef.current[orderId]) return detailRequestsRef.current[orderId];
+    const version = (detailVersionsRef.current[orderId] ?? 0) + 1;
+    detailVersionsRef.current[orderId] = version;
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
     const request = ordersApi.executionDetail(orderId)
       .then(async (detail) => {
+        if (detailVersionsRef.current[orderId] !== version) return null;
         setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
         void orderDetailEditor.ensureEmployees();
         return detail;
       })
       .catch((error) => {
-        appMessage.error(normalizeError(error).message);
+        if (detailVersionsRef.current[orderId] === version) appMessage.error(normalizeError(error).message);
         return null;
       })
       .finally(() => {
+        if (detailVersionsRef.current[orderId] !== version) return;
         delete detailRequestsRef.current[orderId];
         setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
       });
@@ -55,12 +65,14 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const orderDetailEditor = useOrderDetailEditor({
     getExecutionDetail: (id) => Object.values(ledgerOrderDetails).find((detail) => detail.account.id === id),
     onSaved: (id, detail) => {
+      detail.orders.forEach((order) => invalidateDetailRequest(order.order_id));
       setLedgerOrderDetails((current) => Object.fromEntries(
         Object.entries(current).map(([orderId, cached]) => cached.account.id === id ? [orderId, detail] : [orderId, cached]),
       ));
       params.onDetailSaved?.(detail);
     },
-    onRefreshFailed: (accountId) => {
+    onRefreshFailed: (accountId, orderId) => {
+      invalidateDetailRequest(orderId);
       setLedgerOrderDetails((current) => Object.fromEntries(
         Object.entries(current).filter(([, cached]) => cached.account.id !== accountId),
       ));

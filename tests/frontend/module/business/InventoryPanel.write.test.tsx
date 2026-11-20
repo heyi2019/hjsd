@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { useRef, useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -9,6 +10,8 @@ import { OrderConsignmentModal } from "@/business/operations/consignment";
 import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDetailDeliverySection";
 import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { useInventoryList } from "@/business/stocks/InventoryPanel/useInventoryList";
+import { useExecutionCache } from "@/business/stocks/InventoryPanel/useExecutionCache";
+import type { InventoryOrderRow } from "@/business/stocks/InventoryPanel/types";
 import { FieldConfigScope } from "@/business/ConfigurableField";
 import { BusinessRegistrationForm } from "@/shared/ui";
 
@@ -124,6 +127,69 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it.each(["success", "failure"])("库存详情强制刷新后忽略更早请求的%s结果", async (oldResult) => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    let rejectOld!: (error: Error) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve, reject) => { resolveOld = resolve; rejectOld = reject; });
+    const detail = (description: string) => ({ account: { ...accounts[0], account_description: description }, orders: [] }) as never;
+    vi.mocked(ordersApi.executionDetail).mockReturnValueOnce(oldRequest).mockResolvedValueOnce(detail("最新详情"));
+    function Probe() {
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+      const removed = useRef(new Set<number>());
+      const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef: removed });
+      return <><button onClick={() => void cache.loadOrderExecution(21)}>读取</button>
+        <button onClick={() => void cache.loadOrderExecution(21, true)}>刷新</button>
+        <span>{cache.orderExecutionDetails[21]?.account.account_description}</span>
+        <span>{cache.executionDetails[1]?.account.account_description}</span>
+        <span>{error?.message ?? "无错误"}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "读取" }));
+    await ui.click(screen.getByRole("button", { name: "刷新" }));
+    await waitFor(() => expect(screen.getAllByText("最新详情")).toHaveLength(2));
+    await act(async () => { if (oldResult === "failure") rejectOld(new Error("过时请求失败")); else resolveOld(detail("过时详情")); });
+    expect(screen.getAllByText("最新详情")).toHaveLength(2);
+    expect(screen.queryByText("过时详情")).not.toBeInTheDocument();
+    expect(screen.getByText("无错误")).toBeInTheDocument();
+  });
+  it("库存详情刷新失败后，不会被挂起的旧请求阻止重新加载", async () => {
+    vi.mocked(ordersApi.executionDetail).mockReturnValueOnce(new Promise(() => {})).mockRejectedValueOnce(new Error("新请求失败"));
+    function Probe() {
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+      const removed = useRef(new Set<number>());
+      const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef: removed });
+      return <><button onClick={() => void cache.loadExecution(accounts[0] as Account)}>读取</button>
+        <button onClick={() => void cache.loadOrderExecution(21, true)}>刷新</button>
+        <span>{cache.executionLoading[1] ? "账号加载中" : "账号未加载"}</span>
+        <span>{error?.message}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "读取" }));
+    expect(screen.getByText("账号加载中")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "刷新" }));
+    await screen.findByText(/新请求失败/);
+    expect(screen.getByText("账号未加载")).toBeInTheDocument();
+  });
+  it("库存详情缓存失效后，未完成的旧请求不能恢复旧快照", async () => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    vi.mocked(ordersApi.executionDetail).mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }));
+    function Probe() {
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const removed = useRef(new Set<number>());
+      const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef: removed });
+      return <><button onClick={() => void cache.loadOrderExecution(21)}>读取</button>
+        <button onClick={() => cache.dropExecutionCache(1)}>清除</button>
+        <span>{cache.executionDetails[1]?.account.account_description ?? "无缓存"}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "读取" }));
+    await ui.click(screen.getByRole("button", { name: "清除" }));
+    await act(async () => resolveOld({ account: { ...accounts[0], account_description: "过时详情" }, orders: [] } as never));
+    expect(screen.getByText("无缓存")).toBeInTheDocument();
+  });
   it("详情编辑的字段配置未加载时禁止直接保存", async () => {
     vi.mocked(orderFormFieldsApi.list).mockRejectedValueOnce(new Error("配置读取失败"));
     vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });

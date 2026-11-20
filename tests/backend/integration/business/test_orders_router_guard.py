@@ -131,6 +131,8 @@ def test_order_output_keeps_game_password_for_detail_editing(seeded_db):
 # ---- _order_list_payload：客户/对手方角色回写（249 / 255） ----
 
 def test_order_list_payload_includes_customer_role(seeded_db):
+    from sqlalchemy import event
+
     account = _new_account(seeded_db)
     customer = create_customer(seeded_db, display_name="甲", actor="pytest")
     order = create_order(
@@ -143,9 +145,23 @@ def test_order_list_payload_includes_customer_role(seeded_db):
         user=_admin(),
     )
     seeded_db.commit()
-    payloads = router._order_list_payload(seeded_db, [order])
+    queries = []
+
+    def record_sql(_conn, _cursor, statement, _params, _context, _many):
+        sql = " ".join(statement.lower().split())
+        if "from order_customer_roles join customers" in sql or "from order_counterparty_roles join counterparties" in sql:
+            queries.append(sql)
+
+    connection = seeded_db.connection()
+    event.listen(connection, "after_cursor_execute", record_sql)
+    try:
+        payloads = router._order_list_payload(seeded_db, [order])
+    finally:
+        event.remove(connection, "after_cursor_execute", record_sql)
     assert payloads[0]["party_name"] == "甲"
     assert payloads[0]["party_role"] == "BUYER"
+    assert len(queries) == 2
+    assert all(".phone" not in query and ".wechat" not in query and ".note" not in query for query in queries)
 
 def test_order_list_payload_includes_counterparty_role(seeded_db):
     account = _new_account(

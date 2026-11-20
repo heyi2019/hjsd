@@ -55,18 +55,20 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
 
     parties: dict[int, tuple[str, str, str | None, str, datetime]] = {}
     if order_ids:
-        for role, customer in db.execute(
-            select(OrderCustomerRole, Customer)
+        for order_id, role, name, source, created_by, created_at in db.execute(
+            select(OrderCustomerRole.order_id, OrderCustomerRole.role, Customer.display_name,
+                   Customer.source, Customer.created_by, Customer.created_at)
             .join(Customer, Customer.id == OrderCustomerRole.customer_id)
             .where(OrderCustomerRole.order_id.in_(order_ids))
         ).all():
-            parties.setdefault(role.order_id, (customer.display_name, role.role, customer.source, customer.created_by, customer.created_at))
-        for role, counterparty in db.execute(
-            select(OrderCounterpartyRole, Counterparty)
+            parties.setdefault(order_id, (name, role, source, created_by, created_at))
+        for order_id, role, name, source, created_by, created_at in db.execute(
+            select(OrderCounterpartyRole.order_id, OrderCounterpartyRole.role, Counterparty.display_name,
+                   Counterparty.source, Counterparty.created_by, Counterparty.created_at)
             .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
             .where(OrderCounterpartyRole.order_id.in_(order_ids))
         ).all():
-            parties.setdefault(role.order_id, (counterparty.display_name, role.role, counterparty.source, counterparty.created_by, counterparty.created_at))
+            parties.setdefault(order_id, (name, role, source, created_by, created_at))
 
     events_by_order: dict[int, list[OrderEvent]] = {}
     if order_ids:

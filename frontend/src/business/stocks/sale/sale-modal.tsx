@@ -212,6 +212,10 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
           const value = values[key];
           if (value !== undefined && value !== null && value !== "") deliveryFormExtra[key] = value;
         }
+        if (values.intermediary_platform !== undefined && values.intermediary_platform !== null && values.intermediary_platform !== "") {
+          deliveryFormExtra.intermediary_platform_other = values.intermediary_platform === "其他"
+            ? values.intermediary_platform_other || null : null;
+        }
         const deliveryResponsibleIds = Array.isArray(values.delivery_responsible_ids)
           ? (values.delivery_responsible_ids as unknown[]).filter((id): id is number => typeof id === "number")
           : [];

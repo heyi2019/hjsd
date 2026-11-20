@@ -1395,7 +1395,8 @@ describe("OrderDetailDeliverySection", () => {
         order_type: "HS",
         created_at: "2026-11-02T10:00:00",
         extra_values: {
-          intermediary_platform: "盼之",
+          intermediary_platform: "其他",
+          intermediary_platform_other: "星河平台",
           intermediary_type: "包赔",
           compensation_type: "续保",
         },
@@ -1403,16 +1404,26 @@ describe("OrderDetailDeliverySection", () => {
       }],
     };
 
-    renderLight(
+    const { rerender } = renderLight(
       <OrderDetailDeliverySection meta={{ sourceOrderNo: "HS-FE265" } as never} detail={detail as never} />,
       { user: "admin" },
     );
 
     await waitFor(() => {
-      expect(screen.getByText("盼之")).toBeInTheDocument();
+      expect(screen.getByText("星河平台")).toBeInTheDocument();
       expect(screen.getByText("包赔")).toBeInTheDocument();
       expect(screen.getByText("续保")).toBeInTheDocument();
     });
+    const onOrderExtraChange = vi.fn();
+    rerender(<OrderDetailDeliverySection meta={{ sourceOrderNo: "HS-FE265" } as never}
+      detail={detail as never} editing onOrderExtraChange={onOrderExtraChange} />);
+    const other = await screen.findByLabelText("编辑其他平台");
+    expect(other).toHaveValue("星河平台");
+    fireEvent.change(other, { target: { value: "新平台" } });
+    expect(onOrderExtraChange).toHaveBeenCalledWith(21, "intermediary_platform_other", "新平台");
+    await ui.click(screen.getByRole("combobox", { name: "编辑交易平台" }));
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(21, "intermediary_platform_other", null);
   });
 
   it("编辑态交易平台、中介类型和包赔类型可以下拉选择", async () => {
@@ -1649,10 +1660,14 @@ it("不填写客户时仍可售出", async () => {
   const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
   renderLight(<RecoverySaleModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
   await saleUi.type(await screen.findByLabelText("售出金额"), "350");
+  await saleUi.click(screen.getByLabelText("交易平台"));
+  await saleUi.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
   await saleUi.click(screen.getByLabelText("资金账户"));
   await saleUi.click(await screen.findByText(/利润池/));
   await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "350" })));
+  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({
+    amount: "350", delivery_form_extra: expect.objectContaining({ intermediary_platform: "盼之", intermediary_platform_other: null }),
+  })));
   expect(customersApi.create).not.toHaveBeenCalled();
   expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
 });
@@ -1767,14 +1782,15 @@ describe("库存售出三表单分支", () => {
     expect(screen.getByText("包赔类型")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("交付操作人").closest(".ant-select")).toHaveTextContent("管理员"));
     await saleUi.click(screen.getByLabelText("交易平台"));
-    await saleUi.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await saleUi.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    await saleUi.type(await screen.findByLabelText("其他平台"), "星河平台");
     await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
     await saleUi.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await saleUi.click(screen.getByLabelText("资金账户"));
     await saleUi.click(await screen.findByText(/利润池/));
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
-      delivery_form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "盼之" }),
+      delivery_form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "其他", intermediary_platform_other: "星河平台" }),
     })));
   });
 
@@ -1792,6 +1808,9 @@ describe("库存售出三表单分支", () => {
     await screen.findByText("pickup-acc");
     fireEvent.click(screen.getByRole("button", { name: /售出/ }));
     expect(await screen.findByText("售出提号账号")).toBeInTheDocument();
+    await saleUi.click(screen.getByLabelText("交易平台"));
+    await saleUi.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    await saleUi.type(await screen.findByLabelText("其他平台"), "分期平台");
     await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
     await saleUi.type(screen.getByPlaceholderText("请输入金额"), "1200");
     await saleUi.click(await screen.findByText("分期付款"));
@@ -1810,6 +1829,7 @@ describe("库存售出三表单分支", () => {
 
     await waitFor(() => expect(vi.mocked(installmentsApi.stockSale)).toHaveBeenCalledWith(expect.objectContaining({
       order_id: 21, principal: "1200", down_payment: "300", pool_id: 3, operator_user_ids: [1], form_extra: { sale_receipt: "分期凭据" },
+      delivery_form_extra: expect.objectContaining({ intermediary_platform: "其他", intermediary_platform_other: "分期平台" }),
     })));
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();

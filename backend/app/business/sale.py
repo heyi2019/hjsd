@@ -19,7 +19,7 @@ def sale_form_context(
     """还原售出表单中的客户与交付字段，供条件必填校验使用。"""
     delivery = delivery_form_extra or {}
     context = {key: delivery.get(key) for key in (
-        "bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_type",
+        "bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_platform_other", "intermediary_type",
         "compensation_type", "delivery_responsible_ids",
     )}
     context.update({

@@ -242,13 +242,13 @@ def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_clie
     _seed_order(
         seeded_db,
         order_no="HS9806",
-        form_extra={"bound_phone": "13800000001"},
+        form_extra={"bound_phone": "13800000001", "intermediary_platform": "其他", "intermediary_platform_other": "星河平台"},
     )
     _seed_order(
         seeded_db,
         order_no="DG9801",
         order_type="DG",
-        form_extra={"bound_phone": "13800000002"},
+        form_extra={"bound_phone": "13800000002", "intermediary_platform": "其他", "intermediary_platform_other": "分期平台"},
     )
 
     response = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
@@ -275,6 +275,8 @@ def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_clie
     )
     assert sub_by_column[buy_phone_column] == "买号交付"
     assert sub_by_column[sell_phone_column] == "卖号交付"
+    buy_platform_column = next(index for index, label in labels.items() if label == "买号交付-交易平台")
+    sell_platform_column = next(index for index, label in labels.items() if label == "卖号交付-交易平台")
 
     rows = {
         sheet.cell(row=row, column=1).value: {
@@ -285,6 +287,12 @@ def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_clie
     }
     assert rows["HS9806"] == {"buy": "13800000001", "sell": None}
     assert rows["DG9801"] == {"buy": None, "sell": "13800000002"}
+    platform_rows = {sheet.cell(row=row, column=1).value: (
+        sheet.cell(row=row, column=buy_platform_column).value,
+        sheet.cell(row=row, column=sell_platform_column).value,
+    ) for row in range(4, sheet.max_row + 1)}
+    assert platform_rows["HS9806"] == ("其他（星河平台）", None)
+    assert platform_rows["DG9801"] == (None, "其他（分期平台）")
 
 
 def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, headers, seeded_db):

@@ -355,8 +355,17 @@ class TestInstallmentsApi:
                        "pool_id": pool.id, "operator_user_ids": [1], "note": "收款备注"}
         if dependency == "customer_nickname":
             payload["customer_input"] = {"display_name": "售出客户", "role": "CONSIGNOR" if order_type == "DG" else "BUYER"}
+        check_other_platform = installment and dependency == "intermediary_platform"
         if dependency == "intermediary_platform":
             payload["delivery_form_extra"] = {"intermediary_platform": "测试平台"}
+        if check_other_platform:
+            payload["delivery_form_extra"] = {"intermediary_platform": "其他", "intermediary_platform_other": "分期平台"}
+            other_field = create_order_form_field(seeded_db, order_type_code=scope, field_key="intermediary_platform_other",
+                                                 label="其他平台", actor="pytest")
+            other_field.is_custom = False
+            seeded_db.flush()
+            create_order_form_field(seeded_db, order_type_code=scope, field_key="receipt_other", label="其他平台凭据",
+                                    required_when={"field": "intermediary_platform_other", "op": "filled"}, actor="pytest")
         seeded_db.commit()
 
         def transactional_db():
@@ -372,7 +381,14 @@ class TestInstallmentsApi:
         spoofed = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {dependency: ""}})
         assert spoofed.status_code == 422 and "售出凭据" in spoofed.text
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL")) is None
-        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+        receipt = {"receipt": "凭据A"}
+        if check_other_platform:
+            missing_other = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {
+                **receipt, "intermediary_platform_other": "",
+            }})
+            assert missing_other.status_code == 422 and "其他平台凭据" in missing_other.text
+            receipt["receipt_other"] = "凭据B"
+        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": receipt})
         assert saved.status_code == 201, saved.text
         event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
         assert event.form_extra["receipt"] == "凭据A"
@@ -429,12 +445,13 @@ class TestInstallmentsApi:
     def test_full_stock_sale_saves_buyer_delivery_and_cashflow_together(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-full-sale")
         order = _order(seeded_db, order_type="HS", account_id=account.id)
+        order.form_extra = {"intermediary_platform": "其他", "intermediary_platform_other": "旧平台"}
         _buy(seeded_db, order.id, "100")
         pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
         response = seeded_client.post(f"/api/v1/orders/{order.id}/stock-sale", headers=headers, json={
             "amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
             "operator_user_ids": [1], "customer_input": {"display_name": "完整售出买家", "role": "BUYER"},
-            "delivery_form_extra": {"delivery_responsible_ids": [1]},
+            "delivery_form_extra": {"delivery_responsible_ids": [1], "intermediary_platform": "盼之", "intermediary_platform_other": None},
         })
         assert response.status_code == 201, response.text
         customer = seeded_db.scalar(select(Customer).where(Customer.display_name == "完整售出买家"))
@@ -442,6 +459,8 @@ class TestInstallmentsApi:
         assert seeded_db.scalar(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order.id, OrderCustomerRole.customer_id == customer.id, OrderCustomerRole.role == "BUYER"))
         seeded_db.refresh(order)
         assert order.form_extra["delivery_responsible_ids"] == [1]
+        assert order.form_extra["intermediary_platform"] == "盼之"
+        assert order.form_extra["intermediary_platform_other"] is None
         assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order.id, Cashflow.category == "SELL"))
 
     def test_full_stock_sale_failure_rolls_back_buyer_and_delivery(self, seeded_client, seeded_db, headers):
@@ -521,7 +540,7 @@ class TestInstallmentsApi:
             "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
             "pool_id": pool.id, "operator_user_ids": [1],
             "customer_input": {"display_name": "分期售出买家", "role": "BUYER"},
-            "delivery_form_extra": {"delivery_responsible_ids": [1]},
+            "delivery_form_extra": {"delivery_responsible_ids": [1], "intermediary_platform": "其他", "intermediary_platform_other": "分期平台"},
         })
         assert response.status_code == 201, response.text
         contract = seeded_db.scalar(select(Installment).where(Installment.order_id == order.id))
@@ -532,7 +551,28 @@ class TestInstallmentsApi:
         customer = seeded_db.scalar(select(Customer).where(Customer.display_name == "分期售出买家"))
         assert customer is not None
         assert seeded_db.scalar(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order.id, OrderCustomerRole.customer_id == customer.id, OrderCustomerRole.role == "BUYER"))
-        assert seeded_db.get(Order, order.id).form_extra["delivery_responsible_ids"] == [1]
+        saved_extra = seeded_db.get(Order, order.id).form_extra
+        assert saved_extra["delivery_responsible_ids"] == [1]
+        assert saved_extra["intermediary_platform_other"] == "分期平台"
+        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["orders"][0]["extra_values"]["intermediary_platform_other"] == "分期平台"
+        edited = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+            "events": [], "orders": [{"order_id": order.id, "form_extra": {"intermediary_platform_other": "新平台"}}],
+        })
+        assert edited.status_code == 200, edited.text
+        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["orders"][0]["extra_values"]["intermediary_platform_other"] == "新平台"
+        cleared = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
+            "events": [], "orders": [{"order_id": order.id, "form_extra": {
+                "intermediary_platform": "盼之", "intermediary_platform_other": None,
+            }}],
+        })
+        assert cleared.status_code == 200, cleared.text
+        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["orders"][0]["extra_values"]["intermediary_platform_other"] is None
 
     def test_stock_sale_rolls_back_when_down_payment_fails(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-sale-rollback")

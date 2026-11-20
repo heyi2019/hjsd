@@ -300,10 +300,14 @@ def _delivery_export_fields(
     # 包赔类型是 option_sets 词典（COMPENSATION_TYPE，管理员可编辑）：
     # 导出按同一套「代码值 → 中文」翻译，未命中保留原值
     compensation_labels = value_labels.get("compensation_type") or {}
+    platform = form_extra.get("intermediary_platform")
+    other_platform = form_extra.get("intermediary_platform_other")
+    if platform == "其他" and isinstance(other_platform, str) and other_platform.strip():
+        platform = f"其他（{other_platform.strip()}）"
     values: dict[str, str | None] = {
         "phone": form_extra.get("bound_phone"),
         "owner": form_extra.get("bound_phone_owner"),
-        "platform": form_extra.get("intermediary_platform"),
+        "platform": platform,
         "type": form_extra.get("intermediary_type"),
         "compensation": (
             compensation_labels.get(compensation, compensation)

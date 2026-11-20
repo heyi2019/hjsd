@@ -446,7 +446,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     clearOptionSetsCache();
     vi.mocked(optionSetsApi.list).mockResolvedValueOnce({
       items: [
-        { code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }] },
+        { code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }, { value: "其他", label: "其他" }] },
         { code: "INTERMEDIARY_TYPE", options: [{ value: "包赔", label: "包赔" }] },
         { code: "COMPENSATION_TYPE", options: [{ value: "shoubao", label: "首保" }] },
       ],
@@ -467,7 +467,8 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     // 交付信息
     await ui.type(screen.getByLabelText("手机号绑定人"), "张三");
     await ui.click(screen.getByLabelText("交易平台").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
-    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.click(await screen.findByText("其他", { selector: ".ant-select-item-option-content" }));
+    await ui.type(await screen.findByLabelText("其他平台"), "星河平台");
     await ui.click(screen.getByLabelText("中介类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
     await ui.click(await screen.findByText("包赔", { selector: ".ant-select-item-option-content" }));
     await ui.click(screen.getByLabelText("包赔类型").closest(".ant-form-item")!.querySelector(".ant-select-selector") as Element);
@@ -476,7 +477,8 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
     const formExtra = (payload.form_extra ?? {}) as Record<string, unknown>;
-    expect(formExtra.intermediary_platform).toBe("盼之");
+    expect(formExtra.intermediary_platform).toBe("其他");
+    expect(formExtra.intermediary_platform_other).toBe("星河平台");
     expect(formExtra.intermediary_type).toBe("包赔");
     expect(formExtra.compensation_type).toBe("shoubao");
     expect(formExtra.bound_phone_owner).toBe("张三");

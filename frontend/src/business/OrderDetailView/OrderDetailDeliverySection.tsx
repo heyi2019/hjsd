@@ -28,6 +28,7 @@ const DELIVERY_FIELDS = [
   { key: "bound_phone", fallback: "换绑手机号" },
   { key: "bound_phone_owner", fallback: "手机号绑定人" },
   { key: "intermediary_platform", fallback: "交易平台" },
+  { key: "intermediary_platform_other", fallback: "其他平台" },
   { key: "intermediary_type", fallback: "中介类型" },
   { key: "compensation_type", fallback: "包赔类型" },
   { key: "delivery_responsible_ids", fallback: "交付操作人" },
@@ -113,11 +114,11 @@ function DeliverySubSection({
   }), [account, draft, employees, employeeNames, extraValues]);
   const deliveryItems = useMemo(() => {
     const existing = buildFormExtraDisplay(editableValues, Object.values(config)).filter(
-      (item) => (config[item.key]?.section ?? "EXTRA") === "DELIVER",
+      (item) => item.key !== "intermediary_platform_other" && (config[item.key]?.section ?? "EXTRA") === "DELIVER",
     );
     const existingKeys = new Set(existing.map((item) => item.key));
     const configured = Object.values(config)
-      .filter((field) => field.is_custom && field.is_active && field.section === "DELIVER" && !existingKeys.has(field.field_key))
+      .filter((field) => field.field_key !== "intermediary_platform_other" && field.is_custom && field.is_active && field.section === "DELIVER" && !existingKeys.has(field.field_key))
       .map((field) => ({ key: field.field_key, label: field.label, value: "", status: "active" as const }));
     return [...existing, ...configured];
   }, [config, editableValues]);
@@ -128,6 +129,7 @@ function DeliverySubSection({
       <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))
+          .filter((field) => field.key !== "intermediary_platform_other" || editableValues.intermediary_platform === "其他")
           .map((field) => (
             <Descriptions.Item key={field.key} label={fieldLabel(config, field.key, field.fallback)}>
               {editing && field.key === "delivery_responsible_ids" ? (
@@ -159,7 +161,12 @@ function DeliverySubSection({
                   defaultActiveFirstOption
                   placeholder="可选填"
                   options={selectOptions(optionsByField[field.key] ?? [], editableValues[field.key])}
-                  onChange={(value: string | undefined) => onExtraChange?.(field.key, value ?? null)}
+                  onChange={(value: string | undefined) => {
+                    onExtraChange?.(field.key, value ?? null);
+                    if (field.key === "intermediary_platform" && value !== "其他" && editableValues.intermediary_platform_other) {
+                      onExtraChange?.("intermediary_platform_other", null);
+                    }
+                  }}
                 />
               ) : editing ? (
                 <Input

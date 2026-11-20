@@ -35,6 +35,11 @@ export function splitFormExtra(values: Values, config: FieldConfigMap) {
     const v = values[key];
     if (v !== undefined && v !== null && v !== "") orderFormExtra[key] = v;
   }
+  if (values.intermediary_platform === "其他" && hasValue(values.intermediary_platform_other)) {
+    orderFormExtra.intermediary_platform_other = values.intermediary_platform_other;
+  } else {
+    delete orderFormExtra.intermediary_platform_other;
+  }
   return { accountExtraValues, orderFormExtra };
 }
 

@@ -3,7 +3,7 @@
 #
 # 与 backup_daily.sh 的分工：
 #   - backup_daily.sh 面向 ECS 生产（docker compose 的 db 服务 + deploy/.env）；
-#   - 本脚本面向本机自建的 heijin-db-1 容器（默认只备 dev；release 母本已上线退役），
+#   - 本脚本面向本机自建的 heijin-db-1 容器（默认备份 dev 和本地 main），
 #     归属本仓库的 deploy/container/compose.yaml。
 #   两者产物格式一致（pg_dump -Fc + .sha256 sidecar），可互相用 restore_pg.sh 恢复。
 #
@@ -13,8 +13,7 @@
 #   3) 每份备份都做**表数闸门**：归档里的 TABLE DATA 条数必须等于源库 public 表数，
 #      不等直接失败。防的是「备份出来是半套或空库，但文件看着正常」。
 #   4) 任何一步失败非零退出，cron 日志要能看见；滚动保留最近 N 份/库。
-#   5) 末尾顺带执行 WAL 归档巡检与保留清理（原为独立的每小时 cron，11-04 并入，
-#      原因见脚本末尾注释）。"BACKUP_OK" 只在两段都成功时出现，它仍是整体健康信号。
+#   5) 本地不启用时间点恢复；所选库都备份成功才输出 "BACKUP_OK"。
 #
 # 用法：
 #   bash deploy/scripts/backup_local.sh
@@ -38,7 +37,7 @@ cd "$(dirname "$0")/../.."   # -> 仓库根
 
 CONTAINER="${ERP_PG_CONTAINER:-heijin-db-1}"
 DB_USER="${ERP_PG_USER:-erp_app}"
-DBS="${ERP_LOCAL_BACKUP_DBS:-heijin_erp_dev}"
+DBS="${ERP_LOCAL_BACKUP_DBS:-heijin_erp_dev heijin_erp_release}"
 KEEP="${ERP_BACKUP_KEEP:-7}"
 OUT="${ERP_LOCAL_BACKUP_DIR:-backups/local}"
 
@@ -100,21 +99,4 @@ done
 
 [ "$OK" -gt 0 ] || die "没有任何库被备份"
 
-# ── WAL 归档巡检 + 保留清理（2026-11-04 并入） ───────────────────────────────
-# 原先由 crontab 的 `20 * * * *` 独立执行，但那条在 macOS 上不可靠：实测 11-03
-# 14:20 后停摆 14.5 小时无人察觉，期间归档堆到 6.3 GB 无任何清理，而日志里最后
-# 一行还写着「✅ 归档正常」——不可靠的调度单元比没有更危险，因为它是虚假安全。
-# 本脚本每天 04:10 已被连续验证；保留策略按 -mtime 整日粒度算，每天跑一次与每
-# 小时跑一次效果等价，因此并入此处，不再单独占用一个 cron 条目。
-#
-# 保留窗口（2026-11-12 收紧）：WAL ERP_WAL_KEEP_DAYS 默认 4 天（原 7 天）；
-# 逻辑备份 ERP_BACKUP_KEEP 仍默认 7 份，两者是不同维度的保留，不要求相等。
-# 绑定约束：基备每周日+周三各一份（cron 0,3）、保留 BASE_KEEP=1 份 = 间隔 3.5 天，
-# WAL 4 天 ≥ 3.5 天基备间隔，最近那份基备仍有完整 WAL 可前滚。要改窗口必须同时改
-# 基备频率/份数，两者是一个整体；需维持旧口径请显式设 ERP_WAL_KEEP_DAYS=7。
-echo "--- WAL 归档巡检（PITR）---"
-PITR_RC=0
-bash deploy/scripts/pg_pitr_backup.sh wal || PITR_RC=$?
-[ "$PITR_RC" -eq 0 ] || die "WAL 归档巡检失败（rc=${PITR_RC}）：归档器异常会让 WAL 堆到爆盘，见上方输出"
-
-echo "BACKUP_OK $(date '+%Y-%m-%d %H:%M:%S') 共 ${OK} 个库 → $(cd "$OUT" && pwd)；WAL 归档正常"
+echo "BACKUP_OK $(date '+%Y-%m-%d %H:%M:%S') 共 ${OK} 个库 → $(cd "$OUT" && pwd)"

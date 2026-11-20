@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # pg_container.sh —— 黑金本机数据库容器的唯一入口。
 #
-# 为什么不让人直接 docker compose up：密码、用户、归档路径都在仓库根 `.env` 里，
+# 为什么不让人直接 docker compose up：密码、用户都在仓库根 `.env` 里，
 # 不走 --env-file 的话 compose 会因变量缺失报错，或者更糟——用占位值起一个新卷。
 #
 # 用法：
@@ -25,7 +25,7 @@ PGUSER="${ERP_PG_USER:-erp_app}"
 PORT="${ERP_PG_PORT:-5433}"
 
 die() { echo "✗ $*" >&2; exit 2; }
-[ -f "${ENV_FILE}" ] || die "找不到 ${ENV_FILE}（ERP_PG_USER / ERP_PG_PASSWORD / ERP_PG_ARCHIVE_HOST 在这里）"
+[ -f "${ENV_FILE}" ] || die "找不到 ${ENV_FILE}（ERP_PG_USER / ERP_PG_PASSWORD 在这里）"
 [ -f "${COMPOSE_FILE}" ] || die "找不到 ${COMPOSE_FILE}"
 
 compose() {

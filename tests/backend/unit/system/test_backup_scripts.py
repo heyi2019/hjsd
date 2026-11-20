@@ -16,6 +16,7 @@ PostgreSQL 与 docker，可在 CI 与本地秒级跑完。
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import shutil
 import stat
@@ -64,14 +65,16 @@ def _fake_docker(
         'case "$args" in\n'
         '  *"ps --status running --services"*) printf "db\\nbackend\\n"; exit 0 ;;\n'
         '  *"ps -q"*) printf "fakecid0123456789\\n"; exit 0 ;;\n'
+        '  *"ps --format"*) printf "heijin-db-1\\n"; exit 0 ;;\n'
         "  *psql*)\n"
         f"    printf '{psql_tables}\\n'\n"
         "    exit 0 ;;\n"
         "  *pg_dump*)\n"
+        '    if [[ -n "${FAKE_DOCKER_FAIL_DB:-}" && "$args" == *"-d ${FAKE_DOCKER_FAIL_DB} "* ]]; then exit 1; fi\n'
         f"    [[ {dump_exit} -ne 0 ]] && exit {dump_exit}\n"
         "    printf 'PGDMP fake pg_dump archive body\\n'\n"
         "    exit 0 ;;\n"
-        '  *"pg_restore --list"*) cat <<\'TOC\'\n'
+        '  *"pg_restore --list"*|*"pg_restore -l"*) cat <<\'TOC\'\n'
         f"{toc}\n"
         "TOC\n"
         "    exit 0 ;;\n"
@@ -112,6 +115,60 @@ def _run(script: Path, bin_dir: Path, *args: str, extra_env: dict[str, str] | No
         env=env,
         check=False,
     )
+
+
+def _run_local_backup(tmp_path: Path, scripts_dir: Path, bin_dir: Path, **extra_env: str):
+    # 本地脚本会为 cron 补全 PATH，用 shell 函数隔离 docker 边界。
+    bash_env = tmp_path / "local-backup-env.sh"
+    bash_env.write_text('docker() { "$FAKE_DOCKER_PATH" "$@"; }\nexport -f docker\n', encoding="utf-8")
+    return _run(
+        scripts_dir / "backup_local.sh", bin_dir,
+        extra_env={
+            "BASH_ENV": str(bash_env),
+            "FAKE_DOCKER_PATH": str(bin_dir / "docker"),
+            "ERP_LOCAL_BACKUP_DBS": "",
+            "ERP_BACKUP_KEEP": "",
+            "ERP_LOCAL_BACKUP_DIR": str(tmp_path / "backups" / "local"),
+            **extra_env,
+        },
+    )
+
+
+def test_local_backup_defaults_to_seven_independent_copies_per_database(tmp_path: Path) -> None:
+    _, scripts_dir, bin_dir = _deploy_tree(tmp_path)
+    out = tmp_path / "backups" / "local"
+    out.mkdir(parents=True)
+    for db in ("heijin_erp_dev", "heijin_erp_release"):
+        for index in range(7):
+            old = out / f"{db}_20000101_00000{index}.dump"
+            old.write_bytes(b"old backup")
+            old.with_suffix(".dump.sha256").write_text("old checksum\n", encoding="utf-8")
+            os.utime(old, (946684800 + index, 946684800 + index))
+
+    result = _run_local_backup(tmp_path, scripts_dir, bin_dir)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "BACKUP_OK" in result.stdout
+    for db in ("heijin_erp_dev", "heijin_erp_release"):
+        dumps = list(out.glob(f"{db}_*.dump"))
+        assert len(dumps) == 7
+        newest = max(dumps, key=lambda path: path.stat().st_mtime)
+        checksum = newest.with_suffix(".dump.sha256").read_text(encoding="utf-8").split()[0]
+        assert checksum == hashlib.sha256(newest.read_bytes()).hexdigest()
+        assert not (out / f"{db}_20000101_000000.dump").exists()
+        assert not (out / f"{db}_20000101_000000.dump.sha256").exists()
+
+
+def test_local_backup_does_not_report_success_when_release_dump_fails(tmp_path: Path) -> None:
+    _, scripts_dir, bin_dir = _deploy_tree(tmp_path)
+
+    result = _run_local_backup(tmp_path, scripts_dir, bin_dir, FAKE_DOCKER_FAIL_DB="heijin_erp_release")
+
+    assert result.returncode != 0
+    assert "heijin_erp_release：pg_dump 失败" in result.stderr
+    assert list((tmp_path / "backups" / "local").glob("heijin_erp_dev_*.dump"))
+    assert "BACKUP_OK" not in result.stdout
+    assert not list((tmp_path / "backups" / "local").glob("*.partial"))
 
 
 def test_no_sqlite_backup_entry_point_left() -> None:

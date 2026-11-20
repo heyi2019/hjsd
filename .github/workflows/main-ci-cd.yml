@@ -47,7 +47,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           current_subject="$(git log -1 --format=%s)"
           if [[ "$current_subject" == chore\(release\):* ]]; then
-            version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+            version="$(tr -d '\r\n' < VERSION)"
             echo "本提交已完成自动发版，跳过重复升号：V${version}"
           else
             summary_file="${RUNNER_TEMP}/release-summary.md"
@@ -56,12 +56,12 @@ jobs:
               echo "## Automatic release"
               cat "$summary_file"
             } >> "$GITHUB_STEP_SUMMARY"
-            git add backend/app/version.py frontend/package.json package-lock.json RELEASE.md
-            version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+            git add VERSION docs/版本管理.md
+            version="$(tr -d '\r\n' < VERSION)"
             git commit -m "chore(release): v${version}"
             git push origin HEAD:main
           fi
-          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+          version="$(tr -d '\r\n' < VERSION)"
           release_sha="$(git rev-parse HEAD)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
@@ -72,8 +72,7 @@ jobs:
           # 避免同一批代码被校验两遍；wait-and-deploy 等待的正是本轮 run。
           # 先算「原始 push 范围」的变更路径集：release 提交是 GITHUB_TOKEN 推回的，
           # gate checkout 到 release sha 后 git status 恒为空，必须显式传路径集。
-          # 不能只传 BASE_SHA 让 gate 自己 diff：release 提交必然改 frontend/package.json，
-          # 该路径属前端选测的 STRUCTURAL，会把任何业务区域选测一并降级成 quick 冒烟。
+          # 不把自动发版产生的版本文件混进业务变更集，保持门禁选测口径稳定。
           diff_base="$BASE_SHA"
           if [[ -z "$diff_base" || "$diff_base" =~ ^0{40}$ ]] \
             || ! git cat-file -e "${diff_base}^{commit}" 2>/dev/null; then

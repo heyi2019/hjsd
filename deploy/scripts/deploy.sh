@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # CI/回滚可显式传入版本；先暂存，避免下面加载 ECS .env 时被遗留的
-# APP_VERSION 覆盖。未显式传入时，版本仍只从 backend/app/version.py 解析。
+# APP_VERSION 覆盖。未显式传入时，版本从项目根目录 VERSION 读取。
 requested_app_version="${APP_VERSION:-}"
 
 if [ ! -f .env ]; then
@@ -25,17 +25,17 @@ else
   unset APP_VERSION || true
 fi
 
-# 版本号唯一事实源是 backend/app/version.py：这里解析后导出，供镜像 tag 与容器内 /health 使用。
+# 版本号唯一事实源是项目 VERSION：这里读取后导出，供镜像 tag 与容器内 /health 使用。
 # 不从 .env 读，避免"改了代码忘改配置"导致线上显示旧版本。
 # 解析失败只降级为 latest 并告警——版本标识不该成为部署关键路径上的阻断点。
 # 部署/回滚可显式覆盖版本（回滚时由 CI 传入 APP_VERSION=旧版本）；
-# 正常发布不设置该变量，仍从 version.py 单一事实源解析。
+# 正常发布不设置该变量，仍从 VERSION 读取。
 if [ -z "${APP_VERSION:-}" ]; then
-  APP_VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' ../backend/app/version.py 2>/dev/null | head -1 || true)"
+  APP_VERSION="$(tr -d '\r\n' < ../VERSION 2>/dev/null || true)"
 fi
 if [ -z "$APP_VERSION" ]; then
   APP_VERSION="latest"
-  echo "⚠ 未能从 ../backend/app/version.py 解析版本号，镜像 tag 回落 latest" >&2
+  echo "⚠ 未能从 ../VERSION 读取项目版本，镜像 tag 回落 latest" >&2
 fi
 export APP_VERSION
 echo "==> 发布版本 V${APP_VERSION}（镜像 tag 同此值）"

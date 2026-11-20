@@ -1,42 +1,6 @@
-# 宜游轩 ERP 发布记录
+# 宜游轩 ERP 历史发布记录
 
-## 发版流程入口
-
-正式版发布、阿里云部署、备份和回滚统一按 [docs/研发流程.md](docs/研发流程.md) 执行。本文件只保留版本记录和版本号生成规则，避免维护两套发布步骤。
-
-> **正常推送 `main` 会自动发版。** CI 会按提交类型自动升版：普通修复/工程变更升
-> patch，`feat` 升 minor，带 `!` 或 `BREAKING CHANGE` 升 major，并同步三处版本、
-> 生成本轮提交摘要和发布章节。下面命令保留给需要本地预览或手动指定版本的场景。
-
-```bash
-# 1 升版本号（patch=修 bug / minor=加功能 / major=不兼容）
-scripts/ops/bump_version.sh patch         # 先 --dry-run 看将要改什么
-scripts/ops/bump_version.sh --check       # 确认三处一致
-
-# 2 生成本文件的发布章节（脚本出骨架，业务口径仍需人工补）
-scripts/ops/changelog.sh --from v1.0.1        # 先看草稿，不落盘
-scripts/ops/changelog.sh --from v1.0.1 --write # 插入到顶部（已有该版本章节会拒绝）
-
-# 3 提交并打 tag（tag 必须指向含本次版本改动的提交）
-git add backend/app/version.py frontend/package.json package-lock.json RELEASE.md
-git commit -m "release: v1.1.1 ..."
-scripts/ops/bump_version.sh --tag         # 或 git tag -a v1.1.1
-```
-
-> **漏写会被测试挡住**：`tests/backend/unit/system/test_settings.py::test_release_notes_has_section_for_current_version`
-> 断言本文件存在当前版本的 `## Vx.y.z` 章节，且章节内含「发布时间」「本次内容」。
-> 版本号涨了、章节没跟上 → `run_regression.py ci` 直接红，不再依赖人记得。
-
-一次改动三处，缺一处即失效：
-
-| 文件 | 作用 | 漏改的后果 |
-| --- | --- | --- |
-| `backend/app/version.py` | 唯一事实源；`deploy.sh` 据此生成镜像 tag | `/health` 与镜像 tag 报旧版本 |
-| `frontend/package.json` | 前端包版本 | 前端无法反查 |
-| `package-lock.json`（仓库根） | workspaces 子包 `packages["frontend"].version` | `npm ci` 结果与 package.json 不符 |
-
-部署侧**无需任何配置**：`deploy.sh` 用 `sed` 从 `version.py` 解析并 `export APP_VERSION`，
-镜像 tag（`heijin-backend:<版本>`）与容器内 `/api/health` 的 `app_version` 自动跟随。
+> 本文件保留版本重置前的历史记录，旧记录中的版本号与重置后的版本系列独立。当前项目版本规则和新的发布记录见 [版本管理](docs/版本管理.md)。历史标签保持原样；同名标签冲突应在发布前处理，不可覆盖。
 
 ---
 

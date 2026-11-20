@@ -34,9 +34,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
+VERSION="$(tr -d '\r\n' < VERSION)"
 if [ -z "$VERSION" ]; then
-  echo "✗ 无法从 backend/app/version.py 解析 __version__" >&2
+  echo "✗ 无法从 VERSION 读取项目版本" >&2
   exit 1
 fi
 echo "==> 发布版本 V${VERSION}，目标平台 ${PLATFORM}"
@@ -45,7 +45,7 @@ mkdir -p "$OUT_DIR"
 
 if [ "$DO_BUILD" = "1" ]; then
   echo "==> 交叉构建后端镜像"
-  docker buildx build --platform "$PLATFORM" -f backend/Dockerfile backend/ \
+  docker buildx build --platform "$PLATFORM" -f backend/Dockerfile . \
     -t "heijin-backend:${VERSION}" --load
   echo "==> 交叉构建前端镜像"
   # 前端构建上下文是仓库根（需读取 backend/app/enums.py 做枚举对齐校验）

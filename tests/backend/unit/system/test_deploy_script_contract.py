@@ -153,6 +153,17 @@ def test_explicit_app_version_overrides_deploy_env_file(tmp_path):
     assert "发布版本 V1.0.1" in result.stdout
 
 
+def test_deploy_reads_project_version_when_not_overridden(tmp_path):
+    """部署包的 VERSION 决定镜像使用的项目版本。"""
+    script, fake_bin = _release_tree(tmp_path)
+    (tmp_path / "VERSION").write_text("2.3.4\n", encoding="utf-8")
+
+    result = _run(script, fake_bin)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "发布版本 V2.3.4" in result.stdout
+
+
 def test_backend_runtime_receives_explicit_release_version():
     """运行中的 API 健康信息必须与导入镜像的发布版本一致。"""
     compose = COMPOSE_FILE.read_text(encoding="utf-8")

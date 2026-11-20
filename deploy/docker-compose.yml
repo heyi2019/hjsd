@@ -22,11 +22,11 @@ services:
     restart: unless-stopped
 
   backend:
-    # 镜像 tag 取 deploy.sh 从 backend/app/version.py 解析出的版本；本地直接 compose up 时回落 latest。
+    # 镜像 tag 取 deploy.sh 从项目 VERSION 读取的版本；直接 compose up 时回落 latest。
     image: heijin-backend:${APP_VERSION:-latest}
     build:
-      context: ../backend
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
     env_file:
       - .env            # 生产环境变量（含 JWT_SECRET_KEY / DATABASE_URL / CORS_ORIGINS）
     environment:

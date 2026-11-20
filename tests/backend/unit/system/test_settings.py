@@ -18,11 +18,17 @@ from app.core.settings import (
 SECURE_TEST_SECRET = "test-production-secret-0123456789-abcdef"
 
 
+def _release_record_file(root, section=""):
+    path = root / "docs" / "版本管理.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("# 版本管理\n\n## 版本发布记录\n\n" + section, encoding="utf-8")
+    return path
+
+
 def test_default_application_version_is_semver_without_release_prefix(monkeypatch):
     """API 对外使用 SemVer；V 前缀只属于系统发布标签。
 
-    版本号的唯一事实源是 `app/version.py`：这里断言"配置默认值 == 事实源"，
-    再校验格式。发版只改 version.py，本测试无需跟着改，但能挡住手滑写坏。
+    项目根目录 VERSION 是唯一事实源，配置默认值从该文件读取并校验格式。
     """
     # CI 可能注入 APP_VERSION（部署脚本的发布版本），会覆盖配置默认值；
     # 本用例测的是「缺省值 == 事实源」，必须屏蔽外部环境变量。
@@ -33,49 +39,271 @@ def test_default_application_version_is_semver_without_release_prefix(monkeypatc
     assert re.fullmatch(r"\d+\.\d+\.\d+", release_version), "必须是 x.y.z 形式，且不带 v 前缀"
 
 
-def test_frontend_version_matches_backend_release_version():
-    """前后端版本必须同源，否则线上无法判断前端跑的是哪份代码。
-
-    典型漂移：只改 `backend/app/version.py` 就发版 → 前端包版本仍是旧的，
-    页面/构建产物与 `/health` 报的版本号打架。发版请走
-    `scripts/ops/bump_version.sh`，它一次改齐三处（version.py / frontend/package.json /
-    根 package-lock.json 的 frontend 子包），本断言是事后兜底。
-    """
+def test_project_version_is_the_only_release_version():
+    """项目版本统一存根目录，前端包和锁文件不维护独立的发布版本。"""
     import json
 
     from app.version import __version__ as release_version
 
-    pkg_path = PROJECT_ROOT / "frontend" / "package.json"
-    # npm workspaces 的真实锁文件在仓库根，版本只落在 packages["frontend"]；
-    # 旧断言指向 frontend/package-lock.json（不存在）被 `if is_file()` 静默跳过，等于没守。
-    lock_path = PROJECT_ROOT / "package-lock.json"
-    assert pkg_path.is_file(), f"缺少前端 package.json：{pkg_path}"
-    assert lock_path.is_file(), f"缺少根锁文件：{lock_path}"
+    version_file = PROJECT_ROOT / "VERSION"
+    assert version_file.is_file(), "项目根目录应有唯一的 VERSION 文件"
+    assert version_file.read_text(encoding="utf-8").strip() == release_version
+    pkg = json.loads((PROJECT_ROOT / "frontend" / "package.json").read_text(encoding="utf-8"))
+    lock = json.loads((PROJECT_ROOT / "package-lock.json").read_text(encoding="utf-8"))
+    assert "version" not in pkg
+    assert "version" not in lock["packages"]["frontend"]
 
-    pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
-    assert pkg["version"] == release_version, (
-        f"frontend/package.json={pkg['version']} 与 backend/app/version.py="
-        f"{release_version} 不一致，请运行 scripts/ops/bump_version.sh"
+
+def test_backend_reads_project_version_in_a_fresh_layout(tmp_path):
+    """更换项目版本后重新启动时，API 必须读取新值而非后端内的常量。"""
+    import shutil
+    import subprocess
+    import sys
+
+    module = tmp_path / "backend" / "app" / "version.py"
+    module.parent.mkdir(parents=True)
+    shutil.copy2(PROJECT_ROOT / "backend" / "app" / "version.py", module)
+    (tmp_path / "VERSION").write_text("2.3.4\n", encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, "-c", "import runpy,sys; print(runpy.run_path(sys.argv[1])['__version__'])", str(module)],
+        check=True, capture_output=True, text=True,
+    )
+    assert result.stdout.strip() == "2.3.4"
+
+
+@pytest.mark.parametrize(("mode", "expected"), [("patch", "2.3.5"), ("minor", "2.4.0"), ("major", "3.0.0")])
+def test_version_bump_updates_the_project_version_only(tmp_path, mode, expected):
+    """升版不依赖也不修改前端 package 或 lock 文件。"""
+    import shutil
+    import subprocess
+
+    script = tmp_path / "scripts" / "ops" / "bump_version.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / "bump_version.sh", script)
+    (tmp_path / "VERSION").write_text("2.3.4\n", encoding="utf-8")
+    (tmp_path / "frontend").mkdir()
+    package = tmp_path / "frontend" / "package.json"
+    package.write_text('{"name":"frontend","private":true}\n', encoding="utf-8")
+    lock = tmp_path / "package-lock.json"
+    lock.write_text('{"packages":{"frontend":{"name":"frontend"}}}\n', encoding="utf-8")
+    originals = (package.read_bytes(), lock.read_bytes())
+
+    result = subprocess.run(["bash", str(script), mode], cwd=tmp_path, capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "VERSION").read_text(encoding="utf-8").strip() == expected
+    assert (package.read_bytes(), lock.read_bytes()) == originals
+
+
+@pytest.mark.parametrize(
+    ("subject", "expected"),
+    [("fix: 修复问题", "2.3.5"), ("feat: 新增功能", "2.4.0"), ("feat!: 不兼容调整", "3.0.0")],
+)
+def test_automatic_release_uses_the_project_version(tmp_path, subject, expected):
+    """自动发版按提交类型升项目版本，并生成对应的发布记录。"""
+    import shutil
+    import subprocess
+
+    scripts = tmp_path / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    for name in ("bump_version.sh", "auto_release.sh"):
+        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    auto_script = scripts / "auto_release.sh"
+    (tmp_path / "VERSION").write_text("2.3.4\n", encoding="utf-8")
+    notes_file = _release_record_file(tmp_path, "### V2.3.4\n**发布状态：** 已发布\n")
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: baseline")
+    baseline = git("rev-parse", "HEAD")
+    git("commit", "-q", "--allow-empty", "-m", subject)
+    result = subprocess.run(["bash", str(auto_script), baseline, "HEAD"], cwd=tmp_path, capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "VERSION").read_text(encoding="utf-8").strip() == expected
+    notes = notes_file.read_text(encoding="utf-8")
+    assert f"### V{expected}" in notes
+    assert "**发布日期：** 待发布" in notes
+    assert "**发布时间：** 待发布" in notes
+    assert "**发布状态：** 待发布" in notes
+    assert "#### 本次更新内容" in notes
+    assert subject.split(": ", 1)[1] in notes
+
+
+def test_automatic_release_preserves_the_chosen_project_version(tmp_path):
+    """发布前明确指定的版本不能被提交类型自动升版覆盖。"""
+    import shutil
+    import subprocess
+
+    scripts = tmp_path / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    for name in ("bump_version.sh", "auto_release.sh"):
+        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("2.3.4\n", encoding="utf-8")
+    notes_file = _release_record_file(tmp_path, "### V2.3.4\n**发布状态：** 已发布\n")
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: baseline")
+    baseline = git("rev-parse", "HEAD")
+    version_file.write_text("2.3.9\n", encoding="utf-8")
+    git("add", "VERSION")
+    git("commit", "-qm", "feat: 按用户指定版本发布")
+
+    result = subprocess.run(
+        ["bash", str(scripts / "auto_release.sh"), baseline, "HEAD"],
+        cwd=tmp_path, capture_output=True, text=True,
     )
 
-    lock = json.loads(lock_path.read_text(encoding="utf-8"))
-    assert lock["packages"]["frontend"]["version"] == release_version, (
-        "package-lock.json 的 packages['frontend'].version 未同步"
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert version_file.read_text(encoding="utf-8").strip() == "2.3.9"
+    assert "### V2.3.9" in notes_file.read_text(encoding="utf-8")
+
+
+def test_first_project_version_release_respects_chosen_version(tmp_path):
+    """从旧版后端常量迁移到 VERSION 时，也不能覆盖用户指定的版本。"""
+    import shutil
+    import subprocess
+
+    scripts = tmp_path / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    for name in ("bump_version.sh", "auto_release.sh"):
+        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    old_module = tmp_path / "backend" / "app" / "version.py"
+    old_module.parent.mkdir(parents=True)
+    old_module.write_text('__version__ = "2.3.4"\n', encoding="utf-8")
+    notes_file = _release_record_file(tmp_path, "### V2.3.4\n**发布状态：** 已发布\n")
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: legacy baseline")
+    baseline = git("rev-parse", "HEAD")
+    (tmp_path / "VERSION").write_text("2.3.9\n", encoding="utf-8")
+    git("add", "VERSION")
+    git("commit", "-qm", "feat: 使用指定项目版本")
+
+    result = subprocess.run(
+        ["bash", str(scripts / "auto_release.sh"), baseline, "HEAD"],
+        cwd=tmp_path, capture_output=True, text=True,
     )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert (tmp_path / "VERSION").read_text(encoding="utf-8").strip() == "2.3.9"
+    assert "### V2.3.9" in notes_file.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("chosen", "record_state", "should_succeed"),
+    [("2.3.4", "none", True), ("2.3.4", "pending", True),
+     ("2.5.0", "none", False), ("abc", "none", False),
+     ("2.3.4", "published", False)],
+)
+def test_release_marker_selects_the_exact_unreleased_version(tmp_path, chosen, record_state, should_succeed):
+    """用户确认的版本即使与当前相同也不可擅自升版或覆盖已有记录。"""
+    import shutil
+    import subprocess
+
+    scripts = tmp_path / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    for name in ("bump_version.sh", "auto_release.sh"):
+        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    version_file = tmp_path / "VERSION"
+    version_file.write_text("2.3.4\n", encoding="utf-8")
+    section = ""
+    if record_state != "none":
+        status = "待发布" if record_state == "pending" else "已发布"
+        section = (f"### V2.3.4\n**版本号：** V2.3.4\n**发布日期：** 待发布\n"
+                   f"**发布时间：** 待发布\n**发布状态：** {status}\n"
+                   "#### 本次更新内容\n- 保留用户填写的内容\n")
+    notes_file = _release_record_file(tmp_path, section)
+    original_notes = notes_file.read_text(encoding="utf-8")
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: baseline")
+    baseline = git("rev-parse", "HEAD")
+    git("commit", "-q", "--allow-empty", "-m", "feat: 功能更新", "-m", f"Release-Version: {chosen}")
+
+    result = subprocess.run(
+        ["bash", str(scripts / "auto_release.sh"), baseline, "HEAD"],
+        cwd=tmp_path, capture_output=True, text=True,
+    )
+    assert (result.returncode == 0) is should_succeed, result.stdout + result.stderr
+    assert version_file.read_text(encoding="utf-8").strip() == "2.3.4"
+    if should_succeed:
+        notes = notes_file.read_text(encoding="utf-8")
+        assert notes.count("### V2.3.4") == 1
+        if record_state == "pending":
+            assert "保留用户填写的内容" in notes
+        assert "功能更新" in notes
+    else:
+        assert notes_file.read_text(encoding="utf-8") == original_notes
+
+
+def test_tag_uses_the_committed_project_version(tmp_path):
+    """单独打标签要指向含当前 VERSION 的提交，重复执行不能覆盖已有标签。"""
+    import shutil
+    import subprocess
+
+    script = tmp_path / "scripts" / "ops" / "bump_version.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / "bump_version.sh", script)
+    (tmp_path / "VERSION").write_text("2.3.4\n", encoding="utf-8")
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: version baseline")
+    first = subprocess.run(["bash", str(script), "--tag"], cwd=tmp_path, capture_output=True, text=True)
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert git("rev-parse", "v2.3.4^{}") == git("rev-parse", "HEAD")
+    second = subprocess.run(["bash", str(script), "--tag"], cwd=tmp_path, capture_output=True, text=True)
+    assert second.returncode != 0
+    assert (tmp_path / "VERSION").read_text(encoding="utf-8") == "2.3.4\n"
 
 
 def _release_sections(text: str) -> dict[str, str]:
-    """把 RELEASE.md 切成 {版本: 章节正文}，正文不含标题行本身。
-
-    只认 `## V1.2.3` / `## V1.2.3（说明）` 这种形态；`## 发版流程` 之类不带
-    版本号的一级标题自然被跳过——它们不是发布记录。
-    """
+    """把版本管理文档中的版本记录切成 {版本: 章节正文}。"""
     sections: dict[str, str] = {}
     current: str | None = None
     buffer: list[str] = []
 
     for line in text.splitlines():
-        match = re.match(r"^##\s+V?(\d+\.\d+\.\d+)", line)
+        match = re.match(r"^###\s+V?(\d+\.\d+\.\d+)(?:\s|$)", line)
         if match:
             if current is not None:
                 sections[current] = "\n".join(buffer)
@@ -97,36 +325,166 @@ def _release_sections(text: str) -> dict[str, str]:
 
 
 def test_release_notes_has_section_for_current_version():
-    """升了版本却没写 RELEASE.md = 更新日志断档，且此前无人会发现。
-
-    实测缺口：`bump_version.sh` 明写「不写 RELEASE.md」，CI 只打 tag 不生成
-    release notes，全仓库无任何断言检查章节是否存在。于是发版脚本可以一路
-    绿灯（升版本 → 打 tag → 部署成功），RELEASE.md 里却没有这一版。
-    本测试就是那道兜底：版本号涨了、章节没跟上 → 直接红。
-    """
+    """项目版本必须有版本号、发布状态、日期、时间及更新内容。"""
     from app.version import __version__ as release_version
 
-    release_path = PROJECT_ROOT / "RELEASE.md"
+    release_path = PROJECT_ROOT / "docs" / "版本管理.md"
     assert release_path.is_file(), f"缺少发布记录：{release_path}"
 
     sections = _release_sections(release_path.read_text(encoding="utf-8"))
-    assert sections, "RELEASE.md 里一个 `## Vx.y.z` 发布章节都没有，格式可能被改坏"
+    assert sections, "版本管理文档中没有 `### Vx.y.z` 发布章节"
 
     assert release_version in sections, (
-        f"RELEASE.md 缺少当前版本 V{release_version} 的章节"
+        f"版本管理文档缺少当前版本 V{release_version} 的章节"
         f"（现有：{', '.join('V' + v for v in sections)}）。\n"
         f"发版请依次执行：\n"
-        f"  1) scripts/ops/bump_version.sh {release_version}   # 改齐三处版本\n"
+        f"  1) scripts/ops/bump_version.sh {release_version}   # 更新项目版本\n"
         f"  2) scripts/ops/changelog.sh --write                # 生成章节草稿并插入\n"
-        f"  3) 人工补业务口径与「发布前检查 / 回滚」两节"
+        f"  3) 人工补充实际更新内容"
     )
 
     body = sections[release_version]
-    for required in ("发布时间", "本次内容"):
+    for required in ("版本号", "发布日期", "发布时间", "发布状态", "本次更新内容"):
         assert required in body, (
             f"V{release_version} 章节缺少「{required}」。"
             "空章节等于没写——它挡不住「这版到底改了什么」这个问题"
         )
+
+
+def test_release_time_is_recorded_only_after_confirmed_publication(tmp_path):
+    """已验证部署后才记录实际日期和北京时间，并保留人工填写的更新内容。"""
+    import subprocess
+    import sys
+
+    notes = _release_record_file(
+        tmp_path,
+        "### V2.3.4\n**版本号：** V2.3.4\n**发布日期：** 待发布\n"
+        "**发布时间：** 待发布\n**发布状态：** 待发布\n"
+        "#### 本次更新内容\n- 用户填写的说明\n",
+    )
+    script = PROJECT_ROOT / "scripts" / "ops" / "record_release_published.py"
+    result = subprocess.run(
+        [sys.executable, str(script), "2.3.4", "--file", str(notes),
+         "--at", "2026-11-21T04:34:56+00:00"], capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    text = notes.read_text(encoding="utf-8")
+    assert "**发布日期：** 2026-11-21" in text
+    assert "**发布时间：** 12:34:56（北京时间）" in text
+    assert "**发布状态：** 已发布" in text
+    assert "用户填写的说明" in text
+
+
+@pytest.mark.parametrize(("version", "timestamp"), [
+    ("2.3.5", "2026-11-21T04:34:56+00:00"),
+    ("2.3.4", "2026-11-21T04:34:56"),
+])
+def test_release_time_rejects_missing_record_or_ambiguous_timestamp(tmp_path, version, timestamp):
+    import subprocess
+    import sys
+
+    notes = _release_record_file(
+        tmp_path, "### V2.3.4\n**发布日期：** 待发布\n**发布时间：** 待发布\n**发布状态：** 待发布\n",
+    )
+    original = notes.read_text(encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(PROJECT_ROOT / "scripts" / "ops" / "record_release_published.py"),
+         version, "--file", str(notes), "--at", timestamp], capture_output=True, text=True,
+    )
+    assert result.returncode != 0
+    assert notes.read_text(encoding="utf-8") == original
+
+
+def test_manual_changelog_preserves_the_pending_release_details(tmp_path):
+    """手动生成提交摘要不能覆盖已有说明或伪造上线时间。"""
+    import shutil
+    import subprocess
+
+    script = tmp_path / "scripts" / "ops" / "changelog.sh"
+    script.parent.mkdir(parents=True)
+    shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / "changelog.sh", script)
+    (tmp_path / "VERSION").write_text("1.0.0\n", encoding="utf-8")
+    notes = _release_record_file(
+        tmp_path,
+        "### V1.0.0\n**版本号：** V1.0.0\n**发布日期：** 待发布\n"
+        "**发布时间：** 待发布\n**发布状态：** 待发布\n"
+        "#### 本次更新内容\n- 手工填写的说明\n",
+    )
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: baseline")
+    baseline = git("rev-parse", "HEAD")
+    git("commit", "-q", "--allow-empty", "-m", "fix: 修复登录")
+    result = subprocess.run(["bash", str(script), "--from", baseline, "--write"], cwd=tmp_path, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    text = notes.read_text(encoding="utf-8")
+    assert text.count("### V1.0.0") == 1
+    assert "手工填写的说明" in text
+    assert "修复登录" in text
+    assert "**发布日期：** 待发布" in text
+    assert "**发布时间：** 待发布" in text
+
+
+def test_confirmed_publication_workflow_updates_release_history_in_git(tmp_path):
+    """用本地裸仓库验证部署成功后的记录提交与重复执行。"""
+    import os
+    import shutil
+    import subprocess
+    import textwrap
+
+    remote = tmp_path / "remote.git"
+    source = tmp_path / "source"
+    runner = tmp_path / "runner"
+    source.mkdir()
+    _release_record_file(
+        source, "### V2.3.4\n**版本号：** V2.3.4\n**发布日期：** 待发布\n"
+        "**发布时间：** 待发布\n**发布状态：** 待发布\n"
+        "#### 本次更新内容\n- 原有说明\n",
+    )
+    helper = source / "scripts" / "ops" / "record_release_published.py"
+    helper.parent.mkdir(parents=True)
+    shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / helper.name, helper)
+
+    def git(*args, cwd=source):
+        return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: pending release")
+    deployed_sha = git("rev-parse", "HEAD")
+    git("init", "--bare", "-q", str(remote), cwd=tmp_path)
+    git("remote", "add", "origin", str(remote))
+    git("push", "-q", "origin", "HEAD:main")
+    git("clone", "-q", "--branch", "main", str(remote), str(runner), cwd=tmp_path)
+    git("config", "commit.gpgsign", "false", cwd=runner)
+    git("config", "core.hooksPath", "/dev/null", cwd=runner)
+
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "deploy-production.yml").read_text(encoding="utf-8")
+    step = workflow.split("      - name: Record confirmed publication\n", 1)[1]
+    commands = textwrap.dedent(step.split("        run: |\n", 1)[1].split("\n      - name:", 1)[0])
+    env = {**os.environ, "APP_VERSION": "2.3.4", "RELEASE_PUBLISHED_AT": "2026-11-21T12:34:56+08:00"}
+    for _ in range(2):
+        git("checkout", "--detach", deployed_sha, cwd=runner)
+        result = subprocess.run(["bash", "-c", commands], cwd=runner, env=env, capture_output=True, text=True)
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    history = git("--git-dir", str(remote), "show", "main:docs/版本管理.md", cwd=tmp_path)
+    assert "**发布日期：** 2026-11-21" in history
+    assert "**发布时间：** 12:34:56（北京时间）" in history
+    assert "**发布状态：** 已发布" in history
+    assert "原有说明" in history
+    assert git("--git-dir", str(remote), "rev-list", "--count", "main", cwd=tmp_path) == "2"
 
 
 def test_env_file_is_project_root_dotenv():

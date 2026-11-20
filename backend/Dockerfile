@@ -21,7 +21,7 @@ FROM python:3.12-alpine AS builder
 RUN sed -i 's|https://dl-cdn.alpinelinux.org/alpine|https://mirrors.aliyun.com/alpine|g' /etc/apk/repositories \
     && apk add --no-cache binutils
 
-COPY requirements.lock.txt .
+COPY backend/requirements.lock.txt .
 
 # 生产安装用 requirements.lock.txt（由 requirements.txt 经 pip-compile 生成，精确锁定运行时依赖）；
 # pandas/numpy 与 pytest 系在 requirements-dev.txt，不进生产镜像。
@@ -58,8 +58,12 @@ ENV PYTHONUNBUFFERED=1 \
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# 拷源码（.dockerignore 已排除 .venv / data / .env / backups / **/__pycache__ / **/*.pyc）。
-COPY . .
+# 只拷运行所需的后端源码；统一版本位于构建上下文根目录。
+COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/scripts ./scripts
+COPY VERSION /VERSION
 
 EXPOSE 8123
 

@@ -52,7 +52,8 @@ jobs:
       - name: Checkout release commit
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          # 发布成功后要确认部署提交仍是 main 的祖先，再写回发布记录。
+          fetch-depth: 0
           ref: ${{ inputs.release_sha || github.sha }}
 
       - name: Validate deployment secrets
@@ -79,8 +80,8 @@ jobs:
         run: |
           set -uo pipefail
           echo "gha cache env: cache_url=${ACTIONS_CACHE_URL:+set} results_url=${ACTIONS_RESULTS_URL:+set} runtime_token=${ACTIONS_RUNTIME_TOKEN:+set}"
-          VERSION="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' backend/app/version.py | head -1)"
-          [[ -n "$VERSION" ]] || { echo 'Unable to read backend/app/version.py' >&2; exit 1; }
+          VERSION="$(tr -d '\r\n' < VERSION)"
+          [[ -n "$VERSION" ]] || { echo 'Unable to read project VERSION' >&2; exit 1; }
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
 
           # 前后端镜像互不依赖，并行构建；后续打包、上传与 ECS 校验口径不变。
@@ -88,7 +89,7 @@ jobs:
             --cache-from type=gha,scope=heijin-backend \
             --cache-to type=gha,mode=max,scope=heijin-backend \
             -t "heijin-backend:${VERSION}" \
-            -f backend/Dockerfile backend &
+            -f backend/Dockerfile . &
           backend_pid=$!
 
           docker buildx build --platform linux/amd64 --load \
@@ -147,9 +148,9 @@ jobs:
             | gzip > "output/heijin-images-${APP_VERSION}-amd64.tar.gz"
 
           # 只上传运行所需的部署文件；应用代码和静态资源已在镜像中。
-          # version.py 必须保留，deploy.sh 与 backup_daily.sh 用它解析镜像版本。
+          # VERSION 必须保留，deploy.sh 用它读取镜像版本。
           tar -czf output/heijin-source.tar.gz \
-            backend/app/version.py \
+            VERSION \
             deploy/docker-compose.yml \
             deploy/scripts \
             frontend/nginx.conf
@@ -287,6 +288,10 @@ jobs:
           curl -fsS http://127.0.0.1/api/health
           REMOTE
 
+      - name: Capture verified release time
+        shell: bash
+        run: echo "RELEASE_PUBLISHED_AT=$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%:z)" >> "$GITHUB_ENV"
+
       - name: Collect deployment diagnostics
         if: failure()
         shell: bash
@@ -324,3 +329,34 @@ jobs:
             git tag -a "${TAG}" -m "Production release ${APP_VERSION} (${GITHUB_SHA})"
             git push origin "${TAG}"
           fi
+
+      - name: Record confirmed publication
+        # 自动发布才更新新系列记录；手动部署可能是回滚，不自动改写原发布时间。
+        if: ${{ success() && (inputs.wait_for_gates == true || inputs.wait_for_gates == 'true') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployed_sha="$(git rev-parse HEAD)"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git switch --force-create release-record FETCH_HEAD
+            if ! git merge-base --is-ancestor "$deployed_sha" HEAD; then
+              echo "::error::生产部署已成功，但部署提交不在当前 main 历史中，未修改发布记录" >&2
+              exit 1
+            fi
+            python3 scripts/ops/record_release_published.py "$APP_VERSION" --at "$RELEASE_PUBLISHED_AT"
+            if git diff --quiet -- docs/版本管理.md; then
+              echo "发布记录已有发布时间，无需重复提交"
+              exit 0
+            fi
+            git add docs/版本管理.md
+            git commit -m "chore(release): 记录 V${APP_VERSION} 发布时间"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "发布记录推送遇到并发更新，重试 ${attempt}/3" >&2
+          done
+          echo "::error::生产部署已成功，但发布记录推送失败；请根据本次部署日志补记" >&2
+          exit 1

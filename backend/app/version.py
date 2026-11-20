@@ -1,14 +1,13 @@
-"""系统发布版本的唯一事实源。
-
-约定：
-1. API 对外版本用 SemVer（如 `1.0.0`），**不带** `v` 前缀；`v1.0.0` 只作为 git tag / 发布标签。
-2. 发版只改这一个文件，`Settings.app_version` 与 `/api/health` 自动跟随，
-   避免"代码里一处、tag 一处、部署配置一处"各自漂移。
-3. 部署时可用环境变量 `APP_VERSION` 覆盖，用于回溯验证线上实际运行版本。
-"""
+"""读取项目统一发布版本，供 API 与健康检查使用。"""
 
 from __future__ import annotations
 
-__version__ = "0.1.3"
+import re
+from pathlib import Path
+
+_version_file = Path(__file__).resolve().parents[2] / "VERSION"
+__version__ = _version_file.read_text(encoding="utf-8").strip()
+if not re.fullmatch(r"\d+\.\d+\.\d+", __version__):
+    raise ValueError(f"项目版本格式无效：{_version_file}")
 
 __all__ = ["__version__"]

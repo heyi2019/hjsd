@@ -424,7 +424,7 @@ STRUCTURAL_PREFIXES = (
     "backend/app/funds/installments/", "backend/app/funds/profit_allocation/",
 )
 # 自动发版只改版本常量，不影响测试范围；本地 changed 遇到它也不该触发全量。
-NON_STRUCTURAL_FILES = {"backend/app/version.py"}
+NON_STRUCTURAL_FILES = {"VERSION"}
 
 
 def is_structural_change(paths: list[str]) -> bool:

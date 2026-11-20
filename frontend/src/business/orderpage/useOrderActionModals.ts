@@ -47,6 +47,7 @@ export function useOrderActionModals({
   const [orderDeleteTarget, setOrderDeleteTarget] = useState<Order | null>(null);
   const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
+  const cashflowRequest = useRef(0);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
@@ -133,10 +134,12 @@ export function useOrderActionModals({
   const getAllocationSession = () => allocationSession.current;
 
   const openRefund = async (sourceOrder?: Order) => {
+    const request = ++cashflowRequest.current;
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order) return;
+      if (!order || cashflowRequest.current !== request) return;
       const [employeeList, poolList] = await Promise.all([employeesApi.list(), poolsApi.list()]);
+      if (cashflowRequest.current !== request) return;
       const activeEmployees = employeeList.filter((employee) => employee.is_active);
       setUsers(activeEmployees);
       setCashflowUsers(activeEmployees);
@@ -149,8 +152,12 @@ export function useOrderActionModals({
         cashflows: buildCashflowDisplayItems(order.cashflows),
       });
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (cashflowRequest.current === request) appMessage.error(normalizeError(error).message);
     }
+  };
+  const closeCashflow = () => {
+    cashflowRequest.current += 1;
+    setCashflowTarget(null);
   };
 
   const loadOrderAccount = async (sourceOrder: Order) => {
@@ -275,7 +282,7 @@ export function useOrderActionModals({
     cashflowPools,
     cashflowTarget,
     cashflowUsers,
-    setCashflowTarget,
+    closeCashflow,
     employeeOptions,
     users,
     setUsers,

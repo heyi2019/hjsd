@@ -37,5 +37,6 @@ export type CashflowModalProps = {
   showDetails?: boolean;
   currentOperator?: string;
   onClose: () => void;
-  onCreated: () => void | Promise<void>;
+  /** 回调始终收到实际写入的订单，便于刷新对应详情。 */
+  onCreated: (target: CashflowTarget) => void | Promise<void>;
 };

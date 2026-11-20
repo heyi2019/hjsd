@@ -472,6 +472,64 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(within(row.closest("tr") as HTMLElement).queryByRole("button", { name: "取消" })).toBeNull();
   });
 
+  it("切换库存资金收支后，较早的请求不能打开其他订单", async () => {
+    let finishFirst!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { finishFirst = resolve; });
+    const secondAccount = { ...accounts[1], status: "WAITING" };
+    const detail = (account: typeof accounts[number], orderId: number, orderNo: string) => ({
+      account, orders: [{ order_id: orderId, order_no: orderNo, events: [], cashflows: [] }],
+    }) as never;
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([
+      { account: accounts[0], order: { id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" } },
+      { account: secondAccount, order: { id: 22, order_no: "TH0002", order_type: "TH", trade_date: "2026-10-15", account_id: 2, account_status: "WAITING", status: "ACTIVE" } },
+    ]) as never);
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 21 ? first : Promise.resolve(detail(secondAccount, 22, "TH0002")));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "资金收支" }));
+    await ui.click(within(screen.getByText("acc-2").closest("tr")!).getByRole("button", { name: "资金收支" }));
+    const second = await screen.findByRole("dialog", { name: /资金收支 · TH0002/ });
+    fireEvent.change(within(second).getByLabelText("金额"), { target: { value: "200" } });
+    await act(async () => finishFirst(detail(accounts[0], 21, "HS0001")));
+    expect(screen.queryByRole("dialog", { name: /资金收支 · HS0001/ })).toBeNull();
+    expect(within(second).getByLabelText("金额")).toHaveValue("200");
+  });
+
+  it("关闭库存资金收支后，较早的请求不能重新打开弹窗", async () => {
+    let finishFirst!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { finishFirst = resolve; });
+    const detail = (account: typeof accounts[number], id: number, orderNo: string) => ({
+      account, orders: [{ order_id: id, order_no: orderNo, events: [], cashflows: [] }],
+    }) as never;
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 21 ? first : Promise.resolve(detail(accounts[1], 22, "TH0002")));
+    function Probe() {
+      const [expanded, setExpanded] = useState<Key[]>([]);
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
+      const actions = useInventoryActions({
+        load: async () => undefined, setRows, setError,
+        executionDetails: details, setExecutionDetails: setDetails,
+        loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
+        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
+        removeFromInventory: () => undefined, editorOpenEditor: async () => true,
+        editorCancelInlineEdit: () => undefined, editorCancelPendingOpen: () => undefined,
+        editorIsSaving: () => false, editorSaveInline: async () => undefined, inlineEditId: null,
+      });
+      return <><button onClick={() => void actions.openCashflow(accounts[0] as Account)}>打开甲</button>
+        <button onClick={() => void actions.openCashflow(accounts[1] as Account)}>打开乙</button>
+        <button onClick={actions.closeCashflow}>关闭</button>
+        <span>{actions.cashflowTarget?.orderNo ?? "未打开"}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "打开乙" }));
+    await screen.findByText("TH0002");
+    await ui.click(screen.getByRole("button", { name: "打开甲" }));
+    await ui.click(screen.getByRole("button", { name: "关闭" }));
+    await act(async () => finishFirst(detail(accounts[0], 21, "HS0001")));
+    expect(screen.getByText("未打开")).toBeInTheDocument();
+  });
+
   it("库存中心资金收支与订单台账展示同一订单的资金明细和操作人", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");

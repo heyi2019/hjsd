@@ -23,9 +23,8 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
         showOperator
         showDetails
         currentOperator={controller.currentOperator}
-        onClose={() => controller.setCashflowTarget(null)}
+        onClose={controller.closeCashflow}
         onCreated={async () => {
-          controller.setCashflowTarget(null);
           await controller.load();
         }}
       />

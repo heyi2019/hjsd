@@ -56,6 +56,7 @@ export function useInventoryActions(params: {
   const [consignmentTarget, setConsignmentTarget] = useState<Account | null>(null);
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
+  const cashflowRequest = useRef(0);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
@@ -117,6 +118,7 @@ export function useInventoryActions(params: {
     setDetailTarget(account);
   }
   async function openCashflow(account: Account) {
+    const request = ++cashflowRequest.current;
     if (account.source_order_id == null) {
       appMessage.warning("当前账号没有绑定来源订单，无法登记资金收支");
       return;
@@ -127,6 +129,7 @@ export function useInventoryActions(params: {
         poolsApi.list(),
         employeesApi.list(),
       ]);
+      if (cashflowRequest.current !== request) return;
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id);
       if (!sourceOrder) {
@@ -145,8 +148,12 @@ export function useInventoryActions(params: {
         ),
       });
     } catch (cause) {
-      setError(normalizeError(cause));
+      if (cashflowRequest.current === request) setError(normalizeError(cause));
     }
+  }
+  function closeCashflow() {
+    cashflowRequest.current += 1;
+    setCashflowTarget(null);
   }
   async function openVoid(account: Account) {
     if (account.source_order_id == null) {
@@ -273,7 +280,7 @@ export function useInventoryActions(params: {
     rebateTarget,
     setRebateTarget,
     cashflowTarget,
-    setCashflowTarget,
+    closeCashflow,
     cashflowPools,
     cashflowUsers,
     profileTarget,

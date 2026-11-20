@@ -50,7 +50,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     setPlatformOffsaleTarget,
     setProfileTarget,
     setRebateTarget,
-    setCashflowTarget,
+    closeCashflow,
     setSaleTarget,
     submitDelete,
     submitVoid,
@@ -109,10 +109,9 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         showOperator
         showDetails
         currentOperator={currentDevUser()}
-        onClose={() => setCashflowTarget(null)}
-        onCreated={async () => {
-          const account = cashflowTarget?.account;
-          setCashflowTarget(null);
+        onClose={closeCashflow}
+        onCreated={async (createdTarget) => {
+          const account = createdTarget.account;
           await load();
           if (account) refreshExecution(account);
         }}

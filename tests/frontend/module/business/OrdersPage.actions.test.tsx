@@ -1,10 +1,12 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
 import { useLedgerInlineEdit } from "@/business/orderpage/useLedgerInlineEdit";
+import { CashflowModal, type CashflowTarget } from "@/finance/cashflow";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
@@ -21,6 +23,7 @@ import * as client from "@/shared/api/client";
 import type { Installment, InstallmentCancelResult } from "@/shared/api/types/installments";
 import type { Order } from "@/shared/api/types/orders";
 import type { ProfitAllocation } from "@/shared/api/types/profitAllocation";
+import type { Pool } from "@/shared/api/types/finance";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -704,6 +707,98 @@ describe("OrdersPage：操作与筛选分支", () => {
     // 比例只读展示，落库与提交唯一口径是金额：比例一律 null，公司行金额留空交后端补。
     expect(payload.every((item) => item.allocation_rate === null)).toBe(true);
     expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: null, allocation_amount: null });
+  });
+
+  it.each(["切换", "关闭"])("订单资金收支%s后，较早的请求不能打开其他订单", async (action) => {
+    let finishFirst!: (order: Order) => void;
+    const first = new Promise<Order>((resolve) => { finishFirst = resolve; });
+    vi.mocked(ordersApi.get).mockImplementation((id) => id === 1 ? first : Promise.resolve(order2));
+    vi.mocked(orderCashflowsApi.create).mockResolvedValue({} as never);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "资金收支");
+    await openRowMenu("DG-2026-0002", "资金收支");
+    const second = await modalOf(/资金收支 · DG-2026-0002/);
+    fireEvent.change(within(second).getByLabelText("金额"), { target: { value: "200" } });
+    fireEvent.change(within(second).getByLabelText("收支备注"), { target: { value: "第二单" } });
+    if (action === "关闭") {
+      fireEvent.click(second.querySelector(".ant-modal-close") as HTMLElement);
+      await waitFor(() => expect(second).not.toBeVisible());
+    }
+    await act(async () => finishFirst(order1));
+    expect(screen.queryByRole("dialog", { name: /资金收支 · HS-2026-0001/ })).toBeNull();
+    if (action === "关闭") {
+      expect(screen.queryByRole("dialog", { name: /资金收支 · DG-2026-0002/ })).toBeNull();
+    } else {
+      expect(second).toBeVisible();
+      expect(within(second).getByLabelText("金额")).toHaveValue("200");
+      await clickModalOk(second);
+      await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200", note: "第二单" })));
+    }
+  });
+
+  it.each(["成功", "失败"])("上一单资金收支提交%s后，不影响后来打开的订单", async (result) => {
+    let finish!: (value: Awaited<ReturnType<typeof orderCashflowsApi.create>>) => void;
+    let fail!: (error: Error) => void;
+    vi.mocked(orderCashflowsApi.create).mockReturnValueOnce(new Promise((resolve, reject) => { finish = resolve; fail = reject; }));
+    vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const first = await modalOf(/资金收支 · HS-2026-0001/);
+    fireEvent.change(within(first).getByLabelText("金额"), { target: { value: "100" } });
+    fireEvent.change(within(first).getByLabelText("收支备注"), { target: { value: "第一单" } });
+    await clickModalOk(first);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1));
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(first).not.toBeVisible());
+    await openRowMenu("DG-2026-0002", "资金收支");
+    const second = await modalOf(/资金收支 · DG-2026-0002/);
+    fireEvent.change(within(second).getByLabelText("金额"), { target: { value: "200" } });
+    await act(async () => { if (result === "成功") finish({} as never); else fail(new Error("第一单提交失败")); });
+    expect(second).toBeVisible();
+    expect(within(second).getByLabelText("金额")).toHaveValue("200");
+    expect(within(second).queryByText(/第一单提交失败/)).toBeNull();
+  });
+
+  it("资金收支保存后不等待后台刷新即可登记另一单", async () => {
+    let finishReload!: () => void;
+    const slowReload = new Promise<void>((resolve) => { finishReload = resolve; });
+    const pools: Pool[] = [{ id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", status: "ACTIVE" }];
+    const onCreated = vi.fn().mockReturnValueOnce(slowReload).mockResolvedValue(undefined);
+    vi.mocked(orderCashflowsApi.create).mockResolvedValue({} as never);
+    function Probe() {
+      const [target, setTarget] = useState<CashflowTarget | null>(null);
+      return <><button onClick={() => setTarget({ orderId: 1, orderNo: "HS-2026-0001" })}>选择甲</button>
+        <button onClick={() => setTarget({ orderId: 2, orderNo: "DG-2026-0002" })}>选择乙</button>
+        <CashflowModal target={target} pools={pools} onClose={() => setTarget(null)} onCreated={onCreated} /></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "选择甲" }));
+    const first = await modalOf(/资金收支 · HS-2026-0001/);
+    fireEvent.change(within(first).getByLabelText("金额"), { target: { value: "100" } });
+    fireEvent.change(within(first).getByLabelText("收支备注"), { target: { value: "第一单" } });
+    await clickModalOk(first);
+    await waitFor(() => expect(first).not.toBeVisible());
+    await ui.click(screen.getByRole("button", { name: "选择乙" }));
+    const second = await modalOf(/资金收支 · DG-2026-0002/);
+    fireEvent.change(within(second).getByLabelText("金额"), { target: { value: "200" } });
+    fireEvent.change(within(second).getByLabelText("收支备注"), { target: { value: "第二单" } });
+    fireEvent.submit(within(second).getByLabelText("金额").closest("form")!);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200" })));
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ orderId: 1 }));
+    await act(async () => finishReload());
+  });
+
+  it("资金收支已保存但刷新失败时，提示刷新而不误报保存失败", async () => {
+    vi.mocked(orderCashflowsApi.create).mockResolvedValue({} as never);
+    vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
+    const pools: Pool[] = [{ id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", status: "ACTIVE" }];
+    renderLight(<CashflowModal target={{ orderId: 1, orderNo: "HS-2026-0001" }} pools={pools} onClose={() => undefined} onCreated={async () => { throw new Error("刷新失败"); }} />, { user: "admin" });
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    fireEvent.change(within(modal).getByLabelText("金额"), { target: { value: "100" } });
+    fireEvent.change(within(modal).getByLabelText("收支备注"), { target: { value: "测试" } });
+    await clickModalOk(modal);
+    await waitFor(() => expect(message.warning).toHaveBeenCalledWith("资金收支已登记，但刷新失败，请手动刷新"));
+    expect(message.error).not.toHaveBeenCalled();
   });
 
   it("资金收支登记期间显示进度并防止重复写入", async () => {

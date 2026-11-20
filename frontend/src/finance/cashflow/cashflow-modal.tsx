@@ -1,5 +1,5 @@
 import { Form, Input, Typography } from "antd";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CfgItem, CustomFieldSection, FieldConfigScope } from "../../business/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../business/ResponsibleEmployeeSelect";
 import { currentDevUser, normalizeError } from "../../shared/api/client";
@@ -24,9 +24,16 @@ export function CashflowModal({
   const [form] = Form.useForm<CashflowFormValues>();
   const [submitting, setSubmitting] = useState(false);
   const submitInFlight = useRef(false);
+  // 弹窗会复用表单；关闭或切换目标后，旧请求不能改动新的表单。
+  const session = useRef(0);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const open = Boolean(target);
   const { username } = useSession();
+
+  useLayoutEffect(() => {
+    session.current += 1;
+    return () => { session.current += 1; };
+  }, [target]);
 
   useEffect(() => {
     if (!target) return;
@@ -50,23 +57,36 @@ export function CashflowModal({
 
   const submit = async (values: CashflowFormValues) => {
     if (!target || submitInFlight.current) return;
+    const submittedTarget = target;
+    const submittedSession = session.current;
     submitInFlight.current = true;
     setSubmitting(true);
     setError(null);
     try {
-      await createOrderCashflow(target.orderId, values);
-      appMessage.success("资金收支已登记");
-      form.resetFields();
-      onClose();
-      await onCreated();
+      await createOrderCashflow(submittedTarget.orderId, values);
+      const isCurrent = session.current === submittedSession;
+      appMessage.success(isCurrent ? "资金收支已登记" : `${submittedTarget.orderNo} 资金收支已登记`);
+      if (isCurrent) {
+        form.resetFields();
+        close();
+      }
+      void Promise.resolve()
+        .then(() => onCreated(submittedTarget))
+        .catch(() => appMessage.warning("资金收支已登记，但刷新失败，请手动刷新"));
     } catch (cause) {
       const normalized = normalizeError(cause);
-      setError(normalized);
-      appMessage.error(normalized.message);
+      const isCurrent = session.current === submittedSession;
+      if (isCurrent) setError(normalized);
+      appMessage.error(isCurrent ? normalized.message : `${submittedTarget.orderNo}：${normalized.message}`);
     } finally {
       submitInFlight.current = false;
       setSubmitting(false);
     }
+  };
+
+  const close = () => {
+    session.current += 1;
+    onClose();
   };
 
   return (
@@ -76,7 +96,7 @@ export function CashflowModal({
       open={open}
       confirmLoading={submitting}
       okText="确定"
-      onCancel={onClose}
+      onCancel={close}
       onOk={() => void form.submit()}
     >
       <ErrorBanner error={error} />

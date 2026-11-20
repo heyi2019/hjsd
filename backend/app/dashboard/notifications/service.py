@@ -89,6 +89,8 @@ def list_notifications(
     recipient_user_id: int,
     unread_only: bool = False,
     notification_type: str | None = None,
+    entity_type: str | None = None,
+    before_id: int | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Notification], int]:
@@ -99,6 +101,12 @@ def list_notifications(
     if notification_type:
         stmt = stmt.where(Notification.notification_type == notification_type)
         count_stmt = count_stmt.where(Notification.notification_type == notification_type)
+    if entity_type:
+        stmt = stmt.where(Notification.entity_type == entity_type)
+        count_stmt = count_stmt.where(Notification.entity_type == entity_type)
+    if before_id is not None:
+        stmt = stmt.where(Notification.id < before_id)
+        count_stmt = count_stmt.where(Notification.id < before_id)
     if unread_only:
         stmt = stmt.where(Notification.read_at.is_(None))
         count_stmt = count_stmt.where(Notification.read_at.is_(None))

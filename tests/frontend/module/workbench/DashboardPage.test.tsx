@@ -90,34 +90,42 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     expect(within(alerts).getByText("获得分润通知 1 条")).toBeInTheDocument();
   });
 
-it("获得分润通知可查看第200条以后的消息", async () => {
+it("获得分润通知只请求订单来源的消息", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ notifications: { pending_profit_count: 0, allocated_profit_count: 201 } }));
     const first = Array.from({ length: 200 }, (_, index) => ({ id: index + 1, notification_no: `N${index}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: "其他", entity_type: "other", entity_id: "-", created_by: "admin", read_at: null }));
     const last = { ...first[0], id: 201, entity_type: "order", entity_id: "HS0201", message: "末尾通知" };
-    vi.mocked(notificationsApi.list).mockImplementation(async (params) => ({ items: params.offset ? [last] : first, total: 201, unread_total: 201 }));
-    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 201, order_no: "HS0201", order_type: "HS", trade_date: "2026-11-17", status: "COMPLETED", sale_amount: "10.00", account_id: 7 }]));
-    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 7, stock_no: "KU0007" }, detail_view: { execution_rows: [], lifecycle: {} } } as never);
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [last], total: 1, unread_total: 201 });
+    vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 201, order_no: "HS0201", order_type: "HS", sale_amount: "10.00", stock_no: "KU0007", inventory_entry_at: "2026-11-10T08:00:00", removed_at: null, recovery_operator: null }]);
     vi.mocked(notificationsApi.markRead).mockResolvedValue(last as never);
     renderLight(<DashboardPage />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 201 条" }));
     expect(await screen.findByText("末尾通知")).toBeInTheDocument();
+    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 10, unread_only: true, notification_type: "PROFIT_ALLOCATED", entity_type: "order" });
   });
 
-it("分润通知只将当前查看页标为已读", async () => {
+it("分润通知逐页加载，已读前页后仍可查看后页", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ notifications: { pending_profit_count: 0, allocated_profit_count: 11 } }));
-    const notifications = Array.from({ length: 11 }, (_, index) => ({ id: index + 1, notification_no: `N${index}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `通知 ${index + 1}`, entity_type: "order", entity_id: `HS${index + 1}`, created_by: "admin", read_at: null }));
-    vi.mocked(notificationsApi.list).mockResolvedValue({ items: notifications, total: 11, unread_total: 11 });
-    vi.mocked(ordersApi.listPage).mockImplementation(async (params) => pageResponse([{ id: Number(params?.keyword?.slice(2)), order_no: params?.keyword, order_type: "HS", trade_date: "2026-11-17", status: "COMPLETED", sale_amount: "10.00", account_id: 7 }] as never));
-    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 7 }, detail_view: { execution_rows: [], lifecycle: {} } } as never);
+    const notifications = Array.from({ length: 11 }, (_, index) => ({ id: 11 - index, notification_no: `N${index}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `通知 ${11 - index}`, entity_type: "order", entity_id: `HS${11 - index}`, created_by: "admin", read_at: null }));
+    vi.mocked(notificationsApi.list).mockImplementation(async (params) => params.before_id
+      ? { items: notifications.slice(10), total: 1, unread_total: 1 }
+      : { items: notifications.slice(0, 10), total: 11, unread_total: 11 });
+    vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, order_type: "HS", sale_amount: "10.00", stock_no: null, inventory_entry_at: "2026-11-10T08:00:00", removed_at: null, recovery_operator: null })));
     vi.mocked(notificationsApi.markRead).mockResolvedValue(notifications[0] as never);
     renderLight(<DashboardPage />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 11 条" }));
-    expect(await screen.findByText("通知 1")).toBeInTheDocument();
-    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledTimes(10));
-    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(11);
-    fireEvent.click(screen.getByRole("listitem", { name: "2" }));
     expect(await screen.findByText("通知 11")).toBeInTheDocument();
-    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(11));
+    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledTimes(10));
+    expect(notificationsApi.list).toHaveBeenCalledTimes(1);
+    expect(notificationsApi.profitDetails).toHaveBeenCalledTimes(1);
+    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(1);
+    fireEvent.click(screen.getByRole("listitem", { name: "2" }));
+    expect(await screen.findByText("通知 1")).toBeInTheDocument();
+    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));
+    expect(notificationsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ before_id: 2 }));
+    fireEvent.click(screen.getByRole("listitem", { name: "1" }));
+    expect(await screen.findByText("通知 11")).toBeInTheDocument();
+    expect(notificationsApi.list).toHaveBeenCalledTimes(2);
+    expect(notificationsApi.profitDetails).toHaveBeenCalledTimes(2);
   });
 
 it("点击获得分润通知展示订单金额、分润配置人和库存回收信息", async () => {
@@ -149,57 +157,12 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
       unread_total: 3,
     });
     vi.mocked(notificationsApi.markRead).mockRejectedValueOnce(new Error("网络不可用"));
-    vi.mocked(ordersApi.listPage).mockImplementation(async (params) => {
-      if (params?.keyword === "TH-ERROR") throw new Error("订单查询失败");
-      return pageResponse([{
-      id: 42,
-      order_no: "TH0001",
-      order_type: "TH",
-      trade_date: "2026-11-17",
-      status: "COMPLETED",
-      sale_amount: "300.00",
-      account_id: 7,
-      stock_no: "KU0007",
-      }]);
-    });
-    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
-      account: {
-        id: 7,
-        stock_no: "KU0007",
-        inventory_entry_at: "2026-11-10T08:00:00",
-      },
-      orders: [],
-      finance_summary: {
-        cashflow_income: "300.00",
-        rebate_income: "0.00",
-        total_income: "300.00",
-        total_expense: "100.00",
-        net_amount: "200.00",
-      },
-      detail_view: {
-        execution_rows: [
-          { category: "INBOUND", operator: "回收人员" },
-          { category: "OUTBOUND", operator: "售出人员" },
-        ],
-        finance_rows: [],
-        operation_rows: [],
-        lifecycle: {
-          sold_at: "2026-11-17T10:00:00",
-          removed_at: "2026-11-17T12:30:00",
-          removed_platform: "平台A",
-          recovery_platform: "平台A",
-          sale_platform: "平台A",
-        },
-        order_notes: "",
-        parties: [],
-        extras: [],
-      },
-    } as never);
+    vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 1, order_no: "TH0001", order_type: "TH", sale_amount: "300.00", stock_no: "KU0007", inventory_entry_at: "2026-11-10T08:00:00", removed_at: "2026-11-17T12:30:00", recovery_operator: "回收人员" }]);
     renderLight(<DashboardPage />, { user: "admin" });
 
     fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 3 条" }));
     expect(await screen.findByText("订单分润通知详情")).toBeInTheDocument();
-    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 200, unread_only: true, notification_type: "PROFIT_ALLOCATED" });
+    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 10, unread_only: true, notification_type: "PROFIT_ALLOCATED", entity_type: "order" });
     expect(screen.getByText("TH0001")).toBeInTheDocument();
     expect(screen.getByText("300.00")).toBeInTheDocument();
     expect(screen.getByText("admin")).toBeInTheDocument();
@@ -250,7 +213,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
 
     fireEvent.click(await screen.findByRole("button", { name: "分润待配置 1 条" }));
     await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
-    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 200, unread_only: true, notification_type: "PROFIT_PENDING" });
+    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 1, unread_only: true, notification_type: "PROFIT_PENDING", entity_type: "order" });
     expect(notificationsApi.markRead).not.toHaveBeenCalled();
   });
 

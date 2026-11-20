@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -27,6 +28,17 @@ class NotificationListOut(BaseModel):
     items: list[NotificationOut]
     total: int
     unread_total: int
+
+
+class ProfitNotificationDetailOut(BaseModel):
+    notification_id: int
+    order_no: str
+    order_type: str
+    sale_amount: Decimal | None
+    stock_no: str | None
+    inventory_entry_at: datetime
+    removed_at: datetime | None
+    recovery_operator: str | None
 
 
 __all__ = ["NotificationListOut", "NotificationOut"]

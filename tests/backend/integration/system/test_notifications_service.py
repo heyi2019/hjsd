@@ -74,6 +74,22 @@ def test_list_notifications_unread_only_filters(seeded_db):
     assert len(all_rows) == 2
 
 
+def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seeded_db):
+    rows = [_make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=str(i)) for i in range(3)]
+    _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="other")
+    first, total = notification_service.list_notifications(
+        seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", limit=2,
+    )
+    assert total == 3
+    assert [item.id for item in first] == [rows[2].id, rows[1].id]
+    for item in first:
+        notification_service.mark_read(seeded_db, item.id, recipient_user_id=2, actor="pytest")
+    second, _ = notification_service.list_notifications(
+        seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", before_id=first[-1].id, limit=2,
+    )
+    assert [item.id for item in second] == [rows[0].id]
+
+
 def test_mark_read_not_found(seeded_db):
     with pytest.raises(NotFound, match="通知不存在"):
         notification_service.mark_read(
@@ -357,3 +373,27 @@ def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, se
     assert filtered.json()["total"] == 1
     assert filtered.json()["unread_total"] == 2
     assert filtered.json()["items"][0]["notification_type"] == "PROFIT_PENDING"
+
+
+def test_profit_notification_details_only_returns_visible_owned_notifications(seeded_client, seeded_db):
+    admin_id = 1  # X-Dev-User admin
+    order = _order(seeded_db, "details")
+    _buy(seeded_db, order)
+    _sell(seeded_db, order)
+    mine = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
+    other = _make_unread(seeded_db, recipient_user_id=_uid(seeded_db, "seeduser2"), notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
+    missing = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id="NO-SUCH-ORDER")
+
+    response = seeded_client.get("/api/v1/notifications/profit-details", params=[("ids", mine.id), ("ids", other.id), ("ids", missing.id)], headers={"X-Dev-User": "admin"})
+    assert response.status_code == 200, response.text
+    assert [item["notification_id"] for item in response.json()] == [mine.id]
+    assert response.json()[0]["order_no"] == order.order_no
+    assert Decimal(response.json()[0]["sale_amount"]) == Decimal("800")
+    scoped_account = seeded_db.get(User, 2)
+    scoped_account.role = "OPERATOR"
+    scoped_account.owner_scope = "SELF"
+    seeded_db.flush()
+    scoped = CurrentUser.build(id=2, username="seeduser2", roles=["OPERATOR"], owner_scope="SELF")
+    denied = seeded_client.get("/api/v1/notifications/profit-details", params={"ids": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
+    assert denied.status_code == 200, denied.text
+    assert denied.json() == []

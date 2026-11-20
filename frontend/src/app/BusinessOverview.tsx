@@ -1,11 +1,7 @@
 import { Card, Descriptions, List, Modal, Pagination, Spin, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { notificationsApi } from "../shared/api/misc.api";
-import { ordersApi } from "../shared/api/orders.api";
-import { findOrderByNumber, loadProfitNotifications } from "./notificationLookup";
-import type { AccountExecutionDetail } from "../shared/api/types/account-execution";
+import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from "../shared/api/misc.api";
 import type { NotificationItem } from "../shared/api/types/common";
-import type { Order } from "../shared/api/types/orders";
 import { formatDateTimeMinute, money } from "../shared/lib/format";
 import { StatRow } from "../shared/ui";
 
@@ -84,9 +80,9 @@ async function settleInBatches<T, R>(items: T[], action: (item: T) => Promise<R>
 
 type ProfitNotificationDetail = {
   notification: NotificationItem;
-  order: Order;
-  execution: AccountExecutionDetail;
+  detail: ProfitDetail;
 };
+type NotificationPage = { items: NotificationItem[]; total: number; details?: ProfitNotificationDetail[]; unavailableCount?: number };
 
 function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onClose: () => void; onRead?: () => void }) {
   const [loading, setLoading] = useState(false);
@@ -95,10 +91,11 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   const [unavailableCount, setUnavailableCount] = useState(0);
   const [readFailureCount, setReadFailureCount] = useState(0);
   const [detailPage, setDetailPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const onReadRef = useRef(onRead);
   const attemptedReads = useRef(new Set<number>());
+  const pages = useRef<NotificationPage[]>([]);
   const generation = useRef(0);
-  const loadedGeneration = useRef(0);
 
   useEffect(() => {
     onReadRef.current = onRead;
@@ -106,31 +103,47 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
 
   useEffect(() => {
     if (!open) return undefined;
-    generation.current += 1;
-    attemptedReads.current.clear();
+    const currentGeneration = ++generation.current;
     let cancelled = false;
     setLoading(true);
     setError(null);
     setDetails([]);
     setUnavailableCount(0);
-    setReadFailureCount(0);
-    setDetailPage(1);
-    void loadProfitNotifications("PROFIT_ALLOCATED")
-      .then(async (items) => {
-        const profitNotifications = items.filter((item) => item.notification_type === "PROFIT_ALLOCATED" && item.entity_type === "order");
-        const loaded = await settleInBatches(profitNotifications, async (notification) => {
-          const order = await findOrderByNumber(notification.entity_id);
-          if (!order) return null;
-          const execution = await ordersApi.executionDetail(order.id);
-          return { notification, order, execution };
+    void (async () => {
+        while (pages.current.length < detailPage) {
+          const previous = pages.current[pages.current.length - 1];
+          if (previous && previous.items.length < 10) break;
+          const beforeId = previous?.items[previous.items.length - 1]?.id;
+          const page = await notificationsApi.list({ limit: 10, unread_only: true, notification_type: "PROFIT_ALLOCATED", entity_type: "order", ...(beforeId ? { before_id: beforeId } : {}) });
+          if (cancelled || currentGeneration !== generation.current) return;
+          if (!page.items.length && page.total > 0) throw new Error("通知读取不完整，请重试");
+          pages.current.push(page);
+          if (pages.current.length === 1) setTotal(page.total);
+          if (!page.items.length) break;
+        }
+        const page = pages.current[detailPage - 1];
+        const items = page?.items ?? [];
+        const loaded = page?.details || !items.length ? [] : await notificationsApi.profitDetails(items.map((notification) => notification.id));
+        if (cancelled || currentGeneration !== generation.current) return;
+        const byId = new Map(loaded.map((detail) => [detail.notification_id, detail]));
+        const available = page?.details ?? items.flatMap((notification) => {
+          const detail = byId.get(notification.id);
+          return detail ? [{ notification, detail }] : [];
         });
-        if (cancelled) return;
-        const available = loaded.flatMap((item) => item.status === "fulfilled" && item.value !== null ? [item.value] : []);
-        loadedGeneration.current = generation.current;
+        const unavailable = page?.unavailableCount ?? items.length - available.length;
+        if (page) { page.details = available; page.unavailableCount = unavailable; }
         setDetails(available);
-        setUnavailableCount(profitNotifications.length - available.length);
+        setUnavailableCount(unavailable);
         setLoading(false);
-      })
+        const visible = available.filter(({ notification }) => !attemptedReads.current.has(notification.id));
+        for (const { notification } of visible) attemptedReads.current.add(notification.id);
+        if (visible.length) {
+          const results = await settleInBatches(visible, (item) => notificationsApi.markRead(item.notification.id));
+          const failed = results.filter((result) => result.status === "rejected").length;
+          if (!cancelled) setReadFailureCount((count) => count + failed);
+          if (failed < results.length) onReadRef.current?.();
+        }
+      })()
       .catch((reason) => {
         if (cancelled) return;
         setError(reason instanceof Error ? reason.message : "分润通知详情加载失败");
@@ -140,22 +153,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
       cancelled = true;
       generation.current += 1;
     };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || loading || loadedGeneration.current !== generation.current) return;
-    const currentGeneration = generation.current;
-    const visible = details.slice((detailPage - 1) * 10, detailPage * 10)
-      .filter(({ notification }) => !attemptedReads.current.has(notification.id));
-    for (const { notification } of visible) attemptedReads.current.add(notification.id);
-    if (!visible.length) return;
-    void settleInBatches(visible, (item) => notificationsApi.markRead(item.notification.id)).then((results) => {
-      if (currentGeneration !== generation.current) return;
-      const failed = results.filter((result) => result.status === "rejected").length;
-      setReadFailureCount((count) => count + failed);
-      if (failed < results.length) onReadRef.current?.();
-    });
-  }, [open, loading, details, detailPage]);
+  }, [open, detailPage]);
 
   return (
     <Modal open={open} title="订单分润通知详情" onCancel={onClose} footer={null} width={720} destroyOnHidden>
@@ -165,20 +163,19 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
       {!loading && !error && readFailureCount > 0 ? <Typography.Text type="warning">{readFailureCount} 条通知未能标为已读，请稍后重试。</Typography.Text> : null}
       {!loading && !error && details.length === 0 ? <Typography.Text type="secondary">暂无可查看的分润通知</Typography.Text> : null}
       <div className="dashboard-notification-detail-list">
-        {details.slice((detailPage - 1) * 10, detailPage * 10).map(({ notification, order, execution }) => {
-          const recoveryRow = execution.detail_view.execution_rows.find((row) => row.category === "INBOUND");
-          const inventoryEntryLabel = order.order_type === "HS" ? "回收入库时间" : "库存入库时间";
+        {details.map(({ notification, detail }) => {
+          const inventoryEntryLabel = detail.order_type === "HS" ? "回收入库时间" : "库存入库时间";
           return (
-            <section key={notification.id} className="dashboard-notification-detail" aria-label={`订单 ${order.order_no}`}>
+            <section key={notification.id} className="dashboard-notification-detail" aria-label={`订单 ${detail.order_no}`}>
               <Descriptions bordered size="small" column={2}>
-                <Descriptions.Item label="订单号">{order.order_no}</Descriptions.Item>
-                <Descriptions.Item label="订单金额">{money(order.sale_amount)}</Descriptions.Item>
+                <Descriptions.Item label="订单号">{detail.order_no}</Descriptions.Item>
+                <Descriptions.Item label="订单金额">{money(detail.sale_amount)}</Descriptions.Item>
                 <Descriptions.Item label="分润配置人">{notification.created_by || "-"}</Descriptions.Item>
                 <Descriptions.Item label="通知时间">{formatDateTimeMinute(notification.created_at)}</Descriptions.Item>
-                <Descriptions.Item label="库存号">{execution.account.stock_no || order.stock_no || "-"}</Descriptions.Item>
-                <Descriptions.Item label={inventoryEntryLabel}>{formatDateTimeMinute(execution.account.inventory_entry_at)}</Descriptions.Item>
-                <Descriptions.Item label="库存移出时间">{formatDateTimeMinute(execution.detail_view.lifecycle.removed_at)}</Descriptions.Item>
-                <Descriptions.Item label="回收操作人">{recoveryRow?.operator || "-"}</Descriptions.Item>
+                <Descriptions.Item label="库存号">{detail.stock_no || "-"}</Descriptions.Item>
+                <Descriptions.Item label={inventoryEntryLabel}>{formatDateTimeMinute(detail.inventory_entry_at)}</Descriptions.Item>
+                <Descriptions.Item label="库存移出时间">{formatDateTimeMinute(detail.removed_at)}</Descriptions.Item>
+                <Descriptions.Item label="回收操作人">{detail.recovery_operator || "-"}</Descriptions.Item>
               </Descriptions>
               <Typography.Paragraph type="secondary" className="dashboard-notification-detail__message">
                 {notification.message}
@@ -187,7 +184,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
           );
         })}
       </div>
-      {details.length > 10 ? <Pagination current={detailPage} pageSize={10} total={details.length} showSizeChanger={false} onChange={setDetailPage} /> : null}
+      {total > 10 ? <Pagination current={detailPage} pageSize={10} total={total} showSizeChanger={false} onChange={setDetailPage} /> : null}
     </Modal>
   );
 }
@@ -215,11 +212,11 @@ export function BusinessAlerts({ alerts, loading, error = false, onPendingProfit
           <Typography.Text type="secondary">暂无异常事项</Typography.Text>
         )}
       </Card>
-      <ProfitNotificationModal
-        open={profitNotificationsOpen}
+      {profitNotificationsOpen && <ProfitNotificationModal
+        open
         onClose={() => setProfitNotificationsOpen(false)}
         onRead={onProfitNotificationsRead}
-      />
+      />}
     </section>
   );
 }

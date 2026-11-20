@@ -2,6 +2,17 @@ import { api } from "./client";
 import type { AttachmentItem, DocumentSequence, NotificationItem } from "./types/common";
 import type { GameTypeOption } from "./types/org";
 
+export interface ProfitNotificationDetail {
+  notification_id: number;
+  order_no: string;
+  order_type: string;
+  sale_amount: string | null;
+  stock_no: string | null;
+  inventory_entry_at: string;
+  removed_at: string | null;
+  recovery_operator: string | null;
+}
+
 export const gameTypesApi = {
   list: (params?: { include_inactive?: boolean }) =>
     api.get<GameTypeOption[]>("/game-types", { params }).then((r) => r.data),
@@ -28,6 +39,7 @@ export const attachmentsApi = {
 };
 
 export const notificationsApi = {
-  list: (params: { limit: number; offset?: number; unread_only?: boolean; notification_type?: string }) => api.get<{ items: NotificationItem[]; total?: number; unread_total: number }>("/notifications", { params }).then(r => r.data),
+  list: (params: { limit: number; offset?: number; before_id?: number; entity_type?: string; unread_only?: boolean; notification_type?: string }) => api.get<{ items: NotificationItem[]; total: number; unread_total: number }>("/notifications", { params }).then(r => r.data),
+  profitDetails: (ids: number[]) => api.get<ProfitNotificationDetail[]>("/notifications/profit-details", { params: { ids }, paramsSerializer: { indexes: null } }).then(r => r.data),
   markRead: (id: number) => api.post<NotificationItem>(`/notifications/${id}/read`).then(r => r.data),
 };

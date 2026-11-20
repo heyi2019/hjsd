@@ -2,7 +2,7 @@
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useState } from "react";
 import { normalizeError } from "../shared/api/client";
-import { findOrderByNumber, loadProfitNotifications } from "./notificationLookup";
+import { findOrderByNumber, findPendingProfitNotification } from "./notificationLookup";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateBusinessModal";
@@ -44,8 +44,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
   const openPendingProfitAllocation = async () => {
     if (!onDashboardNavigate) return;
     try {
-      const items = await loadProfitNotifications("PROFIT_PENDING");
-      const notification = items.find((item) => item.notification_type === "PROFIT_PENDING" && item.entity_type === "order");
+      const notification = await findPendingProfitNotification();
       if (!notification) {
         appMessage.warning("没有找到待配置分润的订单");
         return;

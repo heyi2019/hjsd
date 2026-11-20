@@ -110,17 +110,16 @@ def r2_monthly_pnl(
     # 本列只作展示、不参与经营利润（operating_profit 不含它），故独立 sum 不会重复加回。
     rebate_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
     if scoped_order_ids:
-        rebate_rows = session.execute(
-            select(RebateRecord.collected_on, RebateRecord.amount)
-            .where(
-                RebateRecord.source_order_id.in_(scoped_order_ids),
-            )
-        ).all()
-        for occurred_on, amount in rebate_rows:
-            if from_date and occurred_on < from_date:
-                continue
-            if to_date and occurred_on > to_date:
-                continue
+        rebate_stmt = (
+            select(RebateRecord.collected_on, func.sum(RebateRecord.amount))
+            .where(RebateRecord.source_order_id.in_(scoped_order_ids))
+            .group_by(RebateRecord.collected_on)
+        )
+        if from_date is not None:
+            rebate_stmt = rebate_stmt.where(RebateRecord.collected_on >= from_date)
+        if to_date is not None:
+            rebate_stmt = rebate_stmt.where(RebateRecord.collected_on <= to_date)
+        for occurred_on, amount in session.execute(rebate_stmt):
             rebate_income[_month_key(occurred_on)] += to_money_or_zero(amount)
 
     # 运营费用只认核算属性，避免依赖自由填写的流水类别。
@@ -137,6 +136,10 @@ def r2_monthly_pnl(
     pool_ids = _visible_pool_ids(user)
     if pool_ids is not None:
         op_stmt = op_stmt.where(Cashflow.pool_id.in_(pool_ids))
+    if from_date is not None:
+        op_stmt = op_stmt.where(Cashflow.occurred_on >= from_date)
+    if to_date is not None:
+        op_stmt = op_stmt.where(Cashflow.occurred_on <= to_date)
     op_rows = session.scalars(op_stmt).all()
     reversal_nos = {
         flow.source_id
@@ -150,10 +153,6 @@ def r2_monthly_pnl(
     operating: dict[str, Decimal] = defaultdict(lambda: ZERO)
     for flow in op_rows:
         occurred_on = flow.occurred_on
-        if from_date and occurred_on < from_date:
-            continue
-        if to_date and occurred_on > to_date:
-            continue
         amount = to_money_or_zero(flow.amount)
         if flow.source_type == CashflowSourceType.REVERSAL.value:
             # 冲销流水先按「被冲销的原流水」归类，不能看冲销流水自身的方向：

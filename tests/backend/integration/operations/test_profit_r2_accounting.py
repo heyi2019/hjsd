@@ -15,6 +15,8 @@ from datetime import date
 from decimal import Decimal
 from uuid import uuid4
 
+from sqlalchemy import event
+
 from app.core.money import to_money
 from app.domain.enums import (
     RebateType,
@@ -133,3 +135,49 @@ def test_r2_standalone_operating_expense_still_counted(seeded_db):
     after = r2_monthly_pnl(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     assert oct_item["operating_expense"] == before_op + Decimal("250.00")
+
+
+def test_r2_loads_only_period_flows_and_cross_period_reversal_original(seeded_db):
+    """短周期报表不加载无关历史流水，但须查到区间外的冲销原流水。"""
+    original = create_cashflow(
+        seeded_db, pool_id=1, occurred_on=date(2026, 9, 20), direction="OUT",
+        accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
+        amount=Decimal("80"), actor="pytest",
+    )
+    reversal = reverse_cashflow(
+        seeded_db, original.id, reversed_on=D, actor="pytest", reason="跨期冲销",
+    )
+    current = create_cashflow(
+        seeded_db, pool_id=1, occurred_on=D, direction="OUT",
+        accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
+        amount=Decimal("30"), actor="pytest",
+    )
+    outside = [
+        create_cashflow(
+            seeded_db, pool_id=1, occurred_on=day, direction="OUT",
+            accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
+            amount=Decimal("10"), actor="pytest",
+        )
+        for day in (date(2026, 9, 1), date(2026, 11, 1))
+    ]
+    expected_loaded = {original.flow_no, reversal.flow_no, current.flow_no}
+    outside_nos = {flow.flow_no for flow in outside}
+    seeded_db.flush()
+    seeded_db.expunge_all()
+    loaded_flow_nos = set()
+
+    def record_load(_session, instance):
+        if isinstance(instance, Cashflow):
+            loaded_flow_nos.add(instance.flow_no)
+
+    event.listen(seeded_db, "loaded_as_persistent", record_load)
+    try:
+        report = r2_monthly_pnl(
+            seeded_db, from_date=date(2026, 10, 1), to_date=date(2026, 10, 31),
+        )
+    finally:
+        event.remove(seeded_db, "loaded_as_persistent", record_load)
+
+    assert report["total"]["operating_expense"] == Decimal("-50.00")
+    assert expected_loaded <= loaded_flow_nos
+    assert not (outside_nos & loaded_flow_nos)

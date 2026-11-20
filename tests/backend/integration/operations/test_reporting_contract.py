@@ -132,26 +132,6 @@ class TestR2MonthlyPnl:
         )
         assert [i["month"] for i in early_only["items"]] == ["2026-09"]
 
-
-def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db, monkeypatch):
-    in_range = _order(seeded_db, trade_date=D)
-    _order(seeded_db, trade_date=EARLY)
-    captured_order_ids: list[list[int]] = []
-
-    def capture_cashflow_order_ids(session, *, order_ids=None, from_date=None, to_date=None):
-        captured_order_ids.append(list(order_ids or []))
-        return {}
-
-    monkeypatch.setattr(
-        "app.operations.profit.cashflow_totals_by_order",
-        capture_cashflow_order_ids,
-    )
-
-    report = order_profit_detail(seeded_db, from_date=MID_GATE)
-
-    assert [item["order_id"] for item in report["items"]] == [in_range.id]
-    assert captured_order_ids == [[in_range.id]]
-
     def test_cancelled_sell_is_reversed_in_reports(self, seeded_db):
         order = _order(seeded_db)
         post_event(
@@ -193,6 +173,26 @@ def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db
         assert detail["income"] == 800
         assert detail["cost"] == 1300
         assert detail["net_profit"] == -500
+
+
+def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db, monkeypatch):
+    in_range = _order(seeded_db, trade_date=D)
+    _order(seeded_db, trade_date=EARLY)
+    captured_order_ids: list[list[int]] = []
+
+    def capture_cashflow_order_ids(session, *, order_ids=None, from_date=None, to_date=None):
+        captured_order_ids.append(list(order_ids or []))
+        return {}
+
+    monkeypatch.setattr(
+        "app.operations.profit.cashflow_totals_by_order",
+        capture_cashflow_order_ids,
+    )
+
+    report = order_profit_detail(seeded_db, from_date=MID_GATE)
+
+    assert [item["order_id"] for item in report["items"]] == [in_range.id]
+    assert captured_order_ids == [[in_range.id]]
 
 
 # --------------------------------------------------------------------- R3 提成

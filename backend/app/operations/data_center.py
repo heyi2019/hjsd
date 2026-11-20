@@ -16,7 +16,7 @@ from app.funds.deposits.reads import deposit_held_total
 from app.business.queries import order_status_counts
 from app.business.stocks.inventory import inventory_cost_by_entry_date
 
-from ._shared import ZERO, _apply_order_scope, cashflow_totals_by_order
+from ._shared import ZERO, _apply_order_scope, _validate_date_range, cashflow_totals_by_order
 
 
 def data_center_summary(
@@ -33,6 +33,7 @@ def data_center_summary(
     工作室收支沿用资金中心的已入账手工收支口径。利润合计明确为「账号售出利润
     + 工作室其他收入」，工作室成本单独展示，不重复扣减。
     """
+    _validate_date_range(from_date, to_date)
     status_counts = order_status_counts(
         session,
         trade_date_from=from_date,

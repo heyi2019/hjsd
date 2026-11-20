@@ -23,6 +23,18 @@ def _pool(seeded_db) -> Pool:
     return pool
 
 
+def test_data_center_rejects_reversed_date_range(seeded_client, seeded_db, headers):
+    response = seeded_client.get(
+        "/api/reports/data-center",
+        params={"from": "2026-10-31", "to": "2026-10-01"},
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "VALIDATION_ERROR"
+    assert response.json()["details"] == {"from": "2026-10-31", "to": "2026-10-01"}
+
+
 def test_data_center_separates_costs_and_combines_profit(seeded_client, seeded_db, headers):
     sold_account = create_account(
         seeded_db,

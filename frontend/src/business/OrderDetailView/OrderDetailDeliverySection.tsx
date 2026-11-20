@@ -1,7 +1,7 @@
 import { Descriptions, Input } from "antd";
 import { type ReactNode } from "react";
 import { useMemo } from "react";
-import type { AccountExecutionDetail, AccountExecutionOrder } from "../../shared/api/types/account-execution";
+import type { AccountExecutionDetail, AccountExecutionEvent, AccountExecutionOrder } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { OrderDraft } from "./editing/use-order-detail-editor";
@@ -19,11 +19,11 @@ import {
 import { useOptionSet } from "../../shared/lib/optionSets";
 import {
   OrderSectionHeading,
+  type OrderEventDraft,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 
-/** 交付主字段（与建单 DeliveryInfoSection 对齐）。值：bound_phone / bound_phone_owner 来自账号（买号交接），
- *  其余来自订单 extra_values。显隐与标签由 OrderFormField 配置驱动。 */
+/** 交付主字段与建单表单对齐，买号和卖号分别保存。 */
 const DELIVERY_FIELDS = [
   { key: "bound_phone", fallback: "换绑手机号" },
   { key: "bound_phone_owner", fallback: "手机号绑定人" },
@@ -33,6 +33,7 @@ const DELIVERY_FIELDS = [
   { key: "compensation_type", fallback: "包赔类型" },
   { key: "delivery_responsible_ids", fallback: "交付操作人" },
 ] as const;
+const SALE_SCOPES: Record<string, string> = { HS: "SALEREC", TH: "SALETH", DG: "SALEDG" };
 
 function textValue(value: unknown): string {
   return typeof value === "string" && value.trim() ? value : "-";
@@ -58,6 +59,11 @@ function DeliverySubSection({
   onExtraChange,
   onProfileChange,
   operatorUsername = currentDevUser(),
+  direction,
+  hasSale,
+  saleEvent,
+  saleEventDraft,
+  onSaleEventExtraChange,
 }: {
   title: string;
   orderType?: string | null | undefined;
@@ -69,6 +75,11 @@ function DeliverySubSection({
   onExtraChange?: (key: string, value: unknown) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
   operatorUsername?: string;
+  direction: "BUY" | "SELL";
+  hasSale: boolean;
+  saleEvent?: AccountExecutionEvent;
+  saleEventDraft?: OrderEventDraft;
+  onSaleEventExtraChange?: (key: string, value: unknown) => void;
 }) {
   const { config, ready, error, retry } = useOrderFormConfig(orderType ?? undefined);
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM");
@@ -80,7 +91,13 @@ function DeliverySubSection({
     compensation_type: compensationTypeOptions ?? config.compensation_type?.options ?? [],
   };
   const extraValues = order?.extra_values;
-  const editableValues = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
+  const allValues = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
+  const editableValues = direction === "SELL"
+    ? Object.fromEntries(Object.entries(allValues).filter(([key]) => key.startsWith("sell_")).map(([key, value]) => [key.slice(5), value]))
+    : allValues;
+  const customValues = direction === "SELL"
+    ? { ...(saleEvent?.form_extra ?? {}), ...(saleEventDraft?.form_extra ?? {}) }
+    : editableValues;
   const defaultOperatorIds = defaultOperatorUserIds(employees ?? [], operatorUsername) ?? [];
   const employeeNames = useMemo(
     () => new Map((employees ?? []).map((employee) => [employee.id, employee.display_name])),
@@ -88,16 +105,16 @@ function DeliverySubSection({
   );
   const mainFields = useMemo(() => DELIVERY_FIELDS.map(({ key, fallback }) => {
     let value: ReactNode = "-";
-    const values = { ...(extraValues ?? {}), ...(draft?.form_extra ?? {}) };
+    const values = editableValues;
     if (key === "bound_phone") {
-      value = editing && account?.bound_phone != null
-        ? account.bound_phone
-        : account?.bound_phone || textValue(values[key]);
+      const hasStoredValue = Object.prototype.hasOwnProperty.call(values, key);
+      value = hasStoredValue ? textValue(values[key])
+        : direction === "BUY" && !hasSale ? account?.bound_phone || "-" : "-";
     } else if (key === "bound_phone_owner") {
       const hasOrderDraftValue = Object.prototype.hasOwnProperty.call(values, key);
       value = hasOrderDraftValue
         ? (values[key] == null ? "" : String(values[key]))
-        : account?.bound_phone_owner || "-";
+        : direction === "BUY" && !hasSale ? account?.bound_phone_owner || "-" : "-";
     } else {
       const raw = values[key];
       if (raw == null || raw === "") {
@@ -111,17 +128,17 @@ function DeliverySubSection({
       }
     }
     return { key, fallback, value };
-  }), [account, draft, employees, employeeNames, extraValues]);
+  }), [account, direction, editableValues, employees, employeeNames, hasSale]);
   const deliveryItems = useMemo(() => {
-    const existing = buildFormExtraDisplay(editableValues, Object.values(config)).filter(
-      (item) => item.key !== "intermediary_platform_other" && (config[item.key]?.section ?? "EXTRA") === "DELIVER",
+    const existing = buildFormExtraDisplay(customValues, Object.values(config)).filter(
+      (item) => item.key !== "intermediary_platform_other" && config[item.key]?.is_custom && config[item.key]?.section === "DELIVER",
     );
     const existingKeys = new Set(existing.map((item) => item.key));
     const configured = Object.values(config)
       .filter((field) => field.field_key !== "intermediary_platform_other" && field.is_custom && field.is_active && field.section === "DELIVER" && !existingKeys.has(field.field_key))
       .map((field) => ({ key: field.field_key, label: field.label, value: "", status: "active" as const }));
     return [...existing, ...configured];
-  }, [config, editableValues]);
+  }, [config, customValues]);
   return (
     <div className="order-detail__meta-group">
       <div className="order-detail__meta-group-title">{title}</div>
@@ -173,8 +190,10 @@ function DeliverySubSection({
                   aria-label={`编辑${field.fallback}`}
                   value={field.value === "-" ? "" : String(field.value)}
                   onChange={(event) => {
-                    if (field.key === "bound_phone") onProfileChange?.({ bound_phone: event.target.value });
-                    else onExtraChange?.(field.key, event.target.value);
+                    onExtraChange?.(field.key, event.target.value);
+                    if (field.key === "bound_phone" && (direction === "SELL" || !hasSale)) {
+                      onProfileChange?.({ bound_phone: event.target.value });
+                    }
                   }}
                 />
               ) : field.value}
@@ -188,8 +207,10 @@ function DeliverySubSection({
               {editing ? (
                 <Input
                   aria-label={`编辑${item.label}`}
-                  value={formatExtraDisplayValue(editableValues[item.key] ?? item.value)}
-                  onChange={(event) => onExtraChange?.(item.key, event.target.value)}
+                  value={formatExtraDisplayValue(customValues[item.key] ?? item.value)}
+                  onChange={(event) => direction === "SELL"
+                    ? onSaleEventExtraChange?.(item.key, event.target.value)
+                    : onExtraChange?.(item.key, event.target.value)}
                 />
               ) : formatExtraDisplayValue(item.value) || "-"}
             </Descriptions.Item>
@@ -212,6 +233,8 @@ export function OrderDetailDeliverySection({
   onOrderEdit,
   onProfileChange,
   operatorUsername = currentDevUser(),
+  eventDrafts,
+  onEventEdit,
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
@@ -223,6 +246,8 @@ export function OrderDetailDeliverySection({
   onOrderEdit?: (orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) => void;
   onProfileChange?: (changes: Partial<Account>) => void;
   operatorUsername?: string;
+  eventDrafts?: Record<number, OrderEventDraft>;
+  onEventEdit?: (event: AccountExecutionEvent, changes: { form_extra?: Record<string, unknown> }) => void;
 }) {
   const creationOrder = useMemo(
     () => detail?.orders.find((order) => order.order_no === meta.sourceOrderNo),
@@ -234,14 +259,23 @@ export function OrderDetailDeliverySection({
     ),
     [detail],
   );
+  const sellEvent = useMemo(() => sellOrder?.events
+    .filter((event) => event.event_type === "SELL")
+    .reduce<AccountExecutionEvent | undefined>((latest, event) => !latest || event.id > latest.id ? event : latest, undefined),
+  [sellOrder]);
+  const saleScope = sellOrder ? SALE_SCOPES[sellOrder.order_type] ?? sellOrder.order_type : undefined;
 
   if (editing) {
     return (
       <div className="order-detail__section order-detail__section--delivery">
         <OrderSectionHeading title="交付信息" />
         <div className="order-detail__meta">
-          <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} operatorUsername={operatorUsername} />
-          {sellOrder ? <DeliverySubSection title="卖号交付" orderType={sellOrder.order_type} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, key, value)} operatorUsername={operatorUsername} /> : null}
+          <DeliverySubSection title="买号交付" direction="BUY" hasSale={Boolean(sellOrder)} orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} editing draft={creationOrder ? orderDrafts?.[creationOrder.order_id] : undefined} onProfileChange={onProfileChange} onExtraChange={(key, value) => creationOrder && onOrderExtraChange?.(creationOrder.order_id, key, value)} operatorUsername={operatorUsername} />
+          {sellOrder ? <DeliverySubSection title="卖号交付" direction="SELL" hasSale orderType={saleScope} order={sellOrder} account={account} employees={employees} editing draft={orderDrafts?.[sellOrder.order_id]} saleEvent={sellEvent} saleEventDraft={sellEvent ? eventDrafts?.[sellEvent.id] : undefined} onSaleEventExtraChange={(key, value) => {
+            if (!sellEvent) return;
+            const extra = eventDrafts?.[sellEvent.id]?.form_extra ?? sellEvent.form_extra ?? {};
+            onEventEdit?.(sellEvent, { form_extra: { ...extra, [key]: value } });
+          }} onProfileChange={onProfileChange} onExtraChange={(key, value) => onOrderExtraChange?.(sellOrder.order_id, `sell_${key}`, value)} operatorUsername={operatorUsername} /> : null}
           {creationOrder ? (
             <Descriptions className="order-detail__meta-table" size="small" bordered column={1}>
               <Descriptions.Item label="订单备注">
@@ -262,11 +296,14 @@ export function OrderDetailDeliverySection({
     <div className="order-detail__section order-detail__section--delivery">
       <OrderSectionHeading title="交付信息" />
       <div className="order-detail__meta">
-        <DeliverySubSection title="买号交付" orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} />
+        <DeliverySubSection title="买号交付" direction="BUY" hasSale={Boolean(sellOrder)} orderType={creationOrder?.order_type} order={creationOrder} account={account} employees={employees} />
         <DeliverySubSection
           title="卖号交付"
-          orderType={sellOrder?.order_type ?? creationOrder?.order_type}
+          direction="SELL"
+          hasSale={Boolean(sellOrder)}
+          orderType={saleScope}
           order={sellOrder}
+          saleEvent={sellEvent}
           account={account}
           employees={employees}
         />

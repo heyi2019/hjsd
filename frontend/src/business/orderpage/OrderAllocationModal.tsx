@@ -197,7 +197,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           business_responsible_ids: [...new Set(rows
             .filter((item) => item.allocation_type === "BUY")
             .flatMap((item) => item.employee_ids ?? []))],
-          delivery_responsible_ids: [...new Set(rows
+          sell_delivery_responsible_ids: [...new Set(rows
             .filter((item) => item.allocation_type === "SELL")
             .flatMap((item) => item.employee_ids ?? []))],
           operation_responsible_ids: [...new Set(rows

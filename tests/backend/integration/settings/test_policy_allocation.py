@@ -254,7 +254,8 @@ class TestProfitAllocation:
         order = self._sold_order(seeded_db)
         order.form_extra = {
             "business_responsible_ids": [3],
-            "delivery_responsible_ids": [3],
+            "delivery_responsible_ids": [1],
+            "sell_delivery_responsible_ids": [3],
         }
         seeded_db.add_all([
             OrderEvent(

@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from app.core.money import to_money
+from app.business.delivery_fields import SELL_DELIVERY_FIELDS
 
 from .schemas import (
     DetailExecutionRowOut,
@@ -265,7 +266,7 @@ def _extras(orders: list[AccountExecutionOrderOut]) -> list[DetailExtraOut]:
         ]
         for field in fields:
             key = str(field.get("key", ""))
-            if any(key == item or key.endswith(f"-{item}") for item in INTERNAL_EXTRA_KEYS): continue
+            if key in SELL_DELIVERY_FIELDS or any(key == item or key.endswith(f"-{item}") for item in INTERNAL_EXTRA_KEYS): continue
             value = field.get("value")
             if value in (None, "") or not str(value).strip(): continue
             result.append(DetailExtraOut(key=f"{order.order_no}-{key}", label=str(field.get("label", key)), value=str(value), section=str(field.get("section", "EXTRA"))))

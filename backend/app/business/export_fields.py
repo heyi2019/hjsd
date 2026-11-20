@@ -16,7 +16,7 @@ from app.domain.users import User
 from app.settings.lists.export import detail_json
 
 # 订单表单里的经办人字段：存用户 id 数组，导出前翻成姓名。
-RESPONSIBLE_ID_KEYS = ("business_responsible_ids", "delivery_responsible_ids", "operation_responsible_ids")
+RESPONSIBLE_ID_KEYS = ("business_responsible_ids", "delivery_responsible_ids", "sell_delivery_responsible_ids", "operation_responsible_ids")
 
 ORDER_DETAIL_EXPORT_COLUMNS = [
     ("detail_account_channel_region", "渠道 / 区服", True),
@@ -267,59 +267,30 @@ def _rebate_export_rows(order_no: str, detail: dict) -> list[dict[str, object]]:
     return rows
 
 
-def _delivery_direction(detail: dict) -> str:
-    """判定订单的交付方向：买单交付给卖家，卖单交付给买家。
-
-    - 已登记 SELL 事件 → 这张单是「卖出去」的那一单，交付对象是买家 → 卖号交付；
-    - DG 代挂（零本金、建单即纳入库存代卖）→ 无论是否已成交都是替客户卖 → 卖号交付；
-    - 其余（HS 回收 / TH 提号中纯买入未成交的单）→ 买号交付。
-    与库存视角的「卖号交付单」判定同源（含 SELL 事件，或 DG 单）。
-    """
-    if detail.get("order_type") == "DG":
-        return "卖号交付"
-    events = detail.get("events") or []
-    if any(event.get("event_type") == "SELL" for event in events):
-        return "卖号交付"
-    return "买号交付"
-
-
 def _delivery_export_fields(
     detail: dict, value_labels: dict[str, dict[str, str]],
     form_extra: dict[str, object] | None = None,
 ) -> dict[str, str | None]:
-    """把同一套交付字段按订单角色归入「买号交付」或「卖号交付」，另一组整组留空。
-
-    交付字段都存在订单自己的 `form_extra` 里，语义随订单角色变化：
-    买入未成交的单是对卖家的交接，卖出过的单与 DG 代挂单是对买家的交接。
-    两组并存而非只标方向，是为了让人一眼看出这张单属于哪种交付。
-    `form_extra` 允许传入已做经办人翻译的副本（导出前统一处理），缺省读详情原值。
-    """
+    """分别导出同一订单的买号和卖号交付信息。"""
     if form_extra is None:
         form_extra = detail.get("form_extra") or {}
-    compensation = form_extra.get("compensation_type")
-    # 包赔类型是 option_sets 词典（COMPENSATION_TYPE，管理员可编辑）：
-    # 导出按同一套「代码值 → 中文」翻译，未命中保留原值
     compensation_labels = value_labels.get("compensation_type") or {}
-    platform = form_extra.get("intermediary_platform")
-    other_platform = form_extra.get("intermediary_platform_other")
-    if platform == "其他" and isinstance(other_platform, str) and other_platform.strip():
-        platform = f"其他（{other_platform.strip()}）"
-    values: dict[str, str | None] = {
-        "phone": form_extra.get("bound_phone"),
-        "owner": form_extra.get("bound_phone_owner"),
-        "platform": platform,
-        "type": form_extra.get("intermediary_type"),
-        "compensation": (
-            compensation_labels.get(compensation, compensation)
-            if isinstance(compensation, str) else compensation
-        ),
-        "responsible": detail_json(
-            form_extra.get("delivery_responsible_ids") or [], value_labels
-        ),
-    }
-    is_buy = _delivery_direction(detail) == "买号交付"
-    buy_values = values if is_buy else dict.fromkeys(values)
-    sell_values = dict.fromkeys(values) if is_buy else values
+    def values_for(prefix: str) -> dict[str, str | None]:
+        compensation = form_extra.get(f"{prefix}compensation_type")
+        platform = form_extra.get(f"{prefix}intermediary_platform")
+        other_platform = form_extra.get(f"{prefix}intermediary_platform_other")
+        if platform == "其他" and isinstance(other_platform, str) and other_platform.strip():
+            platform = f"其他（{other_platform.strip()}）"
+        return {
+            "phone": form_extra.get(f"{prefix}bound_phone"),
+            "owner": form_extra.get(f"{prefix}bound_phone_owner"),
+            "platform": platform,
+            "type": form_extra.get(f"{prefix}intermediary_type"),
+            "compensation": compensation_labels.get(compensation, compensation) if isinstance(compensation, str) else compensation,
+            "responsible": detail_json(form_extra.get(f"{prefix}delivery_responsible_ids") or [], value_labels),
+        }
+    buy_values = values_for("")
+    sell_values = values_for("sell_")
     return {
         **{f"detail_buy_delivery_{suffix}": value for suffix, value in buy_values.items()},
         **{f"detail_sell_delivery_{suffix}": value for suffix, value in sell_values.items()},

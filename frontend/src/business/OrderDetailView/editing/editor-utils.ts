@@ -1,5 +1,5 @@
 import type { EmployeeOption } from "../../../shared/api/types/org";
-import type { AccountExecutionDetail } from "../../../shared/api/types/account-execution";
+import type { AccountExecutionDetail, AccountExecutionOrder } from "../../../shared/api/types/account-execution";
 import type { OrderDraft } from "./editor-types";
 
 const SHARED_ORDER_FORM_EXTRA_KEYS = new Set(["bound_phone_owner"]);
@@ -15,6 +15,7 @@ export function propagateSharedOrderExtra(
   drafts: Record<number, OrderDraft>,
   orderIds: number[],
   changes: Record<string, unknown>,
+  originalOrders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "note">> = [],
 ): Record<number, OrderDraft> {
   const sharedChanges = Object.fromEntries(
     Object.entries(changes).filter(([key]) => SHARED_ORDER_FORM_EXTRA_KEYS.has(key)),
@@ -23,10 +24,11 @@ export function propagateSharedOrderExtra(
 
   const next = { ...drafts };
   orderIds.forEach((orderId) => {
+    const original = originalOrders.find((order) => order.order_id === orderId);
     const current = next[orderId] ?? {
       order_id: orderId,
-      occurred_at: "",
-      note: "",
+      occurred_at: original?.created_at ?? "",
+      note: original?.note ?? "",
       form_extra: {},
     };
     next[orderId] = {

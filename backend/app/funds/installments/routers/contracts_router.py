@@ -183,6 +183,8 @@ def create_stock_sale(
         db, payload.order_id, event_type="SELL", sale_mode="INSTALLMENT",
         amount=payload.principal, occurred_on=payload.paid_on, actor=_actor(user),
         portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
+        bound_phone=(payload.delivery_form_extra or {}).get("bound_phone"),
+        bound_phone_owner=(payload.delivery_form_extra or {}).get("bound_phone_owner"),
         form_extra=payload.form_extra, form_extra_context=field_context, user=user,
     )
     item = inst_create.create_installment(

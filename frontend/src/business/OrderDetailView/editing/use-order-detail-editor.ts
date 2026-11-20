@@ -12,7 +12,7 @@ import { normalizeError } from "../../../shared/api/client";
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
-import { buildEventEdits, buildOperationEventCreates } from "./execution-edit-payload";
+import { buildEventEdits, buildOperationEventCreates, buildOrderEdits } from "./execution-edit-payload";
 import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
 import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
 
@@ -195,8 +195,10 @@ export function useOrderDetailEditor(params: {
     if (saveAction.isPending()) return;
     const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
     const sharedOrderIds = sharedOrderIdsForEdit(detail, orderId);
+    const originalOrders = detail?.orders ?? [];
+    const originalOrder = originalOrders.find((order) => order.order_id === orderId);
     setOrderDrafts((current) => {
-      const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: "", note: "", form_extra: {} };
+      const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: originalOrder?.created_at ?? "", note: originalOrder?.note ?? "", form_extra: {} };
       const next = {
         ...current,
         [orderId]: {
@@ -206,7 +208,7 @@ export function useOrderDetailEditor(params: {
         },
       };
       const sharedExtra = changes.form_extra ?? {};
-      return propagateSharedOrderExtra(next, sharedOrderIds, sharedExtra);
+      return propagateSharedOrderExtra(next, sharedOrderIds, sharedExtra, originalOrders);
     });
   }
 
@@ -287,20 +289,7 @@ export function useOrderDetailEditor(params: {
           note: draft.note,
           ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
         }));
-        const originalOrders = detail?.orders ?? [];
-        const orders = Object.values(orderDrafts).filter((draft) => {
-          const original = originalOrders.find((order) => order.order_id === draft.order_id);
-          return Boolean(original && (
-            draft.occurred_at !== (original.created_at ?? "")
-            || draft.note !== (original.note ?? "")
-            || Object.keys(draft.form_extra).length > 0
-          ));
-        }).map((draft) => ({
-          order_id: draft.order_id,
-          ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
-          note: draft.note,
-          ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
-        }));
+        const orders = buildOrderEdits(detail?.orders ?? [], orderDrafts);
         const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));
         const sourceOrderId = editingAccount.source_order_id;
         if (sourceOrderId == null) throw new Error("账号没有绑定来源订单，无法保存详情");

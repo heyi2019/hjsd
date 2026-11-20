@@ -110,7 +110,7 @@ export function OrderDetailView({
               wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
               <FieldConfigStatus scope="PROFILE" ready={profileConfig.ready} error={profileConfig.error} retry={profileConfig.retry} />
               <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
-                <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} operatorUsername={operatorUsername} />
+                <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} eventDrafts={eventDrafts} onEventEdit={onEventEdit} operatorUsername={operatorUsername} />
                 <OrderDetailOperationSection meta={meta} editing account={editing ?? account} orderType={detail?.orders.find((order) => order.order_id === meta.orderId)?.order_type ?? detail?.orders[0]?.order_type} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />
                 <CustomFieldSections testIdSuffix="inventory-edit" />
               </FieldConfigScope>

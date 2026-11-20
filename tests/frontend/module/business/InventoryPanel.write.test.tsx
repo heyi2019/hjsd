@@ -884,7 +884,7 @@ describe("InventoryPanel：写入与长路径", () => {
     vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
     const account = { ...accounts[0], extra_values: { check_note: "原凭据" } };
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({
-      account, orders: [{ order_id: 21, order_no: "HS-2026-0001", order_type: "HS", status: "ACTIVE", events: [] }],
+      account, orders: [{ order_id: 21, order_no: "HS-2026-0001", order_type: "HS", status: "ACTIVE", note: "原订单备注", extra_values: { bound_phone_owner: "原绑定人" }, events: [] }],
       detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
     } as never);
     vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
@@ -895,6 +895,9 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(input).toHaveValue("原凭据");
     await ui.clear(input);
     await ui.type(input, "新凭据");
+    const owner = screen.getByLabelText("编辑手机号绑定人");
+    await ui.clear(owner);
+    await ui.type(owner, "新绑定人");
     await ui.click(screen.getByRole("button", { name: "保存修改" }));
     await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(21, expect.objectContaining({
       profile: expect.objectContaining({ form_extra: { check_note: "新凭据" } }),
@@ -902,6 +905,8 @@ describe("InventoryPanel：写入与长路径", () => {
     const payload = vi.mocked(ordersApi.updateExecution).mock.calls[0][1];
     const profile = payload.profile as { extra_values?: Record<string, unknown> } | undefined;
     expect(profile?.extra_values ?? {}).not.toHaveProperty("check_note");
+    expect(payload.orders).toEqual([expect.objectContaining({ order_id: 21, form_extra: { bound_phone_owner: "新绑定人" } })]);
+    expect(payload.orders?.[0]).not.toHaveProperty("note");
   });
 
   it("首次编辑库存账号只读取一次来源订单详情", async () => {
@@ -1556,7 +1561,11 @@ describe("OrderDetailDeliverySection", () => {
     expect(screen.queryByText("7")).not.toBeInTheDocument();
   });
 
-  it("FE-267：买号和卖号交付都回显手机号绑定人", async () => {
+  it("FE-267：同一订单买号和卖号交付独立展示并编辑", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "SALEREC" ? [{
+      id: 9901, order_type_code: "SALEREC", field_key: "sale_receipt", label: "卖号凭据", field_type: "TEXT",
+      options: [], required: false, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "DELIVER",
+    }] as never : []);
     const detail = {
       orders: [
         {
@@ -1564,31 +1573,54 @@ describe("OrderDetailDeliverySection", () => {
           order_no: "HS-FE267",
           order_type: "HS",
           created_at: "2026-11-02T10:00:00",
-          extra_values: { bound_phone: "13800000001", bound_phone_owner: "买家负责人" },
-          events: [],
-        },
-        {
-          order_id: 24,
-          order_no: "DG-FE267",
-          order_type: "DG",
-          created_at: "2026-11-02T11:00:00",
-          extra_values: { bound_phone: "13800000002", bound_phone_owner: "卖出负责人" },
-          events: [{ event_type: "SELL", id: 1, amount: "1", occurred_on: "2026-11-02" }],
+          extra_values: {
+            bound_phone: "13800000001", bound_phone_owner: "买号绑定人", intermediary_platform: "盼之",
+            sell_bound_phone: "13800000002", sell_bound_phone_owner: "卖号绑定人", sell_intermediary_platform: "其他",
+            sell_intermediary_platform_other: "卖号平台",
+          },
+          events: [{ event_type: "SELL", id: 1, amount: "1", occurred_on: "2026-11-02", form_extra: { sale_mode: "FULL", sale_receipt: "原卖号凭据" } }],
         },
       ],
     };
 
-    renderLight(
-      <OrderDetailDeliverySection meta={{ sourceOrderNo: "HS-FE267" } as never} detail={detail as never} />,
+    const { rerender } = renderLight(
+      <OrderDetailDeliverySection meta={{ sourceOrderNo: "HS-FE267" } as never} detail={detail as never} account={{ bound_phone: "13800000002" } as never} />,
       { user: "admin" },
     );
 
     await waitFor(() => {
-      expect(screen.getByText("买家负责人")).toBeInTheDocument();
-      expect(screen.getByText("卖出负责人")).toBeInTheDocument();
+      expect(screen.getByText("买号绑定人")).toBeInTheDocument();
+      expect(screen.getByText("卖号绑定人")).toBeInTheDocument();
       expect(screen.getByText("13800000001")).toBeInTheDocument();
       expect(screen.getByText("13800000002")).toBeInTheDocument();
+      expect(screen.getByText("卖号平台")).toBeInTheDocument();
+      expect(screen.getByText("原卖号凭据")).toBeInTheDocument();
     });
+    const onOrderExtraChange = vi.fn();
+    const onProfileChange = vi.fn();
+    const onEventEdit = vi.fn();
+    rerender(<OrderDetailDeliverySection meta={{ sourceOrderNo: "HS-FE267" } as never} detail={detail as never}
+      account={{ bound_phone: "13800000002" } as never} editing onOrderExtraChange={onOrderExtraChange} onProfileChange={onProfileChange} onEventEdit={onEventEdit} />);
+    const groups = document.querySelectorAll<HTMLElement>(".order-detail__meta-group");
+    expect(groups).toHaveLength(2);
+    expect(within(groups[0]).getByLabelText("编辑换绑手机号")).toHaveValue("13800000001");
+    expect(within(groups[1]).getByLabelText("编辑换绑手机号")).toHaveValue("13800000002");
+    fireEvent.change(within(groups[0]).getByLabelText("编辑换绑手机号"), { target: { value: "13700000001" } });
+    expect(onOrderExtraChange).toHaveBeenCalledWith(23, "bound_phone", "13700000001");
+    expect(onProfileChange).not.toHaveBeenCalled();
+    fireEvent.change(within(groups[1]).getByLabelText("编辑换绑手机号"), { target: { value: "13900000002" } });
+    expect(onOrderExtraChange).toHaveBeenCalledWith(23, "sell_bound_phone", "13900000002");
+    expect(onProfileChange).toHaveBeenCalledWith({ bound_phone: "13900000002" });
+    fireEvent.change(within(groups[0]).getByLabelText("编辑手机号绑定人"), { target: { value: "新买号绑定人" } });
+    fireEvent.change(within(groups[1]).getByLabelText("编辑手机号绑定人"), { target: { value: "新卖号绑定人" } });
+    expect(onOrderExtraChange).toHaveBeenCalledWith(23, "bound_phone_owner", "新买号绑定人");
+    expect(onOrderExtraChange).toHaveBeenCalledWith(23, "sell_bound_phone_owner", "新卖号绑定人");
+    await ui.click(within(groups[1]).getByRole("combobox", { name: "编辑交易平台" }));
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(23, "sell_intermediary_platform", "盼之");
+    expect(onOrderExtraChange).toHaveBeenCalledWith(23, "sell_intermediary_platform_other", null);
+    fireEvent.change(within(groups[1]).getByLabelText("编辑卖号凭据"), { target: { value: "新卖号凭据" } });
+    expect(onEventEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), { form_extra: { sale_mode: "FULL", sale_receipt: "新卖号凭据" } });
   });
 
   it("FE-268：仅有代挂订单时卖号交付仍展示交付表格", async () => {

@@ -36,6 +36,7 @@ from .cancellation_model import (
     opposite_cancellation_direction as _opposite_direction,
 )
 from .events_rules import _assert_pool_active, _resolve_pool
+from .delivery_fields import DELIVERY_FIELDS
 
 def _auto_link_recovered_installment_sale(
     session: Session,
@@ -315,9 +316,18 @@ def _build_event_form_extra(
         event_form_extra["operation_type"] = operation_type
     if rebate_type is not None:
         event_form_extra["rebate_type"] = rebate_type
-    if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
+    if event_type == EventType.SELL.value:
         account = session.get(Account, order.account_id) if order.account_id is not None else None
         snapshot = dict(order.account_snapshot or {})
+        order_extra = dict(order.form_extra or {})
+        if "bound_phone" not in order_extra:
+            order_extra["bound_phone"] = snapshot.get("bound_phone", account.bound_phone if account else None)
+        sale_delivery = {f"sell_{key}": (form_extra_context or {}).get(key) for key in DELIVERY_FIELDS}
+        sale_delivery["sell_bound_phone"] = normalized_bound_phone
+        sale_delivery["sell_bound_phone_owner"] = normalized_bound_phone_owner
+        order_extra.update(sale_delivery)
+        order.form_extra = order_extra
+    if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
         if normalized_bound_phone is not None:
             snapshot["bound_phone"] = normalized_bound_phone
         if normalized_bound_phone_owner is not None:

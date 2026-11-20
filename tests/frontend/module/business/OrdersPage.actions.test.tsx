@@ -636,7 +636,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       ...order1,
       form_extra: {
         business_responsible_ids: [11],
-        delivery_responsible_ids: [22],
+        sell_delivery_responsible_ids: [22],
       },
       events: [
         { id: 101, event_no: "EV-101", order_id: 1, event_type: "BUY", amount: "1000.00", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "1000.00" },
@@ -666,7 +666,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       ...order1,
       form_extra: {
         business_responsible_ids: [11, 22],
-        delivery_responsible_ids: [22],
+        sell_delivery_responsible_ids: [22],
         operation_responsible_ids: [33],
       },
       events: [
@@ -689,7 +689,8 @@ describe("OrdersPage：操作与筛选分支", () => {
 
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
-    const [, payload] = vi.mocked(profitAllocationApi.set).mock.calls[0];
+    const [, payload, extra] = vi.mocked(profitAllocationApi.set).mock.calls[0];
+    expect(extra).toEqual(expect.objectContaining({ sell_delivery_responsible_ids: [22] }));
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
     expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: null, allocation_amount: "300.00" }]);
     expect(payload).toHaveLength(4);

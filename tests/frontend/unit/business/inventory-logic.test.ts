@@ -22,7 +22,8 @@ describe("库存纯逻辑", () => {
     const candidates = buildActionAllocationCandidates({
       form_extra: {
         business_responsible_ids: [11],
-        delivery_responsible_ids: [22],
+        delivery_responsible_ids: [99],
+        sell_delivery_responsible_ids: [22],
       },
       events: [
         { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "100" },
@@ -39,7 +40,7 @@ describe("库存纯逻辑", () => {
 
   it("分润售出优先使用交付负责人，缺失时才回退售出事件操作人或当前人", () => {
     expect(buildActionAllocationCandidates({
-      form_extra: { delivery_responsible_ids: [22] },
+      form_extra: { delivery_responsible_ids: [99], sell_delivery_responsible_ids: [22] },
       events: [{ id: 1, event_no: "EV-1", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [44], cancellable_amount: "200" }],
     })).toMatchObject({ SELL: [22] });
     expect(buildActionAllocationCandidates({

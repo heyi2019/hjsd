@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildEventEdits } from "@/business/OrderDetailView/editing/execution-edit-payload";
+import { buildEventEdits, buildOrderEdits } from "@/business/OrderDetailView/editing/execution-edit-payload";
 import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { resolveExecutionPlatform } from "@/business/OrderDetailView/OrderDetail.shared";
 import { mergeLedgerOrderWithDetail } from "@/business/orderpage/useLedgerInlineEdit";
 
 describe("详情编辑保存载荷", () => {
-  it("会提交事件的文本、时间和操作人修改", () => {
+  it("会提交事件和订单实际修改的文本、时间和操作人", () => {
     const payload = buildEventEdits(
       [{ id: 7, amount: "100.00", note: "旧备注", occurred_at: "2026-11-14T01:00:00" }],
       {
@@ -30,6 +30,13 @@ describe("详情编辑保存载荷", () => {
         operator_user_ids: [11, 12],
       },
     ]);
+    const original = [{ order_id: 21, created_at: "2026-11-14T01:00:00", note: "旧备注" }];
+    expect(buildOrderEdits(original, {
+      21: { order_id: 21, occurred_at: "2026-11-14T01:00:00", note: "旧备注", form_extra: { sell_bound_phone: "139" } },
+    })).toEqual([{ order_id: 21, form_extra: { sell_bound_phone: "139" } }]);
+    expect(buildOrderEdits(original, {
+      21: { order_id: 21, occurred_at: "2026-11-14T02:00:00", note: "新备注", form_extra: {} },
+    })).toEqual([{ order_id: 21, occurred_at: "2026-11-14T02:00:00", note: "新备注" }]);
   });
 
   it("运营动作修改平台后，操作明细使用同一份事件草稿", () => {
@@ -61,10 +68,12 @@ describe("详情编辑保存载荷", () => {
       },
       [1, 2],
       { bound_phone_owner: "新绑定人" },
+      [{ order_id: 2, created_at: "2026-11-01T10:00:00", note: "原备注" }],
     );
 
     expect(result[1].form_extra).toEqual({ delivery_note: "保留", bound_phone_owner: "新绑定人" });
     expect(result[2].form_extra).toEqual({ bound_phone_owner: "新绑定人" });
+    expect(result[2]).toMatchObject({ occurred_at: "2026-11-01T10:00:00", note: "原备注" });
   });
 
   it("详情缓存存在时使用全部关联订单，否则只更新当前订单", () => {

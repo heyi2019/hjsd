@@ -160,7 +160,7 @@ def stock_sale(
         db, order_id, event_type="SELL", sale_mode="FULL", amount=payload.amount,
         occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
         portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
-        bound_phone=payload.bound_phone, bound_phone_owner=payload.bound_phone_owner,
+        bound_phone=field_context["bound_phone"], bound_phone_owner=field_context["bound_phone_owner"],
         form_extra={**(payload.form_extra or {}), **({"sale_amount": str(payload.sale_amount)} if payload.sale_amount is not None else {})},
         form_extra_context=field_context,
         user=user,

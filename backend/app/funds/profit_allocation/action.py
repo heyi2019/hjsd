@@ -28,7 +28,7 @@ def _resolve_action_actor_ids(
     for action_type in ("BUY", "SELL"):
         configured_key = {
             "BUY": "business_responsible_ids",
-            "SELL": "delivery_responsible_ids",
+            "SELL": "sell_delivery_responsible_ids",
         }[action_type]
         configured = [
             int(uid)

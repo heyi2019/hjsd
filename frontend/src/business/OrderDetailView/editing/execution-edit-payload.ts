@@ -1,4 +1,5 @@
-import type { AccountExecutionEvent } from "../../../shared/api/types/account-execution";
+import type { AccountExecutionEvent, AccountExecutionOrder } from "../../../shared/api/types/account-execution";
+import type { OrderDraft } from "./editor-types";
 
 export type ExecutionEventDraft = {
   id: number;
@@ -33,6 +34,28 @@ export type ExecutionOperationCreate = {
   form_extra?: Record<string, unknown>;
   operator_user_ids?: number[];
 };
+
+/** 只提交真正修改的订单字段，编辑交付信息时保留原备注和入库时间。 */
+export function buildOrderEdits(
+  orders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "note">>,
+  drafts: Record<number, OrderDraft>,
+) {
+  const originals = new Map(orders.map((order) => [order.order_id, order]));
+  return Object.values(drafts).flatMap((draft) => {
+    const original = originals.get(draft.order_id);
+    if (!original) return [];
+    const timeChanged = Boolean(draft.occurred_at && draft.occurred_at !== (original.created_at ?? ""));
+    const noteChanged = draft.note !== (original.note ?? "");
+    const hasExtra = Object.keys(draft.form_extra).length > 0;
+    if (!timeChanged && !noteChanged && !hasExtra) return [];
+    return [{
+      order_id: draft.order_id,
+      ...(timeChanged ? { occurred_at: draft.occurred_at } : {}),
+      ...(noteChanged ? { note: draft.note } : {}),
+      ...(hasExtra ? { form_extra: draft.form_extra } : {}),
+    }];
+  });
+}
 
 export function buildOperationEventCreates(
   drafts: Record<string, OperationEventCreateDraft>,

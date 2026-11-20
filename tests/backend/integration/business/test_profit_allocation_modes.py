@@ -113,7 +113,7 @@ def test_action_rows_can_omit_company_when_company_rate_is_configured(seeded_db)
     order_id = _order_with_profit(seeded_db)
     order = seeded_db.get(Order, order_id)
     assert order is not None
-    order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [1]}
+    order.form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
 
     rows = policy_allocations.set_allocations(
         seeded_db,
@@ -133,7 +133,7 @@ def test_action_amount_rows_keep_configured_company_share(seeded_db):
     order_id = _order_with_profit(seeded_db)
     order = seeded_db.get(Order, order_id)
     assert order is not None
-    order.form_extra = {"business_responsible_ids": [1], "delivery_responsible_ids": [1]}
+    order.form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
 
     rows = policy_allocations.set_allocations(
         seeded_db,

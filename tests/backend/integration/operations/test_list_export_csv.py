@@ -17,6 +17,7 @@ from sqlalchemy import select
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
+from app.domain.users import User
 from app.settings.lists.export import build_list_csv
 from app.business.export_fields import _event_platform, _order_detail_export_fields
 
@@ -234,21 +235,17 @@ def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
 
 
 def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_client, headers, seeded_db):
-    """交付字段按订单角色分落两组：DG 代挂单进卖号交付、未成交的 HS 单进买号交付。
-
-    同一套 form_extra 字段在两类单上语义不同，拆组后每单只有其中一组有值，
-    另一组整行留空 —— 比给一列「交付方向」更直观。
-    """
+    """同一订单的买号和卖号交付分别导出，只有卖号资料的订单买号列留空。"""
     _seed_order(
         seeded_db,
         order_no="HS9806",
-        form_extra={"bound_phone": "13800000001", "intermediary_platform": "其他", "intermediary_platform_other": "星河平台"},
+        form_extra={"bound_phone": "13800000001", "intermediary_platform": "其他", "intermediary_platform_other": "星河平台", "delivery_responsible_ids": [1], "sell_bound_phone": "13900000003", "sell_intermediary_platform": "盼之", "sell_delivery_responsible_ids": [2]},
     )
     _seed_order(
         seeded_db,
         order_no="DG9801",
         order_type="DG",
-        form_extra={"bound_phone": "13800000002", "intermediary_platform": "其他", "intermediary_platform_other": "分期平台"},
+        form_extra={"sell_bound_phone": "13800000002", "sell_intermediary_platform": "其他", "sell_intermediary_platform_other": "分期平台"},
     )
 
     response = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers)
@@ -285,14 +282,18 @@ def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_clie
         }
         for row in range(4, sheet.max_row + 1)
     }
-    assert rows["HS9806"] == {"buy": "13800000001", "sell": None}
+    assert rows["HS9806"] == {"buy": "13800000001", "sell": "13900000003"}
     assert rows["DG9801"] == {"buy": None, "sell": "13800000002"}
     platform_rows = {sheet.cell(row=row, column=1).value: (
         sheet.cell(row=row, column=buy_platform_column).value,
         sheet.cell(row=row, column=sell_platform_column).value,
     ) for row in range(4, sheet.max_row + 1)}
-    assert platform_rows["HS9806"] == ("其他（星河平台）", None)
+    assert platform_rows["HS9806"] == ("其他（星河平台）", "盼之")
     assert platform_rows["DG9801"] == (None, "其他（分期平台）")
+    responsible_columns = [next(index for index, label in labels.items() if label == f"{direction}交付-交付操作人") for direction in ("买号", "卖号")]
+    first_order_row = next(row for row in range(4, sheet.max_row + 1) if sheet.cell(row=row, column=1).value == "HS9806")
+    users = [seeded_db.get(User, user_id) for user_id in (1, 2)]
+    assert [sheet.cell(row=first_order_row, column=column).value for column in responsible_columns] == [user.display_name or user.username for user in users]
 
 
 def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, headers, seeded_db):

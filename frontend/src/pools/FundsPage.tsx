@@ -20,7 +20,7 @@ export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const ctrl = useFundsPageController(active, periodState);
   return (
     <section className="ui-stack">
-      <ErrorBanner error={ctrl.fundsError ?? ctrl.error} onRetry={() => void ctrl.load()} retrying={ctrl.loading} />
+      <ErrorBanner error={ctrl.fundsError} onRetry={() => void ctrl.reloadFunds()} retrying={ctrl.fundsLoading} />
       <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
       <Tabs
         defaultActiveKey="overview"

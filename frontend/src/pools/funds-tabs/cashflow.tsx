@@ -29,10 +29,10 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     cashflowLedgerType, setCashflowLedgerType,
     cashflowAttribute, setCashflowAttribute, cashflowCategory, setCashflowCategory, flowDirectionOptions, flowAttributeOptions,
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, cashflowPage, cashflowPageSize, setCashflowPage, totalFlowIncome, totalFlowExpense,
-    loading, cashflowsReady, cashflowLoading, cashflowError, error,
+    fundsReady, cashflowsReady, cashflowLoading, cashflowError,
   } = ctrl;
-  const cashflowUnavailable = !cashflowsReady || Boolean(error) || Boolean(cashflowError);
-  const filtersDisabled = Boolean(error) || Boolean(cashflowError) || (!cashflowsReady && !cashflowLoading);
+  const cashflowUnavailable = !cashflowsReady || Boolean(cashflowError);
+  const filtersDisabled = Boolean(cashflowError) || (!cashflowsReady && !cashflowLoading);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
   // 类别筛选下拉：业务类别=系统固定枚举；工作室类别=支出科目词典（可配置）+ 固定收入科目。
   // value 用 category 原文，与后端精确匹配（Cashflow.category == category）对齐。
@@ -52,7 +52,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
   ];
   const cashflowColumns: ColumnsType<Cashflow> = [
     { title: "账簿", dataIndex: "ledger_type", render: (v: string) => LEDGER_TYPE_LABEL[v] ?? v },
-    { title: "资金账户", key: "pool_name", render: (_v, row) => pools.find((pool) => pool.id === row.pool_id)?.name ?? `账户 ${row.pool_id}` },
+    { title: "资金账户", key: "pool_name", render: (_v, row) => (fundsReady ? pools.find((pool) => pool.id === row.pool_id)?.name : undefined) ?? `账户 ${row.pool_id}` },
     { title: "订单号", dataIndex: "order_no", render: (v: string | null) => v || "—" },
     { title: "流水号", dataIndex: "flow_no" },
     { title: "日期", dataIndex: "occurred_on" },
@@ -78,7 +78,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
     <Card className="glass" title="资金明细">
       <div className="ui-filter-bar funds-cashflow-filters">
         <Input aria-label="流水搜索" allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注" onChange={(event) => setCashflowKeyword(event.target.value)} />
-        <Select aria-label="流水资金账户" allowClear disabled={filtersDisabled} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
+        <Select aria-label="流水资金账户" allowClear disabled={filtersDisabled || !fundsReady} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
         <Select aria-label="流水方向" allowClear disabled={filtersDisabled} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
         <Select aria-label="流水账簿" allowClear disabled={filtersDisabled} value={cashflowLedgerType || undefined} placeholder="全部账簿" options={Object.entries(LEDGER_TYPE_LABEL).map(([value, label]) => ({ value, label }))} onChange={(value) => setCashflowLedgerType(value ?? "")} />
         <Select aria-label="流水核算属性" allowClear disabled={filtersDisabled} value={cashflowAttribute || undefined} placeholder="全部核算属性" options={flowAttributeOptions ?? []} onChange={(value) => setCashflowAttribute(value ?? "")} />
@@ -121,7 +121,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
         total={cashflowUnavailable ? 0 : cashflowTotal}
         controlledPaging
         emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
-        loading={loading || cashflowLoading}
+        loading={cashflowLoading}
         onPageChange={setCashflowPage}
       />
     </Card>

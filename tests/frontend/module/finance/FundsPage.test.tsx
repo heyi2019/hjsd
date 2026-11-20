@@ -224,7 +224,9 @@ describe("FundsPage：资金账户卡片", () => {
     else vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
     renderLight(<FundsPage />, { user: "admin" });
 
-    await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
+    await ui.click(screen.getByRole("tab", { name: kind }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(`${kind}加载失败`);
+    await ui.click(screen.getByRole("tab", { name: "总览" }));
     expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("1,600.00");
     expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
   });
@@ -242,6 +244,96 @@ describe("FundsPage：资金账户卡片", () => {
       expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
     } finally {
       await act(async () => { finishDeposits(deposits); await pendingDeposits; });
+    }
+  });
+
+  it("押金仍在加载时，对账列表就绪后可以查看和新增", async () => {
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
+    vi.mocked(depositsApi.list).mockReturnValueOnce(pending);
+    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([
+      { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "测试对账账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "OPEN" },
+    ]);
+    renderLight(<FundsPage />, { user: "admin" });
+
+    try {
+      await ui.click(screen.getByRole("tab", { name: "对账" }));
+      expect(await screen.findByText("测试对账账户")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("button", { name: "新增对账" })).toBeEnabled());
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      await act(async () => { finishDeposits(deposits); await pending; });
+    }
+  });
+
+  it("对账仍在加载时，已就绪的押金列表无需等待", async () => {
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finishReconciliations = resolve; });
+    vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pending);
+    renderLight(<FundsPage />, { user: "admin" });
+
+    try {
+      await ui.click(screen.getByRole("tab", { name: "押金" }));
+      expect(await screen.findByText("#99")).toBeInTheDocument();
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "新增占用" })).toBeEnabled();
+    } finally {
+      await act(async () => { finishReconciliations([]); await pending; });
+    }
+  });
+
+  it("对账失败后可独立重试，不必等待正在加载的押金", async () => {
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
+    vi.mocked(depositsApi.list).mockReturnValueOnce(pending);
+    vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
+    renderLight(<FundsPage />, { user: "admin" });
+
+    try {
+      await ui.click(screen.getByRole("tab", { name: "对账" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("对账加载失败");
+      expect(screen.getByRole("button", { name: "新增对账" })).toBeDisabled();
+      await ui.click(screen.getByRole("button", { name: "重新加载" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "新增对账" })).toBeEnabled());
+      expect(depositsApi.list).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => { finishDeposits(deposits); await pending; });
+    }
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    expect(await screen.findByText("#99")).toBeInTheDocument();
+  });
+
+  it.each(["押金", "对账"])("%s加载失败时，资金流水仍独立可用", async (kind) => {
+    if (kind === "押金") vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
+    else vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
+    renderLight(<FundsPage />, { user: "admin" });
+    await ui.click(screen.getByRole("tab", { name: kind }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(`${kind}加载失败`);
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await waitFor(() => expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("800.00"));
+    expect(screen.getByRole("combobox", { name: "流水方向" })).toBeEnabled();
+  });
+
+  it.each(["对账", "资金明细"])("账户重新加载时，%s不展示上次的账户名称", async (kind) => {
+    let finishPools!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishPools = resolve; });
+    vi.mocked(reconciliationsApi.list).mockResolvedValue([
+      { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "测试对账账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "OPEN" },
+    ]);
+    const { rerender } = renderLight(<FundsPage active />, { user: "admin" });
+    await waitFor(() => expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled());
+    vi.mocked(poolsApi.list).mockReturnValueOnce(pending);
+    rerender(<FundsPage active={false} />);
+    rerender(<FundsPage active />);
+
+    try {
+      await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(2));
+      await ui.click(screen.getByRole("tab", { name: kind }));
+      const row = (await screen.findByText(kind === "对账" ? "测试对账账户" : "ZC00001")).closest("tr") as HTMLElement;
+      expect(within(row).queryByText("经营主池")).not.toBeInTheDocument();
+      expect(within(row).getByText(kind === "对账" ? "1" : "账户 1")).toBeInTheDocument();
+    } finally {
+      await act(async () => { finishPools(pools); await pending; });
     }
   });
 
@@ -331,19 +423,26 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
   });
 
-  it("并行加载失败时等待其余请求结束，再允许重新加载", async () => {
+  it("押金失败后可独立重试，不必等待正在加载的对账", async () => {
     let finish!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finish = resolve; });
     vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
     vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pending);
     renderLight(<FundsPage />, { user: "admin" });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled());
-    expect(screen.queryByRole("button", { name: "重新加载" })).not.toBeInTheDocument();
-    await act(async () => { finish([]); await pending; });
-    await ui.click(await screen.findByRole("button", { name: "重新加载" }));
-    expect(await screen.findByRole("cell", { name: /经营主池/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
+    try {
+      await ui.click(screen.getByRole("tab", { name: "押金" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("押金加载失败");
+      expect(screen.getByRole("button", { name: "新增占用" })).toBeDisabled();
+      await ui.click(screen.getByRole("button", { name: "重新加载" }));
+      expect(await screen.findByText("#99")).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole("button", { name: "新增占用" })).toBeEnabled());
+      expect(reconciliationsApi.list).toHaveBeenCalledTimes(1);
+    } finally {
+      await act(async () => { finish([]); await pending; });
+    }
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "新增对账" })).toBeEnabled());
   });
 
   it("资金中心将工作室运营、对账和押金作为一级入口", async () => {

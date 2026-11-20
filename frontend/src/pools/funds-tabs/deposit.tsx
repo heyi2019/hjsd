@@ -1,14 +1,15 @@
 /** 押金占用区块：从 FundsPage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { ConfirmButton, DataTable, MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
+import { ConfirmButton, DataTable, ErrorBanner, MoneyText, PermissionButton, StatusTag } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { today } from "../../shared/lib/format";
 import type { FundsPageController } from "../useFundsPageController";
 import type { Deposit } from "../../shared/api/types/finance";
 
 export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
-  const { deposits, employees, openDepositCreate, openDepositEdit, deleteDeposit, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, loading } = ctrl;
+  const { deposits, employees, openDepositCreate, openDepositEdit, deleteDeposit, returnForm, setReturnTarget, lossForm, setLossTarget, cancelForm, setCancelTarget, depositsReady, depositsLoading, depositsError, reloadDeposits, fundsReady } = ctrl;
+  const depositsUnavailable = !depositsReady || Boolean(depositsError);
   const { arrange: arrangeDepositColumns } = useListViewColumns("DEPOSITS");
   const depositColumns: ColumnsType<Deposit> = [
     { title: "押金性质", dataIndex: "ledger_type", width: 120, render: (v: string) => v === "STUDIO" ? "工作室运营押金" : "业务押金" },
@@ -38,7 +39,7 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
           <PermissionButton
             permission="deposit.post"
             size="small"
-            disabled={row.status !== "PAID"}
+            disabled={row.status !== "PAID" || !fundsReady}
             onClick={() => openDepositEdit(row)}
           >
             编辑
@@ -89,19 +90,20 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
       className="glass"
       title="押金占用"
       extra={
-        <PermissionButton permission="deposit.post" type="primary" onClick={openDepositCreate}>
+        <PermissionButton permission="deposit.post" type="primary" disabled={depositsUnavailable || !fundsReady} onClick={openDepositCreate}>
           新增占用
         </PermissionButton>
       }
     >
+      <ErrorBanner error={depositsError} onRetry={() => void reloadDeposits()} retrying={depositsLoading} />
       <DataTable<Deposit>
         columns={arrangeDepositColumns(depositColumns)}
-        rows={deposits}
+        rows={depositsUnavailable ? [] : deposits}
         page={1}
         pageSize={10}
-        total={deposits.length}
-        emptyText="暂无押金占用"
-        loading={loading}
+        total={depositsUnavailable ? 0 : deposits.length}
+        emptyText={depositsError ? "押金数据不可用，请点击重新加载" : "暂无押金占用"}
+        loading={depositsLoading}
         onPageChange={() => undefined}
       />
     </Card>

@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { normalizeError } from "../shared/api/client";
-import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useCashflowResources } from "./useCashflowResources";
 import { useDepositResources } from "./useDepositResources";
@@ -16,14 +14,7 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
   const poolResources = usePoolResources();
   const depositResources = useDepositResources();
   const reconciliationResources = useReconciliationResources();
-  const [reconciliationsReady, setReconciliationsReady] = useState(false);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [fundsReady, setFundsReady] = useState(false);
-  const [fundsLoading, setFundsLoading] = useState(false);
-  const [fundsError, setFundsError] = useState<{ message: string; code?: string } | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [loading, setLoading] = useState(false);
-  const loadRequest = useLatestRequest();
   const cashflow = useCashflowResources(active && periodState.ready, periodState);
 
   useEffect(() => {
@@ -37,47 +28,23 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
   }, []);
 
   const load = useCallback(async (includeCashflow = true) => {
-    const requestId = loadRequest.start();
-    const isCurrent = () => loadRequest.isCurrent(requestId);
-    setLoading(true);
-    setFundsReady(false);
-    setFundsLoading(true);
-    setFundsError(null);
-    setReconciliationsReady(false);
-    try {
-      const results = await Promise.allSettled([
-        poolResources.loadPools(isCurrent).then(
-          () => { if (isCurrent()) setFundsReady(true); },
-          (err) => {
-            if (isCurrent()) setFundsError(normalizeError(err));
-            throw err;
-          },
-        ).finally(() => { if (isCurrent()) setFundsLoading(false); }),
-        depositResources.loadDeposits(isCurrent),
-        reconciliationResources.loadReconciliations(isCurrent),
-        ...(includeCashflow && periodState.ready ? [cashflow.fetchCashflows()] : []),
-      ]);
-      if (!isCurrent()) return;
-      const failure = results.find((result) => result.status === "rejected");
-      if (failure?.status === "rejected") throw failure.reason;
-      setReconciliationsReady(true);
-      setError(null);
-    } catch (err) {
-      if (isCurrent()) setError(normalizeError(err));
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  }, [cashflow.fetchCashflows, depositResources.loadDeposits, loadRequest, poolResources.loadPools, reconciliationResources.loadReconciliations, periodState.ready]);
+    await Promise.all([
+      poolResources.loadPools(),
+      depositResources.loadDeposits(),
+      reconciliationResources.loadReconciliations(),
+      ...(includeCashflow && periodState.ready ? [cashflow.fetchCashflows()] : []),
+    ]);
+  }, [cashflow.fetchCashflows, depositResources.loadDeposits, poolResources.loadPools, reconciliationResources.loadReconciliations, periodState.ready]);
 
   // keep-alive：建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
   useReloadOnActive(active, () => load(false));
 
   // 四张统计卡全部取服务端汇总（Decimal 聚合）：前端不再对卡片浮点累加，也不再有 N+1。
-  const unavailableAmount = fundsError ? "不可用" : "—";
+  const unavailableAmount = poolResources.fundsError ? "不可用" : "—";
   const balanceTotals = poolResources.balanceTotals;
-  const totalCash = fundsReady && balanceTotals ? balanceTotals.cash_balance : unavailableAmount;
-  const totalAvailable = fundsReady && balanceTotals ? balanceTotals.available : unavailableAmount;
-  const totalDeposit = fundsReady && balanceTotals ? balanceTotals.deposit_held : unavailableAmount;
+  const totalCash = poolResources.fundsReady && balanceTotals ? balanceTotals.cash_balance : unavailableAmount;
+  const totalAvailable = poolResources.fundsReady && balanceTotals ? balanceTotals.available : unavailableAmount;
+  const totalDeposit = poolResources.fundsReady && balanceTotals ? balanceTotals.deposit_held : unavailableAmount;
 
   const totalFlowIncome = cashflow.cashflowTotals.income;
   const totalFlowExpense = cashflow.cashflowTotals.expense;
@@ -87,14 +54,20 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
     employees,
     balances: poolResources.balances,
     deposits: depositResources.deposits,
+    depositsReady: depositResources.depositsReady,
+    depositsLoading: depositResources.depositsLoading,
+    depositsError: depositResources.depositsError,
+    reloadDeposits: depositResources.loadDeposits,
     ...cashflow,
     reconciliations: reconciliationResources.reconciliations,
-    reconciliationsReady,
-    loading,
-    error,
-    fundsReady,
-    fundsLoading,
-    fundsError,
+    reconciliationsReady: reconciliationResources.reconciliationsReady,
+    reconciliationsLoading: reconciliationResources.reconciliationsLoading,
+    reconciliationsError: reconciliationResources.reconciliationsError,
+    reloadReconciliations: reconciliationResources.loadReconciliations,
+    fundsReady: poolResources.fundsReady,
+    fundsLoading: poolResources.fundsLoading,
+    fundsError: poolResources.fundsError,
+    reloadFunds: poolResources.loadPools,
     load,
     totalCash,
     totalAvailable,

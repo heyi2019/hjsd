@@ -53,6 +53,35 @@ beforeEach(() => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("新增需求时立即打开表单并等待客户名单", async () => {
+    let finish!: (value: ReturnType<typeof pageResponse<Customer>>) => void;
+    const pending = new Promise<ReturnType<typeof pageResponse<Customer>>>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.page).mockReturnValueOnce(pending);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    expect(within(modal).getByRole("button", { name: "创建需求" })).toBeDisabled();
+    await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("LEAD", true));
+    await act(async () => finish(pageResponse(customers, { limit: 500 })));
+    await waitFor(() => expect(within(modal).getByRole("button", { name: "创建需求" })).toBeEnabled());
+  });
+
+  it("关闭后重新打开需求表单时忽略旧名单请求", async () => {
+    let fail!: (error: Error) => void;
+    const pending = new Promise<ReturnType<typeof pageResponse<Customer>>>((_resolve, reject) => { fail = reject; });
+    vi.mocked(customersApi.page).mockReturnValueOnce(pending);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    await ui.click(within(modal).getByRole("button", { name: "Close" }));
+    await ui.click(screen.getByRole("button", { name: "新增需求" }));
+    const reopened = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    await waitFor(() => expect(within(reopened).getByRole("button", { name: "创建需求" })).toBeEnabled());
+    await act(async () => { fail(new Error("旧名单失败")); await pending.catch(() => undefined); });
+    expect(within(reopened).getByRole("button", { name: "创建需求" })).toBeEnabled();
+    expect(screen.queryByText(/旧名单失败/)).not.toBeInTheDocument();
+  });
+
   it("统计未返回时先显示需求列表及分页总数", async () => {
     let finish!: (value: { total_count: number; open_count: number }) => void;
     const pending = new Promise<{ total_count: number; open_count: number }>((resolve) => { finish = resolve; });

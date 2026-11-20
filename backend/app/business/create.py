@@ -85,7 +85,7 @@ def create_order(
     snapshot_extra = dict((account_snapshot or {}).get("extra_values") or {})
     submitted_extra = dict(form_extra or {})
     merged_extra = {**snapshot_extra, **submitted_extra}
-    if account_snapshot is not None and "bound_phone" not in merged_extra:
+    if account_snapshot is not None and "bound_phone" in account_snapshot and "bound_phone" not in merged_extra:
         merged_extra["bound_phone"] = account_snapshot.get("bound_phone")
     form_extra = validate_form_extra(
         session,

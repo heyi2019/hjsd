@@ -18,6 +18,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { ToolbarMultiSelect } from "../shared/ui/ToolbarMultiSelect";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
+import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { collectExtras } from "./CustomersPage.fragments";
 
 export function CounterpartyPanel({ active = true, focusId, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
@@ -43,6 +44,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [detailTarget, setDetailTarget] = useState<Counterparty | null>(null);
   const [detailData, setDetailData] = useState<Counterparty | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const detailRequest = useLatestRequest();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const write = useAsyncAction();
   const [form] = Form.useForm();
@@ -96,17 +98,20 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     return () => { requestRef.current += 1; };
   }, [active, load, page, resetKey]);
 
-  const openDetail = async (row: Counterparty, loadedDetail?: Counterparty) => {
-    setDetailTarget(row);
-    setDetailData(loadedDetail ?? null);
-    setDetailLoading(!loadedDetail);
-    if (loadedDetail) return;
+  const openDetail = async (id: number, row?: Counterparty) => {
+    const request = detailRequest.start();
+    setDetailTarget(row ?? null);
+    setDetailData(null);
+    setDetailLoading(true);
     try {
-      setDetailData(await counterpartiesApi.get(row.id));
+      const detail = await counterpartiesApi.get(id);
+      if (!detailRequest.isCurrent(request)) return;
+      if (!row) setDetailTarget(detail);
+      setDetailData(detail);
     } catch (err) {
-      setError(normalizeError(err));
+      if (detailRequest.isCurrent(request)) setError(normalizeError(err));
     } finally {
-      setDetailLoading(false);
+      if (detailRequest.isCurrent(request)) setDetailLoading(false);
     }
   };
 
@@ -115,13 +120,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     if (focusId == null || handledFocusRef.current === focusId) return;
     const row = rows?.find((item) => item.id === focusId);
     handledFocusRef.current = focusId;
-    if (row) {
-      void openDetail(row);
-      return;
-    }
-    void counterpartiesApi.get(focusId)
-      .then((item) => openDetail(item, item))
-      .catch((err) => setError(normalizeError(err)));
+    void openDetail(focusId, row);
   }, [focusId, rows]);
 
   const submit = async (values: Record<string, unknown>) => {
@@ -173,7 +172,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
           href="#"
           onClick={(event) => {
             event.preventDefault();
-            void openDetail(row);
+            void openDetail(row.id, row);
           }}
         >
           {value}
@@ -189,7 +188,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       key: "actions",
       render: (_v, row) => (
         <Space size={2}>
-          <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row)}>
+          <PermissionButton permission="counterparty.read" size="small" onClick={() => void openDetail(row.id, row)}>
             详情
           </PermissionButton>
           <PermissionButton permission="counterparty.manage" size="small" disabled={row.status !== "ACTIVE"} onClick={() => { write.clearError(); setEditTarget(row); }}>
@@ -350,8 +349,10 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         title={detailTarget ? `合作方档案 · ${detailTarget.counterparty_no}` : "合作方档案"}
         open={Boolean(detailTarget)}
         onClose={() => {
+          detailRequest.invalidate();
           setDetailTarget(null);
           setDetailData(null);
+          setDetailLoading(false);
         }}
         width={640}
         destroyOnHidden
@@ -361,9 +362,12 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
               permission="counterparty.manage"
               size="small"
               onClick={() => {
+                detailRequest.invalidate();
                 write.clearError();
                 setEditTarget(detailTarget);
                 setDetailTarget(null);
+                setDetailData(null);
+                setDetailLoading(false);
               }}
             >
               编辑

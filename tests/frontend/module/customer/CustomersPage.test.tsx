@@ -316,6 +316,26 @@ describe("CustomersPage：客户档案", () => {
     expect(counterpartiesApi.get).toHaveBeenCalledWith(11);
   });
 
+  it("关闭并打开另一合作方后，迟到的详情不能覆盖当前档案", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const second = { ...counterparties[0], id: 12, counterparty_no: "CP-0002", display_name: "同行乙", contact_name: "乙联系人" };
+    let finishFirst!: (value: Awaited<ReturnType<typeof counterpartiesApi.get>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof counterpartiesApi.get>>>((resolve) => { finishFirst = resolve; });
+    vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([counterparties[0], second]));
+    vi.mocked(counterpartiesApi.get).mockImplementation((id) => id === 11 ? first : Promise.resolve(second));
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await user.click(await screen.findByRole("link", { name: "CP-0001" }));
+    await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("link", { name: "CP-0002" }));
+    expect(await screen.findByText("乙联系人")).toBeInTheDocument();
+    await act(async () => { finishFirst(counterparties[0]); await first; });
+    const drawer = screen.getByRole("dialog");
+    expect(within(drawer).getByText("乙联系人")).toBeInTheDocument();
+    expect(within(drawer).queryByText("李经理")).not.toBeInTheDocument();
+  });
+
   it("加载成功后渲染客户编号与状态标签", async () => {
     renderLight(<CustomersPage />);
     expect(await screen.findByText("CUS-0001")).toBeInTheDocument();
@@ -678,6 +698,31 @@ describe("CustomersPage：行内动作", () => {
   });
 
   describe("CustomersPage：客户与合作方操作流", () => {
+    it("合并弹窗重开后忽略上一次迟到的客户名单", async () => {
+      let finishFirst!: (value: Awaited<ReturnType<typeof customersApi.page>>) => void;
+      const first = new Promise<Awaited<ReturnType<typeof customersApi.page>>>((resolve) => { finishFirst = resolve; });
+      let candidateRequests = 0;
+      vi.mocked(customersApi.page).mockImplementation(async (params) => {
+        if (params?.status === "ACTIVE" && params.limit === 500) {
+          candidateRequests += 1;
+          if (candidateRequests === 1) return first;
+          return pageResponse([{ ...customers[1], status: "ACTIVE" }]);
+        }
+        return pageResponse(customers);
+      });
+      renderLight(<CustomersPage />, { user: "admin" });
+      await screen.findByText("CUS-0001");
+      await ui.click(screen.getAllByRole("button", { name: /合并/ })[0]);
+      const dialog = await screen.findByRole("dialog");
+      await ui.click(dialog.querySelector(".ant-modal-close") as Element);
+      await ui.click(screen.getAllByRole("button", { name: /合并/ })[0]);
+      await waitFor(() => expect(candidateRequests).toBe(2));
+      await act(async () => { finishFirst(pageResponse([{ ...customers[0], id: 3, customer_no: "CUS-0003", display_name: "旧名单" }])); await first; });
+      const reopened = await screen.findByRole("dialog");
+      await ui.click(reopened.querySelector(".ant-select-selector") as Element);
+      expect(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+      expect(screen.queryByText("CUS-0003 旧名单", { selector: ".ant-select-item-option-content" })).not.toBeInTheDocument();
+    });
     it("合并客户可选择后续页的有效客户", async () => {
       vi.mocked(customersApi.page).mockImplementation(async (params) => {
         if (params?.status === "ACTIVE" && params?.limit === 500) {

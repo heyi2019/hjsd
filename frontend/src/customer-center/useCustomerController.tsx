@@ -1,6 +1,6 @@
 import { Form, Space, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../business/ConfigurableField";
 import { customersApi } from "../shared/api/customers.api";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
@@ -49,12 +49,20 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const requestRef = useRef(0);
   const summaryRequestRef = useRef(0);
   const detailRequest = useLatestRequest();
+  const candidatesRequest = useLatestRequest();
   const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const [mergeForm] = Form.useForm();
 
   const activeDefs = fieldDefs.filter((def) => def.is_active);
+  const filters = useMemo(() => ({
+    ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+    ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
+    ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+  }), [creatorFilter, keyword, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
 
   const [exporting, setExporting] = useState(false);
   /** 客户按列配置导出 CSV。 */
@@ -63,11 +71,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     try {
       downloadBlob(
         await customersApi.exportCsv({
-          ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-          ...(statusFilter ? { status: statusFilter } : {}),
-          ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-          ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
-          ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+          ...filters,
         }),
         `客户-${today()}.csv`,
       );
@@ -83,11 +87,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     const request = ++requestRef.current;
     setLoading(true);
     const params = {
-      ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-      ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
-      ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+      ...filters,
       limit: pageSize,
       offset: (page - 1) * pageSize,
       ...(sortDesc ? {} : { sort_desc: false }),
@@ -102,7 +102,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     }).finally(() => {
       if (request === requestRef.current) setLoading(false);
     });
-  }, [creatorFilter, keyword, page, pageSize, sortDesc, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
+  }, [filters, page, pageSize, sortDesc]);
 
   const loadSummary = useCallback(async () => {
     const request = ++summaryRequestRef.current;
@@ -110,11 +110,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     setSummaryError(null);
     const params = {
       today_date: today(),
-      ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-      ...(statusFilter ? { status: statusFilter } : {}),
-      ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-      ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
-      ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+      ...filters,
     };
     await customersApi.summary(params).then((customerSummary) => {
       if (request === summaryRequestRef.current) setSummary(customerSummary);
@@ -123,7 +119,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     }).finally(() => {
       if (request === summaryRequestRef.current) setSummaryLoading(false);
     });
-  }, [creatorFilter, keyword, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
+  }, [filters]);
   const load = useCallback(async () => {
     await Promise.all([loadList(), loadSummary()]);
   }, [loadList, loadSummary]);
@@ -337,17 +333,21 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const requestEdit = (target: Customer) => { detailRequest.invalidate(); clearActionError(); setEditTarget(target); setDetailTarget(null); setDetailLoading(false); };
   // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
   // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
-  const cancelMerge = () => { clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
+  const cancelMerge = () => { candidatesRequest.invalidate(); clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
   const requestMerge = async (target: Customer) => {
+    const request = candidatesRequest.start();
     clearActionError();
     mergeForm.resetFields();
     setMergeTarget(target);
     setMergeCandidates(null);
     try {
-      setMergeCandidates(await loadActiveCustomers());
+      const candidates = await loadActiveCustomers();
+      if (candidatesRequest.isCurrent(request)) setMergeCandidates(candidates);
     } catch (err) {
-      setCandidateError(normalizeError(err));
-      setMergeCandidates([]);
+      if (candidatesRequest.isCurrent(request)) {
+        setCandidateError(normalizeError(err));
+        setMergeCandidates([]);
+      }
     }
   };
 

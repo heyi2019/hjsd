@@ -40,6 +40,23 @@ class FieldDefinition(Protocol):
     options: list[Any] | None
 
 
+def has_field_value(value: Any) -> bool:
+    return value is not None and value != "" and value != []
+
+
+def field_is_required(definition: Any, values: Mapping[str, Any]) -> bool:
+    required = definition.required
+    condition = definition.required_when
+    if condition:
+        dependency = values.get(condition.get("field"))
+        if condition.get("op") == "filled":
+            return has_field_value(dependency)
+        current = dependency if isinstance(dependency, list) else [dependency]
+        hit = any(str(item) in (condition.get("values") or []) for item in current)
+        return not hit if condition.get("op") == "ne" else hit
+    return required
+
+
 def normalize_date_value(value: Any, definition: FieldDefinition) -> str:
     """校验并返回归一化的 ``YYYY-MM-DD``（两域共用的唯一 DATE 口径）。"""
     if not isinstance(value, str):

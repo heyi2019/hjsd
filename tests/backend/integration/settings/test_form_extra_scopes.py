@@ -76,6 +76,29 @@ def test_all_registered_long_scopes_can_configure_fields_and_labels(seeded_clien
         assert loaded.json()["EXTRA"] == "扩展信息"
 
 
+@pytest.mark.parametrize(("order_type", "value", "other_value"), [("HS", "文字", 12), ("TH", 12, "文字")])
+def test_order_account_custom_fields_do_not_mix_order_types(seeded_client, seeded_db, headers, order_type, value, other_value):
+    from app.business.form_fields import create_order_form_field
+    for scope, field_type in [("HS", "TEXT"), ("TH", "NUMBER")]:
+        create_order_form_field(seeded_db, order_type_code=scope, field_key="shared_value", label="账号字段",
+                                field_type=field_type, section="ACCOUNT_PRODUCT", required=True, actor="pytest")
+    other_type = "TH" if order_type == "HS" else "HS"
+    create_order_form_field(seeded_db, order_type_code=other_type, field_key="other_required", label="其他业务字段",
+                            section="ACCOUNT_PRODUCT", required=True, actor="pytest")
+    seeded_db.commit()
+    payload = {"order_type": order_type, "trade_date": D, "account_snapshot": {
+        "game_account": f"scope-test-{order_type}", "extra_values": {"shared_value": value},
+    }}
+    created = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    assert created.status_code == 201, created.text
+    account = seeded_db.get(Account, created.json()["account_id"])
+    assert account.form_extra["shared_value"] == value
+    invalid = seeded_client.post("/api/v1/orders", json={**payload, "account_snapshot": {
+        "game_account": f"scope-invalid-{order_type}", "extra_values": {"shared_value": other_value},
+    }}, headers=headers)
+    assert invalid.status_code == 422, invalid.text
+
+
 def test_operation_scope_seeds_match_registry(seeded_db):
     """当前基线为所有操作作用域落入可读取的字段种子。"""
     from app.domain import form_scopes

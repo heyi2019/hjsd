@@ -47,6 +47,34 @@ def _set(seeded_db, customer_id: int, pairs: list[tuple[str, object]], **kwargs)
     )
 
 
+def test_required_multiselect_cannot_be_empty_on_customer_creation(seeded_db):
+    _add_field(seeded_db, "required_choices", field_type="MULTI_SELECT",
+               options=[{"value": "A", "label": "甲"}], required=True)
+    with pytest.raises(Validation, match="required_choices"):
+        create_customer(seeded_db, display_name="空多选", actor="pytest", extra_values={"required_choices": []})
+
+
+def test_conditional_customer_field_is_required_when_triggered(seeded_db):
+    _add_field(seeded_db, "kind", field_type="SELECT",
+               options=[{"value": "A", "label": "甲"}, {"value": "B", "label": "乙"}])
+    note = _add_field(seeded_db, "details")
+    note.required_when = {"field": "kind", "op": "eq", "values": ["A"]}
+    seeded_db.flush()
+    with pytest.raises(Validation, match="details"):
+        create_customer(seeded_db, display_name="缺条件字段", actor="pytest", extra_values={"kind": "A"})
+    created = create_customer(seeded_db, display_name="不触发条件", actor="pytest", extra_values={"kind": "B"})
+    assert created.form_extra == {"kind": "B"}
+
+
+def test_customer_extra_fields_can_be_edited_via_api(seeded_client, seeded_db, headers):
+    _add_field(seeded_db, "remark")
+    customer = create_customer(seeded_db, display_name="字段编辑客户", actor="pytest", extra_values={"remark": "旧值"})
+    saved = seeded_client.patch(f"/api/v1/customers/{customer.id}", headers=headers,
+                                json={"extra_values": {"remark": "新值"}})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["extra_values"]["remark"] == "新值"
+
+
 # --------------------------------------------------------------- 定义来源
 def test_definitions_only_include_customer_custom_fields(seeded_db):
     _add_field(seeded_db, "extra_a")

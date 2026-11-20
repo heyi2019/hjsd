@@ -25,6 +25,8 @@ from ._common import (
     validate_wallet_realname,
 )
 
+_ACCOUNT_FORM_SCOPE = {"RECOVERY": "HS", "PICKUP": "TH", "CONSIGNMENT": "DG"}
+
 
 def create_account(
     session: Session,
@@ -97,6 +99,7 @@ def create_account(
         entity_id=account.id,
         values=(extra_values or {}).items(),
         require_all=True,
+        scope=_ACCOUNT_FORM_SCOPE.get(inventory_type),
     )
     record_audit(
         session,
@@ -223,6 +226,7 @@ def update_account_profile(
             entity_type="account",
             entity_id=account.id,
             values=(extra_values or {}).items(),
+            scope=_ACCOUNT_FORM_SCOPE.get(account.inventory_type),
         )
     if form_extra is not _UNSET and form_extra:
         # INVEDIT 作用域自定义字段值合并进账号 form_extra。

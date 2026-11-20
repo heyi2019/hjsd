@@ -12,7 +12,7 @@ from app.core.errors import Validation
 from app.domain.trade import OrderFormField
 from app.domain.users import User
 from app.domain.form_scopes import SCOPE_CODES
-from app.shared.form_field_value import validate_field_value
+from app.shared.form_field_value import field_is_required, has_field_value, validate_field_value
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
 
@@ -190,21 +190,8 @@ def validate_form_extra(
         # 不写回——本域保留提交原值。三处策略差异由 strict=False 固化。
         validate_field_value(definition, value, strict=False)
 
-    def filled(value: Any) -> bool:
-        return value is not None and value != "" and value != []
-
     for definition in active_custom:
-        required = definition.required
-        condition = definition.required_when
-        if condition:
-            dependency = normalized.get(condition.get("field"))
-            if condition.get("op") == "filled":
-                required = filled(dependency)
-            else:
-                current = dependency if isinstance(dependency, list) else [dependency]
-                hit = any(str(item) in (condition.get("values") or []) for item in current)
-                required = (not hit) if condition.get("op") == "ne" else hit
-        if required and not filled(normalized.get(definition.field_key)):
+        if field_is_required(definition, normalized) and not has_field_value(normalized.get(definition.field_key)):
             raise Validation(f"字段 {definition.label} 必填", details={"field_key": definition.field_key})
     return normalized
 

@@ -80,10 +80,18 @@ export function resolveRules(
   return stripped;
 }
 
+/** 条件可以依赖普通字段，也可以依赖 form_extra 中的自定义字段。 */
+export function useConditionFieldValue(condField: string | undefined): unknown {
+  const form = Form.useFormInstance();
+  const field = condField ?? "__no_required_when__";
+  const directValue = Form.useWatch(field, form);
+  const customValue = Form.useWatch(["form_extra", field], form);
+  return directValue === undefined ? customValue : directValue;
+}
+
 /** 订阅条件依赖字段的当前值；无条件时不订阅（用占位键，antd useWatch 对未知字段返回 undefined）。 */
 export function useConditionValues(cfg: FieldConfigMap, key: string): Record<string, unknown> | undefined {
-  const form = Form.useFormInstance();
   const condField = fieldConfigFor(cfg, key)?.required_when?.field;
-  const depValue = Form.useWatch(condField ?? "__no_required_when__", form);
+  const depValue = useConditionFieldValue(condField);
   return condField ? { [condField]: depValue } : undefined;
 }

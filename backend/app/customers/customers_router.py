@@ -239,7 +239,6 @@ def update_customer(
         customer_id,
         actor=_actor(user),
         user=user,
-        extra_values=payload.extra_values,
         **payload.model_dump(exclude_unset=True),
     )
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)

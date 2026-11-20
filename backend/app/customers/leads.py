@@ -95,6 +95,7 @@ def create_lead(
         entity_id=lead.id,
         values=(extra_values or {}).items(),
         require_all=True,
+        scope="LEAD",
     )
     record_audit(
         session,
@@ -220,13 +221,14 @@ def update_lead(
     if extra_values is not _UNSET:
         values = _normalize_extra_values(extra_values)
         _validate_required_extras(
-            session, EntityType.LEAD.value, values, partial=True
+            session, EntityType.LEAD.value, values, partial=True, scope="LEAD"
         )
         set_extra_values(
             session,
             entity_type=EntityType.LEAD.value,
             entity_id=lead.id,
             values=values.items(),
+            scope="LEAD",
         )
     record_audit(
         session,
@@ -276,11 +278,11 @@ def convert_lead(
     order = session.scalar(stmt)
     if order is None:
         raise NotFound("订单不存在", details={"order_no": normalized_order_no})
+    set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id,
+                     values=(extra_values or {}).items(), require_all=True, scope="LEADCONVERT")
     lead.status = LeadStatus.CONVERTED.value
     lead.converted_order_id = order.id
     lead.updated_by = actor
-    if extra_values:
-        set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id, values=extra_values.items())
     session.flush()
     record_audit(
         session,
@@ -315,11 +317,11 @@ def close_lead(
     if lead.status != LeadStatus.OPEN.value:
         raise Conflict("只有 OPEN 需求可以关闭", details={"lead_no": lead.lead_no})
     normalized = _required_text(reason, message="关闭需求必须填写原因", field="reason")
+    set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id,
+                     values=(extra_values or {}).items(), require_all=True, scope="LEADCLOSE")
     lead.status = LeadStatus.CLOSED.value
     lead.closed_reason = normalized
     lead.updated_by = actor
-    if extra_values:
-        set_extra_values(session, entity_type=EntityType.LEAD.value, entity_id=lead.id, values=extra_values.items())
     session.flush()
     record_audit(
         session,

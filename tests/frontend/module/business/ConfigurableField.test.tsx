@@ -163,6 +163,28 @@ describe("resolveRules 金额字段必填 > 0（选填可 0 / 必填不可 0）"
 });
 
 describe("CustomFormField", () => {
+  it.each(["custom-to-custom", "core-to-custom", "custom-to-core"])("条件必填可监听%s字段并阻止缺值提交", async (sourceKind) => {
+    const source = makeField({ field_key: "source", label: "来源" });
+    const note = makeField({ field_key: "details", label: "补充说明", required_when: { field: "source", op: "filled" } });
+    const submit = vi.fn();
+    const Harness = () => {
+      const [form] = Form.useForm();
+      return <Form form={form} onFinish={submit}>
+        {sourceKind === "core-to-custom" ? <Form.Item name="source" label="来源"><Input /></Form.Item> : <CustomFormField def={source} />}
+        {sourceKind === "custom-to-core" ? <CfgItem name="details" label="补充说明" cfg={{ details: note }}><Input /></CfgItem> : <CustomFormField def={note} />}
+        <button type="submit">提交</button>
+      </Form>;
+    };
+    renderLight(<Harness />);
+    await ui.type(screen.getByLabelText("来源"), "已填写");
+    await ui.click(screen.getByRole("button", { name: "提交" }));
+    expect(await screen.findByText("补充说明必填")).toBeInTheDocument();
+    expect(submit).not.toHaveBeenCalled();
+    await ui.type(screen.getByLabelText("补充说明"), "说明");
+    await ui.click(screen.getByRole("button", { name: "提交" }));
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+  });
+
   it("TEXT 字段值归集到 form_extra.<field_key>", async () => {
     const def = makeField({ field_key: "vip_tag", label: "VIP标签", field_type: "TEXT", required: false });
     let captured: Record<string, unknown> | null = null;

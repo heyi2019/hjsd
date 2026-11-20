@@ -3,10 +3,41 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+import pytest
+
 from app.business.create import create_order
+from app.business.form_fields import create_order_form_field
 from app.customers.customers import create_customer
 from app.customers.counterparties import create_counterparty
 from app.customers.leads import create_lead
+
+
+@pytest.mark.parametrize(("action", "scope", "field_key"), [
+    ("close", "LEADCLOSE", "close_note"),
+    ("convert", "LEADCONVERT", "convert_note"),
+])
+def test_lead_actions_validate_only_their_own_fields(seeded_client, seeded_db, headers, action, scope, field_key):
+    customer = create_customer(seeded_db, display_name="字段配置客户", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest")
+    for field_scope, key in [("LEAD", "request_note"), ("LEADCLOSE", "close_note"), ("LEADCONVERT", "convert_note")]:
+        create_order_form_field(seeded_db, order_type_code=field_scope, field_key=key,
+                                label=key, required=True, actor="pytest")
+    seeded_db.commit()
+    payload = {"customer_id": customer.id, "request_type": "FIND_ACCOUNT", "target": "测试"}
+    missing = seeded_client.post("/api/v1/leads", json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "request_note" in missing.text
+    created = seeded_client.post("/api/v1/leads", json={**payload, "extra_values": {"request_note": "建档凭据"}}, headers=headers)
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["id"]
+    url = f"/api/v1/leads/{lead_id}/{action}"
+    action_payload = {"reason": "结束"} if action == "close" else {"order_no": order.order_no}
+    missing_action = seeded_client.post(url, json=action_payload, headers=headers)
+    assert missing_action.status_code == 422, missing_action.text
+    assert field_key in missing_action.text
+    done = seeded_client.post(url, json={**action_payload, "extra_values": {field_key: "操作凭据"}}, headers=headers)
+    assert done.status_code == 200, done.text
+    assert done.json()["extra_values"] == {"request_note": "建档凭据", field_key: "操作凭据"}
 
 
 def test_customer_center_creation_period_filters_lists_summaries_and_export(seeded_client, seeded_db, headers):

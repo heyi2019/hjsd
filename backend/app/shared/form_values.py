@@ -20,7 +20,7 @@ from app.core.errors import NotFound, Validation
 from app.domain.parties import Counterparty, Customer, CustomerLead
 from app.domain.trade import Account, OrderFormField
 from app.shared.form_field_value import _option_values as _shared_option_values
-from app.shared.form_field_value import validate_field_value
+from app.shared.form_field_value import field_is_required, has_field_value, validate_field_value
 
 # 客户字段定义来自 CUSTOMER 作用域；建单账号字段由订单字段配置筛选后写入账号扩展 JSON。
 _EXTRA_DEFINITION_SCOPES: dict[str, tuple[str, ...]] = {
@@ -39,12 +39,16 @@ _EXTRA_ENTITY_MODELS: dict[str, type] = {
 
 
 def _extra_definitions(
-    session: Session, entity_type: str, *, required_only: bool = False
+    session: Session, entity_type: str, *, required_only: bool = False, scope: str | None = None
 ) -> list[OrderFormField]:
     """按实体取设置页对应作用域的自定义字段定义。"""
     scopes = _EXTRA_DEFINITION_SCOPES.get(entity_type)
     if not scopes:
         return []
+    if scope is not None:
+        if scope not in scopes:
+            raise Validation("字段作用域与实体不匹配", details={"entity_type": entity_type, "scope": scope})
+        scopes = (scope,)
     stmt = select(OrderFormField).where(
         OrderFormField.order_type_code.in_(scopes),
         OrderFormField.is_custom.is_(True),
@@ -70,26 +74,22 @@ def _validate_extra_value(definition: OrderFormField, value: Any) -> Any:
 
 
 def _validate_required_extras(
-    session: Session, entity_type: str, values: Mapping[str, Any], *, partial: bool = False
+    session: Session, entity_type: str, values: Mapping[str, Any], *, partial: bool = False, scope: str | None = None
 ) -> None:
     """必填扩展字段缺失即拒绝（BAS-04-04）。
 
     partial=True（更新路径）：只校验**本次提交**涉及到的必填字段非空，
     不要求把历史上已填过的必填字段再交一遍。
     """
-    definitions = _extra_definitions(session, entity_type, required_only=True)
-    if partial:
-        missing = [
-            definition.field_key
-            for definition in definitions
-            if definition.field_key in values and values.get(definition.field_key) in (None, "")
-        ]
-    else:
-        missing = [
-            definition.field_key
-            for definition in definitions
-            if values.get(definition.field_key) in (None, "")
-        ]
+    definitions = _extra_definitions(session, entity_type, scope=scope)
+    missing = [
+        definition.field_key
+        for definition in definitions
+        if (not partial or definition.field_key in values)
+        # 账号字段的条件依赖可能属于订单其他板块，已在建单时按完整表单校验。
+        and (definition.required if entity_type == "account" else field_is_required(definition, values))
+        and not has_field_value(values.get(definition.field_key))
+    ]
     if missing:
         raise Validation(
             f"必填扩展字段未填写：{', '.join(missing)}",
@@ -103,11 +103,12 @@ def _validate_extra_values(
     entity_type: str,
     entity_id: int | None,
     values: Iterable[tuple[str, Any]],
+    scope: str | None = None,
 ) -> dict[str, Any]:
     """按启用定义校验扩展值，返回归一化后的键值对。"""
     definitions = {
         definition.field_key: definition
-        for definition in _extra_definitions(session, entity_type)
+        for definition in _extra_definitions(session, entity_type, scope=scope)
     }
     validated: dict[str, Any] = {}
     for field_key, value in values:
@@ -128,6 +129,7 @@ def set_extra_values(
     entity_id: int,
     values: Iterable[tuple[str, Any]],
     require_all: bool = False,
+    scope: str | None = None,
 ) -> dict[str, Any]:
     """按启用的字段定义写入扩展值；未启用字段拒绝写入（BAS-04-04）。"""
     if isinstance(entity_id, bool) or not isinstance(entity_id, int) or entity_id <= 0:
@@ -149,9 +151,9 @@ def set_extra_values(
     if len(values_map) != len(values):
         raise Validation("扩展字段不能重复提交", details={"field": "extra_values"})
     if require_all:
-        _validate_required_extras(session, entity_type, values_map, partial=False)
+        _validate_required_extras(session, entity_type, values_map, partial=False, scope=scope)
     saved = _validate_extra_values(
-        session, entity_type=entity_type, entity_id=entity_id, values=values
+        session, entity_type=entity_type, entity_id=entity_id, values=values, scope=scope
     )
     merged = dict(entity.form_extra or {})
     for field_key, value in saved.items():

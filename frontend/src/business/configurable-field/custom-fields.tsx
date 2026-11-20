@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 import { dateValueFromEvent, dateValueProps, Select } from "../../shared/ui";
 import type { OrderFormField } from "../../shared/api/types/forms";
 import { useFieldConfig, useSectionLabels } from "./context";
-import { isConditionActive } from "./rules";
+import { isConditionActive, useConditionFieldValue } from "./rules";
 
 const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, string> = {
   ACCOUNT_PRODUCT: "账号 / 产品补充信息",
@@ -51,7 +51,7 @@ export function resolveOptionItems(
 export function CustomFormField({ def }: { def: OrderFormField }): ReactElement {
   const name = ["form_extra", def.field_key] as [string, string];
   const condField = def.required_when?.field;
-  const depValue = Form.useWatch(condField ?? "__no_required_when__", Form.useFormInstance());
+  const depValue = useConditionFieldValue(condField);
   const required =
     def.required ||
     isConditionActive(def.required_when, condField ? { [condField]: depValue } : undefined);

@@ -389,6 +389,15 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     assert [item["notification_id"] for item in response.json()] == [mine.id]
     assert response.json()[0]["order_no"] == order.order_no
     assert Decimal(response.json()[0]["sale_amount"]) == Decimal("800")
+    original = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers={"X-Dev-User": "admin"})
+    assert original.status_code == 200, original.text
+    execution = original.json()
+    detail = response.json()[0]
+    assert detail["stock_no"] == execution["account"]["stock_no"]
+    assert detail["inventory_entry_at"] == execution["account"]["inventory_entry_at"]
+    assert detail["removed_at"] == execution["detail_view"]["lifecycle"]["removed_at"]
+    recovery = next(row for row in execution["detail_view"]["execution_rows"] if row["category"] == "INBOUND")
+    assert detail["recovery_operator"] == recovery["operator"]
     scoped_account = seeded_db.get(User, 2)
     scoped_account.role = "OPERATOR"
     scoped_account.owner_scope = "SELF"
@@ -397,3 +406,33 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     denied = seeded_client.get("/api/v1/notifications/profit-details", params={"ids": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
     assert denied.status_code == 200, denied.text
     assert denied.json() == []
+
+
+def test_profit_notification_details_batch_does_not_query_per_order(seeded_client, seeded_db):
+    from sqlalchemy import event
+
+    ids = []
+    for index in range(3):
+        order = _order(seeded_db, f"batch-{index}")
+        _buy(seeded_db, order)
+        _sell(seeded_db, order)
+        ids.append(_make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no).id)
+    statements = []
+    connection = seeded_db.connection()
+
+    def record(_connection, _cursor, statement, _params, _context, _executemany):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    event.listen(connection, "before_cursor_execute", record)
+    try:
+        one = seeded_client.get("/api/v1/notifications/profit-details", params=[("ids", ids[0])], headers={"X-Dev-User": "admin"})
+        one_count = len(statements)
+        statements.clear()
+        many = seeded_client.get("/api/v1/notifications/profit-details", params=[("ids", value) for value in ids], headers={"X-Dev-User": "admin"})
+        many_count = len(statements)
+    finally:
+        event.remove(connection, "before_cursor_execute", record)
+    assert one.status_code == many.status_code == 200
+    assert len(many.json()) == 3
+    assert many_count <= one_count + 1, (one_count, many_count)

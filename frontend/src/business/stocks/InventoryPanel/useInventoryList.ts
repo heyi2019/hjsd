@@ -81,9 +81,11 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
 
   const wasActiveRef = useRef(false);
   const previousInitialAgeRef = useRef(initialAgeGtDays);
+  const previousSearchRef = useRef<{ keyword: string | undefined; filters: string; refreshKey: number } | null>(null);
   useEffect(() => {
     if (!active) {
       wasActiveRef.current = false;
+      previousSearchRef.current = null;
       return loadSequence.invalidate;
     }
     const reset = !wasActiveRef.current || previousInitialAgeRef.current !== initialAgeGtDays;
@@ -94,9 +96,19 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
       setPage(1);
       return loadSequence.invalidate;
     }
-    void load();
-    return loadSequence.invalidate;
-  }, [active, ageGtDays, initialAgeGtDays, load, loadSequence, page, refreshKey]);
+    const { keyword: searchKeyword, ...otherFilters } = filters;
+    const filterKey = JSON.stringify(otherFilters);
+    const previous = previousSearchRef.current;
+    const debounceSearch = previous !== null && previous.filters === filterKey
+      && previous.refreshKey === refreshKey && previous.keyword !== searchKeyword;
+    previousSearchRef.current = { keyword: searchKeyword, filters: filterKey, refreshKey };
+    const timer = debounceSearch ? window.setTimeout(() => void load(), 250) : undefined;
+    if (!debounceSearch) void load();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      loadSequence.invalidate();
+    };
+  }, [active, ageGtDays, filters, initialAgeGtDays, load, loadSequence, page, refreshKey]);
 
   const countInventoryRows = useCallback((type?: string) => {
     if (type) return typeCounts[type] ?? 0;

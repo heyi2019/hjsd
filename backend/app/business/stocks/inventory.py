@@ -146,10 +146,9 @@ def inventory_ledger(
     facet_query = stmt(include_type=False, include_search_date=False).with_only_columns(
         type_expr, func.count(Account.id), maintain_column_froms=True,
     ).group_by(type_expr)
-    type_counts = {str(kind): int(count) for kind, count in session.execute(facet_query).all() if kind}
-    facet_total = int(session.scalar(select(func.count()).select_from(
-        stmt(include_type=False, include_search_date=False).subquery()
-    )) or 0)
+    facets = session.execute(facet_query).all()
+    type_counts = {str(kind): int(count) for kind, count in facets if kind}
+    facet_total = sum(int(count) for _kind, count in facets)
     # options remain available across the current business/game filters, like the prior UI.
     game_type_query = _inventory_ledger_scope(session, user).with_only_columns(
         game_type_expr, maintain_column_froms=True,

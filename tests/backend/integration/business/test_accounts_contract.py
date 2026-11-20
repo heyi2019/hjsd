@@ -58,6 +58,36 @@ def _buy(seeded_db, account, amount="500"):
     return order
 
 class TestCreateAccountGuards:
+    def test_inventory_ledger_reuses_facet_counts_for_total(self, seeded_db):
+        from sqlalchemy import event
+
+        for name in ("facet-query-hit", "facet-query-other"):
+            account = _account(seeded_db, name)
+            create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id)
+        unclassified = _account(seeded_db, "facet-query-unclassified")
+        legacy_order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=unclassified.id)
+        unclassified.inventory_type = None
+        legacy_order.order_type = "OTHER"
+        legacy_order.account_snapshot = None
+        seeded_db.flush()
+        statements = []
+
+        def record_sql(_conn, _cursor, statement, _params, _context, _many):
+            if statement.lstrip().lower().startswith("select"):
+                statements.append(statement)
+
+        connection = seeded_db.connection()
+        event.listen(connection, "before_cursor_execute", record_sql)
+        try:
+            result = inventory_ledger(seeded_db, keyword="facet-query-hit")
+        finally:
+            event.remove(connection, "before_cursor_execute", record_sql)
+
+        assert result["total"] == 1
+        assert result["facet_total"] == 3
+        assert result["type_counts"] == {"RECOVERY": 2}
+        assert len(statements) == 5
+
     def test_inventory_order_summary_reuses_loaded_accounts(self, seeded_db):
         from sqlalchemy import event
         from app.business.router_outputs.list_payload import _order_list_payload

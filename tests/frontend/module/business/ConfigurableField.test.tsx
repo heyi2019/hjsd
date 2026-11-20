@@ -63,6 +63,43 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+it.each([
+  ["普通字段", "必填"], ["嵌套字段", "必填"], ["自定义字段", "必填"],
+  ["普通字段", "条件必填"], ["嵌套字段", "条件必填"], ["自定义字段", "条件必填"],
+])("%s 的配置%s文本不能仅输入空白", async (kind, mode) => {
+  const def = makeField({ field_key: "detail", label: "说明", field_type: "TEXT", required: mode === "必填",
+    required_when: mode === "条件必填" ? { field: "trigger", op: "filled" } : null });
+  const onFinish = vi.fn();
+  renderLight(
+    <FieldConfigContext.Provider value={{ detail: def }}>
+      <Form onFinish={onFinish} initialValues={{ trigger: "已填写" }}>
+        <Form.Item name="trigger" hidden><Input /></Form.Item>
+        {kind === "普通字段" ? <CfgItem name="detail" label="说明"><Input placeholder="填写说明" /></CfgItem>
+          : kind === "嵌套字段" ? <CfgNestedItem name="detail" label="说明"><Input placeholder="填写说明" /></CfgNestedItem>
+            : <CustomFormField def={def} />}
+        <button type="submit">提交</button>
+      </Form>
+    </FieldConfigContext.Provider>,
+  );
+  const input = kind === "自定义字段" ? screen.getByLabelText("说明") : screen.getByPlaceholderText("填写说明");
+  await ui.type(input, "   ");
+  await ui.click(screen.getByRole("button", { name: "提交" }));
+  await waitFor(() => expect(onFinish).not.toHaveBeenCalled());
+  expect(input).toHaveAttribute("aria-invalid", "true");
+});
+
+it("选填文本仍可留空白", async () => {
+  const def = makeField({ field_key: "detail", label: "说明", field_type: "TEXT", required: false });
+  const onFinish = vi.fn();
+  renderLight(<FieldConfigContext.Provider value={{ detail: def }}><Form onFinish={onFinish}>
+    <CfgItem name="detail" label="说明"><Input /></CfgItem>
+    <button type="submit">提交</button>
+  </Form></FieldConfigContext.Provider>);
+  await ui.type(screen.getByLabelText("说明"), "   ");
+  await ui.click(screen.getByRole("button", { name: "提交" }));
+  await waitFor(() => expect(onFinish).toHaveBeenCalledOnce());
+});
+
 describe("resolveRules 必填以配置为最终口径", () => {
   const base = [{ required: true, message: "基础必填" }] as Record<string, unknown>[];
 

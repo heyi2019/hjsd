@@ -4,6 +4,7 @@ import type { Rule } from "antd/es/form";
 import type { RequiredWhen } from "../../shared/api/types/forms";
 import { fieldConfigFor, useFieldConfig } from "./context";
 import type { FieldConfigMap } from "./context";
+import { requiredTextRules } from "../../shared/lib/validators";
 
 export function isFieldActive(config: FieldConfigMap, key: string): boolean {
   const def = fieldConfigFor(config, key);
@@ -66,14 +67,14 @@ export function resolveRules(
     const hasRequired = base.some((rule) => rule && (rule as { required?: boolean }).required);
     const rules = hasRequired ? [...base] : [...base, { required: true, message: `${def.label}必填` } as Rule];
     if (isMoney) rules.push(moneyPositiveRule);
-    return rules;
+    return def.field_type === "TEXT" ? requiredTextRules(rules) : rules;
   }
   const stripped = base.filter((rule) => !(rule as { required?: boolean }).required);
   if (def.required_when) {
     if (isConditionActive(def.required_when, values)) {
       const rules = [...stripped, { required: true, message: `${def.label}必填` } as Rule];
       if (isMoney) rules.push(moneyPositiveRule);
-      return rules;
+      return def.field_type === "TEXT" ? requiredTextRules(rules) : rules;
     }
     return stripped;
   }

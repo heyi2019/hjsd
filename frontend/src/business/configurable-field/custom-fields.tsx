@@ -5,6 +5,7 @@ import { dateValueFromEvent, dateValueProps, Select } from "../../shared/ui";
 import type { OrderFormField } from "../../shared/api/types/forms";
 import { useFieldConfig, useSectionLabels } from "./context";
 import { isConditionActive, useConditionFieldValue } from "./rules";
+import { requiredTextRules } from "../../shared/lib/validators";
 
 const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, string> = {
   ACCOUNT_PRODUCT: "账号 / 产品补充信息",
@@ -65,7 +66,8 @@ export function CustomFormField({ def }: { def: OrderFormField }): ReactElement 
   const required =
     def.required ||
     isConditionActive(def.required_when, condField ? { [condField]: depValue } : undefined);
-  const rules = required ? [{ required: true, message: `${def.label}必填` }] : [];
+  const baseRules = required ? [{ required: true, message: `${def.label}必填` }] : [];
+  const rules = def.field_type === "TEXT" ? requiredTextRules(baseRules) : baseRules;
   const options = resolveOptionItems(def.options);
   switch (def.field_type) {
     case "NUMBER":

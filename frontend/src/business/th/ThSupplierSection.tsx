@@ -8,7 +8,7 @@ export function ThSupplierSection(props: { participantExtras?: ReactNode } = {})
   const participantTitle = sectionLabel("PARTICIPANT", "供货方信息");
   return (
     <BusinessRegistrationSection className="th-supplier-section" title={participantTitle}>
-      <CfgItem name="supplier_nickname" label="供货方昵称" requiredWhitespace>
+      <CfgItem name="supplier_nickname" label="供货方昵称">
         <Input placeholder="可选填" />
       </CfgItem>
       <BusinessRegistrationGroup className="supplier-contacts" title="联系方式">

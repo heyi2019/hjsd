@@ -5,6 +5,12 @@
  */
 import type { Rule } from "antd/es/form";
 
+/** 文本必填规则将纯空白视为未填写；其他类型及选填规则保持不变。 */
+export function requiredTextRules(rules: Rule[]): Rule[] {
+  return rules.map((rule) => typeof rule === "object" && rule !== null && "required" in rule && rule.required
+    ? { ...rule, whitespace: true } : rule);
+}
+
 /** 金额：数字、最多两位小数、非负（允许负值需显式传 allowNegative）。 */
 export function moneyRules(label = "金额", options?: { allowNegative?: boolean }): Rule[] {
   return [

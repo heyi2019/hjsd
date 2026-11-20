@@ -225,8 +225,8 @@ class TestListAndGetCustomers:
             contract_type="PICKUP_SALE",
             principal=500,
             down_payment=100,
-            periods=1,
-            per_period=400,
+            periods=4,
+            per_period=100,
             first_due_on=date(2026, 9, 1),
             actor="pytest",
         )
@@ -237,16 +237,34 @@ class TestListAndGetCustomers:
             )
         )
         overdue.status = ScheduleStatus.OVERDUE.value
+        second = seeded_db.scalar(select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id == installment.id,
+            InstallmentSchedule.period_no == 2,
+        ))
+        second.status = ScheduleStatus.OVERDUE.value
         seeded_db.flush()
+        from sqlalchemy import event
+        schedule_rows = []
 
-        detail = get_customer_detail(seeded_db, customer.id)
+        def record_rows(_conn, cursor, statement, _params, _context, _many):
+            if "from installment_schedules" in " ".join(statement.lower().split()):
+                schedule_rows.append(cursor.rowcount)
+
+        connection = seeded_db.connection()
+        event.listen(connection, "after_cursor_execute", record_rows)
+        try:
+            detail = get_customer_detail(seeded_db, customer.id)
+        finally:
+            event.remove(connection, "after_cursor_execute", record_rows)
 
         assert detail["overview"]["order_count"] == 2
         assert detail["overview"]["active_order_count"] == 2
         assert detail["overview"]["last_trade_date"] == date(2026, 10, 11)
         assert detail["overview"]["installment_paid_total"] == 0
         assert detail["overview"]["installment_receivable_total"] == 500
-        assert detail["overview"]["overdue_period_count"] == 1
+        assert detail["overview"]["overdue_period_count"] == 2
+        assert detail["installments"][0]["overdue_periods"] == 2
+        assert schedule_rows == [1]
         assert {item["order_no"] for item in detail["business"]} == {
             dg_order.order_no, th.order_no,
         }
@@ -627,6 +645,24 @@ class TestCustomerDetailRemaining:
         inst.bad_debt_amount = Decimal(bad_debt)
         seeded_db.flush()
         return inst
+
+    def test_cancelled_contract_does_not_contribute_overdue_periods(self, seeded_db):
+        customer = _customer(seeded_db, "取消合约客户")
+        active = self._installment(seeded_db, customer, paid="0")
+        cancelled = self._installment(seeded_db, customer, paid="0")
+        cancelled.status = "CANCELLED"
+        schedules = seeded_db.scalars(select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id.in_([active.id, cancelled.id]),
+            InstallmentSchedule.period_no == 1,
+        )).all()
+        for schedule in schedules:
+            schedule.status = ScheduleStatus.OVERDUE.value
+        seeded_db.flush()
+
+        detail = get_customer_detail(seeded_db, customer.id)
+        counts = {item["id"]: item["overdue_periods"] for item in detail["installments"]}
+        assert counts == {active.id: 1, cancelled.id: 0}
+        assert detail["overview"]["overdue_period_count"] == 1
 
     def test_customer_detail_remaining_clamps_after_waiver(self, seeded_db):
         """先收后减免：合约级与汇总级都夹底 0，不出现负数。"""

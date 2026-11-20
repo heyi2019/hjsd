@@ -122,19 +122,14 @@ def get_customer_detail(
         ).all()
     ) if order_ids else []
     installment_ids = [item.id for item in installments]
-    schedules = list(
-        session.scalars(
-            select(InstallmentSchedule).where(
-                InstallmentSchedule.installment_id.in_(installment_ids)
-            )
-        ).all()
-    ) if installment_ids else []
-    overdue_by_installment: dict[int, int] = {}
-    for schedule in schedules:
-        if schedule.status == ScheduleStatus.OVERDUE.value:
-            overdue_by_installment[schedule.installment_id] = (
-                overdue_by_installment.get(schedule.installment_id, 0) + 1
-            )
+    overdue_by_installment = dict(session.execute(
+        select(InstallmentSchedule.installment_id, func.count(InstallmentSchedule.id))
+        .where(
+            InstallmentSchedule.installment_id.in_(installment_ids),
+            InstallmentSchedule.status == ScheduleStatus.OVERDUE.value,
+        )
+        .group_by(InstallmentSchedule.installment_id)
+    ).all()) if installment_ids else {}
 
     order_no_by_id = {item["order_id"]: item["order_no"] for item in orders}
     installment_items: list[dict[str, Any]] = []

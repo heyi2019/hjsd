@@ -137,6 +137,18 @@ class TestCounterpartyGuards:
         assert response.json()["total"] == 1
         assert response.json()["items"][0]["id"] == mine.id
 
+    def test_counterparty_page_search_filters_before_pagination_and_counts(self, seeded_client, seeded_db):
+        create_counterparty(seeded_db, display_name="搜索同行甲", type="PEER", actor="pytest", phone="13712345678")
+        create_counterparty(seeded_db, display_name="搜索同行乙", type="PEER", actor="pytest")
+        create_counterparty(seeded_db, display_name="其他合作方", type="PEER", actor="pytest")
+        response = seeded_client.get(f"{COUNTERPARTIES}/page", params={"keyword": "搜索同行", "limit": 1}, headers={"X-Dev-User": "admin"})
+        assert response.status_code == 200, response.text
+        assert response.json()["total"] == 2
+        assert len(response.json()["items"]) == 1
+        response = seeded_client.get(f"{COUNTERPARTIES}/page", params={"keyword": "13712345678"}, headers={"X-Dev-User": "admin"})
+        assert response.json()["total"] == 1
+        assert response.json()["items"][0]["display_name"] == "搜索同行甲"
+
     def test_get_counterparty_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             get_counterparty(seeded_db, 999999)

@@ -1,4 +1,5 @@
 import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
+import { SearchOutlined } from "@ant-design/icons";
 import { ToolbarSelect } from "../shared/ui/ToolbarSelect";
 import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
@@ -23,6 +24,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+  const [searchInput, setSearchInput] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const { activeEmployees, settled: employeesSettled } = useEmployeeOptions();
   const creatorOptions = employeesSettled ? activeEmployees.map((item) => ({ label: item.display_name || item.username, value: item.username })) : null;
@@ -58,6 +61,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     setLoading(true);
     try {
       const response = await counterpartiesApi.page({
+        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
         ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
         ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
@@ -74,7 +78,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     } finally {
       if (request === requestRef.current) setLoading(false);
     }
-  }, [creatorFilter, page, pageSize, sortDesc, statusFilter, createdPeriod?.from, createdPeriod?.to]);
+  }, [creatorFilter, keyword, page, pageSize, sortDesc, statusFilter, createdPeriod?.from, createdPeriod?.to]);
 
   const resetKey = JSON.stringify([createdPeriod?.from, createdPeriod?.to]);
   const previousResetKey = useRef(resetKey);
@@ -223,9 +227,13 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
+        <Input.Search type="search" aria-label="搜索合作方" maxLength={128} allowClear value={searchInput}
+          placeholder="搜索合作方编号 / 名称 / 联系方式" enterButton={<SearchOutlined />}
+          onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}
+          onSearch={(value) => { setKeyword(value); setPage(1); }} />
+        {createdPicker}
         <ToolbarSelect allowClear placeholder="按状态筛选" aria-label="合作方状态" value={statusFilter} options={counterpartyStatusOptions ?? []} disabled={counterpartyStatusOptions === null || rows === null} onChange={(value) => { setStatusFilter(value); setPage(1); }} />
         <ToolbarMultiSelect allowClear placeholder="创建操作人" aria-label="合作方创建操作人筛选" selectedLabels={creatorFilter.map((value) => creatorOptions?.find((option) => option.value === value)?.label ?? value)} value={creatorFilter} options={creatorOptions ?? []} disabled={creatorOptions === null || rows === null} onChange={(value) => { setCreatorFilter(value as string[]); setPage(1); }} />
-        {createdPicker}
         <TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} />
       </Space>
       <DataTable<Counterparty>

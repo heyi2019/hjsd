@@ -4,7 +4,8 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CustomerLeadPanel } from "@/customer-center/CustomerLeadPanel";
-import { customersApi, leadsApi } from "@/shared/api/customers.api";
+import { CounterpartyPanel } from "@/customer-center/CounterpartyPanel";
+import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { Customer, Lead } from "@/shared/api/types/customers";
@@ -50,6 +51,28 @@ beforeEach(() => {
   ]);
   vi.spyOn(message, "success").mockReturnValue(undefined as never);
   vi.spyOn(message, "error").mockReturnValue(undefined as never);
+});
+
+describe("客户中心工具栏搜索", () => {
+  it("合作方按关键词查询，并将日历放在搜索之后", async () => {
+    vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
+    renderLight(<CounterpartyPanel createdPicker={<span data-testid="toolbar-date">日期</span>} />, { user: "admin" });
+    const search = await screen.findByRole("searchbox", { name: "搜索合作方" });
+    expect(search.compareDocumentPosition(screen.getByTestId("toolbar-date")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await ui.type(search, "同行甲{enter}");
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "同行甲", offset: 0 })));
+    await ui.clear(search);
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenLastCalledWith(expect.not.objectContaining({ keyword: expect.anything() })));
+  });
+
+  it("需求池按关键词查询列表和统计，并将日历放在搜索之后", async () => {
+    renderLight(<CustomerLeadPanel createdPicker={<span data-testid="toolbar-date">日期</span>} />, { user: "admin" });
+    const search = await screen.findByRole("searchbox", { name: "搜索客户需求" });
+    expect(search.compareDocumentPosition(screen.getByTestId("toolbar-date")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await ui.type(search, "张三{enter}");
+    await waitFor(() => expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "张三", offset: 0 })));
+    await waitFor(() => expect(leadsApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "张三" })));
+  });
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {

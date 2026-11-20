@@ -8,11 +8,12 @@ from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
+from app.core.like_pattern import like_contains
 from app.shared.numbering import allocate_number
 from app.domain.enums import (
     AuditAction,
@@ -33,6 +34,17 @@ from ._common import (
 from app.shared.form_values import _validate_required_extras, set_extra_values
 
 # --------------------------------------------------------------------- 合作方
+def _keyword_filter(stmt, keyword: str | None):
+    if not keyword:
+        return stmt
+    pattern, escape = like_contains(keyword)
+    return stmt.where(or_(*(
+        column.ilike(pattern, escape=escape)
+        for column in (Counterparty.counterparty_no, Counterparty.display_name, Counterparty.contact_name,
+                       Counterparty.phone, Counterparty.wechat, Counterparty.qq)
+    )))
+
+
 def create_counterparty(
     session: Session,
     *,
@@ -100,13 +112,14 @@ def list_counterparties(
     type: str | None = None,
     status: str | None = None,
     created_by: Sequence[str] | None = None,
+    keyword: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     sort_desc: bool = False,
     created_from: date | None = None,
     created_to: date | None = None,
 ) -> list[Counterparty]:
-    stmt = apply_created_range(select(Counterparty), Counterparty.created_at, created_from, created_to)
+    stmt = _keyword_filter(apply_created_range(select(Counterparty), Counterparty.created_at, created_from, created_to), keyword)
     if type:
         stmt = stmt.where(Counterparty.type == type)
     if status:
@@ -121,9 +134,10 @@ def list_counterparties(
 def count_counterparties(
     session: Session, *, type: str | None = None, status: str | None = None,
     created_by: Sequence[str] | None = None,
+    keyword: str | None = None,
     created_from: date | None = None, created_to: date | None = None,
 ) -> int:
-    stmt = apply_created_range(select(func.count(Counterparty.id)), Counterparty.created_at, created_from, created_to)
+    stmt = _keyword_filter(apply_created_range(select(func.count(Counterparty.id)), Counterparty.created_at, created_from, created_to), keyword)
     if type:
         stmt = stmt.where(Counterparty.type == type)
     if status:

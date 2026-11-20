@@ -79,17 +79,17 @@ def list_leads_page(
         total=summary["total_count"],
         limit=limit,
         offset=offset,
-        sort_desc=sort_desc,
     )
 
 
 @router.get("/leads/summary", response_model=schemas.LeadSummaryOut)
 def lead_summary(
+    keyword: str | None = Query(default=None, max_length=128),
     created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.LeadSummaryOut:
-    return schemas.LeadSummaryOut(**parties_summarize_leads(db, user=user, **created_filter))
+    return schemas.LeadSummaryOut(**parties_summarize_leads(db, user=user, keyword=keyword, **created_filter))
 
 
 @router.get("/leads/{lead_id}", response_model=schemas.LeadOut)

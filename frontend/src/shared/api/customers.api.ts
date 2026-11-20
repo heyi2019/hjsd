@@ -54,7 +54,7 @@ export const customersApi = {
 export const counterpartiesApi = {
   list: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[] }) =>
     api.get<Counterparty[]>("/counterparties", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
-  page: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[]; limit?: number; offset?: number; sort_desc?: boolean }) =>
+  page: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[]; keyword?: string; limit?: number; offset?: number; sort_desc?: boolean }) =>
     api.get<PageResponse<Counterparty>>("/counterparties/page", {
       params: { limit: 10, offset: 0, ...params },
       paramsSerializer: { indexes: null },
@@ -73,7 +73,7 @@ export const leadsApi = {
     api.get<PageResponse<Lead>>("/leads/page", {
       params: { limit: 10, offset: 0, ...params },
     }).then((r) => r.data),
-  summary: (params?: CreatedDateFilter) => api.get<LeadSummary>("/leads/summary", { params }).then(r => r.data),
+  summary: (params?: CreatedDateFilter & { keyword?: string }) => api.get<LeadSummary>("/leads/summary", { params }).then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<Lead>("/leads", data).then(r => r.data),
   close: (id: number, reason: string, extra_values?: Record<string, unknown>, operator_user_ids?: number[]) => api.post<Lead>(`/leads/${id}/close`, { reason, extra_values, operator_user_ids }).then(r => r.data),
   convert: (id: number, order_no: string, extra_values?: Record<string, unknown>, operator_user_ids?: number[]) => api.post<Lead>(`/leads/${id}/convert`, { order_no, extra_values, operator_user_ids }).then(r => r.data),

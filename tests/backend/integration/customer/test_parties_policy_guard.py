@@ -306,6 +306,20 @@ class TestPartiesLeadGuards:
         rows = list_leads(seeded_db, keyword="守门专用")
         assert any("守门专用" in r.target for r in rows)
 
+    def test_lead_search_by_customer_matches_list_and_summary(self, seeded_client, seeded_db):
+        customer = _customer(seeded_db, display_name="搜索客户甲")
+        create_lead(seeded_db, customer_id=customer.id, request_type="FIND_ACCOUNT", target="目标一", actor="pytest")
+        create_lead(seeded_db, customer_id=customer.id, request_type="FIND_ACCOUNT", target="目标二", actor="pytest")
+        other = _customer(seeded_db, display_name="其他客户")
+        create_lead(seeded_db, customer_id=other.id, request_type="FIND_ACCOUNT", target="目标三", actor="pytest")
+        headers = {"X-Dev-User": "admin"}
+        page = seeded_client.get("/api/leads/page", params={"keyword": "搜索客户甲", "limit": 1}, headers=headers)
+        summary = seeded_client.get("/api/leads/summary", params={"keyword": "搜索客户甲"}, headers=headers)
+        assert page.status_code == 200, page.text
+        assert summary.status_code == 200, summary.text
+        assert page.json()["total"] == summary.json()["total_count"] == 2
+        assert len(page.json()["items"]) == 1
+
     def test_update_lead_not_open(self, seeded_db):
         # 816: 非 OPEN 需求不可编辑 -> Conflict
         cust = _customer(seeded_db)

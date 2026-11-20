@@ -21,7 +21,7 @@ from app.shared.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.shared.scope import owner_scope_filter
 from app.domain.enums import AuditAction, EntityType, LeadStatus, LeadType, SequenceKey
-from app.domain.parties import CustomerLead
+from app.domain.parties import Customer, CustomerLead
 from app.domain.trade import Order
 
 from ._common import _UNSET, _normalize_extra_values, _required_text, _validate_owner_id, apply_created_range
@@ -147,6 +147,10 @@ def _lead_list_stmt(
             or_(
                 CustomerLead.lead_no.ilike(pattern, escape=escape),
                 CustomerLead.target.ilike(pattern, escape=escape),
+                CustomerLead.customer_id.in_(select(Customer.id).where(or_(
+                    Customer.customer_no.ilike(pattern, escape=escape),
+                    Customer.display_name.ilike(pattern, escape=escape),
+                ))),
             )
         )
     if user is not None:

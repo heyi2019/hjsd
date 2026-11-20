@@ -109,9 +109,10 @@ def inventory_ledger(
         func.date(func.coalesce(Account.inventory_entry_at, Order.trade_date, Account.created_at)),
         Date,
     )
+    base_scope = _inventory_ledger_scope(session, user)
 
     def stmt(*, include_type: bool = True, include_search_date: bool = True):
-        query = _inventory_ledger_scope(session, user)
+        query = base_scope
         if business_mode:
             query = query.where(business_mode_expr == business_mode)
         if game_type:
@@ -150,13 +151,14 @@ def inventory_ledger(
     type_counts = {str(kind): int(count) for kind, count in facets if kind}
     facet_total = sum(int(count) for _kind, count in facets)
     # options remain available across the current business/game filters, like the prior UI.
-    game_type_query = _inventory_ledger_scope(session, user).with_only_columns(
+    game_type_query = base_scope.with_only_columns(
         game_type_expr, maintain_column_froms=True,
     ).where(game_type_expr.is_not(None))
     game_type_query = game_type_query.distinct().order_by(game_type_expr)
     game_types = list(session.scalars(game_type_query).all())
     account_id_query = stmt().with_only_columns(Account.id, maintain_column_froms=True).distinct()
-    stats = _inventory_stats_for_filter(session, account_id_query, user=user)
+    # account_id_query 已包含相同账号权限范围，无需在汇总外层重复解析团队成员。
+    stats = _inventory_stats_for_filter(session, account_id_query)
     return {"items": items, "total": total, "facet_total": facet_total, "type_counts": type_counts,
             "game_types": game_types, "stats": stats}
 

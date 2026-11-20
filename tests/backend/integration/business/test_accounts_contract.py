@@ -17,7 +17,7 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
-from app.domain.trade import Account
+from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.business.stocks.inventory import inventory, inventory_ledger, list_accounts, total_inventory_cost
 from app.business.stocks.profile import create_account, get_account, update_account_profile
@@ -145,6 +145,26 @@ class TestCreateAccountGuards:
         assert result["facet_total"] == 3
         assert result["type_counts"] == {"RECOVERY": 2}
         assert len(statements) == 5
+
+        owner = seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).first()
+        owner.team_ids = [42042]
+        for order in seeded_db.scalars(select(Order)).all():
+            order.owner_id = owner.id
+        hidden_account = _account(seeded_db, "facet-query-hit-hidden")
+        create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=hidden_account.id)
+        seeded_db.flush()
+        team_user = CurrentUser.build(id=999999, username="team-viewer", roles=["VIEWER"], owner_scope="TEAM", team_ids=frozenset({42042}))
+        statements.clear()
+        event.listen(connection, "before_cursor_execute", record_sql)
+        try:
+            scoped = inventory_ledger(seeded_db, keyword="facet-query-hit", user=team_user)
+        finally:
+            event.remove(connection, "before_cursor_execute", record_sql)
+        assert scoped["total"] == 1
+        assert scoped["facet_total"] == 3
+        assert scoped["type_counts"] == {"RECOVERY": 2}
+        assert scoped["stats"] == result["stats"]
+        assert len([sql for sql in statements if " from users " in f" {' '.join(sql.lower().split())} "]) == 1
 
     def test_inventory_order_summary_reuses_loaded_accounts(self, seeded_db):
         from sqlalchemy import event

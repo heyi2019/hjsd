@@ -19,6 +19,8 @@ import { findCancelableBuy, type InventoryActionKey } from "./helpers";
 import type { InventoryOrderRow } from "./types";
 import { buildCashflowDisplayItems, type CashflowTarget } from "../../../finance/cashflow";
 import type { EmployeeOption } from "../../../shared/api/types/org";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
 
 export function useInventoryActions(params: {
   // list 域注入
@@ -36,7 +38,7 @@ export function useInventoryActions(params: {
   expandedOrderIds: Key[];
   removeFromInventory: (accountId: number, orderId?: number) => void;
   // editor 域注入（本地 openEditor/cancelInlineEdit 会再包装一层）
-  editorOpenEditor: (account: Account) => Promise<boolean>;
+  editorOpenEditor: (account: Account, isCurrent?: () => boolean) => Promise<boolean>;
   editorCancelInlineEdit: () => void;
   editorCancelPendingOpen: () => void;
   editorIsSaving: () => boolean;
@@ -56,7 +58,7 @@ export function useInventoryActions(params: {
   const [consignmentTarget, setConsignmentTarget] = useState<Account | null>(null);
   const [rebateTarget, setRebateTarget] = useState<Account | null>(null);
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
-  const cashflowRequest = useRef(0);
+  const actionRequest = useLatestRequest();
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
@@ -64,17 +66,21 @@ export function useInventoryActions(params: {
   const [voidTarget, setVoidTarget] = useState<{ account: Account; orderId: number; eventId?: number; amount: string; portion: string } | null>(null);
   const [voidPools, setVoidPools] = useState<Pool[]>([]);
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
-  const [voiding, setVoiding] = useState(false);
+  const voidWrite = useAsyncAction();
+  const voiding = voidWrite.pending;
   // 删除二次确认：target 非空即弹窗打开，deleting 控制防重与按钮 loading。
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const deleteWrite = useAsyncAction();
+  const deleting = deleteWrite.pending;
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
-  const editIntentRef = useRef(0);
+  const editIntent = useLatestRequest();
   const editRequestsRef = useRef<Record<string, Promise<AccountExecutionDetail | null>>>({});
   function openProfile(account: Account, mode: OrderProfileTarget["mode"]) {
+    actionRequest.start();
     setProfileTarget({ account, mode });
   }
   async function openEditor(account: Account, orderId?: number) {
+    const action = actionRequest.start();
     const boundOrderId = orderId ?? account.source_order_id;
     if (boundOrderId == null) {
       appMessage.warning("当前账号没有绑定来源订单，无法编辑");
@@ -84,16 +90,16 @@ export function useInventoryActions(params: {
       appMessage.warning("当前订单正在保存，请稍候");
       return;
     }
-    const intent = ++editIntentRef.current;
+    const intent = editIntent.start();
     editorCancelPendingOpen();
     const key = `${boundOrderId}:${account.id}`;
     const request = editRequestsRef.current[key] ?? loadEditorExecution(account, boundOrderId);
     editRequestsRef.current[key] = request;
     try {
       const detail = await request;
-      if (!detail || intent !== editIntentRef.current) return;
-      const opened = await editorOpenEditor(detail.account);
-      if (opened && intent === editIntentRef.current) expandTo([`${boundOrderId}:${detail.account.id}`]);
+      if (!detail || !editIntent.isCurrent(intent) || !actionRequest.isCurrent(action)) return;
+      const opened = await editorOpenEditor(detail.account, () => actionRequest.isCurrent(action));
+      if (opened && editIntent.isCurrent(intent) && actionRequest.isCurrent(action)) expandTo([`${boundOrderId}:${detail.account.id}`]);
     } finally {
       if (editRequestsRef.current[key] === request) delete editRequestsRef.current[key];
     }
@@ -103,22 +109,23 @@ export function useInventoryActions(params: {
       appMessage.warning("当前订单正在保存，请稍候");
       return;
     }
-    editIntentRef.current += 1;
+    editIntent.invalidate();
     editorCancelInlineEdit();
     setDetailTarget(null);
   }
   async function saveInline() {
     if (editorIsSaving()) return;
-    editIntentRef.current += 1;
+    editIntent.invalidate();
     editorCancelPendingOpen();
     await editorSaveInline();
   }
   async function openDetail(account: Account) {
+    const request = actionRequest.start();
     await loadExecution(account);
-    setDetailTarget(account);
+    if (actionRequest.isCurrent(request)) setDetailTarget(account);
   }
   async function openCashflow(account: Account) {
-    const request = ++cashflowRequest.current;
+    const request = actionRequest.start();
     if (account.source_order_id == null) {
       appMessage.warning("当前账号没有绑定来源订单，无法登记资金收支");
       return;
@@ -129,7 +136,7 @@ export function useInventoryActions(params: {
         poolsApi.list(),
         employeesApi.list(),
       ]);
-      if (cashflowRequest.current !== request) return;
+      if (!actionRequest.isCurrent(request)) return;
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const sourceOrder = detail.orders.find((order) => order.order_id === account.source_order_id);
       if (!sourceOrder) {
@@ -148,14 +155,15 @@ export function useInventoryActions(params: {
         ),
       });
     } catch (cause) {
-      if (cashflowRequest.current === request) setError(normalizeError(cause));
+      if (actionRequest.isCurrent(request)) setError(normalizeError(cause));
     }
   }
   function closeCashflow() {
-    cashflowRequest.current += 1;
+    actionRequest.invalidate();
     setCashflowTarget(null);
   }
   async function openVoid(account: Account) {
+    const request = actionRequest.start();
     if (account.source_order_id == null) {
       appMessage.warning("当前账号没有绑定来源订单，无法取消交易");
       return;
@@ -165,22 +173,32 @@ export function useInventoryActions(params: {
         executionDetails[account.id] ?? ordersApi.executionDetail(account.source_order_id),
         poolsApi.list(),
       ]);
+      if (!actionRequest.isCurrent(request)) return;
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       setVoidPools(poolList.filter((pool) => pool.status === "ACTIVE"));
       const buy = findCancelableBuy(detail);
       setVoidTarget({ account, ...(buy ?? { orderId: account.source_order_id, amount: "0.00", portion: "PRINCIPAL" }) });
+      voidForm.resetFields();
       voidForm.setFieldsValue({ amount: buy?.amount ?? "0.00", pool_id: undefined, reason: undefined });
     } catch (cause) {
-      setError(normalizeError(cause));
+      if (actionRequest.isCurrent(request)) setError(normalizeError(cause));
     }
   }
+  function closeVoid() {
+    if (voidWrite.isPending()) return;
+    actionRequest.invalidate();
+    setVoidTarget(null);
+    voidForm.resetFields();
+  }
   async function openPlatformOffsale(account: Account) {
+    const request = actionRequest.start();
     if (account.source_order_id == null) {
       appMessage.warning("当前账号没有绑定来源订单，无法下架寄售记录");
       return;
     }
     try {
       const detail = executionDetails[account.id] ?? await ordersApi.executionDetail(account.source_order_id);
+      if (!actionRequest.isCurrent(request)) return;
       setExecutionDetails((current) => ({ ...current, [account.id]: detail }));
       const records = consignmentRecords(detail.orders);
       if (!records.length && account.inventory_type !== "CONSIGNMENT") {
@@ -189,35 +207,42 @@ export function useInventoryActions(params: {
       }
       setPlatformOffsaleTarget({ account, records });
     } catch (cause) {
-      setError(normalizeError(cause));
+      if (actionRequest.isCurrent(request)) setError(normalizeError(cause));
     }
   }
   async function submitVoid(values: { amount: string; pool_id: number; reason: string; form_extra?: Record<string, unknown> }) {
-    if (!voidTarget) return;
-    setVoiding(true);
-    try {
-      const payload = {
-        amount: values.amount,
-        occurred_on: today(),
-        ...(Number(values.amount) > 0 ? { pool_id: Number(values.pool_id) } : {}),
-        portion: voidTarget.portion,
-        ...(voidTarget.eventId != null && Number(values.amount) > 0 ? { offset_event_id: voidTarget.eventId } : {}),
-        reason: values.reason.trim(),
-        form_extra: values.form_extra,
-      };
-      await ordersApi.inventoryOffsale(voidTarget.orderId, { ...payload, unlisted_at: dayjs().format("YYYY-MM-DDTHH:mm") });
-      appMessage.success("入库已取消，账号已退出库存");
-      dropExecutionCache(voidTarget.account.id);
-      setVoidTarget(null);
-      voidForm.resetFields();
-      // 先关闭提交弹窗，再后台刷新库存。
-      void load();
-      // 取消会改订单/流水状态，同步通知上层重拉台账与分期列表。
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      setVoiding(false);
-    }
+    const target = voidTarget;
+    if (!target) return;
+    const session = actionRequest.current();
+    await voidWrite.run(async () => {
+      try {
+        const payload = {
+          amount: values.amount,
+          occurred_on: today(),
+          ...(Number(values.amount) > 0 ? { pool_id: Number(values.pool_id) } : {}),
+          portion: target.portion,
+          ...(target.eventId != null && Number(values.amount) > 0 ? { offset_event_id: target.eventId } : {}),
+          reason: values.reason.trim(),
+          form_extra: values.form_extra,
+        };
+        await ordersApi.inventoryOffsale(target.orderId, { ...payload, unlisted_at: dayjs().format("YYYY-MM-DDTHH:mm") });
+        const success = "入库已取消，账号已退出库存";
+        appMessage.success(actionRequest.isCurrent(session) ? success : `${target.account.source_order_no ?? `账号 ${target.account.id}`}：${success}`);
+        dropExecutionCache(target.account.id);
+        if (actionRequest.isCurrent(session)) {
+          actionRequest.invalidate();
+          setVoidTarget(null);
+          voidForm.resetFields();
+        }
+        // 先关闭提交弹窗，再后台刷新库存。
+        void load();
+        // 取消会改订单/流水状态，同步通知上层重拉台账与分期列表。
+      } catch (cause) {
+        const error = normalizeError(cause);
+        if (actionRequest.isCurrent(session)) setError(error);
+        else appMessage.error(`${target.account.source_order_no ?? `账号 ${target.account.id}`}：${error.message}`);
+      }
+    });
   }
   /** 删除成功后重拉台账：关联订单已清理，上层订单/分期视图也要同步刷新。 */
   async function submitDelete(reason: string) {
@@ -228,21 +253,26 @@ export function useInventoryActions(params: {
       appMessage.error("当前库存没有关联订单，无法删除");
       return;
     }
-    setDeleting(true);
-    try {
-      await ordersApi.deleteOrder(sourceOrderId, reason);
-      setDeleteTarget(null);
-      dropExecutionCache(target.id);
-      if (inlineEditId === target.id) cancelInlineEdit();
-      expandTo(expandedOrderIds.filter((key) => String(key) !== String(target.source_order_id)));
-      appMessage.success("已删除");
-      await load();
-    } catch (cause) {
-      // 失败时弹窗保持打开，用户可改原因后重试；错误必须出声，不能「点了没反应」。
-      appMessage.error(normalizeError(cause).message);
-    } finally {
-      setDeleting(false);
-    }
+    const session = actionRequest.current();
+    await deleteWrite.run(async () => {
+      try {
+        await ordersApi.deleteOrder(sourceOrderId, reason);
+        const current = actionRequest.isCurrent(session);
+        if (current) {
+          actionRequest.invalidate();
+          setDeleteTarget(null);
+          if (inlineEditId === target.id) cancelInlineEdit();
+          expandTo(expandedOrderIds.filter((key) => String(key) !== `${sourceOrderId}:${target.id}`));
+        }
+        dropExecutionCache(target.id);
+        appMessage.success(current ? "已删除" : `${target.source_order_no ?? `账号 ${target.id}`}：已删除`);
+        void load();
+      } catch (cause) {
+        // 失败时弹窗保持打开，用户可改原因后重试；错误必须出声，不能「点了没反应」。
+        const message = normalizeError(cause).message;
+        appMessage.error(actionRequest.isCurrent(session) ? message : `${target.source_order_no ?? `账号 ${target.id}`}：${message}`);
+      }
+    });
   }
   function handleInventoryAction(key: InventoryActionKey, row: Account) {
     if (key === "void") {
@@ -260,7 +290,8 @@ export function useInventoryActions(params: {
       appMessage.warning("当前订单正在保存，请稍候");
       return;
     }
-    editIntentRef.current += 1;
+    actionRequest.invalidate();
+    editIntent.invalidate();
     editorCancelPendingOpen();
     // 手风琴：一次只展开一行。展开详情严格按订单 ID 请求；账号仅用于资料编辑和动作适配。
     if (!expanded && inlineEditId === row.account.id) cancelInlineEdit();
@@ -288,7 +319,7 @@ export function useInventoryActions(params: {
     detailTarget,
     setDetailTarget,
     voidTarget,
-    setVoidTarget,
+    closeVoid,
     voidPools,
     voidForm,
     voiding,
@@ -310,5 +341,6 @@ export function useInventoryActions(params: {
     handleExpand,
     openPartyCard,
     openCashflow,
+    invalidatePendingActions: actionRequest.invalidate,
   };
 }

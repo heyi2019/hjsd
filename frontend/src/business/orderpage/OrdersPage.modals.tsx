@@ -31,15 +31,14 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
       <OrderDeleteDialog
         order={controller.orderDeleteTarget}
         submitting={controller.orderDeleteSubmitting}
-        onCancel={() => controller.setOrderDeleteTarget(null)}
+        onCancel={controller.closeOrderDelete}
         onConfirm={controller.submitOrderDelete}
       />
       <OrderProfileModal
         target={controller.profileTarget}
-        onClose={() => controller.setProfileTarget(null)}
-        onSaved={(updated) => {
-          const orderId = controller.profileTarget?.orderId ?? updated.source_order_id;
-          controller.setProfileTarget(null);
+        onClose={controller.closeOrderProfile}
+        onSaved={(updated, target) => {
+          const orderId = target.orderId ?? updated.source_order_id;
           if (orderId != null) {
             void controller.loadLedgerDetail({ id: orderId, account_id: updated.id }, true);
           }
@@ -51,15 +50,14 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
       <OrderPlatformOffsaleModal
         account={controller.orderOffsaleTarget?.account ?? null}
         records={controller.orderOffsaleTarget?.records ?? []}
-        onClose={() => controller.setOrderOffsaleTarget(null)}
+        onClose={controller.closeOrderOffsale}
         onSystemOffsale={controller.handleOrderSystemOffsale}
         onChanged={controller.handleOrderOffsaleChanged}
       />
       <InventoryRebateModal
         account={controller.orderRebateTarget}
-        onClose={() => controller.setOrderRebateTarget(null)}
+        onClose={controller.closeOrderRebate}
         onCreated={async () => {
-          controller.setOrderRebateTarget(null);
           await controller.load();
         }}
       />

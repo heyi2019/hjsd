@@ -1,7 +1,7 @@
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { configurableLabel } from "../../../shared/lib/optionSets";
 import { Form, Input, Radio, Space, Spin, Typography } from "antd";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { rebatesApi } from "../../../shared/api/rebates.api";
@@ -15,6 +15,8 @@ import { moneyRules } from "../../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
+import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { InventoryAccountSummary } from "../InventoryAccountSummary";
 import "./rebate-modal.css";
 
@@ -35,14 +37,14 @@ function sourceOrder(detail: AccountExecutionDetail | null, sourceOrderId: numbe
 export function InventoryRebateModal(props: {
   account: Account | null;
   onClose: () => void;
-  onCreated: () => void | Promise<void>;
+  onCreated: (account: Account) => void | Promise<void>;
 }) {
   const [detail, setDetail] = useState<AccountExecutionDetail | null>(null);
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const submitInFlight = useRef(false);
-  const [editSubmitting, setEditSubmitting] = useState(false);
-  const editInFlight = useRef(false);
+  const createWrite = useAsyncAction();
+  const editWrite = useAsyncAction();
+  const submitting = createWrite.pending;
+  const editSubmitting = editWrite.pending;
   const [editError, setEditError] = useState<{ message: string; code?: string } | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [rebates, setRebates] = useState<Rebate[]>([]);
@@ -50,6 +52,9 @@ export function InventoryRebateModal(props: {
   const [editTarget, setEditTarget] = useState<Rebate | null>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const detailsRequest = useLatestRequest();
+  const employeesRequest = useLatestRequest();
+  const session = useRequestSession(props.account);
   const open = Boolean(props.account);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVREBATE" : undefined);
 
@@ -60,14 +65,20 @@ export function InventoryRebateModal(props: {
       setError({ message: "当前账号没有绑定来源订单，无法登记返点" });
       return;
     }
-    let cancelled = false;
+    const request = detailsRequest.start();
     setLoading(true);
     setError(null);
+    setDetail(null);
+    setRebates([]);
+    setEditTarget(null);
+    form.resetFields();
     void ordersApi.executionDetail(sourceOrderId)
       .then(async (value) => {
-        if (cancelled) return;
+        if (!detailsRequest.isCurrent(request)) return;
+        const items = await rebatesApi.list({ source_order_id: sourceOrderId });
+        if (!detailsRequest.isCurrent(request)) return;
         setDetail(value);
-        setRebates(await rebatesApi.list({ source_order_id: sourceOrderId }));
+        setRebates(items);
         const firstKind: RebateKind | undefined = sourceOrder(value, sourceOrderId, "BUY") ? "BUY" : sourceOrder(value, sourceOrderId, "SELL") ? "SELL" : undefined;
         form.setFieldsValue({
           rebate_type: firstKind,
@@ -75,22 +86,24 @@ export function InventoryRebateModal(props: {
         });
       })
       .catch((cause) => {
-        if (!cancelled) setError(normalizeError(cause));
+        if (detailsRequest.isCurrent(request)) setError(normalizeError(cause));
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (detailsRequest.isCurrent(request)) setLoading(false);
       });
     return () => {
-      cancelled = true;
+      detailsRequest.invalidate();
     };
-  }, [form, open, props.account]);
+  }, [detailsRequest, form, open, props.account]);
 
   useEffect(() => {
     if (!open) return;
+    const request = employeesRequest.start();
     void employeesApi.list()
-      .then(setEmployees)
-      .catch((cause) => setError(normalizeError(cause)));
-  }, [open]);
+      .then((items) => { if (employeesRequest.isCurrent(request)) setEmployees(items); })
+      .catch((cause) => { if (employeesRequest.isCurrent(request)) setError(normalizeError(cause)); });
+    return employeesRequest.invalidate;
+  }, [employeesRequest, open]);
 
   const availableKinds = useMemo(
     () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, props.account?.source_order_id, kind)),
@@ -98,59 +111,76 @@ export function InventoryRebateModal(props: {
   );
 
   const submit = async (values: { rebate_type?: RebateKind; amount?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    if (!props.account || !configReady) return;
+    const account = props.account;
+    if (!account || !configReady) return;
     const kind = values.rebate_type;
-    const order = kind ? sourceOrder(detail, props.account.source_order_id, kind) : undefined;
-    if (!kind || !order || submitInFlight.current) return;
-    submitInFlight.current = true;
-    setSubmitting(true);
-    try {
-      await rebatesApi.create({
-        source_order_id: order.order_id,
-        rebate_type: kind,
-        amount: values.amount!,
-        collected_on: values.collected_on ?? today(),
-        channel: kind === "BUY" ? "买号返点" : "卖号返点",
-        note: REBATE_KIND_LABEL[kind],
-        operator_user_ids: values.operator_user_ids,
-        form_extra: values.form_extra,
-      });
-      appMessage.success("返点已登记");
-      form.resetFields();
-      props.onClose();
-      await props.onCreated();
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      submitInFlight.current = false;
-      setSubmitting(false);
-    }
+    const order = kind ? sourceOrder(detail, account.source_order_id, kind) : undefined;
+    if (!kind || !order) return;
+    const submittedSession = session.current();
+    await createWrite.run(async () => {
+      try {
+        await rebatesApi.create({
+          source_order_id: order.order_id,
+          rebate_type: kind,
+          amount: values.amount!,
+          collected_on: values.collected_on ?? today(),
+          channel: kind === "BUY" ? "买号返点" : "卖号返点",
+          note: REBATE_KIND_LABEL[kind],
+          operator_user_ids: values.operator_user_ids,
+          form_extra: values.form_extra,
+        });
+        appMessage.success("返点已登记");
+        if (session.isCurrent(submittedSession)) {
+          form.resetFields();
+          close();
+        }
+        void Promise.resolve().then(() => props.onCreated(account))
+          .catch(() => appMessage.warning("返点已登记，但刷新失败，请手动刷新"));
+      } catch (cause) {
+        const error = normalizeError(cause);
+        if (session.isCurrent(submittedSession)) setError(error);
+        else appMessage.error(`${account.source_order_no ?? `账号 ${account.id}`}：${error.message}`);
+      }
+    });
   };
 
   const submitEdit = async (values: { amount?: string; collected_on?: string; note?: string; operator_user_ids?: number[] }) => {
-    if (!editTarget || editInFlight.current || !configReady) return;
-    editInFlight.current = true;
-    setEditSubmitting(true);
-    setEditError(null);
-    try {
-      const updated = await rebatesApi.update(editTarget.id, {
-        amount: values.amount,
-        collected_on: values.collected_on,
-        note: values.note || null,
-        operator_user_ids: values.operator_user_ids,
-      });
-      setRebates((current) => current.map((item) => item.id === updated.id ? updated : item));
-      setEditTarget(null);
-      editForm.resetFields();
-      appMessage.success("返点明细已更新");
-      // 返点是收入"其中项"，编辑会改变订单利润/分润：必须通知上层刷新订单详情与统计（与登记/删除同口径）。
-      await props.onCreated();
-    } catch (cause) {
-      setEditError(normalizeError(cause));
-    } finally {
-      editInFlight.current = false;
-      setEditSubmitting(false);
-    }
+    const account = props.account;
+    const target = editTarget;
+    if (!target || !account || !configReady) return;
+    const submittedSession = session.current();
+    await editWrite.run(async () => {
+      setEditError(null);
+      try {
+        const updated = await rebatesApi.update(target.id, {
+          amount: values.amount,
+          collected_on: values.collected_on,
+          note: values.note || null,
+          operator_user_ids: values.operator_user_ids,
+        });
+        if (session.isCurrent(submittedSession)) {
+          setRebates((current) => current.map((item) => item.id === updated.id ? updated : item));
+          setEditTarget(null);
+          editForm.resetFields();
+          close();
+        }
+        appMessage.success("返点明细已更新");
+        // 返点是收入"其中项"，编辑会改变订单利润/分润：必须通知上层刷新订单详情与统计（与登记/删除同口径）。
+        void Promise.resolve().then(() => props.onCreated(account))
+          .catch(() => appMessage.warning("返点已更新，但刷新失败，请手动刷新"));
+      } catch (cause) {
+        const error = normalizeError(cause);
+        if (session.isCurrent(submittedSession)) setEditError(error);
+        else appMessage.error(`${account.source_order_no ?? `账号 ${account.id}`}：${error.message}`);
+      }
+    });
+  };
+
+  const close = () => {
+    session.invalidate();
+    detailsRequest.invalidate();
+    setEditTarget(null);
+    props.onClose();
   };
 
   return (
@@ -161,7 +191,7 @@ export function InventoryRebateModal(props: {
       open={open}
       destroyOnHidden
       wrapClassName="inventory-rebate-modal"
-      onCancel={() => { setEditTarget(null); props.onClose(); }}
+      onCancel={close}
       width={900}
       footer={
         <PermissionButton permission="order.event.post" type="primary" aria-label="确认登记" loading={submitting} disabled={!configReady} onClick={() => form.submit()}>

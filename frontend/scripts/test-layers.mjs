@@ -43,6 +43,7 @@ export const fastTests = [
   "tests/frontend/unit/shared/client.test.ts",
   "tests/frontend/unit/shared/financeApiBoundaries.test.ts",
   "tests/frontend/unit/shared/format.test.ts",
+  "tests/frontend/unit/shared/latestRequest.test.ts",
   "tests/frontend/unit/shared/listColumns.test.ts",
   "tests/frontend/unit/shared/money.test.ts",
   "tests/frontend/unit/shared/retiredProducts.test.ts",

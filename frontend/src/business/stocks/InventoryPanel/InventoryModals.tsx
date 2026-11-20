@@ -64,17 +64,16 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     voidPools,
     voidTarget,
     voiding,
+    closeVoid,
   } = controller;
 
   return (
     <>
       {saleTarget ? (() => {
-        const onCreated = async () => {
-          const account = saleTarget;
-          setSaleTarget(null);
-          if (account) removeFromInventory(account.id, account.source_order_id ?? undefined);
+        const onCreated = async (account: NonNullable<typeof saleTarget>) => {
+          removeFromInventory(account.id, account.source_order_id ?? undefined);
           await load();
-          if (account) controller.dropExecutionCache(account.id);
+          controller.dropExecutionCache(account.id);
         };
         const common = { account: saleTarget, onClose: () => setSaleTarget(null), onCreated };
         if (saleTarget.inventory_type === "CONSIGNMENT") return <ConsignmentSaleModal {...common} />;
@@ -84,21 +83,17 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
       <OrderConsignmentModal
         account={consignmentTarget}
         onClose={() => setConsignmentTarget(null)}
-        onCreated={async () => {
-          const account = consignmentTarget;
-          setConsignmentTarget(null);
+        onCreated={async (account) => {
           await load();
-          if (account) refreshExecution(account);
+          refreshExecution(account);
         }}
       />
       <InventoryRebateModal
         account={rebateTarget}
         onClose={() => setRebateTarget(null)}
-        onCreated={async () => {
-          const account = rebateTarget;
-          setRebateTarget(null);
+        onCreated={async (account) => {
           await load();
-          if (account) refreshExecution(account);
+          refreshExecution(account);
         }}
       />
       <CashflowModal
@@ -117,7 +112,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         }}
       />
       <InventoryCancellationDialog
-        title="取消入库登记"
+        title={voidTarget ? `取消入库登记 · ${voidTarget.account.source_order_no ?? voidTarget.account.stock_no ?? `账号 ${voidTarget.account.id}`}` : "取消入库登记"}
         open={Boolean(voidTarget)}
         okText="确认冲销"
         submitting={voiding}
@@ -126,7 +121,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         amount={voidTarget?.amount ?? "0.00"}
         allowZeroRefund
         pools={voidPools}
-        onCancel={() => { if (!voiding) { controller.setVoidTarget(null); voidForm.resetFields(); } }}
+        onCancel={closeVoid}
         onFinish={(values) => void submitVoid(values)}
         description={voidTarget ? <p className="muted">
           来源订单买入流水剩余可冲销 ¥{money(voidTarget.amount)}。按实际退回金额冲销，取消后账号退出库存，同时关闭仍在上架的平台记录。
@@ -149,18 +144,15 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
               form_extra,
             });
             appMessage.success("寄售记录已下架，账号已出库");
-            setPlatformOffsaleTarget(null);
-            await load();
+            void load();
             refreshExecution(target.account);
           } catch (cause) {
-            controller.setError(normalizeError(cause));
-            await load();
+            void load();
             throw cause;
           }
         }}
         onChanged={async () => {
           const account = platformOffsaleTarget?.account;
-          setPlatformOffsaleTarget(null);
           if (!account?.source_order_id) return;
           await load();
           const detail = await ordersApi.executionDetail(account.source_order_id);
@@ -202,13 +194,13 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
       <OrderProfileModal
         target={profileTarget}
         onClose={() => setProfileTarget(null)}
-        onSaved={(updated) => {
+        onSaved={(updated, target) => {
           controller.setRows((current) => current.map((row) => row.account.id === updated.id ? mergeInventoryAccount(row, updated) : row));
           setExecutionDetails((current) => {
             const detail = current[updated.id];
             return detail ? { ...current, [updated.id]: { ...detail, account: { ...detail.account, ...updated } } } : current;
           });
-          refreshExecution(updated, profileTarget?.orderId ?? updated.source_order_id);
+          refreshExecution(updated, target.orderId ?? updated.source_order_id);
         }}
         onError={(error) => controller.setError(normalizeError(error))}
         operationSource="库存中心"

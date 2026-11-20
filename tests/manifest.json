@@ -64,25 +64,25 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 87,
+        "files": 89,
         "layers": {
-          "fast": 26,
+          "fast": 27,
           "quick": 7,
-          "react": 42,
+          "react": 43,
           "deep": 12
         },
         "cases": {
-          "fast": 150,
-          "quick": 79,
-          "react": 587,
-          "deep": 88
+          "fast": 162,
+          "quick": 91,
+          "react": 713,
+          "deep": 94
         },
         "byArea": {
           "unit": {
             "workbench": 1,
             "business": 9,
             "settings": 1,
-            "shared": 10,
+            "shared": 12,
             "system": 5
           },
           "module": {
@@ -96,7 +96,7 @@
             "system": 5
           }
         },
-        "_baseline_note": "当前磁盘实际为 90 个测试文件、fast 27 个、react 43 个、deep 12 个；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",
+        "_baseline_note": "前端测试文件按当前磁盘同步；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",
         "root_layout": "tests/frontend/<unit|module>/<区域>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",

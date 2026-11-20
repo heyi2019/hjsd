@@ -16,7 +16,6 @@ export function CreateBusinessModalWrapper({ controller }: { controller: OrdersP
         open={Boolean(createType)}
         onClose={() => setCreateType(undefined)}
         onCreated={async () => {
-          setCreateType(undefined);
           setInventoryRefreshKey((key) => key + 1);
           if (activeTab !== "ledger") return;
           await load();
@@ -30,9 +29,8 @@ export function OrderAccountActionModals({ controller }: { controller: OrdersPag
   const sale = controller.orderSaleTarget;
   const saleCommon = {
     account: sale,
-    onClose: () => controller.setOrderSaleTarget(null),
+    onClose: controller.closeOrderSale,
     onCreated: async () => {
-      controller.setOrderSaleTarget(null);
       await controller.load();
     },
   };
@@ -47,9 +45,8 @@ export function OrderAccountActionModals({ controller }: { controller: OrdersPag
       <OrderConsignmentModal
         account={consignment?.account ?? null}
         orderId={consignment?.orderId}
-        onClose={() => controller.setOrderConsignmentTarget(null)}
+        onClose={controller.closeOrderConsignment}
         onCreated={async () => {
-          controller.setOrderConsignmentTarget(null);
           await controller.load();
         }}
       />

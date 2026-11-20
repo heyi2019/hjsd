@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import { orderTypesApi, ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
@@ -10,6 +10,7 @@ import { filterRetiredOrderTypeOptions } from "../../shared/lib/retiredProducts"
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { useSession } from "../../shared/state/session";
 import { appMessage } from "../../shared/ui/appFeedback";
+import { useLatestRequest } from "../../shared/hooks/useLatestRequest";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 
 type Opt = { value: string; label: string };
@@ -41,7 +42,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [mineOrders, setMineOrders] = useState(initialMine);
-  const requestSequence = useRef(0);
+  const requestSequence = useLatestRequest();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   // 订单台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
@@ -115,7 +116,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   }), [mineOrders, orderTypeFilter, orderStatusFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, inventoryOperatorIds, saleOperatorIds, keyword, dateRange]);
 
   const load = useCallback(async () => {
-    const requestId = ++requestSequence.current;
+    const requestId = requestSequence.start();
     setLoading(true);
     try {
       const result = await ordersApi.listPage({
@@ -124,16 +125,16 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
-      if (requestId !== requestSequence.current) return;
+      if (!requestSequence.isCurrent(requestId)) return;
       setOrders(result.items);
       setPageTotal(result.total);
       setLoadError(null);
     } catch (error) {
-      if (requestId === requestSequence.current) setLoadError(normalizeError(error));
+      if (requestSequence.isCurrent(requestId)) setLoadError(normalizeError(error));
     } finally {
-      if (requestId === requestSequence.current) setLoading(false);
+      if (requestSequence.isCurrent(requestId)) setLoading(false);
     }
-  }, [queryFilters, ledgerSortDesc, page, pageSize]);
+  }, [queryFilters, ledgerSortDesc, page, pageSize, requestSequence]);
 
   useEffect(() => {
     if (active) {
@@ -182,7 +183,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   // keep-alive 重新激活、筛选变更、翻页或排序变更时均由后端返回当前页。
   useEffect(() => {
     if (active) void load();
-  }, [active, load]);
+    return requestSequence.invalidate;
+  }, [active, load, requestSequence]);
 
   useEffect(() => {
     if (!active) return;

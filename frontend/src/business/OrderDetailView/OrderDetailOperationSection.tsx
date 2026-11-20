@@ -156,7 +156,7 @@ function editableOperationColumns(
       title: "内容", dataIndex: "content", key: "content", onCell: () => ({ className: "order-operation-content" }),
       render: (_value: OrderOperationRow["content"], row: OrderOperationRow) => {
         if (row.operationKey === "description") return <Input aria-label="编辑运营描述" value={account?.account_description ?? ""} onChange={(event) => onProfileChange?.({ account_description: event.target.value })} />;
-        if (row.operationKey === "images") return <OrderDetailImageGallery images={account?.account_images ?? []} altPrefix="作图" limit={9} editing onChange={(images) => onProfileChange?.({ account_images: images })} />;
+        if (row.operationKey === "images") return <OrderDetailImageGallery images={account?.account_images ?? []} altPrefix="作图" ownerKey={account?.id} limit={9} editing onChange={(images) => onProfileChange?.({ account_images: images })} />;
         const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key];
         const extra = row.event ? eventExtra(row, draft as OrderEventDraft | undefined) : (draft?.form_extra ?? {});
         if (row.operationKey === "consignment") {

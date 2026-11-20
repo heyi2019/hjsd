@@ -19,6 +19,8 @@ import { DeliveryInfoSection } from "../../DeliveryInfoSection";
 import { InventoryAccountSummary } from "../InventoryAccountSummary";
 import { collectFullPayment, collectInstallmentPayment } from "./receiver";
 import { SaleFinanceCard } from "./SaleFinanceCard";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import "./sale-modal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
@@ -38,7 +40,7 @@ function buyerRoleOf(inventoryType: string | null | undefined): "BUYER" | "CONSI
 export interface InventorySaleModalProps {
   account: Account | null;
   onClose: () => void;
-  onCreated: () => void | Promise<void>;
+  onCreated: (account: Account) => void | Promise<void>;
   /** 固定货源类型（RECOVERY/PICKUP/CONSIGNMENT），由三个业务入口显式注入。 */
   inventoryType: SaleInventoryType;
   /** 弹窗标题，按货源类型差异化。 */
@@ -60,8 +62,9 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const [pools, setPools] = useState<Pool[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const submitInFlight = useRef(false);
+  const write = useAsyncAction();
+  const submitting = write.pending;
+  const session = useRequestSession(account);
   const [form] = Form.useForm();
   const { username } = useSession();
   const open = Boolean(props.account);
@@ -149,77 +152,94 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
 
   useEffect(() => {
     if (!open || !props.account) return;
+    form.resetFields();
+    setError(null);
+    lastAutoPeriodFee.current = undefined;
+    lastAutoPeriodAmount.current = undefined;
+    setPlan(null);
+  }, [form, open, props.account?.id, props.account?.source_order_id]);
+
+  useEffect(() => {
+    if (!open || !props.account) return;
     form.setFieldsValue({ bound_phone: props.account.bound_phone ?? undefined });
-  }, [form, open, props.account]);
+  }, [form, open, props.account?.id, props.account?.bound_phone]);
 
   const submit = async (values: Record<string, unknown>) => {
-    if (!props.account) return;
+    const submittedAccount = props.account;
+    if (!submittedAccount) return;
     const customerNickname = String(values.customer_nickname ?? "").trim();
-    const sourceOrderId = props.account.source_order_id;
+    const sourceOrderId = submittedAccount.source_order_id;
     if (sourceOrderId == null) {
       setError({ message: "该库存账号未关联到入库订单，无法在其上登记售出" });
       return;
     }
-    if (submitInFlight.current) return;
-    submitInFlight.current = true;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const selectedOperatorIds = Array.isArray(values.operator_user_ids)
-        ? (values.operator_user_ids as unknown[]).filter((id): id is number => typeof id === "number")
-        : [];
-      const devUsername = import.meta.env.DEV ? currentDevUser() : undefined;
-      let currentEmployeeId = employees.find((employee) => employee.is_active && employee.username === username)?.id
-        ?? (devUsername ? employees.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
-      // 未选操作人时重新读取人员，避免弹窗刚打开时丢失默认当前人。
-      if (selectedOperatorIds.length === 0 && currentEmployeeId === undefined) {
-        const latestEmployees = await employeesApi.list();
-        currentEmployeeId = latestEmployees.find((employee) => employee.is_active && employee.username === username)?.id
-          ?? (devUsername ? latestEmployees.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
+    const submittedSession = session.current();
+    await write.run(async () => {
+      setError(null);
+      try {
+        const selectedOperatorIds = Array.isArray(values.operator_user_ids)
+          ? (values.operator_user_ids as unknown[]).filter((id): id is number => typeof id === "number")
+          : [];
+        const devUsername = import.meta.env.DEV ? currentDevUser() : undefined;
+        let currentEmployeeId = employees.find((employee) => employee.is_active && employee.username === username)?.id
+          ?? (devUsername ? employees.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
+        // 未选操作人时重新读取人员，避免弹窗刚打开时丢失默认当前人。
+        if (selectedOperatorIds.length === 0 && currentEmployeeId === undefined) {
+          const latestEmployees = await employeesApi.list();
+          currentEmployeeId = latestEmployees.find((employee) => employee.is_active && employee.username === username)?.id
+            ?? (devUsername ? latestEmployees.find((employee) => employee.is_active && employee.username === devUsername)?.id : undefined);
+        }
+        const operatorUserIds = selectedOperatorIds.length > 0
+          ? selectedOperatorIds
+          : currentEmployeeId === undefined ? [] : [currentEmployeeId];
+        if (operatorUserIds.length === 0) {
+          setError({ message: "售出操作人必填" });
+          return;
+        }
+        values.operator_user_ids = operatorUserIds;
+        const customerInput = customerNickname ? {
+          display_name: customerNickname,
+          role: buyerRoleOf(resolvedType),
+          contact_name: values.customer_contact_name as string | undefined,
+          phone: values.customer_phone as string | undefined,
+          wechat: values.customer_wechat as string | undefined,
+          qq: values.customer_qq as string | undefined,
+          source: (values.customer_source === "其他" ? values.customer_source_other : values.customer_source) as string | undefined,
+          note: values.note as string | undefined,
+        } : undefined;
+        const deliveryFormExtra: Record<string, unknown> = {};
+        for (const key of ["bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_type", "compensation_type"]) {
+          const value = values[key];
+          if (value !== undefined && value !== null && value !== "") deliveryFormExtra[key] = value;
+        }
+        const deliveryResponsibleIds = Array.isArray(values.delivery_responsible_ids)
+          ? (values.delivery_responsible_ids as unknown[]).filter((id): id is number => typeof id === "number")
+          : [];
+        if (deliveryResponsibleIds.length > 0) deliveryFormExtra.delivery_responsible_ids = deliveryResponsibleIds;
+        if (values.payment_method === "INSTALLMENT") {
+          await collectInstallmentPayment({ sourceOrderId, values, customerInput, deliveryFormExtra });
+          appMessage.success("分期售出已创建，账号已进入分期中");
+        } else {
+          await collectFullPayment({ sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra });
+          appMessage.success("账号已售出");
+        }
+        if (session.isCurrent(submittedSession)) {
+          form.resetFields();
+          close();
+        }
+        void Promise.resolve().then(() => props.onCreated(submittedAccount))
+          .catch(() => appMessage.warning("售出已保存，但刷新失败，请手动刷新"));
+      } catch (cause) {
+        const error = normalizeError(cause);
+        if (session.isCurrent(submittedSession)) setError(error);
+        else appMessage.error(`${submittedAccount.source_order_no ?? `账号 ${submittedAccount.id}`}：${error.message}`);
       }
-      const operatorUserIds = selectedOperatorIds.length > 0
-        ? selectedOperatorIds
-        : currentEmployeeId === undefined ? [] : [currentEmployeeId];
-      if (operatorUserIds.length === 0) {
-        setError({ message: "售出操作人必填" });
-        return;
-      }
-      values.operator_user_ids = operatorUserIds;
-      const customerInput = customerNickname ? {
-        display_name: customerNickname,
-        role: buyerRoleOf(resolvedType),
-        contact_name: values.customer_contact_name as string | undefined,
-        phone: values.customer_phone as string | undefined,
-        wechat: values.customer_wechat as string | undefined,
-        qq: values.customer_qq as string | undefined,
-        source: (values.customer_source === "其他" ? values.customer_source_other : values.customer_source) as string | undefined,
-        note: values.note as string | undefined,
-      } : undefined;
-      const deliveryFormExtra: Record<string, unknown> = {};
-      for (const key of ["bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_type", "compensation_type"]) {
-        const value = values[key];
-        if (value !== undefined && value !== null && value !== "") deliveryFormExtra[key] = value;
-      }
-      const deliveryResponsibleIds = Array.isArray(values.delivery_responsible_ids)
-        ? (values.delivery_responsible_ids as unknown[]).filter((id): id is number => typeof id === "number")
-        : [];
-      if (deliveryResponsibleIds.length > 0) deliveryFormExtra.delivery_responsible_ids = deliveryResponsibleIds;
-      if (values.payment_method === "INSTALLMENT") {
-        await collectInstallmentPayment({ sourceOrderId, values, customerInput, deliveryFormExtra });
-        appMessage.success("分期售出已创建，账号已进入分期中");
-      } else {
-        await collectFullPayment({ sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra });
-        appMessage.success("账号已售出");
-      }
-      form.resetFields();
-      props.onClose();
-      await props.onCreated();
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      submitInFlight.current = false;
-      setSubmitting(false);
-    }
+    });
+  };
+
+  const close = () => {
+    session.invalidate();
+    props.onClose();
   };
 
   return (
@@ -229,7 +249,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       open={open}
       className="inventory-sale-modal"
       destroyOnHidden
-      onCancel={props.onClose}
+      onCancel={close}
       footer={
         <PermissionButton permission="order.create" type="primary" loading={submitting} onClick={() => form.submit()}>
           确认售出

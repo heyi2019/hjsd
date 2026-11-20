@@ -10,6 +10,8 @@ import type { Pool } from "../../../shared/api/types/finance";
 import { poolsApi } from "../../../shared/api/pools.api";
 import { normalizeError } from "../../../shared/api/client";
 import { appMessage } from "../../../shared/ui/appFeedback";
+import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { buildEventEdits, buildOperationEventCreates } from "./execution-edit-payload";
 import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
 import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
@@ -39,10 +41,10 @@ export function useOrderDetailEditor(params: {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [invEditExtraForm] = Form.useForm();
-  const [savingAccount, setSavingAccount] = useState(false);
-  const openVersion = useRef(0);
+  const saveAction = useAsyncAction();
+  const savingAccount = saveAction.pending;
+  const openVersion = useLatestRequest();
   const openingEditor = useRef(false);
-  const savingEditor = useRef(false);
 
   async function ensureEmployees(): Promise<EmployeeOption[]> {
     if (employees.length) return employees;
@@ -81,12 +83,12 @@ export function useOrderDetailEditor(params: {
     invEditExtraForm.resetFields();
   }
 
-  async function openEditor(account: Account): Promise<boolean> {
-    if (savingEditor.current) {
+  async function openEditor(account: Account, isCurrent?: () => boolean): Promise<boolean> {
+    if (saveAction.isPending()) {
       appMessage.warning("当前订单正在保存，请稍候");
       return false;
     }
-    const version = ++openVersion.current;
+    const version = openVersion.start();
     openingEditor.current = true;
     setInlineEditId(null);
     setEditingAccount({ ...account });
@@ -97,14 +99,19 @@ export function useOrderDetailEditor(params: {
     setPartyDrafts({});
     invEditExtraForm.resetFields();
     await Promise.all([ensureEmployees(), ensurePools()]);
-    if (openVersion.current !== version) return false;
+    if (!openVersion.isCurrent(version)) return false;
+    if (isCurrent && !isCurrent()) {
+      openingEditor.current = false;
+      clearEditor();
+      return false;
+    }
     openingEditor.current = false;
     setInlineEditId(account.id);
     return true;
   }
 
   function cancelPendingOpen() {
-    openVersion.current += 1;
+    openVersion.invalidate();
     if (openingEditor.current) {
       openingEditor.current = false;
       clearEditor();
@@ -112,17 +119,17 @@ export function useOrderDetailEditor(params: {
   }
 
   function cancelInlineEdit() {
-    if (savingEditor.current) {
+    if (saveAction.isPending()) {
       appMessage.warning("当前订单正在保存，请稍候");
       return;
     }
     openingEditor.current = false;
-    openVersion.current += 1;
+    openVersion.invalidate();
     clearEditor();
   }
 
   function updateEventDraft(event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     setEventDrafts((current) => ({
       ...current,
       [event.id]: {
@@ -133,7 +140,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateOperationDraft(key: string, changes: Partial<OperationDraft>) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     setOperationDrafts((current) => ({
       ...current,
       [key]: {
@@ -144,7 +151,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function addOperationDraft(operationType: NonNullable<OperationDraft["operation_type"]>) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     operationDraftSequence.current += 1;
     const key = `new:${operationType.toLowerCase()}:${operationDraftSequence.current}`;
     setOperationDrafts((current) => ({
@@ -159,7 +166,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function removeOperationDraft(key: string) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     setOperationDrafts((current) => {
       if (!(key in current)) return current;
       const next = { ...current };
@@ -169,7 +176,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateFinanceDraft(flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     setFinanceDrafts((current) => ({
       ...current,
       [flowNo]: { ...(current[flowNo] ?? { flow_no: flowNo, occurred_at: "", note: "" }), ...changes },
@@ -177,12 +184,12 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateEditingAccount(changes: Partial<Account>) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     setEditingAccount((current) => current ? { ...current, ...changes } : current);
   }
 
   function updateOrderDraft(orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
     const sharedOrderIds = sharedOrderIdsForEdit(detail, orderId);
     setOrderDrafts((current) => {
@@ -201,7 +208,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function updatePartyDraft(orderId: number, addition: PartyAddition) {
-    if (savingEditor.current) return;
+    if (saveAction.isPending()) return;
     setPartyDrafts((current) => {
       const existing = current[orderId] ?? [];
       const same = (item: PartyAddition) => item.entity_type === addition.entity_type
@@ -213,111 +220,108 @@ export function useOrderDetailEditor(params: {
   }
 
   async function saveInline() {
-    if (!editingAccount || savingEditor.current) return;
-    savingEditor.current = true;
-    setSavingAccount(true);
-    try {
-      const extraValues = await invEditExtraForm.validateFields();
-      const {
-        id,
-        game_account,
-        game_type,
-        game_password,
-        camp_account,
-        channel_region,
-        bound_phone,
-        has_secondary,
-        secondary_images,
-        wallet_realname,
-        wallet_realname_images,
-        account_description,
-        account_images,
-        note,
-        extra_values,
-      } = editingAccount;
-      const profile = {
-        game_account,
-        game_type,
-        game_password,
-        camp_account,
-        channel_region,
-        bound_phone,
-        has_secondary,
-        secondary_images,
-        wallet_realname,
-        wallet_realname_images,
-        account_description,
-        account_images,
-        note,
-        extra_values,
-        form_extra: extraValues?.form_extra,
-      };
-      const detail = getExecutionDetail(id);
-      const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];
-      const events = buildEventEdits(originalEvents, eventDrafts);
-      const new_events = buildOperationEventCreates(operationDrafts);
-      const originalFinanceRows = detail?.detail_view.finance_rows ?? [];
-      const cashflows = Object.values(financeDrafts).filter((draft) => {
-        const original = originalFinanceRows.find((row) => row.flow_no === draft.flow_no);
-        return original && (
-          draft.amount !== undefined && draft.amount !== original.amount
-          || draft.pool_id !== undefined && draft.pool_id !== original.pool_id
-          || draft.occurred_at !== (original.occurred_at ?? "")
-          || draft.note !== (original.note ?? "")
-          || draft.operator_user_ids !== undefined
-            && JSON.stringify(draft.operator_user_ids) !== JSON.stringify(original.operator_user_ids ?? [])
-        );
-      }).map((draft) => ({
-        flow_no: draft.flow_no,
-        ...(draft.amount !== undefined ? { amount: draft.amount } : {}),
-        ...(draft.pool_id !== undefined ? { pool_id: draft.pool_id } : {}),
-        ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
-        note: draft.note,
-        ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
-      }));
-      const originalOrders = detail?.orders ?? [];
-      const orders = Object.values(orderDrafts).filter((draft) => {
-        const original = originalOrders.find((order) => order.order_id === draft.order_id);
-        return Boolean(original && (
-          draft.occurred_at !== (original.created_at ?? "")
-          || draft.note !== (original.note ?? "")
-          || Object.keys(draft.form_extra).length > 0
-        ));
-      }).map((draft) => ({
-        order_id: draft.order_id,
-        ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
-        note: draft.note,
-        ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
-      }));
-      const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));
-      const sourceOrderId = editingAccount.source_order_id;
-      if (sourceOrderId == null) throw new Error("账号没有绑定来源订单，无法保存详情");
-      await ordersApi.updateExecution(sourceOrderId, {
-        profile,
-        events,
-        new_events,
-        cashflows,
-        orders,
-        parties,
-      });
+    if (!editingAccount) return;
+    await saveAction.run(async () => {
       try {
-        const detail = await ordersApi.executionDetail(sourceOrderId);
-        onSaved(id, detail);
-      } catch (refreshError) {
+        const extraValues = await invEditExtraForm.validateFields();
+        const {
+          id,
+          game_account,
+          game_type,
+          game_password,
+          camp_account,
+          channel_region,
+          bound_phone,
+          has_secondary,
+          secondary_images,
+          wallet_realname,
+          wallet_realname_images,
+          account_description,
+          account_images,
+          note,
+          extra_values,
+        } = editingAccount;
+        const profile = {
+          game_account,
+          game_type,
+          game_password,
+          camp_account,
+          channel_region,
+          bound_phone,
+          has_secondary,
+          secondary_images,
+          wallet_realname,
+          wallet_realname_images,
+          account_description,
+          account_images,
+          note,
+          extra_values,
+          form_extra: extraValues?.form_extra,
+        };
+        const detail = getExecutionDetail(id);
+        const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];
+        const events = buildEventEdits(originalEvents, eventDrafts);
+        const new_events = buildOperationEventCreates(operationDrafts);
+        const originalFinanceRows = detail?.detail_view.finance_rows ?? [];
+        const cashflows = Object.values(financeDrafts).filter((draft) => {
+          const original = originalFinanceRows.find((row) => row.flow_no === draft.flow_no);
+          return original && (
+            draft.amount !== undefined && draft.amount !== original.amount
+            || draft.pool_id !== undefined && draft.pool_id !== original.pool_id
+            || draft.occurred_at !== (original.occurred_at ?? "")
+            || draft.note !== (original.note ?? "")
+            || draft.operator_user_ids !== undefined
+              && JSON.stringify(draft.operator_user_ids) !== JSON.stringify(original.operator_user_ids ?? [])
+          );
+        }).map((draft) => ({
+          flow_no: draft.flow_no,
+          ...(draft.amount !== undefined ? { amount: draft.amount } : {}),
+          ...(draft.pool_id !== undefined ? { pool_id: draft.pool_id } : {}),
+          ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
+          note: draft.note,
+          ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
+        }));
+        const originalOrders = detail?.orders ?? [];
+        const orders = Object.values(orderDrafts).filter((draft) => {
+          const original = originalOrders.find((order) => order.order_id === draft.order_id);
+          return Boolean(original && (
+            draft.occurred_at !== (original.created_at ?? "")
+            || draft.note !== (original.note ?? "")
+            || Object.keys(draft.form_extra).length > 0
+          ));
+        }).map((draft) => ({
+          order_id: draft.order_id,
+          ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
+          note: draft.note,
+          ...(Object.keys(draft.form_extra).length ? { form_extra: draft.form_extra } : {}),
+        }));
+        const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));
+        const sourceOrderId = editingAccount.source_order_id;
+        if (sourceOrderId == null) throw new Error("账号没有绑定来源订单，无法保存详情");
+        await ordersApi.updateExecution(sourceOrderId, {
+          profile,
+          events,
+          new_events,
+          cashflows,
+          orders,
+          parties,
+        });
+        try {
+          const detail = await ordersApi.executionDetail(sourceOrderId);
+          onSaved(id, detail);
+        } catch (refreshError) {
+          clearEditor();
+          onRefreshFailed(id, sourceOrderId);
+          appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
+          console.warn("reload execution detail after save failed", normalizeError(refreshError).message);
+          return;
+        }
         clearEditor();
-        onRefreshFailed(id, sourceOrderId);
-        appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
-        console.warn("reload execution detail after save failed", normalizeError(refreshError).message);
-        return;
+        appMessage.success("修改已保存");
+      } catch (err) {
+        appMessage.error(normalizeError(err).message);
       }
-      clearEditor();
-      appMessage.success("修改已保存");
-    } catch (err) {
-      appMessage.error(normalizeError(err).message);
-    } finally {
-      savingEditor.current = false;
-      setSavingAccount(false);
-    }
+    });
   }
 
   return {
@@ -343,7 +347,7 @@ export function useOrderDetailEditor(params: {
     savingAccount,
     openEditor,
     cancelPendingOpen,
-    isSaving: () => savingEditor.current,
+    isSaving: saveAction.isPending,
     cancelInlineEdit,
     saveInline,
   };

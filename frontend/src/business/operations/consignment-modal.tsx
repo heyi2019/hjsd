@@ -2,7 +2,7 @@ import { appMessage } from "../../shared/ui/appFeedback";
 /** 库存账号寄售：每次只登记一个中介平台及其实际上架时间。 */
 import { DatePicker, Form, InputNumber } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import type { Account } from "../../shared/api/types/accounts";
@@ -13,6 +13,8 @@ import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTabl
 import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "../stocks/InventoryAccountSummary";
+import { useLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { activeConsignmentListings } from "./consignment-logic";
 import "./consignment-modal.css";
 
@@ -22,15 +24,18 @@ export function OrderConsignmentModal(props: {
   account: Account | null;
   orderId?: number | null;
   onClose: () => void;
-  onCreated: () => void | Promise<void>;
+  onCreated: (account: Account, orderId: number) => void | Promise<void>;
 }) {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const write = useAsyncAction();
+  const submitting = write.pending;
   const [listed, setListed] = useState<ListedPlatform[]>([]);
   const [listingReady, setListingReady] = useState(false);
   const [listingLoading, setListingLoading] = useState(false);
   const [listingError, setListingError] = useState<{ message: string; code?: string } | null>(null);
-  const requestGeneration = useRef(0);
+  const requestGeneration = useLatestRequest();
+  const employeesRequest = useLatestRequest();
+  const session = useRequestSession(props.account);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [sourceOrderId, setSourceOrderId] = useState<number | null>(props.orderId ?? props.account?.source_order_id ?? null);
   const [form] = Form.useForm();
@@ -41,7 +46,7 @@ export function OrderConsignmentModal(props: {
 
   const refreshListed = async (orderId: number, generation: number) => {
     const detail = await ordersApi.executionDetail(orderId);
-    if (generation !== requestGeneration.current) return;
+    if (!requestGeneration.isCurrent(generation)) return;
     const sourceOrder = detail.orders.find((order) => order.order_id === orderId);
     setSourceOrderId(sourceOrder?.order_id ?? null);
     const current = detail.account.status === "VOID" || !sourceOrder ? [] : activeConsignmentListings(sourceOrder).map((item) => ({
@@ -56,17 +61,17 @@ export function OrderConsignmentModal(props: {
   };
 
   const reloadListed = async (orderId: number): Promise<boolean> => {
-    const generation = ++requestGeneration.current;
+    const generation = requestGeneration.start();
     setListingLoading(true);
     try {
       await refreshListed(orderId, generation);
-      if (generation === requestGeneration.current) setListingError(null);
+      if (requestGeneration.isCurrent(generation)) setListingError(null);
       return true;
     } catch (cause) {
-      if (generation === requestGeneration.current) setListingError(normalizeError(cause));
+      if (requestGeneration.isCurrent(generation)) setListingError(normalizeError(cause));
       return false;
     } finally {
-      if (generation === requestGeneration.current) setListingLoading(false);
+      if (requestGeneration.isCurrent(generation)) setListingLoading(false);
     }
   };
 
@@ -77,15 +82,20 @@ export function OrderConsignmentModal(props: {
     setListed([]);
     setListingReady(false);
     setSourceOrderId(props.orderId ?? props.account?.source_order_id ?? null);
+    form.resetFields();
     form.setFieldsValue({ listed_at: dayjs().second(0).millisecond(0) });
-    void employeesApi.list().then((items) => setEmployees(items.filter((item) => item.is_active))).catch((cause) => setError(normalizeError(cause)));
+    const employeeToken = employeesRequest.start();
+    void employeesApi.list().then((items) => {
+      if (employeesRequest.isCurrent(employeeToken)) setEmployees(items.filter((item) => item.is_active));
+    }).catch((cause) => { if (employeesRequest.isCurrent(employeeToken)) setError(normalizeError(cause)); });
     const orderId = props.orderId ?? props.account?.source_order_id;
     if (orderId != null) void reloadListed(orderId);
-    return () => { requestGeneration.current += 1; };
-  }, [form, open, props.account, props.orderId]);
+    return () => { requestGeneration.invalidate(); employeesRequest.invalidate(); };
+  }, [employeesRequest, form, open, props.account, props.orderId, requestGeneration]);
 
   const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    if (!props.account || !configReady) return;
+    const account = props.account;
+    if (!account || !configReady) return;
     const listedAt = values.listed_at ?? dayjs();
     if (!values.platform) return;
     if (!sourceOrderId) {
@@ -93,37 +103,44 @@ export function OrderConsignmentModal(props: {
       return;
     }
     const price = typeof values.consignment_price === "number" ? values.consignment_price : undefined;
-    setSubmitting(true);
-    try {
-      await ordersApi.postEvent(sourceOrderId, {
-        event_type: "OPERATE",
-        operation_type: "CONSIGNMENT",
-        occurred_on: listedAt.format("YYYY-MM-DD"),
-        operator_user_ids: values.operator_user_ids,
-        note: `寄售上架：${values.platform}`,
-        form_extra_scope: "CONSIGN",
-        form_extra: {
-          ...values.form_extra,
-          consignment_platforms: [values.platform],
-          ...(price === undefined ? {} : { consignment_price: price }),
-          listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
-        },
-      });
-      appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
-      form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
-      // 上架已成功；列表刷新与通知父页面并行，避免详情慢时弹窗一直停在确认状态。
-      // 刷新完成前暂不可再次选平台，防止重复上架。
-      setListingReady(false);
-      const [listingRefreshed] = await Promise.all([
-        reloadListed(sourceOrderId),
-        Promise.resolve().then(() => props.onCreated()),
-      ]);
-      if (!listingRefreshed) appMessage.warning("已上架，但上架记录刷新失败，请重新加载");
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      setSubmitting(false);
-    }
+    const orderId = sourceOrderId;
+    const submittedSession = session.current();
+    await write.run(async () => {
+      try {
+        await ordersApi.postEvent(orderId, {
+          event_type: "OPERATE",
+          operation_type: "CONSIGNMENT",
+          occurred_on: listedAt.format("YYYY-MM-DD"),
+          operator_user_ids: values.operator_user_ids,
+          note: `寄售上架：${values.platform}`,
+          form_extra_scope: "CONSIGN",
+          form_extra: {
+            ...values.form_extra,
+            consignment_platforms: [values.platform],
+            ...(price === undefined ? {} : { consignment_price: price }),
+            listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
+          },
+        });
+        appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
+        if (session.isCurrent(submittedSession)) {
+          form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
+          setListingReady(false);
+          void reloadListed(orderId);
+          close();
+        }
+        void Promise.resolve().then(() => props.onCreated(account, orderId))
+          .catch(() => appMessage.warning("已上架，但页面刷新失败，请手动刷新"));
+      } catch (cause) {
+        const error = normalizeError(cause);
+        if (session.isCurrent(submittedSession)) setError(error);
+        else appMessage.error(`${account.source_order_no ?? `账号 ${account.id}`}：${error.message}`);
+      }
+    });
+  };
+
+  const close = () => {
+    session.invalidate();
+    props.onClose();
   };
 
   return (
@@ -131,9 +148,9 @@ export function OrderConsignmentModal(props: {
       title="登记寄售"
       open={open}
       destroyOnHidden
-      onCancel={props.onClose}
+      onCancel={close}
       footer={
-        <CompactActions onCancel={props.onClose} divider={false}>
+        <CompactActions onCancel={close} divider={false}>
           <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} disabled={!configReady} onClick={() => form.submit()}>
             确认上架
           </PermissionButton>

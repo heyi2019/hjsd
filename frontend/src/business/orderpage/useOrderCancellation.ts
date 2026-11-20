@@ -12,6 +12,8 @@ import { currentDevUser, currentUser, normalizeError } from "../../shared/api/cl
 import { money, today } from "../../shared/lib/format";
 import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
 import { appMessage } from "../../shared/ui/appFeedback";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { pickCancelableEvent, resolveCancelAmount, type CancelFormScope } from "./helpers";
 
 /**
@@ -23,13 +25,15 @@ export function useOrderCancellation(params: {
   selectedOrder: Order | null;
   setSelectedOrder: (order: Order | null) => void;
   load: () => Promise<void>;
+  actionRequest: LatestRequest;
 }) {
-  const { selectedOrder, setSelectedOrder, load } = params;
+  const { selectedOrder, setSelectedOrder, load, actionRequest } = params;
   const currentOperator = currentDevUser();
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
   const [cancelScope, setCancelScope] = useState<CancelFormScope>("ORDERCANC");
-  const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  const cancelWrite = useAsyncAction();
+  const cancelSubmitting = cancelWrite.pending;
   const [cancelPools, setCancelPools] = useState<Pool[]>([]);
   const [cancelEmployees, setCancelEmployees] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
   const [cancelForm] = Form.useForm();
@@ -53,17 +57,21 @@ export function useOrderCancellation(params: {
       : event.event_type === "SELL");
 
   const openCancelTransaction = async (sourceOrder?: Order) => {
+    const request = actionRequest.start();
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order) return;
+      if (!order || !actionRequest.isCurrent(request)) return;
       const hasActiveInstallment = Boolean(order.installment_principal && order.installment_status !== "CANCELLED");
       if (hasActiveInstallment) {
         const contracts = await installmentsApi.list({ order_id: order.id });
+        if (!actionRequest.isCurrent(request)) return;
         const target = contracts.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
         if (!target) {
           appMessage.error("未找到可取消的分期合约");
           return;
         }
+        cancelForm.resetFields();
+        cancelForm.setFieldsValue({ cancelled_on: today() });
         setCancelInstallmentTarget(target);
         setCancelOrderTarget(null);
       } else {
@@ -73,38 +81,35 @@ export function useOrderCancellation(params: {
         const first = reversible[0];
         const unsoldInventory = order.status === "ACTIVE" && ["HS", "TH"].includes(order.order_type) && order.account_id != null;
         const nextScope: CancelFormScope = first?.event.event_type === "BUY" || (!first && unsoldInventory) ? "INVREFUND" : "ORDERCANC";
-        cancelForm.setFieldsValue({
-          cancelled_on: today(),
-          offset_event_id: first?.event.id,
-          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first?.remaining,
-          amount: first?.remaining ?? "0.00",
-          pool_id: first?.event.pool_id ?? undefined,
-        });
         const [poolList, employeeList] = await Promise.all([poolsApi.list(), employeesApi.list()]);
+        if (!actionRequest.isCurrent(request)) return;
         const activeEmployees = employeeList.filter((employee) => employee.is_active);
         setCancelPools(poolList.filter((pool) => pool.status === "ACTIVE"));
         setCancelEmployees(activeEmployees);
         // 先在打开弹窗的加载阶段写入默认操作人，避免依赖 ResponsibleEmployeeSelect
         // 内部的 /auth/me 异步回填；提交动作必须始终携带显式员工 ID。
-        if (cancelForm.getFieldValue("operator_user_ids") == null) {
-          const defaultEmployee = activeEmployees.find((employee) => employee.username === currentOperator)
-            ?? (activeEmployees.length === 1 ? activeEmployees[0] : undefined);
-          if (defaultEmployee) cancelForm.setFieldValue("operator_user_ids", [defaultEmployee.id]);
-        }
-        if (first && cancelForm.getFieldValue("pool_id") == null) {
-          cancelForm.setFieldValue("pool_id", poolList[0]?.id);
-        }
+        const defaultEmployee = activeEmployees.find((employee) => employee.username === currentOperator)
+          ?? (activeEmployees.length === 1 ? activeEmployees[0] : undefined);
+        cancelForm.resetFields();
+        cancelForm.setFieldsValue({
+          cancelled_on: today(),
+          offset_event_id: first?.event.id,
+          [nextScope === "INVREFUND" ? "refund_amount" : "cancel_amount"]: first?.remaining,
+          amount: first?.remaining ?? "0.00",
+          pool_id: first?.event.pool_id ?? (first ? poolList[0]?.id : undefined),
+          operator_user_ids: defaultEmployee ? [defaultEmployee.id] : undefined,
+        });
         setCancelScope(nextScope);
         setCancelOrderTarget(order);
         setCancelInstallmentTarget(null);
       }
-      if (hasActiveInstallment) cancelForm.setFieldsValue({ cancelled_on: today() });
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
 
   const closeCancelTransaction = () => {
+    actionRequest.invalidate();
     setCancelOrderTarget(null);
     setCancelInstallmentTarget(null);
     setCancelScope("ORDERCANC");
@@ -115,99 +120,105 @@ export function useOrderCancellation(params: {
     const installment = cancelInstallmentTarget;
     const order = cancelOrderTarget;
     if (!installment && !order) return;
-    setCancelSubmitting(true);
-    try {
-      if (installment) {
-        const result = await installmentsApi.cancel(installment.id, values);
-        appMessage.success(cancelRefundSuccess(result.refund_amount, installment.contract_type));
-        await load();
-      } else {
-        if (!order) return;
-        const reversible = cancelableEventsForScope(order, cancelScope);
-        const selected = pickCancelableEvent(reversible, values.offset_event_id);
-        if (cancelScope === "INVREFUND" && order.account_id != null) {
-          const amount = values.amount ?? selected?.remaining ?? "0.00";
-          let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
-          if (!operatorUserIds?.length) {
-            const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
-            if (byDevUser) operatorUserIds = [byDevUser.id];
-            else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
-            else if (cancelEmployees.length > 0) {
-              try {
-                const current = await currentUser();
-                const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
-                if (bySessionUser) operatorUserIds = [bySessionUser.id];
-              } catch { /* 无法取得当前人员时交给后端校验。 */ }
-            }
-          }
-          await ordersApi.inventoryOffsale(order.id, {
-            amount,
-            occurred_on: values.cancelled_on,
-            unlisted_at: `${values.cancelled_on}T${dayjs().format("HH:mm")}`,
-            ...(Number(amount) > 0 ? { pool_id: Number(values.pool_id), offset_event_id: selected?.event.id } : {}),
-            operator_user_ids: operatorUserIds,
-            reason: values.reason.trim(),
-            form_extra: values.form_extra,
-          });
-          appMessage.success("交易已取消，账号已退出库存");
-          await load();
-          closeCancelTransaction();
-          setSelectedOrder(null);
-          return;
-        }
-        if (selected) {
-          const resolved = resolveCancelAmount({ scope: cancelScope, values, remaining: selected.remaining });
-          if (!resolved.ok) {
-            appMessage.error(resolved.error);
-            return;
-          }
-          const amount = resolved.amount;
-          // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
-          // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式操作人。
-          let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
-          if (!operatorUserIds?.length) {
-            const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
-            if (byDevUser) operatorUserIds = [byDevUser.id];
-            else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
-            else if (cancelEmployees.length > 0) {
-              try {
-                const current = await currentUser();
-                const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
-                if (bySessionUser) operatorUserIds = [bySessionUser.id];
-              } catch {
-                // 下拉组件已尝试默认当前员工；解析失败时保留空值，让后端按必填规则返回明确错误。
+    const session = actionRequest.current();
+    const targetNo = order?.order_no ?? installment?.inst_no ?? "订单";
+    const success = (text: string) => appMessage.success(actionRequest.isCurrent(session) ? text : `${targetNo}：${text}`);
+    const complete = () => {
+      if (actionRequest.isCurrent(session)) {
+        closeCancelTransaction();
+        setSelectedOrder(null);
+      }
+      void Promise.resolve().then(load).catch(() => appMessage.warning("交易已取消，但台账刷新失败，请手动刷新"));
+    };
+    await cancelWrite.run(async () => {
+      try {
+        if (installment) {
+          const result = await installmentsApi.cancel(installment.id, values);
+          success(cancelRefundSuccess(result.refund_amount, installment.contract_type));
+          complete();
+        } else {
+          if (!order) return;
+          const reversible = cancelableEventsForScope(order, cancelScope);
+          const selected = pickCancelableEvent(reversible, values.offset_event_id);
+          if (cancelScope === "INVREFUND" && order.account_id != null) {
+            const amount = values.amount ?? selected?.remaining ?? "0.00";
+            let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
+            if (!operatorUserIds?.length) {
+              const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
+              if (byDevUser) operatorUserIds = [byDevUser.id];
+              else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
+              else if (cancelEmployees.length > 0) {
+                try {
+                  const current = await currentUser();
+                  const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
+                  if (bySessionUser) operatorUserIds = [bySessionUser.id];
+                } catch { /* 无法取得当前人员时交给后端校验。 */ }
               }
             }
+            await ordersApi.inventoryOffsale(order.id, {
+              amount,
+              occurred_on: values.cancelled_on,
+              unlisted_at: `${values.cancelled_on}T${dayjs().format("HH:mm")}`,
+              ...(Number(amount) > 0 ? { pool_id: Number(values.pool_id), offset_event_id: selected?.event.id } : {}),
+              operator_user_ids: operatorUserIds,
+              reason: values.reason.trim(),
+              form_extra: values.form_extra,
+            });
+            success("交易已取消，账号已退出库存");
+            complete();
+            return;
           }
-          const result = await ordersApi.postEvent(order.id, {
-            event_type: "CANCEL",
-            finalize_sale_cancel: ["HS", "TH"].includes(order.order_type),
-            amount,
-            occurred_on: values.cancelled_on,
-            offset_event_id: selected.event.id,
-            pool_id: Number(values.pool_id),
-            operator_user_ids: operatorUserIds,
-            reason: values.reason,
-            note: cancelScope === "INVREFUND" ? "取消：冲销入库并入账" : "取消：原路退款",
-            form_extra_scope: cancelScope,
-            form_extra: values.form_extra,
-          });
-          appMessage.success(cancelScope === "INVREFUND"
-            ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
-            : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金账户退还客户`);
-        } else {
-          await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
-          appMessage.success("交易已取消，无已登记款项需要退款");
+          if (selected) {
+            const resolved = resolveCancelAmount({ scope: cancelScope, values, remaining: selected.remaining });
+            if (!resolved.ok) {
+              appMessage.error(resolved.error);
+              return;
+            }
+            const amount = resolved.amount;
+            // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
+            // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式操作人。
+            let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
+            if (!operatorUserIds?.length) {
+              const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
+              if (byDevUser) operatorUserIds = [byDevUser.id];
+              else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
+              else if (cancelEmployees.length > 0) {
+                try {
+                  const current = await currentUser();
+                  const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
+                  if (bySessionUser) operatorUserIds = [bySessionUser.id];
+                } catch {
+                  // 下拉组件已尝试默认当前员工；解析失败时保留空值，让后端按必填规则返回明确错误。
+                }
+              }
+            }
+            const result = await ordersApi.postEvent(order.id, {
+              event_type: "CANCEL",
+              finalize_sale_cancel: ["HS", "TH"].includes(order.order_type),
+              amount,
+              occurred_on: values.cancelled_on,
+              offset_event_id: selected.event.id,
+              pool_id: Number(values.pool_id),
+              operator_user_ids: operatorUserIds,
+              reason: values.reason,
+              note: cancelScope === "INVREFUND" ? "取消：冲销入库并入账" : "取消：原路退款",
+              form_extra_scope: cancelScope,
+              form_extra: values.form_extra,
+            });
+            success(cancelScope === "INVREFUND"
+              ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
+              : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金账户退还客户`);
+          } else {
+            await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
+            success("交易已取消，无已登记款项需要退款");
+          }
+          complete();
         }
-        await load();
+      } catch (error) {
+        const message = normalizeError(error).message;
+        appMessage.error(actionRequest.isCurrent(session) ? message : `${targetNo}：${message}`);
       }
-      closeCancelTransaction();
-      setSelectedOrder(null);
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setCancelSubmitting(false);
-    }
+    });
   };
 
   const sharedCancellationEvent = cancelOrderTarget
@@ -228,7 +239,6 @@ export function useOrderCancellation(params: {
     cancelScope,
     setCancelScope,
     cancelSubmitting,
-    setCancelSubmitting,
     cancelableEventsForScope,
     reversibleEvents,
     closeCancelTransaction,

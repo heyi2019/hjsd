@@ -4,6 +4,7 @@ import type { AccountExecutionDetail } from "../../../shared/api/types/account-e
 import type { Account } from "../../../shared/api/types/accounts";
 import { normalizeError } from "../../../shared/api/client";
 import type { InventoryOrderRow } from "./types";
+import { useKeyedLatestRequest } from "../../../shared/hooks/useLatestRequest";
 
 export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   setRows: Dispatch<SetStateAction<InventoryOrderRow[]>>;
@@ -15,8 +16,8 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   const [orderExecutionDetails, setOrderExecutionDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [orderExecutionLoading, setOrderExecutionLoading] = useState<Record<number, boolean>>({});
   const [expandedOrderIds, setExpandedOrderIds] = useState<Key[]>([]);
-  const orderVersions = useRef<Record<number, number>>({});
-  const accountVersions = useRef<Record<number, number>>({});
+  const orderVersions = useKeyedLatestRequest<number>();
+  const accountVersions = useKeyedLatestRequest<number>();
   const accountLoadingTokens = useRef<Record<number, symbol>>({});
   const orderLoadingTokens = useRef<Record<number, symbol>>({});
   const accountLoadingByOrder = useRef<Record<number, number>>({});
@@ -32,9 +33,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       delete orderLoadingTokens.current[orderId];
       setOrderExecutionLoading((current) => ({ ...current, [orderId]: false }));
     }
-    const version = (orderVersions.current[orderId] ?? 0) + 1;
-    orderVersions.current[orderId] = version;
-    return version;
+    return orderVersions.start(orderId);
   };
   // 横向滚动记忆：手风琴展开/收起会以 key 重建整张 Table，旧滚动位置归零。
   // 展开前抓取 .ant-table-body 的 scrollLeft，重建后用 useLayoutEffect 还原（绘制前写回，无闪烁）。
@@ -60,17 +59,17 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     const orderId = row.source_order_id;
     orderAccountIds.current[orderId] = row.id;
     const version = startOrderRequest(orderId);
-    const accountVersion = accountVersions.current[row.id] ?? 0;
+    const accountVersion = accountVersions.current(row.id);
     const token = Symbol();
     accountLoadingTokens.current[row.id] = token;
     accountLoadingByOrder.current[orderId] = row.id;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
-      if (orderVersions.current[orderId] !== version || (accountVersions.current[row.id] ?? 0) !== accountVersion) return;
+      if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(row.id, accountVersion)) return;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
     } catch (err) {
-      if (orderVersions.current[orderId] === version && (accountVersions.current[row.id] ?? 0) === accountVersion) setError(normalizeError(err));
+      if (orderVersions.isCurrent(orderId, version) && accountVersions.isCurrent(row.id, accountVersion)) setError(normalizeError(err));
     } finally {
       if (accountLoadingTokens.current[row.id] === token) {
         delete accountLoadingTokens.current[row.id];
@@ -82,20 +81,20 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   async function loadOrderExecution(orderId: number, force = false): Promise<AccountExecutionDetail | null> {
     if (!force && (orderExecutionDetails[orderId] || orderExecutionLoading[orderId])) return orderExecutionDetails[orderId] ?? null;
     const version = startOrderRequest(orderId);
-    const accountSnapshot = { ...accountVersions.current };
+    const accountSnapshot = accountVersions.snapshot();
     const token = Symbol();
     orderLoadingTokens.current[orderId] = token;
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
-      if (orderVersions.current[orderId] !== version || (accountVersions.current[detail.account.id] ?? 0) !== (accountSnapshot[detail.account.id] ?? 0)) return null;
+      if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(detail.account.id, accountSnapshot.get(detail.account.id) ?? 0)) return null;
       orderAccountIds.current[orderId] = detail.account.id;
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
       setExecutionDetails((current) => ({ ...current, [detail.account.id]: detail }));
       return detail;
     } catch (err) {
       const accountId = orderAccountIds.current[orderId];
-      if (orderVersions.current[orderId] === version && (accountId === undefined || (accountVersions.current[accountId] ?? 0) === (accountSnapshot[accountId] ?? 0))) setError(normalizeError(err));
+      if (orderVersions.isCurrent(orderId, version) && (accountId === undefined || accountVersions.isCurrent(accountId, accountSnapshot.get(accountId) ?? 0))) setError(normalizeError(err));
       return null;
     } finally {
       if (orderLoadingTokens.current[orderId] === token) {
@@ -115,7 +114,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     if (executionLoading[row.id] || orderExecutionLoading[orderId]) return null;
     orderAccountIds.current[orderId] = row.id;
     const version = startOrderRequest(orderId);
-    const accountVersion = accountVersions.current[row.id] ?? 0;
+    const accountVersion = accountVersions.current(row.id);
     const token = Symbol();
     accountLoadingTokens.current[row.id] = token;
     accountLoadingByOrder.current[orderId] = row.id;
@@ -124,12 +123,12 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
       const detail = await ordersApi.executionDetail(orderId);
-      if (orderVersions.current[orderId] !== version || (accountVersions.current[row.id] ?? 0) !== accountVersion) return null;
+      if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(row.id, accountVersion)) return null;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
       return detail;
     } catch (err) {
-      if (orderVersions.current[orderId] === version && (accountVersions.current[row.id] ?? 0) === accountVersion) setError(normalizeError(err));
+      if (orderVersions.isCurrent(orderId, version) && accountVersions.isCurrent(row.id, accountVersion)) setError(normalizeError(err));
       return null;
     } finally {
       if (accountLoadingTokens.current[row.id] === token) {
@@ -145,7 +144,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   }
   /** 只丢弃详情缓存：用于账号已离开在库列表（售出/下架）的场景，重拉已无展示方，纯属浪费请求。 */
   function dropExecutionCache(accountId: number) {
-    accountVersions.current[accountId] = (accountVersions.current[accountId] ?? 0) + 1;
+    accountVersions.invalidate(accountId);
     delete accountLoadingTokens.current[accountId];
     setExecutionLoading((current) => ({ ...current, [accountId]: false }));
     setExecutionDetails((current) => {

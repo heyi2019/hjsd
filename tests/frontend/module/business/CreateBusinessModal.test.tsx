@@ -383,6 +383,31 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
     resolveRefresh();
   });
 
+it("上一张建单完成后不关闭或清空新表单", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof ordersApi.create>>) => void;
+    vi.mocked(ordersApi.create).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const onClose = vi.fn();
+    const onCreated = vi.fn();
+    const { rerender } = renderLight(<CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType="TH" />, { user: "admin" });
+    await ui.type(await screen.findByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "first-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
+    await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
+    await pickMainPool();
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+    await waitFor(() => expect(ordersApi.create).toHaveBeenCalledTimes(1));
+    rerender(<CreateBusinessModal open={false} onClose={onClose} onCreated={onCreated} initialOrderType="TH" />);
+    rerender(<CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType="HS" />);
+    const nextAccount = await screen.findByLabelText("游戏账号");
+    fireEvent.change(nextAccount, { target: { value: "second-account" } });
+    await act(async () => finish({ id: 31 } as never));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("游戏账号")).toHaveValue("second-account");
+    expect(onCreated).toHaveBeenCalledTimes(1);
+  });
+
 it("支出明细只保留金额和备注", async () => {
     await openModal();
     expect(screen.queryByLabelText("设计费")).toBeNull();

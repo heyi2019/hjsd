@@ -69,6 +69,26 @@ beforeEach(() => {
 });
 
 describe("OrderProfileModal：描述与图片读取", () => {
+  it("资料保存防止重复提交，旧订单完成后不关闭新订单", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof ordersApi.updateExecution>>) => void;
+    vi.mocked(ordersApi.updateExecution).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { rerender } = renderModal({ account, mode: "description" });
+    const area = await screen.findByPlaceholderText("补充账号等级、资源、限制等信息");
+    fireEvent.change(area, { target: { value: "第一单描述" } });
+    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: /保存/ }));
+    await act(async () => { await Promise.resolve(); });
+    expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1);
+    const second = { ...account, id: 8, source_order_id: 72, source_order_no: "HS0072", game_account: "acc-002", account_description: "第二单" };
+    rerender(<OrderProfileModal target={{ account: second, mode: "description" }} onClose={onClose} onSaved={onSaved} onError={onError} />);
+    await waitFor(() => expect(screen.getByPlaceholderText("补充账号等级、资源、限制等信息")).toHaveValue("第二单"));
+    fireEvent.change(screen.getByPlaceholderText("补充账号等级、资源、限制等信息"), { target: { value: "第二单草稿" } });
+    await act(async () => finish({ ok: true }));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByPlaceholderText("补充账号等级、资源、限制等信息")).toHaveValue("第二单草稿");
+    expect(onSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 7, account_description: "第一单描述" }), expect.objectContaining({ mode: "description", account: expect.objectContaining({ id: 7 }) }));
+  });
   it("description 模式：输入描述后通过订单执行接口保存账号资料", async () => {
     renderModal({ account, mode: "description" });
     expect(await screen.findByText("描述")).toBeInTheDocument();
@@ -87,7 +107,7 @@ describe("OrderProfileModal：描述与图片读取", () => {
       71,
       { profile: { account_description: "满级账号" }, events: [], new_events: [expect.objectContaining({ operation_type: "DESCRIPTION", occurred_at: expect.any(String), operator_user_ids: [1] })] },
     ]);
-    expect(onSaved).toHaveBeenCalledWith({ ...account, account_description: "满级账号" });
+    expect(onSaved).toHaveBeenCalledWith({ ...account, account_description: "满级账号" }, expect.objectContaining({ account, mode: "description" }));
     expect(onClose).toHaveBeenCalled();
   });
 

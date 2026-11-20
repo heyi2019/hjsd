@@ -1,4 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { Form } from "antd";
 import { useRef, useState, type Key } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,6 +16,7 @@ import { useInventoryActions } from "@/business/stocks/InventoryPanel/useInvento
 import type { InventoryOrderRow } from "@/business/stocks/InventoryPanel/types";
 import { FieldConfigScope } from "@/business/ConfigurableField";
 import { BusinessRegistrationForm } from "@/shared/ui";
+import { appMessage } from "@/shared/ui/appFeedback";
 
 import type { Account } from "@/shared/api/types/accounts";
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
@@ -544,6 +546,199 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(within(modal).getByLabelText("操作人")).toBeInTheDocument();
   });
 
+  it("连续取消不同库存订单时，旧详情不能覆盖订单和退款金额", async () => {
+    let finishFirst!: (detail: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { finishFirst = resolve; });
+    const secondAccount = { ...accounts[1], status: "WAITING" };
+    const detail = (account: typeof accounts[number], orderId: number, eventId: number, amount: string) => ({
+      account, orders: [{ order_id: orderId, events: [{ id: eventId, event_type: "BUY", amount, cancellable_amount: amount, portion: "PRINCIPAL", is_posted: true }] }],
+    }) as never;
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([
+      { account: accounts[0], order: { id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" } },
+      { account: secondAccount, order: { id: 22, order_no: "TH0002", order_type: "TH", trade_date: "2026-10-15", account_id: 2, account_status: "WAITING", status: "ACTIVE" } },
+    ]) as never);
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 21 ? first : Promise.resolve(detail(secondAccount, 22, 202, "250.00")));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "取消" }));
+    await ui.click(within(screen.getByText("acc-2").closest("tr")!).getByRole("button", { name: "取消" }));
+    const modal = await screen.findByRole("dialog", { name: /取消入库登记/ });
+    expect(within(modal).getByLabelText("退回金额")).toHaveValue("250.00");
+    fireEvent.change(within(modal).getByLabelText("取消原因"), { target: { value: "第二单" } });
+    await act(async () => finishFirst(detail(accounts[0], 21, 101, "100.00")));
+    expect(modal).toHaveAccessibleName("取消入库登记 · TH-2026-0002");
+    expect(within(modal).getByLabelText("退回金额")).toHaveValue("250.00");
+    expect(within(modal).getByLabelText("取消原因")).toHaveValue("第二单");
+    await ui.click(within(modal).getByLabelText("收款账户"));
+    await ui.click(await screen.findByText("利润池", { selector: ".ant-select-item-option-content" }));
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(22, expect.objectContaining({ amount: "250.00", offset_event_id: 202, reason: "第二单" })));
+  });
+
+  it("库存取消详情加载期间切换到售出，迟到的取消结果不能打断新操作", async () => {
+    let finishFirst!: (detail: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { finishFirst = resolve; });
+    const secondAccount = { ...accounts[1], status: "WAITING" };
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([
+      { account: accounts[0], order: { id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", account_id: 1, account_status: "WAITING", status: "ACTIVE" } },
+      { account: secondAccount, order: { id: 22, order_no: "TH0002", order_type: "TH", trade_date: "2026-10-15", account_id: 2, account_status: "WAITING", status: "ACTIVE" } },
+    ]) as never);
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 21 ? first : Promise.resolve({ account: secondAccount, orders: [] } as never));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "取消" }));
+    await ui.click(within(screen.getByText("acc-2").closest("tr")!).getByRole("button", { name: "售出" }));
+    expect(await screen.findByRole("dialog", { name: "售出提号账号" })).toBeInTheDocument();
+    await act(async () => finishFirst({ account: accounts[0], orders: [{ order_id: 21, events: [] }] } as never));
+    expect(screen.queryByRole("dialog", { name: /取消入库登记/ })).toBeNull();
+    expect(screen.getByRole("dialog", { name: "售出提号账号" })).toBeInTheDocument();
+  });
+
+  it("库存取消提交中重复确认只发送一次", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof ordersApi.inventoryOffsale>>) => void;
+    vi.mocked(ordersApi.inventoryOffsale).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: accounts[0], orders: [{ order_id: 21, events: [] }] } as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "取消" }));
+    const modal = await screen.findByRole("dialog", { name: /取消入库登记/ });
+    fireEvent.change(within(modal).getByLabelText("取消原因"), { target: { value: "取消交易" } });
+    const form = within(modal).getByLabelText("取消原因").closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await Promise.resolve(); });
+    expect(ordersApi.inventoryOffsale).toHaveBeenCalledTimes(1);
+    await act(async () => finish({ ok: true }));
+  });
+
+  it("旧库存取消失败时不会把错误写进新的页面操作", async () => {
+    let fail!: (error: Error) => void;
+    vi.mocked(ordersApi.inventoryOffsale).mockReturnValue(new Promise((_, reject) => { fail = reject; }));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: accounts[0], orders: [{ order_id: 21, events: [] }] } as never);
+    const setError = vi.fn();
+    const notifyError = vi.spyOn(appMessage, "error");
+    function Probe() {
+      const [expanded, setExpanded] = useState<Key[]>([]);
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
+      const actions = useInventoryActions({
+        load: async () => undefined, setRows, setError,
+        executionDetails: details, setExecutionDetails: setDetails,
+        loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
+        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
+        removeFromInventory: () => undefined, editorOpenEditor: async () => true,
+        editorCancelInlineEdit: () => undefined, editorCancelPendingOpen: () => undefined,
+        editorIsSaving: () => false, editorSaveInline: async () => undefined, inlineEditId: null,
+      });
+      return <><button onClick={() => void actions.openVoid(accounts[0] as Account)}>取消甲</button>
+        <button onClick={() => void actions.submitVoid({ amount: "0", pool_id: 3, reason: "取消交易" })}>确认</button>
+        <button onClick={actions.invalidatePendingActions}>切换操作</button>
+        <span>{actions.voidTarget ? "已打开取消" : "未打开取消"}</span><Form form={actions.voidForm} /></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "取消甲" }));
+    await screen.findByText("已打开取消");
+    await ui.click(screen.getByRole("button", { name: "确认" }));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "切换操作" }));
+    await act(async () => fail(new Error("取消失败")));
+    expect(setError).not.toHaveBeenCalled();
+    expect(notifyError).toHaveBeenCalledWith(expect.stringMatching(/HS-2026-0001：.*取消失败/));
+    notifyError.mockRestore();
+  });
+
+  it("库存删除提交中重复确认只发送一次", async () => {
+    let finish!: () => void;
+    vi.mocked(ordersApi.deleteOrder).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "删除" }));
+    const modal = await screen.findByRole("dialog", { name: "删除" });
+    fireEvent.change(within(modal).getByLabelText("删除原因"), { target: { value: "删除测试" } });
+    const form = within(modal).getByLabelText("删除原因").closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await Promise.resolve(); });
+    expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1);
+    await act(async () => finish());
+  });
+
+  it("删除完成时不会覆盖后来展开的库存订单", async () => {
+    let finish!: () => void;
+    vi.mocked(ordersApi.deleteOrder).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    function Probe() {
+      const [expanded, setExpanded] = useState<Key[]>(["21:1"]);
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
+      const actions = useInventoryActions({
+        load: async () => undefined, setRows, setError,
+        executionDetails: details, setExecutionDetails: setDetails,
+        loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
+        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
+        removeFromInventory: () => undefined, editorOpenEditor: async () => true,
+        editorCancelInlineEdit: () => undefined, editorCancelPendingOpen: () => undefined,
+        editorIsSaving: () => false, editorSaveInline: async () => undefined, inlineEditId: null,
+      });
+      return <><button onClick={() => actions.setDeleteTarget(accounts[0] as Account)}>删除甲</button>
+        <button onClick={() => void actions.submitDelete("原因")}>确认</button>
+        <button onClick={() => { actions.invalidatePendingActions(); setExpanded(["22:2"]); }}>展开乙</button>
+        <span>{`展开:${expanded.join(",")}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "删除甲" }));
+    await ui.click(screen.getByRole("button", { name: "确认" }));
+    await waitFor(() => expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "展开乙" }));
+    await act(async () => finish());
+    expect(screen.getByText("展开:22:2")).toBeInTheDocument();
+  });
+
+  it("切换返点订单后，旧订单迟到的返点明细不能覆盖当前数据", async () => {
+    let finishFirst!: (value: Awaited<ReturnType<typeof rebatesApi.list>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof rebatesApi.list>>>((resolve) => { finishFirst = resolve; });
+    const detail = (account: typeof accounts[number]) => ({
+      account, orders: [{ order_id: account.source_order_id, order_type: "HS", events: [] }],
+    }) as never;
+    const rebate = (id: number, orderId: number, amount: string) => ({
+      id, rebate_no: `RB${id}`, source_order_id: orderId, rebate_type: "BUY", channel: "买号返点", amount, status: "OPEN", collected_on: "2026-10-17", operator: "管理员",
+    }) as never;
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async (id) => detail(id === 21 ? accounts[0] : accounts[1]));
+    vi.mocked(rebatesApi.list).mockImplementation((params) => params?.source_order_id === 21 ? first : Promise.resolve([rebate(2, 22, "222.00")]));
+    const { rerender } = renderLight(<InventoryRebateModal account={accounts[0] as Account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    await waitFor(() => expect(rebatesApi.list).toHaveBeenCalledWith(expect.objectContaining({ source_order_id: 21 })));
+    rerender(<InventoryRebateModal account={accounts[1] as Account} onClose={() => undefined} onCreated={() => undefined} />);
+    const table = await screen.findByRole("table", { name: "返点明细表" });
+    await waitFor(() => expect(table).toHaveTextContent("222.00"));
+    await act(async () => finishFirst([rebate(1, 21, "111.00")]));
+    expect(table).toHaveTextContent("222.00");
+    expect(table).not.toHaveTextContent("111.00");
+  });
+
+  it("上一单返点保存完成后，不关闭新订单的返点弹窗", async () => {
+    seedOrderFormFields();
+    let finish!: (value: Awaited<ReturnType<typeof rebatesApi.create>>) => void;
+    vi.mocked(rebatesApi.create).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async (id) => ({
+      account: id === 21 ? accounts[0] : accounts[1], orders: [{ order_id: id, order_type: "HS", events: [] }],
+    }) as never);
+    vi.mocked(rebatesApi.list).mockResolvedValue([]);
+    const onClose = vi.fn();
+    const onCreated = vi.fn();
+    const { rerender } = renderLight(<InventoryRebateModal account={accounts[0] as Account} onClose={onClose} onCreated={onCreated} />, { user: "admin" });
+    const amount = await screen.findByLabelText("返点金额");
+    fireEvent.change(amount, { target: { value: "100" } });
+    await ui.click(screen.getByRole("button", { name: "确认登记" }));
+    await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledTimes(1));
+    rerender(<InventoryRebateModal account={accounts[1] as Account} onClose={onClose} onCreated={onCreated} />);
+    await waitFor(() => expect(screen.getByText("acc-2")).toBeInTheDocument());
+    await act(async () => finish({} as never));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 1, source_order_id: 21 }));
+  });
+
   it("库存编辑直接展开详情，账户资料保持只读", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -578,6 +773,34 @@ describe("InventoryPanel：写入与长路径", () => {
     await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
     await act(async () => { finish(detail as never); await slowRefresh; });
+  });
+
+  it("上架重复提交只写一次，旧订单完成后不关闭新订单", async () => {
+    seedOrderFormFields();
+    let finish!: (value: Awaited<ReturnType<typeof ordersApi.postEvent>>) => void;
+    vi.mocked(ordersApi.postEvent).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async (id) => ({
+      account: id === 21 ? accounts[0] : accounts[1],
+      orders: [{ order_id: id, order_no: `HS${id}`, order_type: "HS", status: "ACTIVE", events: [] }],
+    }) as never);
+    const onClose = vi.fn();
+    const onCreated = vi.fn();
+    const { rerender } = renderLight(<OrderConsignmentModal account={accounts[0] as Account} onClose={onClose} onCreated={onCreated} />, { user: "admin" });
+    const platform = await screen.findByRole("combobox", { name: "寄售平台" });
+    await waitFor(() => expect(platform).toBeEnabled());
+    await ui.click(platform);
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    const form = platform.closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await Promise.resolve(); });
+    expect(ordersApi.postEvent).toHaveBeenCalledTimes(1);
+    rerender(<OrderConsignmentModal account={accounts[1] as Account} onClose={onClose} onCreated={onCreated} />);
+    await screen.findByText("acc-2");
+    await act(async () => finish({} as never));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 1, source_order_id: 21 }), 21);
   });
 
   it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {
@@ -1134,6 +1357,26 @@ describe("OrderDetailDeliverySection", () => {
 describe("库存售出流程", () => {
 beforeEach(() => {
   seedOrderFormFields();
+});
+
+it("上一单售出完成后，不清空或关闭新订单的表单", async () => {
+  let finish!: (value: Awaited<ReturnType<typeof ordersApi.stockSale>>) => void;
+  vi.mocked(ordersApi.stockSale).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+  const onClose = vi.fn();
+  const onCreated = vi.fn();
+  const { rerender } = renderLight(<RecoverySaleModal account={accounts[0] as Account} onClose={onClose} onCreated={onCreated} />, { user: "admin" });
+  await ui.type(await screen.findByLabelText("售出金额"), "350");
+  await ui.click(screen.getByLabelText("资金账户"));
+  await ui.click(await screen.findByText(/利润池/));
+  await ui.click(screen.getByRole("button", { name: /确认售出/ }));
+  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledTimes(1));
+  rerender(<RecoverySaleModal account={accounts[1] as Account} onClose={onClose} onCreated={onCreated} />);
+  await waitFor(() => expect(screen.getByText("acc-2")).toBeInTheDocument());
+  fireEvent.change(screen.getByLabelText("售出金额"), { target: { value: "200" } });
+  await act(async () => finish({} as never));
+  expect(onClose).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("售出金额")).toHaveValue("200");
+  expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ id: 1, source_order_id: 21 }));
 });
 
 it.each([RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal])("已选售出操作人时无需等待人员重查，提交期间防止重复操作", async (SaleModal) => {

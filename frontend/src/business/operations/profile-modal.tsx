@@ -9,6 +9,8 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import { BusinessActionModal, BusinessRegistrationForm, InlineError } from "../../shared/ui";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
 import "./profile-modal.css";
 
 export type OrderProfileTarget = {
@@ -46,13 +48,16 @@ export function OrderProfileModal({
 }: {
   target: OrderProfileTarget | null;
   onClose: () => void;
-  onSaved: (account: Account) => void;
+  onSaved: (account: Account, target: OrderProfileTarget) => void;
   onError: (error: unknown) => void;
   operationSource?: string;
 }) {
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<UploadFile[]>([]);
-  const [saving, setSaving] = useState(false);
+  const write = useAsyncAction();
+  const saving = write.pending;
+  const session = useRequestSession(target);
+  const employeesRequest = useLatestRequest();
   const [validationError, setValidationError] = useState<{ message: string } | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [form] = Form.useForm();
@@ -68,10 +73,13 @@ export function OrderProfileModal({
       url,
     })));
     setValidationError(null);
+    form.resetFields();
+    const request = employeesRequest.start();
     void Promise.resolve(employeesApi.list())
-      .then((items) => setEmployees((items ?? []).filter((item) => item.is_active)))
-      .catch(onError);
-  }, [target]);
+      .then((items) => { if (employeesRequest.isCurrent(request)) setEmployees((items ?? []).filter((item) => item.is_active)); })
+      .catch((error) => { if (employeesRequest.isCurrent(request)) onError(error); });
+    return employeesRequest.invalidate;
+  }, [employeesRequest, form, target]);
 
   async function imageValues(): Promise<string[]> {
     return (await Promise.all(images.slice(0, 9).map(async (file) => {
@@ -81,42 +89,49 @@ export function OrderProfileModal({
   }
 
   async function save() {
-    if (!target) return;
-    setValidationError(null);
-    setSaving(true);
-    try {
-      const values = await form.validateFields();
-      const imagePayload = target.mode === "images" ? await imageValues() : null;
-      if (target.mode === "images" && !imagePayload?.length) {
-        setValidationError({ message: "请至少添加一张图片" });
-        return;
+    const submittedTarget = target;
+    if (!submittedTarget) return;
+    const submittedSession = session.current();
+    await write.run(async () => {
+      setValidationError(null);
+      try {
+        const values = await form.validateFields();
+        const imagePayload = submittedTarget.mode === "images" ? await imageValues() : null;
+        if (submittedTarget.mode === "images" && !imagePayload?.length) {
+          if (session.isCurrent(submittedSession)) setValidationError({ message: "请至少添加一张图片" });
+          return;
+        }
+        const payload = submittedTarget.mode === "description"
+          ? { account_description: description }
+          : { account_images: imagePayload ?? [] };
+        const orderId = submittedTarget.orderId ?? submittedTarget.account.source_order_id;
+        if (!orderId) {
+          if (session.isCurrent(submittedSession)) setValidationError({ message: "当前账号没有来源订单，无法保存运营资料" });
+          return;
+        }
+        await ordersApi.updateExecution(orderId, {
+          profile: payload,
+          events: [],
+          new_events: [{
+            operation_type: submittedTarget.mode === "images" ? "IMAGE" : "DESCRIPTION",
+            occurred_at: dayjs().format("YYYY-MM-DDTHH:mm:ss"),
+            operator_user_ids: values.operator_user_ids ?? [],
+            note: `${operationSource}登记${submittedTarget.mode === "images" ? "作图" : "描述"}`,
+          }],
+        });
+        onSaved({ ...submittedTarget.account, ...payload }, submittedTarget);
+        if (session.isCurrent(submittedSession)) close();
+        appMessage.success("账号资料已保存");
+      } catch (error) {
+        if (session.isCurrent(submittedSession)) onError(error);
+        else appMessage.error(`${submittedTarget.account.source_order_no ?? `账号 ${submittedTarget.account.id}`}：保存失败`);
       }
-      const payload = target.mode === "description"
-        ? { account_description: description }
-        : { account_images: imagePayload ?? [] };
-      const orderId = target.orderId ?? target.account.source_order_id;
-      if (!orderId) {
-        setValidationError({ message: "当前账号没有来源订单，无法保存运营资料" });
-        return;
-      }
-      await ordersApi.updateExecution(orderId, {
-        profile: payload,
-        events: [],
-        new_events: [{
-          operation_type: target.mode === "images" ? "IMAGE" : "DESCRIPTION",
-          occurred_at: dayjs().format("YYYY-MM-DDTHH:mm:ss"),
-          operator_user_ids: values.operator_user_ids ?? [],
-          note: `${operationSource}登记${target.mode === "images" ? "作图" : "描述"}`,
-        }],
-      });
-      onSaved({ ...target.account, ...payload });
-      onClose();
-      appMessage.success("账号资料已保存");
-    } catch (error) {
-      onError(error);
-    } finally {
-      setSaving(false);
-    }
+    });
+  }
+
+  function close() {
+    session.invalidate();
+    onClose();
   }
 
   if (!target) return null;
@@ -128,7 +143,7 @@ export function OrderProfileModal({
       okText="保存"
       cancelText="取消"
       confirmLoading={saving}
-      onCancel={onClose}
+      onCancel={close}
       onOk={() => void save()}
     >
       <InlineError error={validationError} />

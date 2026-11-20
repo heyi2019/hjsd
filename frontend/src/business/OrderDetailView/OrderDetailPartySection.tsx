@@ -9,6 +9,7 @@ import { loadCustomers } from "../../shared/api/loadCustomers";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useRequestSession } from "../../shared/hooks/useLatestRequest";
 import { ErrorBanner, PermissionButton, Select } from "../../shared/ui";
 import {
   OrderSectionHeading,
@@ -53,6 +54,7 @@ export function OrderDetailPartySection({
   const [newCounterpartyName, setNewCounterpartyName] = useState("");
   const customerCreate = useAsyncAction();
   const counterpartyCreate = useAsyncAction();
+  const session = useRequestSession(editing ? meta.orderId : null);
 
   useEffect(() => {
     if (!editing) return;
@@ -92,10 +94,16 @@ export function OrderDetailPartySection({
     const name = (newCustomerNames[role] ?? "").trim();
     const orderId = meta.orderId;
     if (!name || !orderId || !customersReady) return;
+    const submittedSession = session.current();
     await customerCreate.run(async () => {
       try {
-        const customer = customers.find((item) => item.display_name === name)
+        const existing = customers.find((item) => item.display_name === name);
+        const customer = existing
           ?? (await customersApi.create({ display_name: name })).customer;
+        if (!session.isCurrent(submittedSession)) {
+          if (!existing) appMessage.warning("客户已创建，订单已切换，请重新选择");
+          return;
+        }
         setCustomers((current) => current.some((item) => item.id === customer.id) ? current : [...current, customer]);
         if (!selectedCustomers[role]?.includes(customer.id)) {
           setSelectedCustomers((current) => ({ ...current, [role]: [...(current[role] ?? []), customer.id] }));
@@ -112,11 +120,17 @@ export function OrderDetailPartySection({
     const name = newCounterpartyName.trim();
     const orderId = meta.orderId;
     if (!name || !orderId || !counterpartiesReady) return;
+    const submittedSession = session.current();
     await counterpartyCreate.run(async () => {
       try {
         if (!counterpartyRole) return;
-        const counterparty = counterparties.find((item) => item.display_name === name && item.type === counterpartyRole)
+        const existing = counterparties.find((item) => item.display_name === name && item.type === counterpartyRole);
+        const counterparty = existing
           ?? (await counterpartiesApi.create({ display_name: name, type: counterpartyRole }));
+        if (!session.isCurrent(submittedSession)) {
+          if (!existing) appMessage.warning("合作方已创建，订单已切换，请重新选择");
+          return;
+        }
         setCounterparties((current) => current.some((item) => item.id === counterparty.id) ? current : [...current, counterparty]);
         if (!selectedCounterpartyIds.includes(counterparty.id)) {
           setSelectedCounterpartyIds((current) => [...current, counterparty.id]);

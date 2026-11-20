@@ -1,6 +1,6 @@
 import { DatePicker, Form, Input } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import type { AccountExecutionOrder } from "../../shared/api/types/account-execution";
@@ -13,6 +13,8 @@ import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, use
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { consignmentListings, type ConsignmentListing } from "./consignment-logic";
 import { formatDateTimeMinute } from "../../shared/lib/format";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
 
 export type ActiveConsignment = ConsignmentListing;
 
@@ -38,8 +40,10 @@ export function OrderPlatformOffsaleModal(props: {
   onChanged: () => void | Promise<void>;
 }) {
   const [form] = Form.useForm();
-  const [submitting, setSubmitting] = useState(false);
-  const submitInFlight = useRef(false);
+  const write = useAsyncAction();
+  const submitting = write.pending;
+  const session = useRequestSession(props.account);
+  const employeesRequest = useLatestRequest();
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const open = Boolean(props.account);
@@ -59,62 +63,82 @@ export function OrderPlatformOffsaleModal(props: {
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVOID" : undefined);
 
   useEffect(() => {
+    if (open) form.resetFields();
+  }, [form, open, props.account?.id, props.account?.source_order_id]);
+
+  useEffect(() => {
     if (!open) return;
     setError(null);
     setSelectedMode(props.records.length ? "PLATFORM" : canSystemOffsale ? "SYSTEM" : "PLATFORM");
     form.setFieldsValue({ unlisted_at: dayjs().second(0).millisecond(0) });
-    void employeesApi.list().then((items) => setEmployees(items.filter((item) => item.is_active))).catch((cause) => setError(normalizeError(cause)));
-  }, [canSystemOffsale, form, open, props.account, props.records.length]);
+    const request = employeesRequest.start();
+    void employeesApi.list().then((items) => {
+      if (employeesRequest.isCurrent(request)) setEmployees(items.filter((item) => item.is_active));
+    }).catch((cause) => { if (employeesRequest.isCurrent(request)) setError(normalizeError(cause)); });
+    return employeesRequest.invalidate;
+  }, [canSystemOffsale, employeesRequest, form, open, props.account, props.records.length]);
 
   const submit = async (values: { listing_id: string; unlisted_at?: Dayjs; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
-    if (submitInFlight.current || !configReady) return;
+    const account = props.account;
+    if (!account || !configReady) return;
+    const submittedSession = session.current();
     if (values.listing_id === "SYSTEM") {
-      submitInFlight.current = true;
-      setSubmitting(true);
-      setError(null);
-      try {
-        await props.onSystemOffsale({ reason: values.reason.trim(), unlisted_at: (values.unlisted_at ?? dayjs()).format("YYYY-MM-DDTHH:mm"), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
-        form.resetFields();
-      } catch (cause) {
-        setError(normalizeError(cause));
-      } finally {
-        submitInFlight.current = false;
-        setSubmitting(false);
-      }
+      await write.run(async () => {
+        setError(null);
+        try {
+          await props.onSystemOffsale({ reason: values.reason.trim(), unlisted_at: (values.unlisted_at ?? dayjs()).format("YYYY-MM-DDTHH:mm"), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
+          if (session.isCurrent(submittedSession)) {
+            form.resetFields();
+            close();
+          }
+        } catch (cause) {
+          const error = normalizeError(cause);
+          if (session.isCurrent(submittedSession)) setError(error);
+          else appMessage.error(`${account.source_order_no ?? `账号 ${account.id}`}：${error.message}`);
+        }
+      });
       return;
     }
     const selected = props.records.find((record) => record.id === values.listing_id);
     if (!selected) return;
-    submitInFlight.current = true;
-    setSubmitting(true);
-    setError(null);
-    try {
-      const unlistedAt = values.unlisted_at ?? dayjs();
-      await ordersApi.postEvent(selected.orderId, {
-        event_type: "OPERATE",
-        operation_type: "UNLIST",
-        occurred_on: unlistedAt.format("YYYY-MM-DD"),
-        reason: values.reason.trim(),
-        operator_user_ids: values.operator_user_ids,
-        note: `寄售下架：${selected.platform}`,
-        form_extra_scope: "INVOID",
-        form_extra: {
-          ...values.form_extra,
-          ...(selected.eventId == null ? {} : { consignment_event_id: selected.eventId }),
-          consignment_platforms: [selected.platform],
-          platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
-          platform_unlist_scope: "PLATFORM",
-        },
-      });
-      appMessage.success(`${selected.platform} 已下架，账号仍保留在 ERP 库存`);
-      form.resetFields();
-      await props.onChanged();
-    } catch (cause) {
-      setError(normalizeError(cause));
-    } finally {
-      submitInFlight.current = false;
-      setSubmitting(false);
-    }
+    await write.run(async () => {
+      setError(null);
+      try {
+        const unlistedAt = values.unlisted_at ?? dayjs();
+        await ordersApi.postEvent(selected.orderId, {
+          event_type: "OPERATE",
+          operation_type: "UNLIST",
+          occurred_on: unlistedAt.format("YYYY-MM-DD"),
+          reason: values.reason.trim(),
+          operator_user_ids: values.operator_user_ids,
+          note: `寄售下架：${selected.platform}`,
+          form_extra_scope: "INVOID",
+          form_extra: {
+            ...values.form_extra,
+            ...(selected.eventId == null ? {} : { consignment_event_id: selected.eventId }),
+            consignment_platforms: [selected.platform],
+            platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
+            platform_unlist_scope: "PLATFORM",
+          },
+        });
+        appMessage.success(`${selected.platform} 已下架，账号仍保留在 ERP 库存`);
+        if (session.isCurrent(submittedSession)) {
+          form.resetFields();
+          close();
+        }
+        void Promise.resolve().then(() => props.onChanged())
+          .catch(() => appMessage.warning("已下架，但刷新失败，请手动刷新"));
+      } catch (cause) {
+        const error = normalizeError(cause);
+        if (session.isCurrent(submittedSession)) setError(error);
+        else appMessage.error(`${account.source_order_no ?? `账号 ${account.id}`}：${error.message}`);
+      }
+    });
+  };
+
+  const close = () => {
+    session.invalidate();
+    props.onClose();
   };
 
   return (
@@ -122,9 +146,9 @@ export function OrderPlatformOffsaleModal(props: {
       title={selectedMode === "SYSTEM" ? "出库" : "下架"}
       open={open}
       destroyOnHidden
-      onCancel={props.onClose}
+      onCancel={close}
       footer={
-        <CompactActions onCancel={props.onClose} divider={false}>
+        <CompactActions onCancel={close} divider={false}>
           <PermissionButton permission="order.update" danger type="primary" aria-label={selectedMode === "SYSTEM" ? "确认出库" : "确认下架"} loading={submitting} disabled={!configReady} onClick={() => form.submit()}>
             {selectedMode === "SYSTEM" ? "确认出库" : "确认下架"}
           </PermissionButton>

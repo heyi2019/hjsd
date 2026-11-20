@@ -24,6 +24,8 @@ import {
   splitFormExtra,
 } from "./create/submit-helpers";
 import { useCreateBusinessLookups } from "./create/useCreateBusinessLookups";
+import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useRequestSession } from "../shared/hooks/useLatestRequest";
 
 export type BusinessOrderType = "HS" | "TH" | "DG";
 
@@ -56,8 +58,9 @@ export function CreateBusinessModal(props: {
     lookupLoading,
     retryLookups,
   } = useCreateBusinessLookups();
-  const [submitting, setSubmitting] = useState(false);
-  const submitInFlight = useRef(false);
+  const write = useAsyncAction();
+  const submitting = write.pending;
+  const session = useRequestSession(props.open ? orderType : null);
   const [form] = Form.useForm();
   const repurchaseConfirmedFor = useRef<string | null>(null);
   const submitErrorVisible = useRef(false);
@@ -107,59 +110,71 @@ export function CreateBusinessModal(props: {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!configReady) return;
-    if (submitInFlight.current) return;
-    submitInFlight.current = true;
-    setSubmitting(true);
-    try {
-      const gameAccount = String(values.game_account ?? "").trim();
-      // 判重已后移到后端（POST /orders）：未售出重复由后端返回 INVENTORY_ACCOUNT_IN_STOCK
-      // 并在 game_account 字段上提示；已售出重复返回 REPURCHASE_CONFIRM_REQUIRED，
-      // 由确认弹窗决定是否按复购回流继续。前端不再拉库存台账自行比对。
-      const { accountExtraValues, orderFormExtra } = splitFormExtra(values, config);
-      const resolvedCustomerSource = resolveCustomerSource(values, isDg);
-      const note = buildOrderNote(values, { isRecovery, isTh, isDg }, resolvedCustomerSource);
-      const initialCosts = buildInitialCosts(values, isRecovery, isTh);
-      await ordersApi.create({
-        order_type: props.initialOrderType,
-        trade_date: today(),
-        // 2026-10-28 口径：账号资料统一走 account_snapshot（与建单一致），
-        // 后端据此内联建库存账号并发放 KU_ 编号；与单独账号字段互斥。
-        account_snapshot: buildAccountSnapshot(values, accountExtraValues),
-        account_id: undefined,
-        // 后端判重：仅当用户已确认复购回流时，同一「已售出」账号才放行。
-        confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
-        note,
-        customer_input: buildCustomerInput({ values, isRecovery, isDg, resolvedCustomerSource }),
-        counterparty_input: buildCounterpartyInput({ values, isTh }),
-        initial_buy: buildInitialBuy(values, isRecovery, isTh),
-        initial_costs: initialCosts,
-        form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,
-      });
-      appMessage.success(isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建");
-      props.onClose();
-      form.resetFields();
-      void Promise.resolve(props.onCreated()).catch(() => undefined);
-    } catch (error) {
-      const normalized = normalizeError(error);
-      if (normalized.code === "INVENTORY_ACCOUNT_IN_STOCK") {
-        // 未售出重复属硬阻止：字段标红 + 页面级提示，不提供复购确认入口。
+    const submittedSession = session.current();
+    await write.run(async () => {
+      try {
+        const gameAccount = String(values.game_account ?? "").trim();
+        // 判重已后移到后端（POST /orders）：未售出重复由后端返回 INVENTORY_ACCOUNT_IN_STOCK
+        // 并在 game_account 字段上提示；已售出重复返回 REPURCHASE_CONFIRM_REQUIRED，
+        // 由确认弹窗决定是否按复购回流继续。前端不再拉库存台账自行比对。
+        const { accountExtraValues, orderFormExtra } = splitFormExtra(values, config);
+        const resolvedCustomerSource = resolveCustomerSource(values, isDg);
+        const note = buildOrderNote(values, { isRecovery, isTh, isDg }, resolvedCustomerSource);
+        const initialCosts = buildInitialCosts(values, isRecovery, isTh);
+        await ordersApi.create({
+          order_type: props.initialOrderType,
+          trade_date: today(),
+          // 2026-10-28 口径：账号资料统一走 account_snapshot（与建单一致），
+          // 后端据此内联建库存账号并发放 KU_ 编号；与单独账号字段互斥。
+          account_snapshot: buildAccountSnapshot(values, accountExtraValues),
+          account_id: undefined,
+          // 后端判重：仅当用户已确认复购回流时，同一「已售出」账号才放行。
+          confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
+          note,
+          customer_input: buildCustomerInput({ values, isRecovery, isDg, resolvedCustomerSource }),
+          counterparty_input: buildCounterpartyInput({ values, isTh }),
+          initial_buy: buildInitialBuy(values, isRecovery, isTh),
+          initial_costs: initialCosts,
+          form_extra: Object.keys(orderFormExtra).length ? orderFormExtra : undefined,
+        });
+        const success = isDg ? "代挂订单已创建，获客信息已保存" : "订单已创建";
+        appMessage.success(session.isCurrent(submittedSession) ? success : `${MODAL_TITLES[orderType]}：${success}`);
+        if (session.isCurrent(submittedSession)) {
+          close();
+          form.resetFields();
+        }
+        void Promise.resolve().then(() => props.onCreated())
+          .catch(() => appMessage.warning("订单已创建，但刷新失败，请手动刷新"));
+      } catch (error) {
+        const normalized = normalizeError(error);
+        if (!session.isCurrent(submittedSession)) {
+          appMessage.error(`${MODAL_TITLES[orderType]}：${normalized.message}`);
+          return;
+        }
+        if (normalized.code === "INVENTORY_ACCOUNT_IN_STOCK") {
+          // 未售出重复属硬阻止：字段标红 + 页面级提示，不提供复购确认入口。
+          submitErrorVisible.current = true;
+          form.setFields([{ name: "game_account", errors: [normalized.message] }]);
+          setLoadError(normalized);
+          return;
+        }
+        if (normalized.code === "REPURCHASE_CONFIRM_REQUIRED") {
+          submitErrorVisible.current = true;
+          form.setFields([{ name: "game_account", errors: [normalized.message] }]);
+          setRepurchasePrompt({ values, gameAccount: String(values.game_account ?? "").trim() });
+          return;
+        }
         submitErrorVisible.current = true;
-        form.setFields([{ name: "game_account", errors: [normalized.message] }]);
         setLoadError(normalized);
-        return;
       }
-      if (normalized.code === "REPURCHASE_CONFIRM_REQUIRED") {
-        submitErrorVisible.current = true;
-        form.setFields([{ name: "game_account", errors: [normalized.message] }]);
-        setRepurchasePrompt({ values, gameAccount: String(values.game_account ?? "").trim() });
-        return;
-      }
-      submitErrorVisible.current = true;
-      setLoadError(normalized);
-    } finally {
-      submitInFlight.current = false;
-      setSubmitting(false);
-    }
+    });
+  };
+
+  const close = () => {
+    session.invalidate();
+    setRepurchasePrompt(null);
+    setAbandonConfirmOpen(false);
+    props.onClose();
   };
 
   // Keep the form instance connected while the modal is closed.  The controller
@@ -181,7 +196,7 @@ export function CreateBusinessModal(props: {
         if (isDirty) {
           setAbandonConfirmOpen(true);
         } else {
-          props.onClose();
+          close();
         }
       }}
       footer={(
@@ -265,7 +280,7 @@ export function CreateBusinessModal(props: {
       okText="放弃"
       cancelText="继续编辑"
       danger
-      onConfirm={async () => { setAbandonConfirmOpen(false); props.onClose(); }}
+      onConfirm={async () => { setAbandonConfirmOpen(false); close(); }}
       onCancel={() => setAbandonConfirmOpen(false)}
     />
     </>

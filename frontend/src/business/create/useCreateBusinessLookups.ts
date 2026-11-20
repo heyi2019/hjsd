@@ -5,6 +5,7 @@ import { employeesApi } from "../../shared/api/org.api";
 import { poolsApi } from "../../shared/api/pools.api";
 import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption, GameTypeOption } from "../../shared/api/types/org";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 
 /** 建单资料预先加载，失败时可在表单中重试。 */
 export function useCreateBusinessLookups() {
@@ -13,32 +14,28 @@ export function useCreateBusinessLookups() {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [lookupError, setLookupError] = useState<{ message: string; code?: string } | null>(null);
-  const [lookupLoading, setLookupLoading] = useState(false);
+  const lookupWrite = useAsyncAction();
+  const lookupLoading = lookupWrite.pending;
   const didInitLookup = useRef(false);
-  const lookupInFlight = useRef(false);
 
   const retryLookups = useCallback(async () => {
-    if (lookupInFlight.current) return;
-    lookupInFlight.current = true;
-    setLookupLoading(true);
-    try {
-      const [poolList, gameTypeList, employeeList] = await Promise.all([
-        poolsApi.list(),
-        gameTypesApi.list({ include_inactive: false }),
-        employeesApi.list(),
-      ]);
-      setPools((Array.isArray(poolList) ? poolList : []).filter((pool) => pool.status === "ACTIVE"));
-      setGameTypes(Array.isArray(gameTypeList) ? gameTypeList : []);
-      setEmployees((Array.isArray(employeeList) ? employeeList : []).filter((employee) => employee.is_active));
-      setLookupError(null);
-      didInitLookup.current = true;
-    } catch (error) {
-      setLookupError(normalizeError(error));
-    } finally {
-      lookupInFlight.current = false;
-      setLookupLoading(false);
-    }
-  }, []);
+    await lookupWrite.run(async () => {
+      try {
+        const [poolList, gameTypeList, employeeList] = await Promise.all([
+          poolsApi.list(),
+          gameTypesApi.list({ include_inactive: false }),
+          employeesApi.list(),
+        ]);
+        setPools((Array.isArray(poolList) ? poolList : []).filter((pool) => pool.status === "ACTIVE"));
+        setGameTypes(Array.isArray(gameTypeList) ? gameTypeList : []);
+        setEmployees((Array.isArray(employeeList) ? employeeList : []).filter((employee) => employee.is_active));
+        setLookupError(null);
+        didInitLookup.current = true;
+      } catch (error) {
+        setLookupError(normalizeError(error));
+      }
+    });
+  }, [lookupWrite.run]);
 
   useEffect(() => {
     if (!didInitLookup.current) void retryLookups();

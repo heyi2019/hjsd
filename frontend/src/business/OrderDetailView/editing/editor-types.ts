@@ -51,7 +51,7 @@ export interface OrderDetailEditor {
   ensureEmployees: () => Promise<EmployeeOption[]>;
   invEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;
-  openEditor: (account: Account) => Promise<boolean>;
+  openEditor: (account: Account, isCurrent?: () => boolean) => Promise<boolean>;
   cancelPendingOpen: () => void;
   isSaving: () => boolean;
   cancelInlineEdit: () => void;

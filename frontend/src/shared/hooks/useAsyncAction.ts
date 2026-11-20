@@ -33,6 +33,7 @@ export function useAsyncAction() {
   }, []);
 
   const clearError = useCallback(() => setError(null), []);
+  const isPending = useCallback(() => busy.current, []);
 
-  return { pending, error, run, clearError };
+  return { pending, error, run, clearError, isPending };
 }

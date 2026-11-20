@@ -1,5 +1,5 @@
 import { Form } from "antd";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useSession } from "../../shared/state/session";
 import { currentDevUser, normalizeError } from "../../shared/api/client";
 import type { CashflowTarget } from "../../finance/cashflow";
@@ -12,6 +12,8 @@ import type { Pool } from "../../shared/api/types/finance";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
 import { appMessage } from "../../shared/ui/appFeedback";
+import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { consignmentRecords, type ActiveConsignment } from "../operations";
 import type { OrderProfileTarget } from "../operations";
 import { buildCashflowDisplayItems } from "../../finance/cashflow";
@@ -26,6 +28,7 @@ import {
 interface OrderActionModalsDeps {
   selectedOrder: Order | null;
   load: () => Promise<void> | void;
+  actionRequest: LatestRequest;
 }
 
 /**
@@ -35,19 +38,18 @@ interface OrderActionModalsDeps {
 export function useOrderActionModals({
   selectedOrder,
   load,
+  actionRequest,
 }: OrderActionModalsDeps) {
   const { username } = useSession();
   const [allocationOpen, setAllocationOpen] = useState(false);
-  const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
-  const allocationSession = useRef(0);
   const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
   const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
   const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
   const [orderDeleteTarget, setOrderDeleteTarget] = useState<Order | null>(null);
-  const [orderDeleteSubmitting, setOrderDeleteSubmitting] = useState(false);
+  const deleteWrite = useAsyncAction();
+  const orderDeleteSubmitting = deleteWrite.pending;
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
-  const cashflowRequest = useRef(0);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
   const [profileTarget, setProfileTarget] = useState<OrderProfileTarget | null>(null);
@@ -69,15 +71,15 @@ export function useOrderActionModals({
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
   const allocationIsLoss = Number(allocationProfit) < 0;
   const openAllocations = async (sourceOrder?: Order) => {
-    const session = ++allocationSession.current;
+    const session = actionRequest.start();
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order || allocationSession.current !== session) return;
+      if (!order || !actionRequest.isCurrent(session)) return;
       const [result, userResult] = await Promise.all([
         profitAllocationApi.allocations(order.id),
         employeesApi.list(),
       ]);
-      if (allocationSession.current !== session) return;
+      if (!actionRequest.isCurrent(session)) return;
       const currentEmployee = userResult.find((item) => item.is_active && item.username === username)
         ?? (import.meta.env.DEV
           ? userResult.find((item) => item.is_active && item.username === currentDevUser())
@@ -106,7 +108,7 @@ export function useOrderActionModals({
           else requiredConversionFailed = true;
         }
       }));
-      if (allocationSession.current !== session) return;
+      if (!actionRequest.isCurrent(session)) return;
       if (requiredConversionFailed) {
         appMessage.error("分润金额换算失败，请重试");
         return;
@@ -122,24 +124,24 @@ export function useOrderActionModals({
       setAllocationProfit(result.allocatable_profit ?? result.order_profit ?? "0");
       setAllocationOpen(true);
     } catch (error) {
-      if (allocationSession.current === session) appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(session)) appMessage.error(normalizeError(error).message);
     }
   };
 
   const closeAllocations = () => {
-    allocationSession.current += 1;
+    actionRequest.invalidate();
     setAllocationOpen(false);
     setActionOrder(null);
   };
-  const getAllocationSession = () => allocationSession.current;
+  const getAllocationSession = actionRequest.current;
 
   const openRefund = async (sourceOrder?: Order) => {
-    const request = ++cashflowRequest.current;
+    const request = actionRequest.start();
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order || cashflowRequest.current !== request) return;
+      if (!order || !actionRequest.isCurrent(request)) return;
       const [employeeList, poolList] = await Promise.all([employeesApi.list(), poolsApi.list()]);
-      if (cashflowRequest.current !== request) return;
+      if (!actionRequest.isCurrent(request)) return;
       const activeEmployees = employeeList.filter((employee) => employee.is_active);
       setUsers(activeEmployees);
       setCashflowUsers(activeEmployees);
@@ -152,11 +154,11 @@ export function useOrderActionModals({
         cashflows: buildCashflowDisplayItems(order.cashflows),
       });
     } catch (error) {
-      if (cashflowRequest.current === request) appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
   const closeCashflow = () => {
-    cashflowRequest.current += 1;
+    actionRequest.invalidate();
     setCashflowTarget(null);
   };
 
@@ -170,52 +172,65 @@ export function useOrderActionModals({
   };
 
   const openOrderRebate = async (sourceOrder: Order) => {
+    const request = actionRequest.start();
     try {
       const account = await loadOrderAccount(sourceOrder);
-      if (account) setOrderRebateTarget(account);
+      if (account && actionRequest.isCurrent(request)) setOrderRebateTarget(account);
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
 
   const openOrderSale = async (sourceOrder: Order) => {
+    const request = actionRequest.start();
     try {
       const account = await loadOrderAccount(sourceOrder);
-      if (account) setOrderSaleTarget(account);
+      if (account && actionRequest.isCurrent(request)) setOrderSaleTarget(account);
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
 
   const openOrderConsignment = async (sourceOrder: Order) => {
+    const request = actionRequest.start();
     try {
       const account = await loadOrderAccount(sourceOrder);
-      if (account) setOrderConsignmentTarget({ account, orderId: sourceOrder.id });
+      if (account && actionRequest.isCurrent(request)) setOrderConsignmentTarget({ account, orderId: sourceOrder.id });
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
 
   const openOrderDelete = (sourceOrder: Order) => {
+    actionRequest.start();
     setOrderDeleteTarget(sourceOrder);
   };
+  const closeOrderSale = () => { actionRequest.invalidate(); setOrderSaleTarget(null); };
+  const closeOrderConsignment = () => { actionRequest.invalidate(); setOrderConsignmentTarget(null); };
+  const closeOrderRebate = () => { actionRequest.invalidate(); setOrderRebateTarget(null); };
+  const closeOrderProfile = () => { actionRequest.invalidate(); setProfileTarget(null); };
+  const closeOrderOffsale = () => { actionRequest.invalidate(); setOrderOffsaleTarget(null); };
+  const closeOrderDelete = () => { actionRequest.invalidate(); setOrderDeleteTarget(null); };
 
   const openOrderProfile = async (sourceOrder: Order, mode: "description" | "images") => {
+    const request = actionRequest.start();
     try {
       const account = await loadOrderAccount(sourceOrder);
-      if (account) setProfileTarget({ account, mode, orderId: sourceOrder.id });
+      if (account && actionRequest.isCurrent(request)) setProfileTarget({ account, mode, orderId: sourceOrder.id });
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
 
   const openOrderOffsale = async (sourceOrder: Order) => {
+    const request = actionRequest.start();
     try {
       if (!sourceOrder.account_id) {
         appMessage.warning("该订单未关联库存账号，无法下架");
         return;
       }
       const detail = await ordersApi.executionDetail(sourceOrder.id);
+      if (!actionRequest.isCurrent(request)) return;
       const records = consignmentRecords(detail.orders);
       if (!records.length && detail.account.inventory_type !== "CONSIGNMENT") {
         appMessage.warning("当前账号没有仍在平台上的寄售记录");
@@ -223,7 +238,7 @@ export function useOrderActionModals({
       }
       setOrderOffsaleTarget({ account: detail.account, records, orderId: sourceOrder.id });
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (actionRequest.isCurrent(request)) appMessage.error(normalizeError(error).message);
     }
   };
 
@@ -239,8 +254,7 @@ export function useOrderActionModals({
         form_extra: payload.form_extra,
       });
       appMessage.success("寄售记录已下架，账号已出库");
-      setOrderOffsaleTarget(null);
-      await load();
+      void Promise.resolve().then(load).catch(() => appMessage.warning("已出库，但刷新失败，请手动刷新"));
     } catch (error) {
       appMessage.error(normalizeError(error).message);
       throw error;
@@ -248,23 +262,24 @@ export function useOrderActionModals({
   };
 
   const handleOrderOffsaleChanged = async () => {
-    setOrderOffsaleTarget(null);
     await load();
   };
 
   const submitOrderDelete = async (reason: string) => {
-    if (!orderDeleteTarget) return;
-    setOrderDeleteSubmitting(true);
-    try {
-      await ordersApi.deleteOrder(orderDeleteTarget.id, reason);
-      appMessage.success("已删除");
-      setOrderDeleteTarget(null);
-      await load();
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      setOrderDeleteSubmitting(false);
-    }
+    const target = orderDeleteTarget;
+    if (!target) return;
+    const session = actionRequest.current();
+    await deleteWrite.run(async () => {
+      try {
+        await ordersApi.deleteOrder(target.id, reason);
+        appMessage.success("已删除");
+        if (actionRequest.isCurrent(session)) closeOrderDelete();
+        void Promise.resolve().then(load).catch(() => appMessage.warning("已删除，但刷新失败，请手动刷新"));
+      } catch (error) {
+        const message = normalizeError(error).message;
+        appMessage.error(actionRequest.isCurrent(session) ? message : `${target.order_no}：${message}`);
+      }
+    });
   };
 
   return {
@@ -274,11 +289,9 @@ export function useOrderActionModals({
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
-    allocationSubmitting,
     closeAllocations,
     getAllocationSession,
     setAllocationProfit,
-    setAllocationSubmitting,
     cashflowPools,
     cashflowTarget,
     cashflowUsers,
@@ -296,18 +309,18 @@ export function useOrderActionModals({
     openOrderSale,
     openRefund,
     orderConsignmentTarget,
-    setOrderConsignmentTarget,
+    closeOrderConsignment,
     orderDeleteSubmitting,
     orderDeleteTarget,
-    setOrderDeleteTarget,
+    closeOrderDelete,
     orderOffsaleTarget,
-    setOrderOffsaleTarget,
+    closeOrderOffsale,
     orderRebateTarget,
-    setOrderRebateTarget,
+    closeOrderRebate,
     orderSaleTarget,
-    setOrderSaleTarget,
+    closeOrderSale,
     profileTarget,
-    setProfileTarget,
+    closeOrderProfile,
     submitOrderDelete,
     openOrderProfile,
   };

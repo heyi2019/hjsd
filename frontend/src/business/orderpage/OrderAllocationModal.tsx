@@ -1,6 +1,5 @@
 import { Alert, Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
-import { useRef } from "react";
 import { CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
 import {
   AdaptiveFormGrid,
@@ -10,6 +9,8 @@ import {
 } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useKeyedLatestRequest } from "../../shared/hooks/useLatestRequest";
 import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { moneyRules } from "../../shared/lib/validators";
 import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
@@ -28,13 +29,11 @@ type AllocationController = Pick<OrdersPageController,
   | "allocationIsLoss"
   | "allocationOpen"
   | "allocationProfit"
-  | "allocationSubmitting"
   | "employeeOptions"
   | "load"
   | "loadLedgerDetail"
   | "closeAllocations"
   | "getAllocationSession"
-  | "setAllocationSubmitting"
 >;
 
 type AllocationFormValues = {
@@ -71,17 +70,14 @@ function AllocationFields({
   orderId: number;
   watchedRows: AllocationFormRow[];
 }) {
-  const conversionVersion = useRef<Record<number, number>>({});
-  const invalidateConversion = (row: number) => {
-    conversionVersion.current[row] = (conversionVersion.current[row] ?? 0) + 1;
-  };
+  const conversionVersion = useKeyedLatestRequest<number>();
+  const invalidateConversion = conversionVersion.invalidate;
   const convertValue = (row: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string, target: "allocation_rate" | "allocation_amount") => {
-    invalidateConversion(row);
-    const version = conversionVersion.current[row];
+    const version = conversionVersion.start(row);
     const session = getAllocationSession();
     if (!value.trim()) return;
     void profitAllocationApi.convert(orderId, direction, value).then((result) => {
-      if (conversionVersion.current[row] !== version || getAllocationSession() !== session) return;
+      if (!conversionVersion.isCurrent(row, version) || getAllocationSession() !== session) return;
       allocationForm.setFieldValue(["allocations", row, target], result.value ?? "");
     }).catch(() => undefined);
   };
@@ -176,67 +172,62 @@ export function AllocationModal({ controller }: { controller: AllocationControll
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
-    allocationSubmitting,
     employeeOptions,
     load,
     loadLedgerDetail,
     closeAllocations,
     getAllocationSession,
-    setAllocationSubmitting,
   } = controller;
   const watchedRows = Form.useWatch<AllocationFormRow[]>("allocations", allocationForm) ?? [];
-  const submitting = useRef(false);
+  const write = useAsyncAction();
 
   const submitAllocations = async (values: AllocationFormValues) => {
-    if (!actionOrder || submitting.current) return;
+    if (!actionOrder) return;
     const rows = values.allocations ?? [];
     if (rows.length === 0) {
       appMessage.error("请先在员工花名册里选择分润对象");
       return;
     }
     const session = getAllocationSession();
-    submitting.current = true;
-    setAllocationSubmitting(true);
-    try {
-      const sourceFormExtra = {
-        ...(values.form_extra ?? {}),
-        business_responsible_ids: [...new Set(rows
-          .filter((item) => item.allocation_type === "BUY")
-          .flatMap((item) => item.employee_ids ?? []))],
-        delivery_responsible_ids: [...new Set(rows
-          .filter((item) => item.allocation_type === "SELL")
-          .flatMap((item) => item.employee_ids ?? []))],
-        operation_responsible_ids: [...new Set(rows
-          .filter((item) => item.allocation_type === "OPERATION")
-          .flatMap((item) => item.employee_ids ?? []))],
-      };
-      // 前端只 submit 金额：比例框已改为只读展示（由金额经 convert 反算），
-      // 不再是输入口径。落库与对账都走金额，避免「展示比例」与「存库比例」两套口径并存。
-      // 公司行金额留空，由后端按公司固定比例自动补金额参与合计校验。
-      const payloadRows = rows.map((item) => ({
-        allocation_type: item.allocation_type,
-        employee_ids: item.employee_ids ?? [],
-        role: item.role ?? "OWNER",
-        allocation_rate: null,
-        allocation_amount: item.allocation_type === "COMPANY"
-          ? null
-          : (item.allocation_amount?.trim() ? item.allocation_amount : null),
-      }));
-      await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
-      appMessage.success("分润已保存");
-      const savedOrder = actionOrder;
-      if (getAllocationSession() === session) closeAllocations();
-      // 保存成功后先关闭弹窗，台账和详情在后台刷新；刷新失败不应误报保存失败。
-      void (async () => {
-        await load();
-        if (savedOrder.account_id != null) await loadLedgerDetail(savedOrder, true);
-      })().catch(() => appMessage.warning("分润已保存，台账刷新失败，请手动刷新"));
-    } catch (error) {
-      appMessage.error(normalizeError(error).message);
-    } finally {
-      submitting.current = false;
-      setAllocationSubmitting(false);
-    }
+    await write.run(async () => {
+      try {
+        const sourceFormExtra = {
+          ...(values.form_extra ?? {}),
+          business_responsible_ids: [...new Set(rows
+            .filter((item) => item.allocation_type === "BUY")
+            .flatMap((item) => item.employee_ids ?? []))],
+          delivery_responsible_ids: [...new Set(rows
+            .filter((item) => item.allocation_type === "SELL")
+            .flatMap((item) => item.employee_ids ?? []))],
+          operation_responsible_ids: [...new Set(rows
+            .filter((item) => item.allocation_type === "OPERATION")
+            .flatMap((item) => item.employee_ids ?? []))],
+        };
+        // 前端只 submit 金额：比例框已改为只读展示（由金额经 convert 反算），
+        // 不再是输入口径。落库与对账都走金额，避免「展示比例」与「存库比例」两套口径并存。
+        // 公司行金额留空，由后端按公司固定比例自动补金额参与合计校验。
+        const payloadRows = rows.map((item) => ({
+          allocation_type: item.allocation_type,
+          employee_ids: item.employee_ids ?? [],
+          role: item.role ?? "OWNER",
+          allocation_rate: null,
+          allocation_amount: item.allocation_type === "COMPANY"
+            ? null
+            : (item.allocation_amount?.trim() ? item.allocation_amount : null),
+        }));
+        await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
+        appMessage.success("分润已保存");
+        const savedOrder = actionOrder;
+        if (getAllocationSession() === session) closeAllocations();
+        // 保存成功后先关闭弹窗，台账和详情在后台刷新；刷新失败不应误报保存失败。
+        void (async () => {
+          await load();
+          if (savedOrder.account_id != null) await loadLedgerDetail(savedOrder, true);
+        })().catch(() => appMessage.warning("分润已保存，台账刷新失败，请手动刷新"));
+      } catch (error) {
+        appMessage.error(normalizeError(error).message);
+      }
+    });
   };
 
   return (
@@ -244,7 +235,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
       title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
       fieldCount={21}
       open={allocationOpen}
-      confirmLoading={allocationSubmitting}
+      confirmLoading={write.pending}
       wrapClassName="allocation-modal"
       onCancel={closeAllocations}
       onOk={() => void allocationForm.submit()}

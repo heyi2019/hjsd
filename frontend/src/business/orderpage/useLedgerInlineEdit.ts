@@ -5,6 +5,8 @@ import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useOrderDetailEditor } from "../OrderDetailView/editing/use-order-detail-editor";
+import { useKeyedLatestRequest, useLatestRequest } from "../../shared/hooks/useLatestRequest";
+import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 
 export function mergeLedgerOrderWithDetail(order: Order, detail: Pick<AccountExecutionDetail, "account">): Order {
   const { account } = detail;
@@ -22,15 +24,15 @@ export function mergeLedgerOrderWithDetail(order: Order, detail: Pick<AccountExe
  * 台账表格的展开详情缓存与账号内联编辑枢纽。
  * 订单与库存必须已有明确绑定，编辑器不负责补建库存档案。
  */
-export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountExecutionDetail) => void } = {}) {
+export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountExecutionDetail) => void; actionRequest?: LatestRequest } = {}) {
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
   const detailRequestsRef = useRef<Partial<Record<number, Promise<AccountExecutionDetail | null>>>>({});
-  const detailVersionsRef = useRef<Record<number, number>>({});
-  const editIntentRef = useRef(0);
+  const detailVersions = useKeyedLatestRequest<number>();
+  const editIntent = useLatestRequest();
   const invalidateDetailRequest = (orderId: number) => {
-    detailVersionsRef.current[orderId] = (detailVersionsRef.current[orderId] ?? 0) + 1;
+    detailVersions.invalidate(orderId);
     delete detailRequestsRef.current[orderId];
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
   };
@@ -41,22 +43,21 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const loadLedgerOrderDetail = async (orderId: number, force = false): Promise<AccountExecutionDetail | null> => {
     if (!force && ledgerOrderDetails[orderId]) return ledgerOrderDetails[orderId];
     if (!force && detailRequestsRef.current[orderId]) return detailRequestsRef.current[orderId];
-    const version = (detailVersionsRef.current[orderId] ?? 0) + 1;
-    detailVersionsRef.current[orderId] = version;
+    const version = detailVersions.start(orderId);
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
     const request = ordersApi.executionDetail(orderId)
       .then(async (detail) => {
-        if (detailVersionsRef.current[orderId] !== version) return null;
+        if (!detailVersions.isCurrent(orderId, version)) return null;
         setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
         void orderDetailEditor.ensureEmployees();
         return detail;
       })
       .catch((error) => {
-        if (detailVersionsRef.current[orderId] === version) appMessage.error(normalizeError(error).message);
+        if (detailVersions.isCurrent(orderId, version)) appMessage.error(normalizeError(error).message);
         return null;
       })
       .finally(() => {
-        if (detailVersionsRef.current[orderId] !== version) return;
+        if (!detailVersions.isCurrent(orderId, version)) return;
         delete detailRequestsRef.current[orderId];
         setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: false }));
       });
@@ -92,12 +93,14 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
         appMessage.warning("当前订单正在保存，请稍候");
         return;
       }
-      const intent = ++editIntentRef.current;
+      const action = params.actionRequest?.start();
+      const isCurrentAction = () => action === undefined || Boolean(params.actionRequest?.isCurrent(action));
+      const intent = editIntent.start();
       orderDetailEditor.cancelPendingOpen();
       const detail = await loadLedgerOrderDetail(order.id);
-      if (!detail || intent !== editIntentRef.current) return;
-      const opened = await orderDetailEditor.openEditor(detail.account);
-      if (opened && intent === editIntentRef.current) setExpandedOrderIds([String(order.id)]);
+      if (!detail || !editIntent.isCurrent(intent) || !isCurrentAction()) return;
+      const opened = await orderDetailEditor.openEditor(detail.account, isCurrentAction);
+      if (opened && editIntent.isCurrent(intent) && isCurrentAction()) setExpandedOrderIds([String(order.id)]);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -113,7 +116,8 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
       appMessage.warning("当前订单正在保存，请稍候");
       return;
     }
-    editIntentRef.current += 1;
+    params.actionRequest?.invalidate();
+    editIntent.invalidate();
     orderDetailEditor.cancelPendingOpen();
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
@@ -121,13 +125,13 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   };
 
   const cancelInlineEdit = () => {
-    if (!orderDetailEditor.isSaving()) editIntentRef.current += 1;
+    if (!orderDetailEditor.isSaving()) editIntent.invalidate();
     orderDetailEditor.cancelInlineEdit();
   };
 
   const saveInline = async () => {
     if (orderDetailEditor.isSaving()) return;
-    editIntentRef.current += 1;
+    editIntent.invalidate();
     orderDetailEditor.cancelPendingOpen();
     await orderDetailEditor.saveInline();
   };

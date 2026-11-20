@@ -8,6 +8,8 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { CfgItem, sectionLabel } from "../ConfigurableField";
 import { DeliveryInfoSection } from "../DeliveryInfoSection";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
+import { useLatestRequest } from "../../shared/hooks/useLatestRequest";
+import { appMessage } from "../../shared/ui/appFeedback";
 import "./RecoveryAccountSection.css";
 
 /** 读取本地图片为 data URL：与账号描述图同构，提交前即完成转换，避免表单提交时再异步读取。 */
@@ -23,6 +25,7 @@ function readImageDataUrl(file: Blob): Promise<string> {
 /** 佐证图上传：受控值即 data URL 数组，最多 3 张。二次验证与钱包实名注销共用。 */
 function OptionalImagesUpload({ value, onChange, namePrefix = "图片" }: { value?: string[]; onChange?: (next: string[]) => void; namePrefix?: string }) {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const readRequest = useLatestRequest();
   useEffect(() => {
     setFileList((current) => {
       const currentUrls = current.map((file) => file.url).filter((url): url is string => Boolean(url));
@@ -34,11 +37,16 @@ function OptionalImagesUpload({ value, onChange, namePrefix = "图片" }: { valu
     });
   }, [namePrefix, value]);
   const handleChange = (next: { fileList: UploadFile[] }) => {
+    const request = readRequest.start();
     const sliced = next.fileList.slice(0, 3);
     setFileList(sliced);
     void Promise.all(sliced.map(async (file) => (
       file.url ?? (file.originFileObj ? readImageDataUrl(file.originFileObj) : null)
-    ))).then((urls) => onChange?.(urls.filter((url): url is string => Boolean(url))));
+    ))).then((urls) => {
+      if (readRequest.isCurrent(request)) onChange?.(urls.filter((url): url is string => Boolean(url)));
+    }).catch(() => {
+      if (readRequest.isCurrent(request)) appMessage.error("图片读取失败，请重试");
+    });
   };
   return (
     <Upload

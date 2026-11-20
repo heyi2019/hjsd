@@ -157,7 +157,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   detailTarget,
   setDetailTarget,
   voidTarget,
-  setVoidTarget,
+  closeVoid,
   voidPools,
   voidForm,
   voiding,
@@ -184,7 +184,10 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   // —— 台账列定义域：15 列 + 移动端列编排（回调依赖注入）——
   const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
     canDelete, editingAccount, executionDetails, loadExecution,
-    setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
+    setSaleTarget: (value) => { actions.invalidatePendingActions(); setSaleTarget(value); },
+    setConsignmentTarget: (value) => { actions.invalidatePendingActions(); setConsignmentTarget(value); },
+    setRebateTarget: (value) => { actions.invalidatePendingActions(); setRebateTarget(value); },
+    setDeleteTarget: (value) => { actions.invalidatePendingActions(); setDeleteTarget(value); },
     openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   });
 
@@ -276,7 +279,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     setRows,
     setSaleTarget,
     setSortDesc,
-    setVoidTarget,
+    closeVoid,
     sortDesc,
     submitDelete,
     submitVoid,

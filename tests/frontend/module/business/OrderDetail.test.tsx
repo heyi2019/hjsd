@@ -547,6 +547,25 @@ describe("OrderDetail", () => {
     await act(async () => { finish((orderType === "HS" ? { customer: { id: 10, customer_no: "C010", display_name: "新参与方", status: "ACTIVE" }, duplicate_candidates: [] } : { id: 10, counterparty_no: "CP010", display_name: "新参与方", type: "PEER", status: "ACTIVE" }) as never); await pending; });
   });
 
+  it.each([ ["HS", "选择卖家", "新建卖家"], ["TH", "选择合作方", "新建合作方"] ])("%s 新建参与方完成时，不写入后来切换的订单", async (orderType, selectName, buttonName) => {
+    const detail = (id: number) => ({ orders: [{ order_id: id, order_no: `TEST${id}`, order_type: orderType, customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } }) as unknown as AccountExecutionDetail;
+    vi.spyOn(customersApi, "page").mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 } as never);
+    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    let finish!: (value: never) => void;
+    const pending = new Promise<never>((resolve) => { finish = resolve; });
+    const create = orderType === "HS" ? vi.spyOn(customersApi, "create").mockReturnValue(pending) : vi.spyOn(counterpartiesApi, "create").mockReturnValue(pending);
+    const onPartyEdit = vi.fn();
+    const { rerender } = renderApp(<OrderDetail row={account} detail={detail(22)} contextOrderId={22} loading={false} editing={account} employees={[]} onPartyEdit={onPartyEdit} />);
+    const select = await screen.findByRole("combobox", { name: selectName });
+    await waitFor(() => expect(select).toBeEnabled());
+    await userEvent.type(select, "新参与方");
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(buttonName) }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    rerender(<OrderDetail row={account} detail={detail(23)} contextOrderId={23} loading={false} editing={account} employees={[]} onPartyEdit={onPartyEdit} />);
+    await act(async () => finish((orderType === "HS" ? { customer: { id: 10, customer_no: "C010", display_name: "新参与方", status: "ACTIVE" }, duplicate_candidates: [] } : { id: 10, counterparty_no: "CP010", display_name: "新参与方", type: "PEER", status: "ACTIVE" }) as never));
+    expect(onPartyEdit).not.toHaveBeenCalled();
+  });
+
   it("参与方多选支持输入新名字并在下拉中新建", async () => {
     const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "page").mockResolvedValue({ items: [], total: 0, limit: 500, offset: 0 } as never);
@@ -1035,6 +1054,67 @@ describe("OrderDetail", () => {
 // —— 原 OrderDetailImageGallery.test.tsx ——
 // 同属订单详情编辑链路，合并后保留图片替换/追加边界，同时减少一次 jsdom+React 启动。
 describe("OrderDetailImageGallery", () => {
+  it("相同图片重复出现时，替换指定位置不会改错另一张", async () => {
+    const onChange = vi.fn();
+    const duplicate = "data:image/png;base64,same";
+    const replacement = new File(["replacement"], "replacement.png", { type: "image/png" });
+    renderLight(<OrderDetailImageGallery images={[duplicate, duplicate]} altPrefix="图片" editing onChange={onChange} />, { user: "admin" });
+    await userEvent.setup({ pointerEventsCheck: 0 }).upload(screen.getByLabelText("替换图片 2"), replacement);
+    await waitFor(() => expect(onChange).toHaveBeenCalled());
+    const [nextImages] = onChange.mock.calls[0] as [string[]];
+    expect(nextImages[0]).toBe(duplicate);
+    expect(nextImages[1]).not.toBe(duplicate);
+  });
+  it("相同图片同时替换时，两张图片都保留各自的结果", async () => {
+    const readers: FileReader[] = [];
+    vi.spyOn(globalThis, "FileReader").mockImplementation(function () {
+      const reader = { readAsDataURL: () => undefined, result: `data:image/png;base64,new-${readers.length + 1}` } as unknown as FileReader;
+      readers.push(reader);
+      return reader;
+    });
+    const onChange = vi.fn();
+    const duplicate = "data:image/png;base64,same";
+    renderLight(<OrderDetailImageGallery images={[duplicate, duplicate]} altPrefix="图片" editing onChange={onChange} />, { user: "admin" });
+    fireEvent.change(screen.getByLabelText("替换图片 1"), { target: { files: [new File(["1"], "1.png", { type: "image/png" })] } });
+    fireEvent.change(screen.getByLabelText("替换图片 2"), { target: { files: [new File(["2"], "2.png", { type: "image/png" })] } });
+    await act(async () => readers[1].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    await act(async () => readers[0].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    expect(onChange).toHaveBeenLastCalledWith(["data:image/png;base64,new-1", "data:image/png;base64,new-2"]);
+  });
+  it("替换图片读取期间删除其他图片，不会把已删除的图片恢复", async () => {
+    const readers: FileReader[] = [];
+    vi.spyOn(globalThis, "FileReader").mockImplementation(function () {
+      const reader = { readAsDataURL: () => undefined, result: "data:image/png;base64,replacement" } as unknown as FileReader;
+      readers.push(reader);
+      return reader;
+    });
+    const onChange = vi.fn();
+    const first = "data:image/png;base64,first";
+    const second = "data:image/png;base64,second";
+    const { rerender } = renderLight(<OrderDetailImageGallery images={[first, second]} altPrefix="图片" editing onChange={onChange} />, { user: "admin" });
+    fireEvent.change(screen.getByLabelText("替换图片 2"), { target: { files: [new File(["x"], "new.png", { type: "image/png" })] } });
+    fireEvent.click(screen.getByLabelText("删除图片 1"));
+    expect(onChange).toHaveBeenCalledWith([second]);
+    rerender(<OrderDetailImageGallery images={[second]} altPrefix="图片" editing onChange={onChange} />);
+    await act(async () => readers[0].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    expect(onChange).toHaveBeenLastCalledWith(["data:image/png;base64,replacement"]);
+  });
+  it("连续上传的图片读取顺序不同，也保留所有图片", async () => {
+    const readers: FileReader[] = [];
+    vi.spyOn(globalThis, "FileReader").mockImplementation(function () {
+      const reader = { readAsDataURL: () => undefined, result: `data:image/png;base64,${readers.length + 1}` } as unknown as FileReader;
+      readers.push(reader);
+      return reader;
+    });
+    const onChange = vi.fn();
+    renderLight(<OrderDetailImageGallery images={[]} altPrefix="图片" editing onChange={onChange} />, { user: "admin" });
+    const input = screen.getByLabelText("上传图片");
+    fireEvent.change(input, { target: { files: [new File(["1"], "1.png", { type: "image/png" })] } });
+    fireEvent.change(input, { target: { files: [new File(["2"], "2.png", { type: "image/png" })] } });
+    await act(async () => readers[1].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    await act(async () => readers[0].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>));
+    expect(onChange).toHaveBeenLastCalledWith(["data:image/png;base64,2", "data:image/png;base64,1"]);
+  });
   it("编辑时可以替换指定位置的图片，并保留其他图片", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const onChange = vi.fn();

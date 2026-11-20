@@ -12,6 +12,7 @@ import { useOrderCancellation } from "./useOrderCancellation";
 import { useOrderActionModals } from "./useOrderActionModals";
 import { mergeLedgerOrderWithDetail, useLedgerInlineEdit } from "./useLedgerInlineEdit";
 import { useSession } from "../../shared/state/session";
+import { useLatestRequest } from "../../shared/hooks/useLatestRequest";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -50,9 +51,11 @@ export function useOrdersPageController(params: {
   // —— 建单入口 / 当前选中订单（跨域共享枢纽） ——
   const [createType, setCreateType] = useState<BusinessOrderType | undefined>();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const actionRequest = useLatestRequest();
 
   // —— 表格详情 / 账号内联编辑枢纽 ——
   const inlineEdit = useLedgerInlineEdit({
+    actionRequest,
     onDetailSaved: (detail) => {
       setOrders((current) => current.map((order) => order.account_id === detail.account.id
         ? mergeLedgerOrderWithDetail(order, detail)
@@ -65,13 +68,13 @@ export function useOrdersPageController(params: {
   }, [active, activeTab]);
 
   // —— 冲销 / 取消域：分笔冲销、原路退款、分期合约取消 ——
-  const cancellation = useOrderCancellation({ selectedOrder, setSelectedOrder, load });
+  const cancellation = useOrderCancellation({ selectedOrder, setSelectedOrder, load, actionRequest });
   const {
     cancelEmployees, setCancelEmployees, cancelForm,
     cancelInstallmentTarget, setCancelInstallmentTarget,
     cancelOrderTarget, setCancelOrderTarget,
     cancelPools, setCancelPools, cancelScope, setCancelScope,
-    cancelSubmitting, setCancelSubmitting,
+    cancelSubmitting,
     cancelableEventsForScope, reversibleEvents,
     closeCancelTransaction, openCancelTransaction, submitCancelTransaction,
     sharedCancellationEvent, hasSharedCancellation,
@@ -79,7 +82,7 @@ export function useOrdersPageController(params: {
 
   // —— 订单动作弹窗域：退款 / 分润配置 / 交付 / 下架 / 账号动作 ——
   // 子 hook 内部持有全部弹窗状态；主 hook 用 spread 并集保持对外返回契约不变。
-  const actionModals = useOrderActionModals({ selectedOrder, load });
+  const actionModals = useOrderActionModals({ selectedOrder, load, actionRequest });
   // openOrderProfile 仅供台账列定义内部点击转发，原本不在对外 return 契约中。
   const { openOrderProfile, ...exposedActionModals } = actionModals;
   const {
@@ -174,8 +177,7 @@ export function useOrdersPageController(params: {
     setCancelOrderTarget: setCancelOrderTarget,
     setCancelPools: setCancelPools,
     setCancelScope: setCancelScope,
-    setCancelSubmitting: setCancelSubmitting,
-    setCreateType: setCreateType,
+    setCreateType: (value: Parameters<typeof setCreateType>[0]) => { actionRequest.invalidate(); setCreateType(value); },
     setDateRange: setDateRange,
     setGameTypeFilter: setGameTypeFilter,
     setInstallmentRefreshKey: setInstallmentRefreshKey,

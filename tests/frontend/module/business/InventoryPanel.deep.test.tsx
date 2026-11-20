@@ -5,6 +5,7 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { InventoryPanel } from "@/business/stocks/InventoryPanel";
 import { consignmentRecords } from "@/business/operations/offsale";
+import { OrderPlatformOffsaleModal } from "@/business/operations";
 import { installmentsApi } from "@/shared/api/installments.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -154,6 +155,27 @@ beforeEach(() => {
 });
 
 describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
+  it("上一单下架完成后，不清空新订单的下架表单", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof ordersApi.postEvent>>) => void;
+    vi.mocked(ordersApi.postEvent).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const records = consignmentRecords(consignmentDetail.orders);
+    const onClose = vi.fn();
+    const onChanged = vi.fn();
+    const onSystemOffsale = vi.fn();
+    const { rerender } = renderLight(<OrderPlatformOffsaleModal account={consignmentRow} records={records} onClose={onClose} onChanged={onChanged} onSystemOffsale={onSystemOffsale} />, { user: "admin" });
+    await ui.click(screen.getByRole("combobox", { name: "下架平台" }));
+    await ui.click(await screen.findByText(/千寻（上架于/, { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByLabelText("下架原因"), "第一单下架");
+    await ui.click(screen.getByRole("button", { name: "确认下架" }));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledTimes(1));
+    const second = { ...consignmentRow, id: 2, source_order_id: 99, game_account: "acc-2" } as Account;
+    rerender(<OrderPlatformOffsaleModal account={second} records={records} onClose={onClose} onChanged={onChanged} onSystemOffsale={onSystemOffsale} />);
+    fireEvent.change(screen.getByLabelText("下架原因"), { target: { value: "第二单草稿" } });
+    await act(async () => finish({} as never));
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("下架原因")).toHaveValue("第二单草稿");
+    expect(onChanged).toHaveBeenCalledTimes(1);
+  });
   it("在库账号卡片使用后端账号统计，不使用分页订单行数", async () => {
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
         account: inStockRow,

@@ -268,6 +268,26 @@ it("代挂必填客户昵称不能仅由空格组成", async () => {
   expect(ordersApi.create).not.toHaveBeenCalled();
 });
 
+it.each(["必填", "条件必填"])("提号供货方昵称配置为%s时不能仅填空格", async (mode) => {
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+    ...allFormFields().filter((field) => field.order_type_code === scope),
+    { id: 9999, order_type_code: scope, field_key: "supplier_nickname", label: "供货方昵称", field_type: "TEXT",
+      options: null, required: mode === "必填", required_when: mode === "条件必填" ? { field: "supplier_phone", op: "filled" } : null,
+      is_active: true, sort_order: 1, locked: false, is_custom: false, note: null },
+  ]);
+  await openTypedModal("TH");
+  await ui.type(screen.getByLabelText("游戏账号"), "account-test");
+  await ui.type(screen.getByLabelText("账号密码"), "secret");
+  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
+  await pickMainPool();
+  if (mode === "条件必填") fireEvent.change(document.getElementById("supplier_phone")!, { target: { value: "13800008888" } });
+  await ui.type(screen.getByLabelText("供货方昵称"), "   ");
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  expect(await screen.findByText("供货方昵称必填")).toBeInTheDocument();
+  expect(ordersApi.create).not.toHaveBeenCalled();
+});
+
 it("关闭并重新打开建单时不保留上一单的校验错误", async () => {
   const onClose = vi.fn();
   const onCreated = vi.fn();

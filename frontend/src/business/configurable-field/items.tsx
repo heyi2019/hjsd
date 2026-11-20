@@ -19,6 +19,8 @@ export function CfgItem(props: {
   /** 核心业务字段即使被旧配置误停用也必须保留，避免表单出现只有标题没有输入控件。 */
   alwaysActive?: boolean;
   rules?: Rule[];
+  /** 文本字段在必填或条件必填生效时，不接受纯空白。 */
+  requiredWhitespace?: boolean;
   valuePropName?: string;
   tooltip?: ReactNode;
   /** 固定展示名称：字段键与配置仍保留，避免历史配置的旧文案影响统一业务术语。 */
@@ -37,11 +39,15 @@ export function CfgItem(props: {
   const cfg = props.cfg ?? useFieldConfig();
   const condValues = useConditionValues(cfg, props.name);
   if (!props.alwaysActive && !isFieldActive(cfg, props.name)) return null;
+  const rules = resolveRules(cfg, props.name, props.rules, condValues).map((rule) =>
+    props.requiredWhitespace && typeof rule === "object" && "required" in rule && rule.required
+      ? { ...rule, whitespace: true } : rule,
+  );
   return (
     <Form.Item
       name={props.name}
       label={props.hideLabel ? undefined : props.fixedLabel ?? fieldLabel(cfg, props.name, props.label ?? "")}
-      rules={resolveRules(cfg, props.name, props.rules, condValues)}
+      rules={rules}
       valuePropName={props.valuePropName}
       tooltip={props.tooltip}
       extra={props.extra}

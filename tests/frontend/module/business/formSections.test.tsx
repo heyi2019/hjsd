@@ -1,6 +1,6 @@
 /** 订单表单小组件：客户来源与支出明细字段路径。 */
 import { useState } from "react";
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, Form, type FormInstance } from "antd";
@@ -87,5 +87,21 @@ describe("FinanceExpenseItems：支出明细字段", () => {
     expect(screen.queryByText("中介费")).toBeNull();
     expect(screen.queryByText("资金账户")).toBeNull();
     expect(screen.queryByText("支出名称")).not.toBeInTheDocument();
+  });
+
+  it("已添加的零元支出不能静默提交，正数可以通过", async () => {
+    const { getForm } = renderFeeForm();
+    await ui.click(screen.getByText("+ 增加支出"));
+    await ui.type(screen.getByPlaceholderText("金额"), "0");
+    await act(async () => {
+      await expect(getForm().validateFields()).rejects.toMatchObject({
+        errorFields: [expect.objectContaining({ name: ["expense_items", 0, "amount"] })],
+      });
+    });
+    await ui.clear(screen.getByPlaceholderText("金额"));
+    await ui.type(screen.getByPlaceholderText("金额"), "0.01");
+    await act(async () => {
+      await expect(getForm().validateFields()).resolves.toMatchObject({ expense_items: [{ amount: "0.01" }] });
+    });
   });
 });

@@ -25,7 +25,11 @@ export function FinanceExpenseItems({ className }: { className?: string }) {
                 <Form.Item
                   name={[field.name, "amount"]}
                   label="金额"
-                  rules={requiredMoneyRules("支出金额")}
+                  rules={[
+                    ...requiredMoneyRules("支出金额"),
+                    { validator: (_rule, value) => value !== undefined && value !== null && value !== "" && Number(value) === 0
+                      ? Promise.reject(new Error("支出金额必须大于 0")) : Promise.resolve() },
+                  ]}
                 >
                   <MoneyInput placeholder="金额" />
                 </Form.Item>

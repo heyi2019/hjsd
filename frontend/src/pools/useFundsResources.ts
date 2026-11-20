@@ -37,10 +37,14 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
     setFundsReady(false);
     setReconciliationsReady(false);
     try {
-      await poolResources.loadPools();
-      await depositResources.loadDeposits();
-      if (includeCashflow && periodState.ready) await cashflow.fetchCashflows();
-      await reconciliationResources.loadReconciliations();
+      const results = await Promise.allSettled([
+        poolResources.loadPools(),
+        depositResources.loadDeposits(),
+        reconciliationResources.loadReconciliations(),
+        ...(includeCashflow && periodState.ready ? [cashflow.fetchCashflows()] : []),
+      ]);
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
       setReconciliationsReady(true);
       setError(null);
       setFundsReady(true);

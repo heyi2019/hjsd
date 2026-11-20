@@ -174,6 +174,29 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
   });
 
+  it("资金账户请求较慢时，押金与对账仍可同时开始加载", async () => {
+    let releasePools!: (value: typeof pools) => void;
+    let depositsStarted = false;
+    let reconciliationsStarted = false;
+    const releaseWhenBothStart = () => {
+      if (depositsStarted && reconciliationsStarted) releasePools(pools);
+    };
+    vi.mocked(poolsApi.list).mockImplementationOnce(() => new Promise((resolve) => { releasePools = resolve; }));
+    vi.mocked(depositsApi.list).mockImplementationOnce(async () => {
+      depositsStarted = true;
+      releaseWhenBothStart();
+      return deposits;
+    });
+    vi.mocked(reconciliationsApi.list).mockImplementationOnce(async () => {
+      reconciliationsStarted = true;
+      releaseWhenBothStart();
+      return [];
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    expect(await screen.findByRole("cell", { name: /经营主池/ }, { timeout: 1500 })).toBeInTheDocument();
+    expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
+  });
+
   it("后端不可达 → 错误条落地", async () => {
     vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<FundsPage />, { user: "admin" });
@@ -187,6 +210,22 @@ describe("FundsPage：资金账户卡片", () => {
     expect(await screen.findByText("资金账户卡片")).toBeInTheDocument();
     expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
+  });
+
+  it("并行加载失败时等待其余请求结束，再允许重新加载", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finish = resolve; });
+    vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
+    vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pending);
+    renderLight(<FundsPage />, { user: "admin" });
+
+    await act(async () => { await Promise.resolve(); });
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "重新加载" })).not.toBeInTheDocument();
+    await act(async () => { finish([]); await pending; });
+    await ui.click(await screen.findByRole("button", { name: "重新加载" }));
+    expect(await screen.findByRole("cell", { name: /经营主池/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
   });
 
   it("资金中心将工作室运营、对账和押金作为一级入口", async () => {

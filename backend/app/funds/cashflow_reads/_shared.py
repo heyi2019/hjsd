@@ -17,6 +17,7 @@ from app.shared.scope import owner_scope_filter
 from app.domain.enums import CashflowLedgerType
 from app.domain.trade import Cashflow, Order
 from app.shared.form_values import get_extra_values_bulk
+from app.shared.amount_search import amount_keyword
 
 def _like_pattern(keyword: str) -> str:
     """把用户输入转成 LIKE 模式；转义 `%` 与 `_`，避免关键字被当成通配符。"""
@@ -93,13 +94,17 @@ def _apply_cashflow_filters(
         stmt = stmt.where(Cashflow.created_by == created_by)
     if keyword is not None and keyword.strip():
         pattern = _like_pattern(keyword)
+        amount = amount_keyword(keyword)
+        conditions = [
+            func.lower(Cashflow.flow_no).like(pattern, escape="\\"),
+            func.lower(Cashflow.category).like(pattern, escape="\\"),
+            func.lower(func.coalesce(Cashflow.note, "")).like(pattern, escape="\\"),
+            func.lower(Order.order_no).like(pattern, escape="\\"),
+        ]
+        if amount is not None:
+            conditions.append(Cashflow.amount == amount)
         stmt = stmt.where(
-            or_(
-                func.lower(Cashflow.flow_no).like(pattern, escape="\\"),
-                func.lower(Cashflow.category).like(pattern, escape="\\"),
-                func.lower(func.coalesce(Cashflow.note, "")).like(pattern, escape="\\"),
-                func.lower(Order.order_no).like(pattern, escape="\\"),
-            )
+            or_(*conditions)
         )
     return stmt
 

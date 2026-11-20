@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
@@ -13,6 +14,7 @@ from sqlalchemy import (
     cast,
     exists,
     func,
+    Numeric,
     or_,
     select,
 )
@@ -25,6 +27,7 @@ from app.domain.trade import (
     Order,
     OrderEvent,
 )
+from app.shared.amount_search import amount_keyword
 
 def list_orders(
     session: Session, *, order_type: str | None = None, status: str | None = None,
@@ -246,6 +249,38 @@ def _latest_sale_operator_matches(operator_ids: list[int]):
     )
 
 
+def _order_price_matches(amount: Decimal):
+    """买入事件和列表显示的售出金额，均在分页前匹配。"""
+    buy_match = exists(select(OrderEvent.id).where(
+        OrderEvent.order_id == Order.id, OrderEvent.event_type == "BUY",
+        OrderEvent.is_posted.is_(True), OrderEvent.amount == amount,
+    ))
+    last_sale = (
+        select(OrderEvent.amount)
+        .where(OrderEvent.order_id == Order.id, OrderEvent.event_type == "SELL", OrderEvent.is_posted.is_(True))
+        .order_by(OrderEvent.id.desc()).limit(1).correlate(Order).scalar_subquery()
+    )
+    recorded_amount = OrderEvent.form_extra["sale_amount"].as_string()
+    valid_amount = recorded_amount.op("~")(r"^[+]?[0-9]{1,16}(\.[0-9]+)?$")
+    recorded_sum = func.sum(case((valid_amount, func.round(cast(recorded_amount, Numeric), 2)), else_=None))
+    consignment_sale = (
+        select(func.coalesce(recorded_sum, func.sum(OrderEvent.amount)))
+        .where(OrderEvent.order_id == Order.id, OrderEvent.event_type == "SELL", OrderEvent.is_posted.is_(True))
+        .correlate(Order).scalar_subquery()
+    )
+    summed_sale = (
+        select(func.sum(OrderEvent.amount))
+        .where(OrderEvent.order_id == Order.id, OrderEvent.event_type == "SELL", OrderEvent.is_posted.is_(True))
+        .correlate(Order).scalar_subquery()
+    )
+    sale_amount = case(
+        (Order.order_type.in_(("HS", "TH")), last_sale),
+        (Order.order_type == "DG", consignment_sale),
+        else_=summed_sale,
+    )
+    return or_(buy_match, sale_amount == amount)
+
+
 def _order_list_stmt(
     *, order_type: str | None, status: str | None,
     trade_date_from: date | None, trade_date_to: date | None,
@@ -305,6 +340,7 @@ def _order_list_stmt(
         )
     if keyword and keyword.strip():
         pattern, escape = like_contains(keyword)
+        amount = amount_keyword(keyword)
         stmt = stmt.where(
             or_(
                 Order.order_no.ilike(pattern, escape=escape),
@@ -330,6 +366,7 @@ def _order_list_stmt(
                         or_(Counterparty.display_name.ilike(pattern, escape=escape), Counterparty.source.ilike(pattern, escape=escape)),
                     )
                 ),
+                *([_order_price_matches(amount)] if amount is not None else []),
             )
         )
     if mine and user is not None:

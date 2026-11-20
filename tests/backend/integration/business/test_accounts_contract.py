@@ -58,6 +58,19 @@ def _buy(seeded_db, account, amount="500"):
     return order
 
 class TestCreateAccountGuards:
+    def test_inventory_search_matches_cost_amount(self, seeded_db):
+        account = _account(seeded_db, "amount-search-inventory")
+        _buy(seeded_db, account, amount="5432.10")
+        other = _account(seeded_db, "amount-search-other")
+        _buy(seeded_db, other, amount="54321.00")
+        result = inventory_ledger(seeded_db, keyword="5,432.10")
+        assert result["total"] == 1
+        assert result["items"][0][0].id == account.id
+        account.cost_amount = Decimal("5500.00")
+        seeded_db.flush()
+        assert inventory_ledger(seeded_db, keyword="5432.10")["items"][0][0].id == account.id
+        assert inventory_ledger(seeded_db, keyword="5500")["items"][0][0].id == account.id
+
     def test_inventory_ledger_reuses_visible_source_order(self, seeded_client, seeded_db, headers):
         from sqlalchemy import event
 

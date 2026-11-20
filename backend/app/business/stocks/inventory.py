@@ -6,15 +6,16 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Date, case, cast, func, or_, select
+from sqlalchemy import Date, case, cast, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
-from app.domain.trade import Account, Order
+from app.domain.trade import Account, Order, OrderEvent
 from app.shared.form_values import get_extra_values_bulk
+from app.shared.amount_search import amount_keyword
 from ._common import (
     AGE_WARNING_MAX_DAYS,
     INVENTORY_STATUSES,
@@ -129,11 +130,19 @@ def inventory_ledger(
         if include_search_date:
             if keyword and keyword.strip():
                 pattern, escape = like_contains(keyword.strip())
-                query = query.where(or_(
+                amount = amount_keyword(keyword)
+                conditions = [
                     func.coalesce(Account.game_account, Order.account_snapshot["game_account"].as_string()).ilike(pattern, escape=escape),
                     game_type_expr.ilike(pattern, escape=escape),
                     func.coalesce(Account.channel_region, Order.account_snapshot["channel_region"].as_string()).ilike(pattern, escape=escape),
-                ))
+                ]
+                if amount is not None:
+                    conditions.append(Account.cost_amount == amount)
+                    conditions.append(exists(select(OrderEvent.id).where(
+                        OrderEvent.order_id == Order.id, OrderEvent.event_type == "BUY",
+                        OrderEvent.is_posted.is_(True), OrderEvent.amount == amount,
+                    )))
+                query = query.where(or_(*conditions))
             if date_from:
                 query = query.where(entry_day >= date_from)
             if date_to:

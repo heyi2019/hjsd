@@ -58,6 +58,35 @@ def _scoped_user() -> CurrentUser:
 
 
 class TestGetAndListOrders:
+    def test_keyword_matches_buy_and_sale_prices(self, seeded_client, seeded_db, headers):
+        order = _order(seeded_db)
+        post_event(seeded_db, order.id, event_type="BUY", amount="5432.10", occurred_on=D, actor="pytest")
+        post_event(seeded_db, order.id, event_type="SELL", amount="6543.21", occurred_on=D, actor="pytest")
+        for keyword in ("5,432.10", "6543.21"):
+            response = seeded_client.get("/api/orders", params={"keyword": keyword}, headers=headers)
+            assert response.status_code == 200, response.text
+            assert [item["id"] for item in response.json()["items"]] == [order.id]
+
+    def test_keyword_matches_consignment_sale_price_not_commission(self, seeded_client, seeded_db, headers):
+        order = _order(seeded_db, order_type="DG")
+        event, _ = post_event(seeded_db, order.id, event_type="SELL", amount="200", occurred_on=D, actor="pytest", portion="GROSS")
+        event.form_extra = {"sale_amount": "7800.00"}
+        seeded_db.flush()
+        response = seeded_client.get("/api/orders", params={"keyword": "7,800"}, headers=headers)
+        assert response.status_code == 200, response.text
+        assert [item["id"] for item in response.json()["items"]] == [order.id]
+        assert Decimal(str(response.json()["items"][0]["sale_amount"])) == Decimal("7800")
+        seeded_db.add(OrderEvent(
+            order_id=order.id, event_type="SELL", event_no="EV-AMOUNT-SECOND", is_posted=True,
+            amount=Decimal("15"), portion="GROSS", occurred_on=D,
+            form_extra={"sale_amount": "200.00"}, created_by="pytest", updated_by="pytest",
+        ))
+        seeded_db.flush()
+        response = seeded_client.get("/api/orders", params={"keyword": "8000"}, headers=headers)
+        assert response.status_code == 200, response.text
+        assert [item["id"] for item in response.json()["items"]] == [order.id]
+        assert Decimal(str(response.json()["items"][0]["sale_amount"])) == Decimal("8000")
+
     def test_get_order_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             get_order(seeded_db, 999999)

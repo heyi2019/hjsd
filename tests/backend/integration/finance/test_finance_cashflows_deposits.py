@@ -153,6 +153,15 @@ def test_list_cashflows_user_filter(seeded_db):
     )
     assert rows == [] and total == 0
 
+def test_cashflow_keyword_matches_exact_amount_and_totals(seeded_db):
+    from app.funds.cashflow_queries import cashflow_totals
+    hit = _make_flow(seeded_db, direction="OUT", amount="5432.10")
+    _make_flow(seeded_db, direction="OUT", amount="54321.00")
+    rows, total = list_cashflows(seeded_db, keyword="5,432.10")
+    assert total == 1
+    assert [row["id"] for row in rows] == [hit.id]
+    assert cashflow_totals(seeded_db, keyword="5,432.10") == (Decimal("0"), Decimal("5432.10"))
+
 def test_list_cashflows_filters(seeded_db):
     flow = _make_flow(seeded_db, direction="OUT")
 

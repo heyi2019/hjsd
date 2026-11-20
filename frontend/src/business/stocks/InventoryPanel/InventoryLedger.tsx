@@ -75,7 +75,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           enterButton={<span aria-label="搜索库存账号"><SearchOutlined /></span>}
           onSearch={(_value, _event, info) => { if (info?.source !== "clear") controller.submitSearch(); }}
           value={keyword}
-          placeholder="搜索游戏账号/产品 / 游戏/产品类型 / 渠道区服"
+          placeholder="搜索账号 / 产品 / 游戏类型 / 区服 / 成本"
           aria-label="搜索库存账号"
           className="ui-ledger-search"
           onChange={(event) => { controller.setKeyword(event.target.value); setPage(1); }}

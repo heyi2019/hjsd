@@ -108,7 +108,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
             enterButton={<span aria-label="执行订单搜索"><SearchOutlined /></span>}
             onSearch={(_value, _event, info) => { if (info?.source !== "clear") controller.submitSearch(); }}
             value={keyword}
-            placeholder="搜索订单号 / 游戏账号/产品 / 对方 / 备注"
+            placeholder="搜索订单号 / 账号 / 对方 / 备注 / 买入价 / 售出价"
             aria-label="搜索订单"
             className="ui-ledger-search"
             onChange={(event) => { setKeyword(event.target.value); setPage(1); }}

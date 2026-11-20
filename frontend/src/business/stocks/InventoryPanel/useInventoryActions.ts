@@ -1,7 +1,7 @@
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { Form } from "antd";
 import dayjs from "dayjs";
-import { useState, type Key, type Dispatch, type SetStateAction } from "react";
+import { useRef, useState, type Key, type Dispatch, type SetStateAction } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { poolsApi } from "../../../shared/api/pools.api";
@@ -36,8 +36,11 @@ export function useInventoryActions(params: {
   expandedOrderIds: Key[];
   removeFromInventory: (accountId: number, orderId?: number) => void;
   // editor 域注入（本地 openEditor/cancelInlineEdit 会再包装一层）
-  editorOpenEditor: (account: Account) => Promise<void>;
+  editorOpenEditor: (account: Account) => Promise<boolean>;
   editorCancelInlineEdit: () => void;
+  editorCancelPendingOpen: () => void;
+  editorIsSaving: () => boolean;
+  editorSaveInline: () => Promise<void>;
   inlineEditId: number | null;
   // 上层回调
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
@@ -46,7 +49,7 @@ export function useInventoryActions(params: {
     load, setRows, setError,
     executionDetails, setExecutionDetails, loadExecution, loadOrderExecution, loadEditorExecution, dropExecutionCache,
     expandTo, expandedOrderIds, removeFromInventory,
-    editorOpenEditor, editorCancelInlineEdit, inlineEditId,
+    editorOpenEditor, editorCancelInlineEdit, editorCancelPendingOpen, editorIsSaving, editorSaveInline, inlineEditId,
     onNavigate,
   } = params;
   const [saleTarget, setSaleTarget] = useState<Account | null>(null);
@@ -65,6 +68,8 @@ export function useInventoryActions(params: {
   const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
+  const editIntentRef = useRef(0);
+  const editRequestsRef = useRef<Record<string, Promise<AccountExecutionDetail | null>>>({});
   function openProfile(account: Account, mode: OrderProfileTarget["mode"]) {
     setProfileTarget({ account, mode });
   }
@@ -74,16 +79,38 @@ export function useInventoryActions(params: {
       appMessage.warning("当前账号没有绑定来源订单，无法编辑");
       return;
     }
-    const detail = await loadEditorExecution(account, boundOrderId);
-    if (!detail) return;
-    await editorOpenEditor(detail.account);
-    // 就地展开该行进入内联编辑（不弹窗）。
-    // DataTable 的行键同时包含订单和账号：同一订单可能拆成多条库存行，展开键必须使用同一复合键。
-    expandTo([`${boundOrderId}:${detail.account.id}`]);
+    if (editorIsSaving()) {
+      appMessage.warning("当前订单正在保存，请稍候");
+      return;
+    }
+    const intent = ++editIntentRef.current;
+    editorCancelPendingOpen();
+    const key = `${boundOrderId}:${account.id}`;
+    const request = editRequestsRef.current[key] ?? loadEditorExecution(account, boundOrderId);
+    editRequestsRef.current[key] = request;
+    try {
+      const detail = await request;
+      if (!detail || intent !== editIntentRef.current) return;
+      const opened = await editorOpenEditor(detail.account);
+      if (opened && intent === editIntentRef.current) expandTo([`${boundOrderId}:${detail.account.id}`]);
+    } finally {
+      if (editRequestsRef.current[key] === request) delete editRequestsRef.current[key];
+    }
   }
   function cancelInlineEdit() {
+    if (editorIsSaving()) {
+      appMessage.warning("当前订单正在保存，请稍候");
+      return;
+    }
+    editIntentRef.current += 1;
     editorCancelInlineEdit();
     setDetailTarget(null);
+  }
+  async function saveInline() {
+    if (editorIsSaving()) return;
+    editIntentRef.current += 1;
+    editorCancelPendingOpen();
+    await editorSaveInline();
   }
   async function openDetail(account: Account) {
     await loadExecution(account);
@@ -222,6 +249,12 @@ export function useInventoryActions(params: {
     if (key === "images") openProfile(row, "images");
   }
   async function handleExpand(expanded: boolean, row: InventoryOrderRow) {
+    if (editorIsSaving()) {
+      appMessage.warning("当前订单正在保存，请稍候");
+      return;
+    }
+    editIntentRef.current += 1;
+    editorCancelPendingOpen();
     // 手风琴：一次只展开一行。展开详情严格按订单 ID 请求；账号仅用于资料编辑和动作适配。
     if (!expanded && inlineEditId === row.account.id) cancelInlineEdit();
     expandTo(expanded ? [`${row.id}:${row.account.id}`] : []);
@@ -262,6 +295,7 @@ export function useInventoryActions(params: {
     openProfile,
     openEditor,
     cancelInlineEdit,
+    saveInline,
     openDetail,
     openVoid,
     openPlatformOffsale,

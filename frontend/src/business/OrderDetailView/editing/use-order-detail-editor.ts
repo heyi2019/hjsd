@@ -40,6 +40,9 @@ export function useOrderDetailEditor(params: {
   const [pools, setPools] = useState<Pool[]>([]);
   const [invEditExtraForm] = Form.useForm();
   const [savingAccount, setSavingAccount] = useState(false);
+  const openVersion = useRef(0);
+  const openingEditor = useRef(false);
+  const savingEditor = useRef(false);
 
   async function ensureEmployees(): Promise<EmployeeOption[]> {
     if (employees.length) return employees;
@@ -67,18 +70,7 @@ export function useOrderDetailEditor(params: {
     }
   }
 
-  async function openEditor(account: Account) {
-    setEditingAccount({ ...account });
-    setEventDrafts({});
-    setOperationDrafts({});
-    setFinanceDrafts({});
-    setOrderDrafts({});
-    setPartyDrafts({});
-    await Promise.all([ensureEmployees(), ensurePools()]);
-    setInlineEditId(account.id);
-  }
-
-  function cancelInlineEdit() {
+  function clearEditor() {
     setInlineEditId(null);
     setEditingAccount(null);
     setEventDrafts({});
@@ -89,7 +81,48 @@ export function useOrderDetailEditor(params: {
     invEditExtraForm.resetFields();
   }
 
+  async function openEditor(account: Account): Promise<boolean> {
+    if (savingEditor.current) {
+      appMessage.warning("当前订单正在保存，请稍候");
+      return false;
+    }
+    const version = ++openVersion.current;
+    openingEditor.current = true;
+    setInlineEditId(null);
+    setEditingAccount({ ...account });
+    setEventDrafts({});
+    setOperationDrafts({});
+    setFinanceDrafts({});
+    setOrderDrafts({});
+    setPartyDrafts({});
+    invEditExtraForm.resetFields();
+    await Promise.all([ensureEmployees(), ensurePools()]);
+    if (openVersion.current !== version) return false;
+    openingEditor.current = false;
+    setInlineEditId(account.id);
+    return true;
+  }
+
+  function cancelPendingOpen() {
+    openVersion.current += 1;
+    if (openingEditor.current) {
+      openingEditor.current = false;
+      clearEditor();
+    }
+  }
+
+  function cancelInlineEdit() {
+    if (savingEditor.current) {
+      appMessage.warning("当前订单正在保存，请稍候");
+      return;
+    }
+    openingEditor.current = false;
+    openVersion.current += 1;
+    clearEditor();
+  }
+
   function updateEventDraft(event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) {
+    if (savingEditor.current) return;
     setEventDrafts((current) => ({
       ...current,
       [event.id]: {
@@ -100,6 +133,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateOperationDraft(key: string, changes: Partial<OperationDraft>) {
+    if (savingEditor.current) return;
     setOperationDrafts((current) => ({
       ...current,
       [key]: {
@@ -110,6 +144,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function addOperationDraft(operationType: NonNullable<OperationDraft["operation_type"]>) {
+    if (savingEditor.current) return;
     operationDraftSequence.current += 1;
     const key = `new:${operationType.toLowerCase()}:${operationDraftSequence.current}`;
     setOperationDrafts((current) => ({
@@ -124,6 +159,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function removeOperationDraft(key: string) {
+    if (savingEditor.current) return;
     setOperationDrafts((current) => {
       if (!(key in current)) return current;
       const next = { ...current };
@@ -133,6 +169,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateFinanceDraft(flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) {
+    if (savingEditor.current) return;
     setFinanceDrafts((current) => ({
       ...current,
       [flowNo]: { ...(current[flowNo] ?? { flow_no: flowNo, occurred_at: "", note: "" }), ...changes },
@@ -140,10 +177,12 @@ export function useOrderDetailEditor(params: {
   }
 
   function updateEditingAccount(changes: Partial<Account>) {
+    if (savingEditor.current) return;
     setEditingAccount((current) => current ? { ...current, ...changes } : current);
   }
 
   function updateOrderDraft(orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) {
+    if (savingEditor.current) return;
     const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
     const sharedOrderIds = sharedOrderIdsForEdit(detail, orderId);
     setOrderDrafts((current) => {
@@ -162,6 +201,7 @@ export function useOrderDetailEditor(params: {
   }
 
   function updatePartyDraft(orderId: number, addition: PartyAddition) {
+    if (savingEditor.current) return;
     setPartyDrafts((current) => {
       const existing = current[orderId] ?? [];
       const same = (item: PartyAddition) => item.entity_type === addition.entity_type
@@ -173,7 +213,8 @@ export function useOrderDetailEditor(params: {
   }
 
   async function saveInline() {
-    if (!editingAccount) return;
+    if (!editingAccount || savingEditor.current) return;
+    savingEditor.current = true;
     setSavingAccount(true);
     try {
       const extraValues = await invEditExtraForm.validateFields();
@@ -263,24 +304,18 @@ export function useOrderDetailEditor(params: {
         const detail = await ordersApi.executionDetail(sourceOrderId);
         onSaved(id, detail);
       } catch (refreshError) {
-        cancelInlineEdit();
+        clearEditor();
         onRefreshFailed(id, sourceOrderId);
         appMessage.warning("修改已保存，但刷新明细失败，请重新加载");
         console.warn("reload execution detail after save failed", normalizeError(refreshError).message);
         return;
       }
-      setEditingAccount(null);
-      setEventDrafts({});
-      setOperationDrafts({});
-      setFinanceDrafts({});
-      setOrderDrafts({});
-      setPartyDrafts({});
-      invEditExtraForm.resetFields();
-      setInlineEditId(null);
+      clearEditor();
       appMessage.success("修改已保存");
     } catch (err) {
       appMessage.error(normalizeError(err).message);
     } finally {
+      savingEditor.current = false;
       setSavingAccount(false);
     }
   }
@@ -307,6 +342,8 @@ export function useOrderDetailEditor(params: {
     invEditExtraForm,
     savingAccount,
     openEditor,
+    cancelPendingOpen,
+    isSaving: () => savingEditor.current,
     cancelInlineEdit,
     saveInline,
   };

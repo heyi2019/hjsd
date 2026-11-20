@@ -30,6 +30,14 @@
   gap: var(--space-4);
   align-content: start;
 }
+.order-detail__editable {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
 .inventory-table .ant-table-tbody > tr.ant-table-expanded-row .order-detail {
   /* 展开详情保留独立卡片边界，在展开行内提供更充足的编辑宽度。 */
   width: min(100%, 1000px);

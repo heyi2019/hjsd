@@ -52,6 +52,15 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("保存中暂停编辑，避免保存完成后丢失后续输入", async () => {
+    const { rerender } = renderLight(<OrderDetail row={account} loading={false} editing={account} saving />);
+    const channel = await screen.findByLabelText("编辑渠道区服");
+    expect(channel).toBeDisabled();
+    expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
+    rerender(<OrderDetail row={account} loading={false} editing={account} saving={false} />);
+    expect(screen.getByLabelText("编辑渠道区服")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
+  });
   it("新增下架行选择具体上架事件并保存关联编号", async () => {
     const onOperationEdit = vi.fn();
     const listing = { id: 7, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: "2026-10-01T10:00:00", form_extra: { consignment_platforms: ["平台甲"], listed_at: "2026-10-01T10:00" } } as never;

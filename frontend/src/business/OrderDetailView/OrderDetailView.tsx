@@ -1,4 +1,4 @@
-import { Space } from "antd";
+import { ConfigProvider, Space } from "antd";
 import type { FormInstance } from "antd";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { Account } from "../../shared/api/types/accounts";
@@ -99,61 +99,65 @@ export function OrderDetailView({
   const profileConfig = useOrderFormConfig(editing ? creationType : undefined);
   if (editing) {
     return (
-      <div className="order-detail order-detail--editing">
-        <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onProfileChange={onProfileChange} />
-        <BusinessRegistrationForm
-          layout="horizontal"
-          labelAlign="left"
-          labelCol={{ flex: "108px" }}
-          wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
-          <FieldConfigStatus scope="PROFILE" ready={profileConfig.ready} error={profileConfig.error} retry={profileConfig.retry} />
-          <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
-            <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} operatorUsername={operatorUsername} />
-            <OrderDetailOperationSection meta={meta} editing account={editing ?? account} orderType={detail?.orders.find((order) => order.order_id === meta.orderId)?.order_type ?? detail?.orders[0]?.order_type} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />
-          </FieldConfigScope>
-        </BusinessRegistrationForm>
-        <OrderDetailFinanceSection
-          rows={financeRows}
-          orderExtras={meta.orderExtras}
-          expenseCount={expenseCount}
-          incomeCount={incomeCount}
-          totalExpense={totalExpense}
-          totalIncome={totalIncome}
-          financeDrafts={financeDrafts}
-          onFinanceEdit={onFinanceEdit}
-          orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
-          onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
-          employees={employees}
-          operatorUsername={operatorUsername}
-          pools={pools}
-          editing
-        />
-        <OrderDetailPartySection
-          meta={meta}
-          detail={detail}
-          editing
-          onPartyEdit={onPartyEdit}
-          orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
-          onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
-        />
-        <OrderDetailExecutionSection
-          rows={executionRows}
-          editing
-          eventDrafts={eventDrafts}
-          onEventEdit={onEventEdit}
-          orderDrafts={orderDrafts}
-          onOrderEdit={onOrderEdit}
-          onOrderExtraChange={onOrderExtraChange}
-          employees={employees}
-          operatorUsername={operatorUsername}
-        />
-        <div className="order-detail__footer">
-          <Space>
-            <PermissionButton permission="order.update" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
-            <PermissionButton permission="order.update" onClick={() => onCancel?.()}>取消</PermissionButton>
-          </Space>
+      <ConfigProvider componentDisabled={saving}>
+        <div className="order-detail order-detail--editing">
+          <fieldset className="order-detail__editable" disabled={saving}>
+            <OrderDetailProfileSection meta={meta} detail={detail} account={editing ?? account} editing onProfileChange={onProfileChange} />
+            <BusinessRegistrationForm
+              layout="horizontal"
+              labelAlign="left"
+              labelCol={{ flex: "108px" }}
+              wrapperCol={{ flex: "auto" }} scope="INVEDIT" form={extraForm}>
+              <FieldConfigStatus scope="PROFILE" ready={profileConfig.ready} error={profileConfig.error} retry={profileConfig.retry} />
+              <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
+                <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} operatorUsername={operatorUsername} />
+                <OrderDetailOperationSection meta={meta} editing account={editing ?? account} orderType={detail?.orders.find((order) => order.order_id === meta.orderId)?.order_type ?? detail?.orders[0]?.order_type} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />
+              </FieldConfigScope>
+            </BusinessRegistrationForm>
+            <OrderDetailFinanceSection
+              rows={financeRows}
+              orderExtras={meta.orderExtras}
+              expenseCount={expenseCount}
+              incomeCount={incomeCount}
+              totalExpense={totalExpense}
+              totalIncome={totalIncome}
+              financeDrafts={financeDrafts}
+              onFinanceEdit={onFinanceEdit}
+              orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
+              onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
+              employees={employees}
+              operatorUsername={operatorUsername}
+              pools={pools}
+              editing
+            />
+            <OrderDetailPartySection
+              meta={meta}
+              detail={detail}
+              editing
+              onPartyEdit={onPartyEdit}
+              orderDraft={meta.orderId ? orderDrafts?.[meta.orderId] : undefined}
+              onOrderExtraChange={meta.orderId == null ? undefined : (key, value) => onOrderExtraChange?.(meta.orderId!, key, value)}
+            />
+            <OrderDetailExecutionSection
+              rows={executionRows}
+              editing
+              eventDrafts={eventDrafts}
+              onEventEdit={onEventEdit}
+              orderDrafts={orderDrafts}
+              onOrderEdit={onOrderEdit}
+              onOrderExtraChange={onOrderExtraChange}
+              employees={employees}
+              operatorUsername={operatorUsername}
+            />
+          </fieldset>
+          <div className="order-detail__footer">
+            <Space>
+              <PermissionButton permission="order.update" type="primary" loading={saving} onClick={() => onSave?.()}>保存修改</PermissionButton>
+              <PermissionButton permission="order.update" onClick={() => onCancel?.()}>取消</PermissionButton>
+            </Space>
+          </div>
         </div>
-      </div>
+      </ConfigProvider>
     );
   }
 

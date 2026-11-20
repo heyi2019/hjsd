@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { useRef, useState } from "react";
+import { useRef, useState, type Key } from "react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -11,6 +11,7 @@ import { OrderDetailDeliverySection } from "@/business/OrderDetailView/OrderDeta
 import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { useInventoryList } from "@/business/stocks/InventoryPanel/useInventoryList";
 import { useExecutionCache } from "@/business/stocks/InventoryPanel/useExecutionCache";
+import { useInventoryActions } from "@/business/stocks/InventoryPanel/useInventoryActions";
 import type { InventoryOrderRow } from "@/business/stocks/InventoryPanel/types";
 import { FieldConfigScope } from "@/business/ConfigurableField";
 import { BusinessRegistrationForm } from "@/shared/ui";
@@ -127,6 +128,147 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it("库存保存时，等待加载的其他账号不能抢走编辑状态", async () => {
+    let resolveSecond!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const second = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveSecond = resolve; });
+    const snapshot = (account: typeof accounts[number]) => ({ account, orders: [] }) as never;
+    const loadEditorExecution = vi.fn((account: Account) => account.id === 2 ? second : Promise.resolve(snapshot(accounts[0])));
+    function Probe() {
+      const [expanded, setExpanded] = useState<Key[]>([]);
+      const [editing, setEditing] = useState<number | null>(null);
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
+      const actions = useInventoryActions({
+        load: async () => undefined, setRows, setError,
+        executionDetails: details, setExecutionDetails: setDetails,
+        loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution,
+        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
+        removeFromInventory: () => undefined,
+        editorOpenEditor: async (account) => { setEditing(account.id); return true; },
+        editorCancelInlineEdit: () => setEditing(null), inlineEditId: editing,
+        editorCancelPendingOpen: () => undefined, editorIsSaving: () => false,
+        editorSaveInline: async () => undefined,
+      });
+      return <><button onClick={() => void actions.openEditor(accounts[0] as Account, 21)}>编辑甲</button>
+        <button onClick={() => void actions.openEditor(accounts[1] as Account, 22)}>编辑乙</button>
+        <button onClick={() => void actions.saveInline()}>保存甲</button>
+        <span>{`展开:${expanded.join(",")},编辑:${editing ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    await screen.findByText("展开:21:1,编辑:1");
+    await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+    await ui.click(screen.getByRole("button", { name: "保存甲" }));
+    await act(async () => resolveSecond(snapshot(accounts[1])));
+    expect(screen.getByText("展开:21:1,编辑:1")).toBeInTheDocument();
+  });
+  it.each(["切换", "取消"])("库存编辑%s后，旧详情不能重新打开原来的账号", async (action) => {
+    let resolveFirst!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveFirst = resolve; });
+    const snapshot = (account: typeof accounts[number]) => ({ account, orders: [] }) as never;
+    const loadEditorExecution = vi.fn((account: Account) => account.id === 1 ? first : Promise.resolve(snapshot(accounts[1])));
+    function Probe() {
+      const [expanded, setExpanded] = useState<Key[]>([]);
+      const [editing, setEditing] = useState<number | null>(null);
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const [details, setDetails] = useState<Record<number, Awaited<ReturnType<typeof ordersApi.executionDetail>>>>({});
+      const actions = useInventoryActions({
+        load: async () => undefined, setRows, setError,
+        executionDetails: details, setExecutionDetails: setDetails,
+        loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution,
+        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
+        removeFromInventory: () => undefined,
+        editorOpenEditor: async (account) => { setEditing(account.id); return true; },
+        editorCancelInlineEdit: () => setEditing(null), inlineEditId: editing,
+        editorCancelPendingOpen: () => undefined, editorIsSaving: () => false,
+        editorSaveInline: async () => undefined,
+      });
+      return <><button onClick={() => void actions.openEditor(accounts[0] as Account, 21)}>编辑甲</button>
+        <button onClick={() => void actions.openEditor(accounts[1] as Account, 22)}>编辑乙</button>
+        <button onClick={actions.cancelInlineEdit}>取消</button>
+        <span>{`展开:${expanded.join(",")},编辑:${editing ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    if (action === "切换") {
+      await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+      await screen.findByText("展开:22:2,编辑:2");
+    } else {
+      await ui.click(screen.getByRole("button", { name: "取消" }));
+    }
+    await act(async () => resolveFirst(snapshot(accounts[0])));
+    expect(screen.getByText(action === "切换" ? "展开:22:2,编辑:2" : "展开:,编辑:无")).toBeInTheDocument();
+  });
+
+  it("切换编辑账号时，先前加载完成不能将编辑行与账号草稿错配", async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<typeof employeesApi.list>>) => void;
+    vi.mocked(employeesApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }));
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
+    function EditorProbe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
+      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑甲</button>
+        <button onClick={() => void editor.openEditor(accounts[1] as Account)}>编辑乙</button>
+        <span>{`编辑行:${editor.inlineEditId ?? "无"},草稿:${editor.editingAccount?.id ?? "无"}`}</span></>;
+    }
+    renderLight(<EditorProbe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+    await screen.findByText("编辑行:2,草稿:2");
+    await act(async () => resolveFirst([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]));
+    expect(screen.getByText("编辑行:2,草稿:2")).toBeInTheDocument();
+  });
+
+  it("取消等待中的详情编辑后，迟到的加载结果不能重新打开编辑", async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<typeof employeesApi.list>>) => void;
+    vi.mocked(employeesApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve; }));
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
+    function EditorProbe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
+      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+        <button onClick={editor.cancelInlineEdit}>取消</button>
+        <span>{`编辑行:${editor.inlineEditId ?? "无"},草稿:${editor.editingAccount?.id ?? "无"}`}</span></>;
+    }
+    renderLight(<EditorProbe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await ui.click(screen.getByRole("button", { name: "取消" }));
+    await act(async () => resolveFirst([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]));
+    expect(screen.getByText("编辑行:无,草稿:无")).toBeInTheDocument();
+  });
+
+  it.each(["保存成功", "保存失败"])("%s前不能切换或取消当前编辑，避免丢失草稿", async (saveResult) => {
+    let resolveSave!: (value: { ok: boolean }) => void;
+    let rejectSave!: (error: Error) => void;
+    vi.mocked(ordersApi.updateExecution).mockReturnValueOnce(new Promise((resolve, reject) => { resolveSave = resolve; rejectSave = reject; }));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce({ account: accounts[0], orders: [] } as never);
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [] } } as never;
+    const onSaved = vi.fn();
+    const onRefreshFailed = vi.fn();
+    function EditorProbe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved, onRefreshFailed });
+      return <><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑甲</button>
+        <button onClick={() => void editor.openEditor(accounts[1] as Account)}>编辑乙</button>
+        <button onClick={() => editor.updateEditingAccount({ account_description: "甲的新草稿" })}>修改甲</button>
+        <button onClick={editor.cancelInlineEdit}>取消</button>
+        <button onClick={() => void editor.saveInline()}>保存</button>
+        <span>{`编辑行:${editor.inlineEditId ?? "无"},草稿:${editor.editingAccount?.account_description ?? "无"}`}</span></>;
+    }
+    renderLight(<EditorProbe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    await screen.findByText("编辑行:1,草稿:高段位账号");
+    await ui.click(screen.getByRole("button", { name: "修改甲" }));
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+    await ui.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.getByText("编辑行:1,草稿:甲的新草稿")).toBeInTheDocument();
+    await act(async () => { if (saveResult === "保存失败") rejectSave(new Error("保存失败")); else resolveSave({ ok: true }); });
+    if (saveResult === "保存失败") expect(screen.getByText("编辑行:1,草稿:甲的新草稿")).toBeInTheDocument();
+    else await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+    await screen.findByText("编辑行:2,草稿:无");
+  });
   it.each(["success", "failure"])("库存详情强制刷新后忽略更早请求的%s结果", async (oldResult) => {
     let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     let rejectOld!: (error: Error) => void;

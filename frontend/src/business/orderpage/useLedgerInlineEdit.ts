@@ -28,6 +28,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
   const detailRequestsRef = useRef<Partial<Record<number, Promise<AccountExecutionDetail | null>>>>({});
   const detailVersionsRef = useRef<Record<number, number>>({});
+  const editIntentRef = useRef(0);
   const invalidateDetailRequest = (orderId: number) => {
     detailVersionsRef.current[orderId] = (detailVersionsRef.current[orderId] ?? 0) + 1;
     delete detailRequestsRef.current[orderId];
@@ -82,15 +83,21 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
 
   const openLedgerEditor = async (order: Order) => {
     try {
-      let accountId = order.account_id;
+      const accountId = order.account_id;
       if (accountId == null) {
         appMessage.warning("该订单未关联库存账号，无法编辑账号资料");
         return;
       }
+      if (orderDetailEditor.isSaving()) {
+        appMessage.warning("当前订单正在保存，请稍候");
+        return;
+      }
+      const intent = ++editIntentRef.current;
+      orderDetailEditor.cancelPendingOpen();
       const detail = await loadLedgerOrderDetail(order.id);
-      if (!detail) return;
-      setExpandedOrderIds([String(order.id)]);
-      await orderDetailEditor.openEditor(detail.account);
+      if (!detail || intent !== editIntentRef.current) return;
+      const opened = await orderDetailEditor.openEditor(detail.account);
+      if (opened && intent === editIntentRef.current) setExpandedOrderIds([String(order.id)]);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -102,9 +109,27 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   );
 
   const handleLedgerExpand = (expanded: boolean, record: Order) => {
+    if (orderDetailEditor.isSaving()) {
+      appMessage.warning("当前订单正在保存，请稍候");
+      return;
+    }
+    editIntentRef.current += 1;
+    orderDetailEditor.cancelPendingOpen();
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
     if (expanded) void loadLedgerOrderDetail(record.id);
+  };
+
+  const cancelInlineEdit = () => {
+    if (!orderDetailEditor.isSaving()) editIntentRef.current += 1;
+    orderDetailEditor.cancelInlineEdit();
+  };
+
+  const saveInline = async () => {
+    if (orderDetailEditor.isSaving()) return;
+    editIntentRef.current += 1;
+    orderDetailEditor.cancelPendingOpen();
+    await orderDetailEditor.saveInline();
   };
 
   // orderDetailEditor 还持有 openEditor（仅本 hook 内部使用），对外只暴露原契约中的 12 个键。
@@ -119,7 +144,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     loadLedgerOrderDetail,
     openLedgerEditor,
     handleLedgerExpand,
-    cancelInlineEdit: orderDetailEditor.cancelInlineEdit,
+    cancelInlineEdit,
     editingAccount: orderDetailEditor.editingAccount,
     employees: orderDetailEditor.employees,
     ensureEmployees: orderDetailEditor.ensureEmployees,
@@ -129,7 +154,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     financeDrafts: orderDetailEditor.financeDrafts,
     inlineEditId: orderDetailEditor.inlineEditId,
     invEditExtraForm: orderDetailEditor.invEditExtraForm,
-    saveInline: orderDetailEditor.saveInline,
+    saveInline,
     savingAccount: orderDetailEditor.savingAccount,
     updateEventDraft: orderDetailEditor.updateEventDraft,
     updateOperationDraft: orderDetailEditor.updateOperationDraft,

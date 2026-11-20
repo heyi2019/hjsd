@@ -274,6 +274,73 @@ async function clickModalOk(modal: HTMLElement) {
 }
 
 describe("OrdersPage：操作与筛选分支", () => {
+  it("订单保存失败后，之前等待加载的其他订单不能覆盖当前草稿", async () => {
+    let resolveSecond!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const second = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveSecond = resolve; });
+    const firstOrder = { ...order1, id: 1, account_id: 1 };
+    const secondOrder = { ...order1, id: 2, account_id: 2 };
+    const snapshot = (id: number) => ({ account: { id, source_order_id: id }, orders: [], detail_view: { finance_rows: [] } }) as never;
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 2 ? second : Promise.resolve(snapshot(1)));
+    vi.mocked(ordersApi.updateExecution).mockRejectedValueOnce(new Error("保存失败"));
+    function Probe() {
+      const ledger = useLedgerInlineEdit();
+      return <><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
+        <button onClick={() => void ledger.openLedgerEditor(secondOrder)}>编辑乙</button>
+        <button onClick={() => ledger.updateEditingAccount({ account_description: "甲的草稿" })}>修改甲</button>
+        <button onClick={() => void ledger.saveInline()}>保存甲</button>
+        <span>{`编辑:${ledger.inlineEditId ?? "无"},草稿:${ledger.editingAccount?.account_description ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    await screen.findByText("编辑:1,草稿:无");
+    await ui.click(screen.getByRole("button", { name: "修改甲" }));
+    await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+    await ui.click(screen.getByRole("button", { name: "保存甲" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledTimes(1));
+    await act(async () => resolveSecond(snapshot(2)));
+    expect(screen.getByText("编辑:1,草稿:甲的草稿")).toBeInTheDocument();
+  });
+  it("订单台账连续编辑不同行时，只打开最后选择的订单", async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveFirst = resolve; });
+    const firstOrder = { ...order1, id: 1, account_id: 1 };
+    const secondOrder = { ...order1, id: 2, account_id: 2 };
+    const snapshot = (id: number) => ({ account: { id, source_order_id: id }, orders: [] }) as never;
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 1 ? first : Promise.resolve(snapshot(2)));
+    function Probe() {
+      const ledger = useLedgerInlineEdit();
+      return <><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
+        <button onClick={() => void ledger.openLedgerEditor(secondOrder)}>编辑乙</button>
+        <span>{`展开:${ledger.expandedOrderIds.join(",")},编辑:${ledger.inlineEditId ?? "无"},草稿:${ledger.editingAccount?.id ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    await ui.click(screen.getByRole("button", { name: "编辑乙" }));
+    await screen.findByText("展开:2,编辑:2,草稿:2");
+    await act(async () => resolveFirst(snapshot(1)));
+    expect(screen.getByText("展开:2,编辑:2,草稿:2")).toBeInTheDocument();
+  });
+
+  it("订单台账切换展开行后，待加载的编辑不能抢回展开状态", async () => {
+    let resolveFirst!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveFirst = resolve; });
+    const firstOrder = { ...order1, id: 1, account_id: 1 };
+    const secondOrder = { ...order1, id: 2, account_id: 2 };
+    const snapshot = (id: number) => ({ account: { id, source_order_id: id }, orders: [] }) as never;
+    vi.mocked(ordersApi.executionDetail).mockImplementation((id) => id === 1 ? first : Promise.resolve(snapshot(2)));
+    function Probe() {
+      const ledger = useLedgerInlineEdit();
+      return <><button onClick={() => void ledger.openLedgerEditor(firstOrder)}>编辑甲</button>
+        <button onClick={() => ledger.handleLedgerExpand(true, secondOrder)}>展开乙</button>
+        <span>{`展开:${ledger.expandedOrderIds.join(",")},编辑:${ledger.inlineEditId ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑甲" }));
+    await ui.click(screen.getByRole("button", { name: "展开乙" }));
+    await screen.findByText("展开:2,编辑:无");
+    await act(async () => resolveFirst(snapshot(1)));
+    expect(screen.getByText("展开:2,编辑:无")).toBeInTheDocument();
+  });
   it.each(["success", "failure"])("订单详情强制刷新后忽略更早请求的%s结果", async (oldResult) => {
     let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     let rejectOld!: (error: Error) => void;

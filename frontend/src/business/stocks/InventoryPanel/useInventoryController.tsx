@@ -123,8 +123,6 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     invEditExtraForm,
     savingAccount,
   } = orderDetailEditor;
-  const saveInline = orderDetailEditor.saveInline;
-
   // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
@@ -137,6 +135,9 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     },
     editorOpenEditor: orderDetailEditor.openEditor,
     editorCancelInlineEdit: orderDetailEditor.cancelInlineEdit,
+    editorCancelPendingOpen: orderDetailEditor.cancelPendingOpen,
+    editorIsSaving: orderDetailEditor.isSaving,
+    editorSaveInline: orderDetailEditor.saveInline,
     inlineEditId,
     onNavigate,
   });
@@ -170,6 +171,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   openProfile,
   openEditor,
   cancelInlineEdit,
+  saveInline,
   openDetail,
   openVoid,
   openPlatformOffsale,

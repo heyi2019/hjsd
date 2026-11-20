@@ -607,6 +607,22 @@ class TestInstallmentsApi:
         assert detail.json()["orders"][0]["extra_values"]["intermediary_platform"] == "买号平台"
         assert detail.json()["orders"][0]["extra_values"]["bound_phone_owner"] == "新买号绑定人"
 
+        settled = seeded_client.post(f"/api/v1/installments/{contract.id}/settle-early", headers=headers, json={"paid_on": TODAY.isoformat()})
+        assert settled.status_code == 200, settled.text
+        delivered = seeded_client.post(f"/api/v1/installments/{contract.id}/deliver", headers=headers, json={
+            "delivered_on": TODAY.isoformat(), "note": "分期结清后换绑",
+            "bound_phone": "13900000003", "bound_phone_owner": "实际卖号绑定人",
+        })
+        assert delivered.status_code == 200, delivered.text
+        detail = seeded_client.get(f"/api/v1/orders/{order.id}/execution-detail", headers=headers)
+        assert detail.status_code == 200, detail.text
+        extra = detail.json()["orders"][0]["extra_values"]
+        assert extra["bound_phone"] == "13700000001"
+        assert extra["bound_phone_owner"] == "新买号绑定人"
+        assert extra["sell_bound_phone"] == "13900000003"
+        assert extra["sell_bound_phone_owner"] == "实际卖号绑定人"
+        assert extra["sell_delivery_responsible_ids"] == [1]
+
     def test_stock_sale_rolls_back_when_down_payment_fails(self, seeded_client, seeded_db, headers):
         account = _account(seeded_db, "atomic-sale-rollback")
         order = _order(seeded_db, order_type="HS", account_id=account.id)

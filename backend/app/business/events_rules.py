@@ -284,6 +284,15 @@ def _post_deliver(
     )
     session.add(event)
     if normalized_bound_phone is not None or normalized_bound_phone_owner is not None:
+        # 订单详情的买号／卖号交付字段各自独立；只覆盖本次交付实际填写的值。
+        order_extra = dict(order.form_extra or {})
+        prefix = "sell_" if direction == "SELL" else ""
+        if normalized_bound_phone is not None:
+            order_extra[f"{prefix}bound_phone"] = normalized_bound_phone
+        if normalized_bound_phone_owner is not None:
+            order_extra[f"{prefix}bound_phone_owner"] = normalized_bound_phone_owner
+        order.form_extra = order_extra
+        order.updated_by = actor
         account = session.get(Account, order.account_id) if order.account_id is not None else None
         snapshot = dict(order.account_snapshot or {})
         if not snapshot.get("game_account") and account is not None and account.game_account:

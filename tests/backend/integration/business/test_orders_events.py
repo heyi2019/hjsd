@@ -414,15 +414,26 @@ class TestEventRules:
     def test_full_sale_can_record_sell_delivery_without_cashflow(self, seeded_db):
         account = _new_account(seeded_db, game_account="full-sale-delivery")
         order = create_order(
-            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id,
+            form_extra={"bound_phone": "13700000000", "bound_phone_owner": "原买号绑定人", "intermediary_platform": "买号平台"},
         )
         post_event(
             seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
             occurred_on=TODAY, actor="pytest",
         )
         post_event(
+            seeded_db, order.id, event_type="DELIVER", delivery_direction="BUY",
+            occurred_on=TODAY, actor="pytest", note="买号换绑凭证",
+            bound_phone=" 13700000001 ", bound_phone_owner=" 买号绑定人 ",
+        )
+        assert order.form_extra["bound_phone"] == "13700000001"
+        assert order.form_extra["bound_phone_owner"] == "买号绑定人"
+        assert order.form_extra["intermediary_platform"] == "买号平台"
+        post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
+            bound_phone="13900000001", bound_phone_owner="原卖号绑定人",
+            form_extra_context={"intermediary_platform": "卖号平台", "delivery_responsible_ids": [1]},
         )
         event, flow = post_event(
             seeded_db,
@@ -432,9 +443,18 @@ class TestEventRules:
             occurred_on=TODAY,
             actor="pytest",
             note="客户自行换绑凭证",
+            bound_phone=" 13900000002 ",
+            bound_phone_owner=" 卖号绑定人 ",
         )
         assert event.event_type == EventType.DELIVER.value
         assert event.form_extra["delivery_direction"] == "SELL"
+        assert order.form_extra["bound_phone"] == "13700000001"
+        assert order.form_extra["bound_phone_owner"] == "买号绑定人"
+        assert order.form_extra["sell_bound_phone"] == "13900000002"
+        assert order.form_extra["sell_bound_phone_owner"] == "卖号绑定人"
+        assert order.form_extra["sell_intermediary_platform"] == "卖号平台"
+        assert order.form_extra["sell_delivery_responsible_ids"] == [1]
+        assert account.bound_phone == "13900000002"
         assert flow is None
         assert seeded_db.scalar(
             select(Cashflow).where(
@@ -448,7 +468,7 @@ class TestEventRules:
         )
         post_event(
             seeded_db, order.id, event_type="SELL", amount=Decimal("200"),
-            occurred_on=TODAY, actor="pytest", portion="GROSS",
+            occurred_on=TODAY, actor="pytest", portion="GROSS", bound_phone="13900000001",
         )
         event, flow = post_event(
             seeded_db,
@@ -458,8 +478,11 @@ class TestEventRules:
             occurred_on=TODAY,
             actor="pytest",
             note="代挂订单交付凭证",
+            bound_phone_owner="代挂卖号绑定人",
         )
         assert event.form_extra["delivery_direction"] == "SELL"
+        assert order.form_extra["sell_bound_phone"] == "13900000001"
+        assert order.form_extra["sell_bound_phone_owner"] == "代挂卖号绑定人"
         assert flow is None
 
     def test_direct_deliver_event_cannot_bypass_installment_service(self, seeded_db):

@@ -42,26 +42,26 @@ export function LoginPage() {
         <div className="login-card-head">
           <p className="login-kicker">欢迎回来</p>
           <h2>登录工作台</h2>
-          <p className="login-sub">使用你的账号继续经营工作</p>
+          <p className="login-sub">请输入账号和密码，开始今天的工作。</p>
         </div>
         {error ? <div id="login-error" className="error" role="alert">{error}</div> : null}
         <div className="login-actions">
               <Form layout="vertical" onFinish={submit}>
                 <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
-                  <Input autoFocus autoComplete="username" aria-describedby={error ? "login-error" : undefined} />
+                  <Input autoFocus autoComplete="username" placeholder="请输入用户名" aria-describedby={error ? "login-error" : undefined} />
                 </Form.Item>
                 <Form.Item
                   name="password"
                   label="密码"
                   rules={[{ required: !import.meta.env.DEV, message: "请输入密码" }]}
                 >
-                  <Input.Password autoComplete="current-password" aria-describedby={error ? "login-error" : undefined} />
+                  <Input.Password autoComplete="current-password" placeholder="请输入密码" aria-describedby={error ? "login-error" : undefined} />
                 </Form.Item>
                 <Button type="primary" htmlType="submit" block loading={submitting}>登录</Button>
               </Form>
         </div>
 
-        <p className="login-card-foot">宜游轩 ERP <span>／</span> V1.0@宜游轩技术团队</p>
+        <p className="login-card-foot">账号由管理员创建，如需帮助请联系管理员</p>
       </Card>
     </main>
   );

@@ -23,6 +23,7 @@ import "./shared/styles/ui-components.css";
 import "./shared/styles/interactions.css";
 import "./shared/ui/antd-adapter.css";
 import "./shared/styles/responsive.css";
+import "./auth/LoginPage.css";
 
 function ThemedApp() {
   const { resolvedMode } = useTheme();

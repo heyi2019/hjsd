@@ -26,6 +26,15 @@ describe("LoginPage：后端前置检查", () => {
     vi.clearAllMocks();
   });
 
+  it("展示品牌介绍与清晰的账号密码登录入口", () => {
+    vi.mocked(client.checkBackendHealth).mockResolvedValueOnce(undefined);
+    renderLight(<LoginPage />);
+    expect(screen.getByRole("heading", { name: /让经营更清晰/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("用户名")).toHaveAttribute("autocomplete", "username");
+    expect(screen.getByLabelText("密码")).toHaveAttribute("autocomplete", "current-password");
+    expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
+  });
+
   it("后端不可达时显示连接提示，而不是等待登录后才报 500", async () => {
     vi.mocked(client.checkBackendHealth).mockRejectedValueOnce(new Error("后端不可达"));
 

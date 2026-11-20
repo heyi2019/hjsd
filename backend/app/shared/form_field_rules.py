@@ -159,6 +159,25 @@ def _normalize_field_options(
     return normalized
 
 
+def merge_form_extra_for_edit(
+    session: Session,
+    *,
+    order_type_code: str,
+    existing: Mapping[str, Any] | None,
+    values: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """替换当前表单可编辑字段，保留其他表单和停用字段的历史值。"""
+    if values is None:
+        return dict(existing or {})
+    scope = normalize_form_scope(order_type_code)
+    editable_keys = set(session.scalars(select(OrderFormField.field_key).where(
+        OrderFormField.order_type_code == scope,
+        OrderFormField.is_custom.is_(True),
+        OrderFormField.is_active.is_(True),
+    )))
+    return {**{key: value for key, value in (existing or {}).items() if key not in editable_keys}, **values}
+
+
 def validate_form_extra(
     session: Session,
     *,

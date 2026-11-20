@@ -11,7 +11,7 @@ import { usePoolResources } from "@/pools/usePoolResources";
 import { useReconciliationActions } from "@/pools/useReconciliationActions";
 import { useReconciliationResources } from "@/pools/useReconciliationResources";
 import { useTransferActions } from "@/pools/useTransferActions";
-import { mergeFormExtra } from "@/pools/formExtra";
+import { mergeFormExtra } from "@/shared/lib/formExtra";
 
 describe("资金中心 API 边界", () => {
   it("押金、划转、对账各自从独立模块提供", () => {

@@ -64,7 +64,10 @@ def recover_account(
     """登记账号回收并关闭原分期，不改写原分期应收。"""
     text_note = _required_text(note, field="note", message="回收必须填写说明")
     installment = get_installment(session, installment_id, user, for_update=True)
-    _merge_form_extra(session, installment, scope="INSTRECOVER", values=form_extra)
+    _merge_form_extra(
+        session, installment, scope="INSTRECOVER", values=form_extra,
+        context={"occurred_on": occurred_on, "note": note, "operator_user_ids": operator_user_ids},
+    )
     if installment.status not in {
         InstallmentStatus.OVERDUE.value,
         InstallmentStatus.DEFAULTED.value,
@@ -150,7 +153,11 @@ def record_sale(
     """登记回收账号的出售订单，并保留原分期与出售订单的利润关联。"""
     text_note = _required_text(note, field="note", message="出售必须填写说明")
     installment = get_installment(session, installment_id, user)
-    _merge_form_extra(session, installment, scope="INSTRESALE", values=form_extra)
+    _merge_form_extra(
+        session, installment, scope="INSTRESALE", values=form_extra,
+        context={"resale_order_id": sale_order_id, "occurred_on": occurred_on, "note": note,
+                 "operator_user_ids": operator_user_ids},
+    )
     if installment.status not in {
         InstallmentStatus.CLOSED.value,
         InstallmentStatus.OVERDUE.value,
@@ -253,7 +260,11 @@ def deliver(
 ) -> Installment:
     """换绑交付：只能从 `SETTLED` 进入，生成无金额 `DELIVER`（A04 / A05）。"""
     installment = get_installment(session, installment_id, user)
-    _merge_form_extra(session, installment, scope="INSTDELIVER", values=form_extra)
+    _merge_form_extra(
+        session, installment, scope="INSTDELIVER", values=form_extra,
+        context={"delivered_on": delivered_on, "note": note, "bound_phone": bound_phone,
+                 "bound_phone_owner": bound_phone_owner, "operator_user_ids": operator_user_ids},
+    )
     if installment.status != InstallmentStatus.SETTLED.value:
         raise Validation(
             f"合约 {installment.inst_no} 未结清（{installment.status}），不可换绑交付",

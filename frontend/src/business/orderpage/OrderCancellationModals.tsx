@@ -1,5 +1,5 @@
 import { Input, Typography } from "antd";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
 import { DateField, MoneyInput, Select, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { executionActionLabel, money, today } from "../../shared/lib/format";
@@ -120,7 +120,7 @@ export function CancelTransactionModal({ controller }: { controller: OrdersPageC
           <CfgItem name="reason" label="取消原因" rules={[{ required: true, message: "请输入取消原因" }]}>
             <Input.TextArea rows={3} placeholder="请输入退款及取消原因" />
           </CfgItem>
-          <CustomFieldSection testIdSuffix="order-cancel" />
+          <CustomFieldSections testIdSuffix="order-cancel" />
           </FieldConfigScope>
         </BusinessRegistrationForm>
       </BusinessActionModal>

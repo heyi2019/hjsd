@@ -4,7 +4,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { reconciliationsApi } from "../shared/api/reconciliations.api";
 import type { Reconciliation } from "../shared/api/types/finance";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { mergeFormExtra } from "./formExtra";
+import { mergeFormExtra } from "../shared/lib/formExtra";
 
 interface ReconciliationActionsDeps {
   load: () => Promise<void>;

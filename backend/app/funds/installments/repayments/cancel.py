@@ -56,7 +56,10 @@ def cancel_installment(
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"order_no": order.order_no, "status": order.status},
         )
-    _merge_form_extra(session, installment, scope=form_extra_scope, values=form_extra)
+    _merge_form_extra(
+        session, installment, scope=form_extra_scope, values=form_extra,
+        context={"cancelled_on": cancelled_on, "reason": reason, "operator_user_ids": operator_user_ids},
+    )
 
     event_ids: list[int] = []
     refund_amount = Decimal("0")

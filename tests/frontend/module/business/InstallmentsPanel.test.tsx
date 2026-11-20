@@ -9,7 +9,7 @@ import { InstallmentsPanel } from "@/finance/installments/InstallmentsPanel";
 import type { Installment } from "@/shared/api/types/installments";
 
 import { installmentsApi } from "@/shared/api/installments.api";
-import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
+import { listColumnsApi, orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { pageResponse } from "@fixtures/api-responses";
@@ -345,6 +345,62 @@ describe("InstallmentsPanel：动作与减免", () => {
   });
 
   describe("InstallmentsPanel：登记收款 / 换绑交付", () => {
+    it("收款显示其他板块字段，清空可选数字后提交剩余凭据", async () => {
+      vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "INSTPAY" ? [
+        { id: 901, order_type_code: scope, field_key: "receipt", label: "收款凭据", field_type: "TEXT",
+          required: true, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "FINANCE" },
+        { id: 902, order_type_code: scope, field_key: "optional_number", label: "可选数字", field_type: "NUMBER",
+          required: false, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "BUSINESS" },
+      ] : []);
+      resolveMockOnce(vi.mocked(installmentsApi.pay), { id: 1 });
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      await screen.findByText("HS0001-INS01");
+      const payButton = screen.getAllByRole("button", { name: /登记收款/ })
+        .find((button) => !(button as HTMLButtonElement).disabled) as Element;
+      await ui.click(payButton);
+      const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+      await ui.type(within(modal).getByLabelText("本次实收"), "50");
+      await ui.type(await within(modal).findByLabelText("收款凭据"), "凭据A");
+      const optionalNumber = within(modal).getByLabelText("可选数字");
+      await ui.type(optionalNumber, "17");
+      await ui.clear(optionalNumber);
+      await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
+      await waitFor(() => expect(vi.mocked(installmentsApi.pay)).toHaveBeenCalledWith(1,
+        expect.objectContaining({ form_extra: { receipt: "凭据A" } }),
+      ));
+    });
+
+    it("换绑交付提交选择的操作人", async () => {
+      vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "INSTDELIVER" ? [
+        { id: 911, order_type_code: scope, field_key: "proof", label: "交付补充", field_type: "TEXT",
+          required: true, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "DELIVER" },
+        { id: 912, order_type_code: scope, field_key: "finance_note", label: "交付财务说明", field_type: "TEXT",
+          required: true, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "FINANCE" },
+      ] : []);
+      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
+      vi.mocked(employeesApi.list).mockResolvedValueOnce([
+        { id: 1, username: "admin", display_name: "管理员", is_active: true },
+        { id: 2, username: "helper", display_name: "协作人员", is_active: true },
+      ]);
+      resolveMockOnce(vi.mocked(installmentsApi.deliver), { id: 1 });
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      await screen.findByText("HS0001-INS01");
+      await ui.click(screen.getByRole("button", { name: /换绑交付/ }));
+      const modal = document.querySelector(".ant-modal-content") as HTMLElement;
+      await waitFor(() => expect(within(modal).getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
+      await ui.click(within(modal).getByRole("combobox", { name: "操作人" }));
+      await ui.click(await screen.findByText("协作人员", { selector: ".ant-select-item-option-content" }));
+      await ui.type(within(modal).getByLabelText("换绑凭证"), "交付完成");
+      await ui.type(await within(modal).findByLabelText("交付补充"), "补充凭据");
+      expect(within(modal).getAllByLabelText("交付补充")).toHaveLength(1);
+      await ui.type(within(modal).getByLabelText("交付财务说明"), "已核对");
+      await ui.click(within(modal).getByRole("button", { name: /确认交付/ }));
+      await waitFor(() => expect(vi.mocked(installmentsApi.deliver)).toHaveBeenCalledWith(1,
+        expect.objectContaining({ operator_user_ids: [1, 2], note: "交付完成",
+          form_extra: { proof: "补充凭据", finance_note: "已核对" } }),
+      ));
+    });
+
     it("已有回收和转售记录时禁用重复处置", async () => {
       vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
         {

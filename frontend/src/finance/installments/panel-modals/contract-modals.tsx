@@ -1,5 +1,5 @@
 import { Input, Typography } from "antd";
-import { CfgItem, CustomFieldSection } from "../../../business/ConfigurableField";
+import { CfgItem } from "../../../business/ConfigurableField";
 import { DateField, Select, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
 import { cancelRefundIntro } from "../../../shared/lib/cancellationCopy";
 import type { ContractTableController } from "../useContractTableController";
@@ -133,7 +133,6 @@ export function DeliverModal({ controller }: { controller: ContractTableControll
       <CfgItem name="note" label="换绑凭证" rules={[{ required: true }]}>
         <Input.TextArea rows={2} />
       </CfgItem>
-      <CustomFieldSection section="DELIVER" testIdSuffix="installment-deliver" />
     </InstallmentActionModal>
   );
 }

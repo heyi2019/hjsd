@@ -32,7 +32,11 @@ def extend_schedule(
     installment = get_installment(session, installment_id, user, for_update=True)
     if installment.status in SCHEDULE_CLOSED_STATUSES:
         raise Validation("已结束的分期合约不能展期")
-    _merge_form_extra(session, installment, scope="INSTEXTEND", values=form_extra)
+    _merge_form_extra(
+        session, installment, scope="INSTEXTEND", values=form_extra,
+        context={"new_due_on": new_due_on, "reason": reason, "period_no": period_no,
+                 "operator_user_ids": operator_user_ids},
+    )
     schedule = session.scalar(
         select(InstallmentSchedule).where(
             InstallmentSchedule.installment_id == installment.id,

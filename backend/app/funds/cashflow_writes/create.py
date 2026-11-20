@@ -118,7 +118,13 @@ def create_cashflow(
     operator_ids = _validate_operator_user_ids(session, operator_user_ids)
     scope = "STUDIOEXP" if normalized_ledger_type == CashflowLedgerType.STUDIO.value else form_extra_scope
     checked_extra = (
-        validate_form_extra(session, order_type_code=scope, values=form_extra)
+        validate_form_extra(
+            session, order_type_code=scope, values=form_extra,
+            context={"pool_id": pool_id, "occurred_on": occurred_on, "direction": direction,
+                     "accounting_attribute": requested_accounting_attribute or accounting_attribute,
+                     "category": category, "amount": amount, "note": note,
+                     "operator_user_ids": operator_user_ids},
+        )
         if scope else dict(form_extra or {})
     )
     flow = Cashflow(

@@ -1,5 +1,5 @@
 import { BusinessActionModal, BusinessRegistrationForm, InlineError, PermissionButton } from "../../../shared/ui";
-import { CustomFieldSection, FieldConfigScope } from "../../../business/ConfigurableField";
+import { CustomFieldSections, FieldConfigScope } from "../../../business/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../../business/ResponsibleEmployeeSelect";
 import type { FormInstance } from "antd";
 import type { ReactNode } from "react";
@@ -24,7 +24,6 @@ export interface InstallmentActionModalProps {
   danger?: boolean;
   intro?: ReactNode;
   outro?: ReactNode;
-  section?: string;
   testIdSuffix: string;
   employees: ContractTableController["employees"];
   children?: ReactNode;
@@ -47,7 +46,6 @@ export function InstallmentActionModal({
   danger,
   intro,
   outro,
-  section,
   testIdSuffix,
   employees,
   children,
@@ -68,7 +66,7 @@ export function InstallmentActionModal({
           {intro}
           {children}
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
-          <CustomFieldSection {...(section ? { section } : {})} testIdSuffix={testIdSuffix} />
+          <CustomFieldSections testIdSuffix={testIdSuffix} />
           {outro}
           <PermissionButton
             permission={permission}

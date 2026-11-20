@@ -13,7 +13,7 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Installment, InstallmentSchedule, OrderEvent
-from app.domain.trade import Cashflow, Account, Order
+from app.domain.trade import Cashflow, Account, Order, OrderFormField
 from app.domain.foundation import Pool
 from app.domain.parties import Customer, OrderCustomerRole
 from app.core.database import get_db
@@ -79,6 +79,88 @@ def _contract(
 
 
 class TestInstallmentsApi:
+    @pytest.mark.parametrize(("action", "scope", "dependency"), [
+        ("payments", "INSTPAY", "amount"),
+        ("settle-early", "INSTSETTLE", "paid_on"),
+        ("cancel", "INSTCANCEL", "reason"),
+        ("order-cancel", "INVCANCEL", "reason"),
+        ("waive", "INSTWAIVE", "reason"),
+        ("extend", "INSTEXTEND", "new_due_on"),
+        ("default", "INSTDEFAULT", "reason"),
+        ("recover", "INSTRECOVER", "note"),
+        ("resale", "INSTRESALE", "resale_order_id"),
+        ("deliver", "INSTDELIVER", "delivered_on"),
+    ])
+    def test_installment_conditional_fields_follow_action_values(
+        self, seeded_client, seeded_db, headers, action, scope, dependency,
+    ):
+        account = _account(seeded_db, f"conditional-installment-{action}")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        created = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
+            "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "pool_id": pool.id, "operator_user_ids": [1],
+        })
+        assert created.status_code == 201, created.text
+        contract = seeded_db.get(Installment, created.json()["id"])
+        base = f"/api/v1/installments/{contract.id}"
+        if action in {"default", "recover"}:
+            contract.status = "OVERDUE"
+        elif action == "resale":
+            contract.status = "CLOSED"
+        elif action == "deliver":
+            settled = seeded_client.post(f"{base}/settle-early", headers=headers, json={"paid_on": TODAY.isoformat()})
+            assert settled.status_code == 200, settled.text
+        seeded_db.flush()
+
+        if action == "payments":
+            url, payload = f"{base}/payments", {"amount": "25", "paid_on": TODAY.isoformat(), "period_no": 1}
+        elif action == "settle-early":
+            url, payload = f"{base}/settle-early", {"paid_on": TODAY.isoformat()}
+        elif action in {"cancel", "order-cancel"}:
+            url, payload = f"{base}/{action}", {"cancelled_on": TODAY.isoformat(), "reason": "取消原因"}
+        elif action == "waive":
+            url, payload = f"{base}/schedules/1/waive", {"amount": "25", "waived_on": TODAY.isoformat(), "reason": "减免原因"}
+        elif action == "extend":
+            url, payload = f"{base}/schedules/1/extend", {"new_due_on": "2027-01-12", "reason": "展期原因"}
+        elif action == "default":
+            url, payload = f"{base}/default", {"reason": "违约原因"}
+        elif action == "recover":
+            url, payload = f"{base}/recover", {"occurred_on": TODAY.isoformat(), "note": "回收说明"}
+        elif action == "resale":
+            url, payload = f"{base}/resale", {"occurred_on": TODAY.isoformat(), "note": "出售说明", "resale_order_id": 999999}
+        else:
+            url, payload = f"{base}/deliver", {"delivered_on": TODAY.isoformat(), "note": "换绑凭证", "operator_user_ids": [1]}
+
+        core_field = seeded_db.scalar(select(OrderFormField).where(
+            OrderFormField.order_type_code == scope, OrderFormField.field_key == dependency,
+        ))
+        if core_field is None:
+            core_field = create_order_form_field(seeded_db, order_type_code=scope, field_key=dependency,
+                                                 label="依赖字段", actor="pytest")
+            core_field.is_custom = False
+            seeded_db.flush()
+        create_order_form_field(
+            seeded_db, order_type_code=scope, field_key="receipt", label="条件凭据", actor="pytest",
+            required_when={"field": dependency, "op": "filled"},
+        )
+        seeded_db.commit()
+        missing = seeded_client.post(url, headers=headers, json=payload)
+        assert missing.status_code == 422, missing.text
+        assert "条件凭据" in missing.text
+        spoofed = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {dependency: ""}})
+        assert spoofed.status_code == 422, spoofed.text
+        assert "条件凭据" in spoofed.text
+        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+        if action == "resale":
+            assert saved.status_code == 422 and "出售必须关联新的售出订单" in saved.text
+        else:
+            assert saved.status_code == 200, saved.text
+            seeded_db.refresh(contract)
+            assert contract.form_extra["receipt"] == "凭据A"
+
     @pytest.mark.parametrize(("action", "scope", "other_scope"), [
         ("payments", "INSTPAY", "INSTSETTLE"),
         ("settle-early", "INSTSETTLE", "INSTPAY"),

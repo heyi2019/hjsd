@@ -3,7 +3,7 @@ import { useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { transfersApi } from "../shared/api/transfers.api";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { mergeFormExtra } from "./formExtra";
+import { mergeFormExtra } from "../shared/lib/formExtra";
 
 interface TransferActionsDeps {
   load: () => Promise<void>;

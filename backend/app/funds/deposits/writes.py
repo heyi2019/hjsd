@@ -23,10 +23,10 @@ from app.domain.enums import (
     DepositStatus,
     Direction,
 )
-from app.domain.trade import Cashflow, Deposit, OrderFormField
+from app.domain.trade import Cashflow, Deposit
 from app.settings.field_definitions.pools import assert_pool_usable
 from app.shared.order_access import get_order
-from app.shared.form_field_rules import validate_form_extra
+from app.shared.form_field_rules import merge_form_extra_for_edit, validate_form_extra
 from app.customers.counterparties import assert_counterparty_usable
 
 from .._common import _positive
@@ -199,18 +199,9 @@ def update_deposit(
     if hold is None:
         raise Validation("押金占用对应流水不存在，无法编辑", details={"deposit_id": deposit.id})
 
-    if form_extra is None:
-        effective_extra = deposit.form_extra
-    else:
-        editable_keys = set(session.scalars(select(OrderFormField.field_key).where(
-            OrderFormField.order_type_code == "FUNDDEPOSIT",
-            OrderFormField.is_custom.is_(True),
-            OrderFormField.is_active.is_(True),
-        )))
-        effective_extra = {
-            **{key: value for key, value in (deposit.form_extra or {}).items() if key not in editable_keys},
-            **form_extra,
-        }
+    effective_extra = merge_form_extra_for_edit(
+        session, order_type_code="FUNDDEPOSIT", existing=deposit.form_extra, values=form_extra,
+    )
     checked_extra = validate_form_extra(
         session, order_type_code="FUNDDEPOSIT",
         values=effective_extra,

@@ -11,3 +11,9 @@ export function mergeFormExtra(
   }
   return merged;
 }
+
+/** 新操作不提交空字段；编辑时应使用 mergeFormExtra 保留历史并表达清空。 */
+export function formExtraOrUndefined(current: unknown): Record<string, unknown> | undefined {
+  const merged = mergeFormExtra(current);
+  return Object.keys(merged).length ? merged : undefined;
+}

@@ -15,9 +15,11 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import select
 
 from app.domain.foundation import AuditLog, Pool
+from app.domain.trade import OrderFormField
 from app.business.form_fields import create_order_form_field
 from app.funds.cashflows import create_cashflow, reverse_cashflow
 
@@ -60,6 +62,52 @@ def _summary(seeded_client, headers, **params) -> dict:
     )
     assert response.status_code == 200, response.text
     return response.json()
+
+
+@pytest.mark.parametrize("editing", [False, True])
+def test_studio_conditional_field_tracks_direction_and_preserves_history(seeded_client, seeded_db, headers, editing):
+    if editing:
+        flow = _flow(seeded_db, direction="OUT", attribute="OPERATING_EXPENSE", amount="120")
+        flow.form_extra = {"other_history": "历史字段"}
+        seeded_db.flush()
+        url = f"/api/v1/cashflows/{flow.id}"
+    else:
+        url = "/api/v1/cashflows"
+    direction = seeded_db.scalar(select(OrderFormField).where(
+        OrderFormField.order_type_code == "STUDIOEXP", OrderFormField.field_key == "direction",
+    ))
+    if direction is None:
+        direction = create_order_form_field(seeded_db, order_type_code="STUDIOEXP", field_key="direction",
+                                            label="收支", actor="pytest")
+        direction.is_custom = False
+        seeded_db.flush()
+    create_order_form_field(
+        seeded_db, order_type_code="STUDIOEXP", field_key="receipt", label="支出凭据", actor="pytest",
+        required_when={"field": "direction", "op": "eq", "values": ["OUT"]},
+    )
+    seeded_db.commit()
+    payload = {"pool_id": _pool(seeded_db).id, "occurred_on": TODAY.isoformat(),
+               "ledger_type": "STUDIO", "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
+               "category": "房租", "amount": "120"}
+    request = seeded_client.put if editing else seeded_client.post
+    missing = request(url, headers=headers, json=payload)
+    assert missing.status_code == 422, missing.text
+    assert "支出凭据" in missing.text
+    spoofed = request(url, headers=headers, json={**payload, "form_extra": {"direction": "IN"}})
+    assert spoofed.status_code == 422, spoofed.text
+    assert "支出凭据" in spoofed.text
+    saved = request(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+    assert saved.status_code == (200 if editing else 201), saved.text
+    assert saved.json()["form_extra"]["receipt"] == "凭据A"
+    if editing:
+        assert saved.json()["form_extra"]["other_history"] == "历史字段"
+    income = request(url, headers=headers, json={
+        **payload, "direction": "IN", "accounting_attribute": "SELF_REVENUE", "category": "货款", "form_extra": {},
+    })
+    assert income.status_code == (200 if editing else 201), income.text
+    assert "receipt" not in (income.json()["form_extra"] or {})
+    if editing:
+        assert income.json()["form_extra"]["other_history"] == "历史字段"
 
 
 def test_summary_counts_only_manual_flows(seeded_client, seeded_db, headers):

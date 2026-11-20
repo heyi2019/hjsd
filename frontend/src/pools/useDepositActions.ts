@@ -5,7 +5,7 @@ import { depositsApi } from "../shared/api/deposits.api";
 import type { Deposit } from "../shared/api/types/finance";
 import { today } from "../shared/lib/format";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
-import { mergeFormExtra } from "./formExtra";
+import { mergeFormExtra } from "../shared/lib/formExtra";
 
 interface DepositActionsDeps {
   load: () => Promise<void>;

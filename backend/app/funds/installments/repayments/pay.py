@@ -43,7 +43,11 @@ def pay(
         raise NotFound("分期合约所属订单不存在", details={"order_id": installment.order_id})
     # 售出首付和提前结清内部生成的收款不对应单独的收款表单。
     if validate_form_fields:
-        _merge_form_extra(session, installment, scope="INSTPAY", values=form_extra)
+        _merge_form_extra(
+            session, installment, scope="INSTPAY", values=form_extra,
+            context={"amount": amount, "paid_on": paid_on, "period_no": period_no, "pool_id": pool_id,
+                     "note": note, "operator_user_ids": operator_user_ids},
+        )
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,

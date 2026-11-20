@@ -12,6 +12,7 @@ import { downloadBlob } from "../../shared/api/download";
 import { today } from "../../shared/lib/format";
 import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 
 export function useContractActions(params: {
   payTarget: Installment | null;
@@ -74,7 +75,7 @@ export function useContractActions(params: {
           paid_on: values.paid_on as string,
           period_no: values.period_no === undefined ? undefined : Number(values.period_no),
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("收款已登记");
         setPayTarget(null);
@@ -91,7 +92,8 @@ export function useContractActions(params: {
           note: values.note as string,
           bound_phone: values.bound_phone ? String(values.bound_phone) : undefined,
           bound_phone_owner: values.bound_phone_owner ? String(values.bound_phone_owner) : undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          operator_user_ids: values.operator_user_ids as number[] | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("已完成交付，不新增现金流");
         setDeliverTarget(null);
@@ -117,7 +119,7 @@ export function useContractActions(params: {
           occurred_on: values.occurred_on as string,
           note: values.note as string,
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("逾期账号已登记回收");
         setRecoverTarget(null);
@@ -134,7 +136,7 @@ export function useContractActions(params: {
           occurred_on: values.occurred_on as string,
           note: values.note as string,
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("已登记出售，原分期与出售订单的利润关联保留");
         setResaleTarget(null);
@@ -168,7 +170,7 @@ export function useContractActions(params: {
           cancelled_on: values.cancelled_on as string,
           reason: values.reason as string,
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success(cancelRefundSuccess(result.refund_amount, cancelTarget.contract_type));
         setCancelTarget(null);
@@ -185,7 +187,7 @@ export function useContractActions(params: {
           pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
           note: values.note as string | undefined,
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("已提前结清，剩余应收一次性收清");
         setSettleTarget(null);
@@ -197,7 +199,7 @@ export function useContractActions(params: {
   const submitDefault = async (values: Record<string, unknown>) => {
     if (!defaultTarget) return;
     await write.run(async () => {
-        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string, operator_user_ids: values.operator_user_ids as number[] | undefined, form_extra: values.form_extra as Record<string, unknown> | undefined });
+        await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string, operator_user_ids: values.operator_user_ids as number[] | undefined, form_extra: formExtraOrUndefined(values.form_extra) });
         appMessage.success("已登记违约，合约进入 DEFAULTED");
         setDefaultTarget(null);
         defaultForm.resetFields();
@@ -213,7 +215,7 @@ export function useContractActions(params: {
           waived_on: values.waived_on as string,
           reason: values.reason as string,
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("期次减免已登记");
         setWaiveTarget(null);
@@ -229,7 +231,7 @@ export function useContractActions(params: {
           new_due_on: values.new_due_on as string,
           reason: values.reason as string,
           operator_user_ids: values.operator_user_ids as number[] | undefined,
-          form_extra: values.form_extra as Record<string, unknown> | undefined,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("期次展期已登记");
         setExtendTarget(null);

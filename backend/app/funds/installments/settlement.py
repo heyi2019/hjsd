@@ -52,7 +52,10 @@ def settle_early(
 ) -> Installment:
     """提前收清剩余应收，逐期生成分期收入资金明细并关闭未来计划。"""
     installment = get_installment(session, installment_id, user, for_update=True)
-    _merge_form_extra(session, installment, scope="INSTSETTLE", values=form_extra)
+    _merge_form_extra(
+        session, installment, scope="INSTSETTLE", values=form_extra,
+        context={"paid_on": paid_on, "pool_id": pool_id, "note": note, "operator_user_ids": operator_user_ids},
+    )
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
@@ -143,7 +146,10 @@ def mark_default(
         reason, field="reason", message="违约处置必须填写原因"
     )
     installment = get_installment(session, installment_id, user, for_update=True)
-    _merge_form_extra(session, installment, scope="INSTDEFAULT", values=form_extra)
+    _merge_form_extra(
+        session, installment, scope="INSTDEFAULT", values=form_extra,
+        context={"reason": reason, "operator_user_ids": operator_user_ids},
+    )
     if installment.status != InstallmentStatus.OVERDUE.value:
         raise Validation(
             f"合约 {installment.inst_no} 当前不是逾期状态，不能登记违约",

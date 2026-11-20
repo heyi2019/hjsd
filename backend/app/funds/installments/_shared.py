@@ -60,8 +60,9 @@ def _merge_form_extra(
     *,
     scope: str,
     values: Mapping[str, Any] | None,
+    context: Mapping[str, Any] | None = None,
 ) -> None:
-    checked = validate_form_extra(session, order_type_code=scope, values=values)
+    checked = validate_form_extra(session, order_type_code=scope, values=values, context=context)
     if checked:
         installment.form_extra = {**(installment.form_extra or {}), **checked}
 

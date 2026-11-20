@@ -11,6 +11,7 @@ import type { Order } from "../../shared/api/types/orders";
 import { currentDevUser, currentUser, normalizeError } from "../../shared/api/client";
 import { money, today } from "../../shared/lib/format";
 import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
+import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
@@ -120,6 +121,7 @@ export function useOrderCancellation(params: {
     const installment = cancelInstallmentTarget;
     const order = cancelOrderTarget;
     if (!installment && !order) return;
+    const formExtra = formExtraOrUndefined(values.form_extra);
     const session = actionRequest.current();
     const targetNo = order?.order_no ?? installment?.inst_no ?? "订单";
     const success = (text: string) => appMessage.success(actionRequest.isCurrent(session) ? text : `${targetNo}：${text}`);
@@ -133,7 +135,7 @@ export function useOrderCancellation(params: {
     await cancelWrite.run(async () => {
       try {
         if (installment) {
-          const result = await installmentsApi.cancel(installment.id, values, "ORDER");
+          const result = await installmentsApi.cancel(installment.id, { ...values, form_extra: formExtra }, "ORDER");
           success(cancelRefundSuccess(result.refund_amount, installment.contract_type));
           complete();
         } else {
@@ -162,7 +164,7 @@ export function useOrderCancellation(params: {
               ...(Number(amount) > 0 ? { pool_id: Number(values.pool_id), offset_event_id: selected?.event.id } : {}),
               operator_user_ids: operatorUserIds,
               reason: values.reason.trim(),
-              form_extra: values.form_extra,
+              form_extra: formExtra,
             });
             success("交易已取消，账号已退出库存");
             complete();
@@ -203,13 +205,13 @@ export function useOrderCancellation(params: {
               reason: values.reason,
               note: cancelScope === "INVREFUND" ? "取消：冲销入库并入账" : "取消：原路退款",
               form_extra_scope: cancelScope,
-              form_extra: values.form_extra,
+              form_extra: formExtra,
             });
             success(cancelScope === "INVREFUND"
               ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
               : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金账户退还客户`);
           } else {
-            await ordersApi.cancel(order.id, { reason: values.reason, form_extra: values.form_extra });
+            await ordersApi.cancel(order.id, { reason: values.reason, form_extra: formExtra });
             success("交易已取消，无已登记款项需要退款");
           }
           complete();

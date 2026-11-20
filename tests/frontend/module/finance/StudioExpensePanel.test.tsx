@@ -7,6 +7,7 @@ import { resolveMockOnce } from "@fixtures/mock-api";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { optionSetsApi } from "@/shared/api/options.api";
+import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { StudioExpensePanel } from "@/pools/StudioExpensePanel";
 import { studioExpenseSummary } from "@fixtures/api-responses";
@@ -63,6 +64,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   mockOptionSets();
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async () => []);
   // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
   // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
   vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary(expenseFlows as never, {
@@ -238,6 +240,27 @@ describe("StudioExpensePanel：工作室支出", () => {
     await ui.click(await screen.findByRole("button", { name: "保存修改" }));
     await waitFor(() => expect(cashflowsApi.update).toHaveBeenCalledWith(51, expect.objectContaining({
       form_extra: { receipt: "历史凭据" },
+    })));
+  });
+
+  it("编辑工作室收支可清空其他板块的可选字段并保留历史", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "STUDIOEXP" ? [{
+      id: 901, order_type_code: scope, field_key: "optional_number", label: "可选数字",
+      field_type: "NUMBER", required: false, is_active: true, sort_order: 1,
+      locked: false, is_custom: true, section: "FINANCE",
+    }] : []);
+    const existing = { ...expenseFlows[0], form_extra: { optional_number: 17, other_history: "历史凭据" } };
+    vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([existing] as never));
+    resolveMockOnce(vi.mocked(cashflowsApi.update), existing);
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    const optionalNumber = await screen.findByLabelText("可选数字");
+    expect(optionalNumber).toHaveValue("17");
+    await ui.clear(optionalNumber);
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(cashflowsApi.update).toHaveBeenCalledWith(51, expect.objectContaining({
+      form_extra: { other_history: "历史凭据" },
     })));
   });
 

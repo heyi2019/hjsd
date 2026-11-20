@@ -20,7 +20,7 @@ from app.funds.attributes import (
     STUDIO_INCOME_ATTRIBUTE,
 )
 from app.settings.field_definitions.pools import assert_pool_usable
-from app.shared.form_field_rules import validate_form_extra
+from app.shared.form_field_rules import merge_form_extra_for_edit, validate_form_extra
 from app.shared.operation_operators import validate_optional_operator_ids
 from app.funds._common import _positive, _text
 from app.funds.cashflow_writes._shared import _get_cashflow
@@ -121,6 +121,16 @@ def update_cashflow(
         amount=amount,
     )
     operator_ids = validate_optional_operator_ids(session, operator_user_ids)
+    effective_extra = merge_form_extra_for_edit(
+        session, order_type_code="STUDIOEXP", existing=flow.form_extra, values=form_extra,
+    )
+    checked_extra = validate_form_extra(
+        session, order_type_code="STUDIOEXP", values=effective_extra,
+        context={"pool_id": pool_id, "occurred_on": occurred_on, "direction": direction,
+                 "accounting_attribute": accounting_attribute or normalized_accounting_attribute,
+                 "category": category, "amount": amount, "note": note,
+                 "operator_user_ids": operator_user_ids},
+    )
     before = {
         "pool_id": flow.pool_id,
         "occurred_on": flow.occurred_on.isoformat(),
@@ -140,7 +150,7 @@ def update_cashflow(
     flow.note = note
     if operator_ids is not None:
         flow.operator_user_ids = operator_ids
-    flow.form_extra = validate_form_extra(session, order_type_code="STUDIOEXP", values=form_extra) or None
+    flow.form_extra = checked_extra or None
     flow.updated_by = actor
     session.flush()
     record_audit(

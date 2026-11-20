@@ -10,7 +10,8 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { Card, DatePicker, Form, Input, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../business/ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../business/ConfigurableField";
+import { formExtraOrUndefined, mergeFormExtra } from "../shared/lib/formExtra";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { studioExpensesApi } from "../shared/api/studioExpenses.api";
@@ -193,8 +194,8 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         note: (values.note as string) || null,
         operator_user_ids: values.operator_user_ids as number[] | undefined,
         form_extra: editing
-          ? { ...(editing.form_extra ?? {}), ...((values.form_extra as Record<string, unknown> | undefined) ?? {}) }
-          : (values.form_extra as Record<string, unknown> | undefined) ?? undefined,
+          ? mergeFormExtra(values.form_extra, editing.form_extra)
+          : formExtraOrUndefined(values.form_extra),
       };
       if (editing) {
         await cashflowsApi.update(editing.id, payload);
@@ -231,6 +232,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     write.clearError();
     setEditTarget(row);
     setRegisterDirection(row.direction === "IN" ? "IN" : "OUT");
+    registerForm.resetFields();
     registerForm.setFieldsValue({
       pool_id: row.pool_id,
       occurred_on: dayjs(row.occurred_on),
@@ -419,7 +421,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
             <Input.TextArea rows={2} />
           </CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
-          <CustomFieldSection testIdSuffix="studio-expense" />
+          <CustomFieldSections testIdSuffix="studio-expense" />
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             {editTarget ? "保存修改" : "登记入账"}
           </PermissionButton>

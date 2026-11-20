@@ -15,6 +15,8 @@ export function SectionManagementCard({ controller }: { controller: OrderFormFie
     sectionKeyInputRef,
     sectionLabelInputRef,
     sectionManagementRows,
+    sectionReady,
+    sectionSaving,
     setAddingSection,
     setEditingSectionValue,
     setSectionDraft,
@@ -40,7 +42,7 @@ export function SectionManagementCard({ controller }: { controller: OrderFormFie
                 render: (_value, row) => (
                   <PermissionGate permission="field-definition.manage">
                     <Space size={2}>
-                      <PermissionButton permission="field-definition.manage" size="small" aria-label={`编辑${row.label}`} onClick={() => editSection(row.value)}>编辑</PermissionButton>
+                      <PermissionButton permission="field-definition.manage" size="small" aria-label={`编辑${row.label}`} disabled={!sectionReady} onClick={() => editSection(row.value)}>编辑</PermissionButton>
                       <PermissionButton permission="field-definition.manage" size="small" onClick={() => setSectionFilter(row.value)}>查看字段</PermissionButton>
                     </Space>
                   </PermissionGate>
@@ -66,6 +68,7 @@ export function SectionManagementCard({ controller }: { controller: OrderFormFie
                   key={`section-key-${editingSectionValue ?? "new"}`}
                   ref={sectionKeyInputRef}
                   defaultValue={sectionDraft.value}
+                  disabled={!sectionReady}
                   className="ui-control-width-180"
                   placeholder="按小写字母和下划线填写"
                 />
@@ -77,16 +80,17 @@ export function SectionManagementCard({ controller }: { controller: OrderFormFie
                   key={`section-label-${editingSectionValue ?? "new"}`}
                   ref={sectionLabelInputRef}
                   defaultValue={sectionDraft.label}
+                  disabled={!sectionReady}
                   className="ui-control-width-220"
                 />
               </label>
-              <PermissionButton permission="field-definition.manage" type="primary" htmlType="button" onClick={() => void saveSection()}>保存板块</PermissionButton>
+              <PermissionButton permission="field-definition.manage" type="primary" htmlType="button" disabled={!sectionReady} loading={sectionSaving} onClick={() => void saveSection()}>保存板块</PermissionButton>
               <PermissionButton permission="field-definition.manage" htmlType="button" onClick={() => { setEditingSectionValue(null); setAddingSection(false); setSectionDraft({ value: "", label: "" }); }}>取消编辑</PermissionButton>
             </div>
           ) : null}
         </PermissionGate>
         <PermissionGate permission="field-definition.manage">
-          <PermissionButton permission="field-definition.manage" type="primary" htmlType="button" onClick={beginAddSection}>新增板块</PermissionButton>
+          <PermissionButton permission="field-definition.manage" type="primary" htmlType="button" disabled={!sectionReady} onClick={beginAddSection}>新增板块</PermissionButton>
         </PermissionGate>
       </Card>
   );

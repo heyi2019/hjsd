@@ -9,9 +9,10 @@ from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
-from app.domain.trade import OrderFormSectionLabel
+from app.domain.trade import OrderFormField, OrderFormSectionLabel
 
 from app.shared.form_field_rules import (
+    FIELD_SECTIONS,
     ORDER_TYPE_CODE_PATTERN,
     _validate_section,
 )
@@ -108,3 +109,47 @@ def save_section_labels(
         after={"labels": dict(normalized)},
     )
     return get_section_labels(session, order_type_code=code)
+
+
+def rename_form_section(
+    session: Session, *, order_type_code: str, from_key: str, to_key: str, label: str, actor: str,
+) -> dict[str, str]:
+    """在同一事务中变更板块键、字段归属与标题。"""
+    code = (order_type_code or "").strip().upper()
+    if code not in SCOPE_CODES:
+        raise Validation("表单作用域未按注册表登记", details={"field": "order_type_code", "value": order_type_code})
+    _validate_section(from_key)
+    _validate_section(to_key)
+    source = from_key.strip()
+    target = to_key.strip()
+    if not label or not label.strip():
+        raise Validation("板块名称不能为空", details={"field": "label"})
+    if source == target:
+        return save_section_labels(session, order_type_code=code, labels={source: label}, actor=actor)
+
+    fields = list(session.scalars(
+        select(OrderFormField).where(
+            OrderFormField.order_type_code == code,
+            OrderFormField.section.in_((source, target)),
+        ).with_for_update()
+    ).all())
+    labels = get_section_labels(session, order_type_code=code)
+    if target in FIELD_SECTIONS or target in labels or any(field.section == target for field in fields):
+        raise Validation("板块键已存在", details={"field": "to_key", "value": target})
+    source_fields = [field for field in fields if field.section == source]
+    if source not in FIELD_SECTIONS and source not in labels and not source_fields:
+        raise Validation("原板块不存在", details={"field": "from_key", "value": source})
+
+    for field in source_fields:
+        field.section = target
+        field.updated_by = actor
+    session.flush()
+    for field in source_fields:
+        record_audit(
+            session, action=AuditAction.ORDER_FORM_FIELD_CHANGE, entity_type="order_form_field",
+            entity_id=f"{code}.{field.field_key}", actor=actor,
+            before={"section": source}, after={"section": target},
+        )
+    return save_section_labels(
+        session, order_type_code=code, labels={source: "", target: label}, actor=actor,
+    )

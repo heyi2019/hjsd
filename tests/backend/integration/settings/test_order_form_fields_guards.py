@@ -227,7 +227,7 @@ def test_set_active_rejects_locked_field(seeded_db):
     seeded_db.commit()
     assert seeded_db.get(OrderFormField, locked.id).is_active is True
 
-def test_save_and_get_section_labels_roundtrip(seeded_db):
+def test_save_and_get_section_labels_roundtrip(seeded_db, monkeypatch):
     """设置面板改板块名 → 落库 → 其他会话从同一业务类型读到新名（共享单一事实源）。"""
     before = ff.get_section_labels(seeded_db, order_type_code="TH")
     assert before == {}
@@ -244,6 +244,28 @@ def test_save_and_get_section_labels_roundtrip(seeded_db):
     # 同一业务类型重新读取，得到覆盖后映射（模拟另一个标签页/用户打开建单）
     reread = ff.get_section_labels(seeded_db, order_type_code="TH")
     assert reread == {"FINANCE": "资金明细改", "PARTICIPANT": "供货方信息改"}
+
+    field = ff.create_order_form_field(
+        seeded_db, order_type_code="TH", field_key="rollback_section", label="回滚字段",
+        section="CUSTOM_OLD", note="保留备注", actor="admin",
+    )
+    ff.save_section_labels(seeded_db, order_type_code="TH", labels={"CUSTOM_OLD": "原板块"}, actor="admin")
+    seeded_db.flush()
+
+    def fail_after_fields(*_args, **_kwargs):
+        assert field.section == "CUSTOM_NEW"
+        raise RuntimeError("模拟标题写入失败")
+
+    monkeypatch.setattr("app.business.section_labels.save_section_labels", fail_after_fields)
+    with pytest.raises(RuntimeError, match="模拟标题写入失败"):
+        with seeded_db.begin_nested():
+            ff.rename_form_section(
+                seeded_db, order_type_code="TH", from_key="CUSTOM_OLD",
+                to_key="CUSTOM_NEW", label="新板块", actor="admin",
+            )
+    seeded_db.refresh(field)
+    assert field.section == "CUSTOM_OLD" and field.note == "保留备注"
+    assert ff.get_section_labels(seeded_db, order_type_code="TH")["CUSTOM_OLD"] == "原板块"
 
 def test_section_labels_empty_label_resets_to_default(seeded_db):
     """空标题 = 恢复默认：覆盖行被删除，读取映射中不再含该板块。"""
@@ -279,7 +301,7 @@ def test_section_labels_rejects_bad_section_key(seeded_db):
     with pytest.raises(Validation):
         ff.save_section_labels(seeded_db, order_type_code="HS", labels={"finance": "x"}, actor="admin")
 
-def test_router_section_labels_roundtrip(seeded_client, headers):
+def test_router_section_labels_roundtrip(seeded_client, seeded_db, headers):
     """路由层闭环：GET 初始为空 → PUT 覆盖 → GET 返回新名 → PUT 空串恢复默认。"""
     base = seeded_client.get(
         "/api/order-form-fields/section-labels", headers=headers,
@@ -302,6 +324,40 @@ def test_router_section_labels_roundtrip(seeded_client, headers):
         params={"order_type_code": "TH"},
     )
     assert reread.json() == {"FINANCE": "资金明细改名"}
+
+    first = ff.create_order_form_field(
+        seeded_db, order_type_code="TH", field_key="section_first", label="第一项",
+        section="CUSTOM_OLD", note="原字段备注", actor="admin",
+    )
+    second = ff.create_order_form_field(
+        seeded_db, order_type_code="TH", field_key="section_second", label="第二项",
+        section="CUSTOM_OLD", actor="admin",
+    )
+    other_scope = ff.create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="section_other", label="其他表单",
+        section="CUSTOM_OLD", actor="admin",
+    )
+    ff.save_section_labels(seeded_db, order_type_code="TH", labels={"CUSTOM_OLD": "原板块"}, actor="admin")
+    renamed = seeded_client.post(
+        "/api/order-form-fields/section-labels/rename", headers=headers,
+        json={"order_type_code": "TH", "from_key": "CUSTOM_OLD", "to_key": "CUSTOM_NEW", "label": "新板块"},
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json() == {"FINANCE": "资金明细改名", "CUSTOM_NEW": "新板块"}
+    seeded_db.refresh(first)
+    seeded_db.refresh(second)
+    seeded_db.refresh(other_scope)
+    assert (first.section, first.note, second.section, other_scope.section) == (
+        "CUSTOM_NEW", "原字段备注", "CUSTOM_NEW", "CUSTOM_OLD",
+    )
+
+    conflict = seeded_client.post(
+        "/api/order-form-fields/section-labels/rename", headers=headers,
+        json={"order_type_code": "TH", "from_key": "CUSTOM_NEW", "to_key": "FINANCE", "label": "重复板块"},
+    )
+    assert conflict.status_code in (409, 422), conflict.text
+    seeded_db.refresh(first)
+    assert first.section == "CUSTOM_NEW" and first.note == "原字段备注"
 
 def test_router_section_labels_requires_auth(seeded_client):
     resp = seeded_client.put(

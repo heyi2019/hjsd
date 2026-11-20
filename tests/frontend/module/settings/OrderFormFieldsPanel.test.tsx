@@ -1,5 +1,5 @@
 /** OrderFormFieldsPanel 交互测试：挂载拉取、新增、行内必填开关、停用、删除、预置字段禁用。 */
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -62,6 +62,8 @@ beforeEach(() => {
   vi.spyOn(message, "error").mockImplementation(() => ({}) as never);
   vi.mocked(orderFormFieldsApi).list.mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi).scopes = vi.fn().mockResolvedValue([]);
+  vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({});
+  vi.mocked(orderFormFieldsApi).saveSectionLabels.mockImplementation(async ({ labels }) => labels);
   vi.mocked(gameTypesApi.list).mockResolvedValue([]);
   vi.mocked(optionSetsApi).get = vi.fn().mockResolvedValue(optionSet() as never);
 });
@@ -120,30 +122,70 @@ describe("OrderFormFieldsPanel", () => {
   });
 
   it("板块管理可以编辑板块键", async () => {
+    let attempts = 0;
+    vi.mocked(orderFormFieldsApi).listSectionLabels.mockImplementation(async (scope) => {
+      if (scope === "HS" && attempts++ === 0) throw new Error("板块标题读取失败");
+      return scope === "TH" ? { TH_SECTION: "提号板块" } : {};
+    });
+    vi.mocked(orderFormFieldsApi).list.mockImplementation(async (scope) => scope === "HS" ? [
+      makeField({ id: 11, field_key: "first", section: "OPERATION", note: "原备注" }),
+      makeField({ id: 12, field_key: "second", section: "OPERATION" }),
+    ] : []);
+    let finishRename!: (value: Record<string, string>) => void;
+    const renameSection = vi.mocked(orderFormFieldsApi.renameSection).mockImplementation(
+      () => new Promise((resolve) => { finishRename = resolve; }),
+    );
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("板块管理");
+    expect(await screen.findByRole("alert")).toHaveTextContent("板块标题读取失败");
+    expect(screen.getByRole("button", { name: "新增板块" })).toBeDisabled();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "新增板块" })).toBeEnabled());
 
     await ui.click(screen.getByRole("button", { name: "编辑运营信息" }));
-    expect(await screen.findByDisplayValue("OPERATION")).toHaveValue("OPERATION");
+    const keyInput = await screen.findByDisplayValue("OPERATION");
+    await ui.clear(keyInput);
+    await ui.type(keyInput, "OP_NEW");
+    const labelInput = screen.getByLabelText("板块名称");
+    await ui.clear(labelInput);
+    await ui.type(labelInput, "新运营");
+    const saveButton = screen.getByRole("button", { name: "保存板块" });
+    await ui.click(saveButton);
+    await waitFor(() => expect(renameSection).toHaveBeenCalledWith({
+      order_type_code: "HS", from_key: "OPERATION", to_key: "OP_NEW", label: "新运营",
+    }));
+    expect(orderFormFieldsApi.update).not.toHaveBeenCalled();
+    expect(saveButton).toBeDisabled();
+    await ui.click(screen.getByRole("radio", { name: "提号" }));
+    expect(await screen.findByText("提号板块")).toBeInTheDocument();
+    await act(async () => { finishRename({ OP_NEW: "新运营" }); });
+    expect(screen.getByText("提号板块")).toBeInTheDocument();
+    expect(screen.queryByText("新运营")).not.toBeInTheDocument();
   });
 
   it("板块管理可以新增板块", async () => {
-    localStorage.setItem("heijin.form-field-section-order", JSON.stringify([
-      "ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "OPERATION", "FINANCE", "EXTRA", "PARTICIPANT", "CUSTOM_OPS",
-    ]));
-    // 板块标题改走后端落库：设置面板加载时从 listSectionLabels 读取覆盖映射。
+    localStorage.setItem("heijin.form-field-section-order", JSON.stringify(["FINANCE", "LOCAL_ONLY"]));
     vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({ CUSTOM_OPS: "自定义运营" });
+    vi.mocked(orderFormFieldsApi).list.mockResolvedValue([makeField({ section: "HISTORIC_SECTION" })]);
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("板块管理");
+    const management = await screen.findByTestId("form-section-management");
+    expect(await within(management).findByText("CUSTOM_OPS")).toBeInTheDocument();
+    expect(within(management).getByText("自定义运营")).toBeInTheDocument();
+    expect(within(management).getAllByText("HISTORIC_SECTION").length).toBeGreaterThan(0);
+    expect(within(management).queryByText("LOCAL_ONLY")).not.toBeInTheDocument();
 
-    expect(screen.getByText("CUSTOM_OPS")).toBeInTheDocument();
-    expect(screen.getByText("自定义运营")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "新增板块" }));
+    await ui.type(screen.getByLabelText("板块键"), "CUSTOM_OPS");
+    await ui.type(screen.getByLabelText("板块名称"), "重复板块");
+    await ui.click(screen.getByRole("button", { name: "保存板块" }));
+    expect(message.error).toHaveBeenCalledWith("板块键已存在");
+    expect(orderFormFieldsApi.saveSectionLabels).not.toHaveBeenCalled();
   });
 
   it("编辑板块名称调用 saveSectionLabels 落库（设置改板块名 → 建单同步显示）", async () => {
-    vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({});
+    vi.mocked(orderFormFieldsApi).listSectionLabels.mockResolvedValue({ FINANCE: "旧财务标题" });
+    vi.mocked(orderFormFieldsApi).saveSectionLabels.mockResolvedValue({ FINANCE: "其他人更新的财务标题", OPERATION: "运营信息改名" });
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
-    await screen.findByText("板块管理");
+    await screen.findByText("旧财务标题");
 
     await ui.click(screen.getByLabelText("编辑运营信息"));
     const labelInput = screen.getByLabelText("板块名称");
@@ -159,7 +201,8 @@ describe("OrderFormFieldsPanel", () => {
       labels: Record<string, string>;
     };
     expect(payload.order_type_code).toBe("HS");
-    expect(payload.labels.OPERATION).toBe("运营信息改名");
+    expect(payload.labels).toEqual({ OPERATION: "运营信息改名" });
+    expect(await screen.findByText("其他人更新的财务标题")).toBeInTheDocument();
   });
 
   it("挂载时按当前业务类型拉取字段列表", async () => {

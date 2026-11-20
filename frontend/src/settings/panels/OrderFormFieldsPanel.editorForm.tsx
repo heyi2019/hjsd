@@ -15,6 +15,7 @@ export function renderOrderFormFieldEditorForm(params: {
   submit: (values: Record<string, unknown>) => void | Promise<void>;
   editingId: number | null;
   fixedLabelField: boolean;
+  sectionReady: boolean;
   editorFieldTypeOptions: LabelOption[];
   orderedSectionOptions: LabelOption[];
   editorSection: string | undefined;
@@ -32,7 +33,7 @@ export function renderOrderFormFieldEditorForm(params: {
   cancelEditing: () => void;
 }): ReactElement {
   const {
-    form, editorFormId, submit, editingId, fixedLabelField,
+    form, editorFormId, submit, editingId, fixedLabelField, sectionReady,
     editorFieldTypeOptions, orderedSectionOptions, editorSection,
     needsOptions, managedOptionField,
     onConfigureGameTypes, onConfigureIntermediaryPlatforms, onConfigurePools, onConfigurePartySources,
@@ -45,6 +46,7 @@ export function renderOrderFormFieldEditorForm(params: {
         id={editorFormId}
         layout="inline"
         onFinish={submit}
+        disabled={!sectionReady}
         className="ui-form-spaced"
         initialValues={{ field_type: "TEXT", sort_order: 0, section: "EXTRA" }}
       >

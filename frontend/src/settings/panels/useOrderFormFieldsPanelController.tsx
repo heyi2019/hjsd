@@ -49,7 +49,15 @@ export function useOrderFormFieldsPanelController({
   const [sectionFilter, setSectionFilter] = useState<string>("ALL");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
   const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
-  const [sectionLabels, setSectionLabels] = useState<Record<string, string>>({});
+  const [sectionConfig, setSectionConfig] = useState<{ scope: string; labels: Record<string, string> } | null>(null);
+  const [sectionLoading, setSectionLoading] = useState(true);
+  const [sectionSaving, setSectionSaving] = useState(false);
+  const sectionSaveInFlight = useRef(false);
+  const activeTypeRef = useRef(activeType);
+  activeTypeRef.current = activeType;
+  const [sectionError, setSectionError] = useState<{ message: string; code?: string } | null>(null);
+  const sectionLabels = sectionConfig?.scope === activeType ? sectionConfig.labels : {};
+  const sectionReady = sectionConfig?.scope === activeType && !sectionLoading && !sectionSaving && !sectionError;
   const [editingSectionValue, setEditingSectionValue] = useState<string | null>(null);
   const [addingSection, setAddingSection] = useState(false);
   const editingField = rows.find((row) => row.id === editingId) ?? null;
@@ -66,12 +74,17 @@ export function useOrderFormFieldsPanelController({
   // 系统统一术语字段（如资金账户）：名称必须全站一致，配置中心只读展示、不可改名。
   const fixedLabelField = FIXED_LABEL_FIELD_KEYS.includes(editingField?.field_key ?? "");
   const orderedSectionOptions = useMemo(() => {
-    const ordered = [...sectionOrder];
+    const known = new Set([
+      ...DEFAULT_SECTION_ORDER,
+      ...Object.keys(sectionLabels),
+      ...rows.map((row) => row.section ?? "EXTRA"),
+    ]);
+    const ordered = [...new Set([...sectionOrder.filter((value) => known.has(value)), ...known])];
     return ordered.map((value) => {
       const option = FIELD_SECTION_OPTIONS.find((item) => item.value === value);
       return { value, label: sectionLabels[value] ?? option?.label ?? value };
     });
-  }, [sectionLabels, sectionOrder]);
+  }, [sectionLabels, sectionOrder, rows]);
   const editorFieldTypeOptions = editingField && MANAGED_OPTION_FIELD_KEYS.includes(editingField.field_key)
     ? [{ value: editingField.field_type, label: "联动选择（库内主数据）" }]
     : fieldTypeOptions;
@@ -121,6 +134,7 @@ export function useOrderFormFieldsPanelController({
   };
 
   const saveSection = async () => {
+    if (!sectionReady || sectionSaveInFlight.current) return;
     const rawValue = sectionKeyInputRef.current?.input?.value ?? sectionDraft.value;
     const label = sectionLabelInputRef.current?.input?.value ?? sectionDraft.label;
     const value = label.trim();
@@ -130,54 +144,54 @@ export function useOrderFormFieldsPanelController({
       appMessage.error("板块键需为大写字母、数字或下划线，且以字母开头");
       return;
     }
-    if (sectionOrder.includes(key) && key !== editingSectionValue) {
+    if (orderedSectionOptions.some((item) => item.value === key) && key !== editingSectionValue) {
       appMessage.error("板块键已存在");
       return;
     }
-    if (addingSection) {
-      const nextOrder = [...sectionOrder, key];
-      const nextLabels = { ...sectionLabels, [key]: value };
-      try {
-        await orderFormFieldsApi.saveSectionLabels({ order_type_code: activeType, labels: nextLabels });
-      } catch (err) {
-        setError(normalizeError(err));
-        return;
-      }
-      setSectionOrder(nextOrder);
-      setSectionLabels(nextLabels);
+    const previousKey = editingSectionValue;
+    if (!addingSection && !previousKey) return;
+    const scope = activeType;
+    const nextOrder = addingSection
+      ? [...orderedSectionOptions.map((item) => item.value), key]
+      : orderedSectionOptions.map((item) => item.value === previousKey ? key : item.value);
+    sectionSaveInFlight.current = true;
+    setSectionSaving(true);
+    try {
+      const labels = previousKey && key !== previousKey
+        ? await orderFormFieldsApi.renameSection({ order_type_code: scope, from_key: previousKey, to_key: key, label: value })
+        : await orderFormFieldsApi.saveSectionLabels({ order_type_code: scope, labels: { [key]: value } });
       localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
+      if (activeTypeRef.current !== scope) return;
+      if (previousKey && key !== previousKey) {
+        setRows((current) => current.map((row) => (
+          (row.section ?? "EXTRA") === previousKey ? { ...row, section: key } : row
+        )));
+      }
+      setSectionConfig({ scope, labels });
+      setSectionOrder(nextOrder);
+      setEditingSectionValue(null);
       setAddingSection(false);
       setSectionDraft({ value: "", label: "" });
-      return;
-    }
-    if (!editingSectionValue) return;
-    if (key !== editingSectionValue) {
-      try {
-        const affectedRows = rows.filter((row) => (row.section ?? "EXTRA") === editingSectionValue);
-        await Promise.all(affectedRows.map((row) => orderFormFieldsApi.update(row.id, { section: key })));
-        setRows((current) => current.map((row) => (
-          (row.section ?? "EXTRA") === editingSectionValue ? { ...row, section: key } : row
-        )));
-      } catch (err) {
-        setError(normalizeError(err));
-        return;
-      }
-    }
-    const nextOrder = sectionOrder.map((item) => item === editingSectionValue ? key : item);
-    const nextLabels = { ...sectionLabels };
-    delete nextLabels[editingSectionValue];
-    nextLabels[key] = value;
-    try {
-      await orderFormFieldsApi.saveSectionLabels({ order_type_code: activeType, labels: nextLabels });
+      setError(null);
     } catch (err) {
-      setError(normalizeError(err));
-      return;
+      if (activeTypeRef.current === scope) setError(normalizeError(err));
+      else appMessage.error(normalizeError(err).message);
+    } finally {
+      sectionSaveInFlight.current = false;
+      setSectionSaving(false);
     }
-    setSectionOrder(nextOrder);
-    setSectionLabels(nextLabels);
-    localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
+  };
+
+  const changeScope = (code: string) => {
+    activeTypeRef.current = code;
+    setActiveType(code);
+    setEditingId(null);
     setEditingSectionValue(null);
+    setAddingSection(false);
     setSectionDraft({ value: "", label: "" });
+    setSectionFilter("ALL");
+    setActiveFilter("ALL");
+    form.resetFields();
   };
 
   // 切换业务类型会重新触发 load / loadSectionLabels；各自用独立请求序号丢弃过期
@@ -199,12 +213,19 @@ export function useOrderFormFieldsPanelController({
   const sectionLabelsSeqRef = useRef(0);
   const loadSectionLabels = useCallback(async (code: string) => {
     const seq = ++sectionLabelsSeqRef.current;
+    setSectionLoading(true);
+    setSectionError(null);
     try {
       const labels = await orderFormFieldsApi.listSectionLabels(code);
       if (seq !== sectionLabelsSeqRef.current) return;
-      setSectionLabels(labels ?? {});
-    } catch {
-      if (seq === sectionLabelsSeqRef.current) setSectionLabels({});
+      setSectionConfig({ scope: code, labels: labels ?? {} });
+    } catch (err) {
+      if (seq === sectionLabelsSeqRef.current) {
+        setSectionConfig(null);
+        setSectionError(normalizeError(err));
+      }
+    } finally {
+      if (seq === sectionLabelsSeqRef.current) setSectionLoading(false);
     }
   }, []);
 
@@ -299,6 +320,7 @@ export function useOrderFormFieldsPanelController({
 
   const editorForm = renderOrderFormFieldEditorForm({
     form, editorFormId, submit, editingId, fixedLabelField,
+    sectionReady,
     editorFieldTypeOptions, orderedSectionOptions, editorSection,
     needsOptions, managedOptionField,
     onConfigureGameTypes, onConfigureIntermediaryPlatforms, onConfigurePools, onConfigurePartySources,
@@ -312,6 +334,7 @@ export function useOrderFormFieldsPanelController({
     groupedScopeOptions,
     activeType,
     setActiveType,
+    changeScope,
     rows,
     setRows,
     gameTypeNames,
@@ -331,7 +354,10 @@ export function useOrderFormFieldsPanelController({
     sectionOrder,
     setSectionOrder,
     sectionLabels,
-    setSectionLabels,
+    sectionError,
+    sectionLoading,
+    sectionSaving,
+    sectionReady,
     editingSectionValue,
     setEditingSectionValue,
     addingSection,

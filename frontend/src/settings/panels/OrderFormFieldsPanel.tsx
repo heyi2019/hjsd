@@ -29,17 +29,18 @@ export function OrderFormFieldsPanel({
     activeFilter,
     activeType,
     columns,
+    changeScope,
     editingId,
     editorForm,
     error,
-    form,
     groupedScopeOptions,
     load,
+    loadSectionLabels,
     orderedSectionOptions,
     sectionFilter,
+    sectionError,
+    sectionLoading,
     setActiveFilter,
-    setActiveType,
-    setEditingId,
     setSectionFilter,
     visibleRows,
   } = controller;
@@ -47,19 +48,14 @@ export function OrderFormFieldsPanel({
   return (
     <section className="order-form-fields-panel">
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
+      <ErrorBanner error={sectionError} onRetry={() => void loadSectionLabels(activeType)} retrying={sectionLoading} />
       <div className="order-form-fields__container">
         <div className="order-form-fields__toolbar">
           <Typography.Text strong>表单</Typography.Text>
           <Select
             className="ui-control-width-260"
             value={activeType}
-            onChange={(value: string) => {
-              setActiveType(value);
-              setEditingId(null);
-              setSectionFilter("ALL");
-              setActiveFilter("ALL");
-              form.resetFields();
-            }}
+            onChange={changeScope}
             options={groupedScopeOptions}
             optionFilterProp="label"
             showSearch
@@ -69,14 +65,7 @@ export function OrderFormFieldsPanel({
             aria-label="建单表快捷入口"
             options={ORDER_SCOPE_OPTIONS}
             value={ORDER_SCOPE_CODES.has(activeType) ? activeType : undefined}
-            onChange={(value) => {
-              const next = String(value);
-              setActiveType(next);
-              setEditingId(null);
-              setSectionFilter("ALL");
-              setActiveFilter("ALL");
-              form.resetFields();
-            }}
+            onChange={(value) => changeScope(String(value))}
           />
           <Typography.Text strong>板块筛选</Typography.Text>
           <Select

@@ -99,6 +99,20 @@ def save_section_labels(
     )
 
 
+@router.post("/order-form-fields/section-labels/rename", response_model=dict[str, str])
+def rename_form_section(
+    payload: schemas.SectionRenameIn,
+    db: Session = Depends(get_db),
+    _user: CurrentUser = manage_form_fields,
+) -> dict[str, str]:
+    from app.business import form_fields as ff
+
+    return ff.rename_form_section(
+        db, order_type_code=payload.order_type_code, from_key=payload.from_key,
+        to_key=payload.to_key, label=payload.label, actor=_user.username,
+    )
+
+
 @router.post(
     "/order-form-fields",
     response_model=schemas.OrderFormFieldOut,

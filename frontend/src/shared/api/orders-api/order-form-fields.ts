@@ -41,4 +41,8 @@ export const orderFormFieldsApi = {
     api
       .put<Record<string, string>>("/order-form-fields/section-labels", payload)
       .then((r) => sectionsChanged(r.data)),
+  renameSection: (payload: { order_type_code: string; from_key: string; to_key: string; label: string }) =>
+    api
+      .post<Record<string, string>>("/order-form-fields/section-labels/rename", payload)
+      .then((r) => sectionsChanged(fieldsChanged(r.data))),
 };

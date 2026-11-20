@@ -35,6 +35,7 @@ from app.shared.form_field_rules import (
 )
 from .section_labels import (
     get_section_labels,
+    rename_form_section,
     save_section_labels,
 )
 
@@ -43,6 +44,7 @@ __all__ = [
     "delete_order_form_field",
     "get_section_labels",
     "list_order_form_fields",
+    "rename_form_section",
     "save_section_labels",
     "set_order_form_field_active",
     "update_order_form_field",

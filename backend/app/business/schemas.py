@@ -499,6 +499,15 @@ class SectionLabelsSaveIn(BaseModel):
     labels: dict[str, str]
 
 
+class SectionRenameIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order_type_code: str = Field(min_length=2, max_length=16)
+    from_key: str = Field(min_length=1, max_length=32)
+    to_key: str = Field(min_length=1, max_length=32)
+    label: str = Field(min_length=1, max_length=128)
+
+
 class OrderFormFieldUpdate(BaseModel):
     """编辑建单表单字段：label/类型/选项/必填态（含条件必填）/排序/备注均可改；field_key 与 code 固定。
 

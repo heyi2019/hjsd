@@ -117,12 +117,21 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     await Promise.all([listRequest, summaryRequest]);
   }, [creatorFilter, keyword, page, pageSize, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
 
-  useEffect(() => { setPage(1); }, [Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
-  // 页面被 keep-alive 隐藏时不请求；重新激活、筛选、翻页都由同一个后端查询入口刷新。
+  const resetKey = JSON.stringify([Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
+  const previousResetKey = useRef(resetKey);
+  // 周期或订单筛选变化时先回到第一页，避免以旧页码发出无效请求。
   useEffect(() => {
-    if (active) void load();
+    if (!active) return;
+    if (previousResetKey.current !== resetKey) {
+      previousResetKey.current = resetKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+    void load();
     return () => { requestRef.current += 1; };
-  }, [active, load]);
+  }, [active, load, page, resetKey]);
 
   useEffect(() => {
     // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页

@@ -180,6 +180,25 @@ describe("CustomersPage：客户档案", () => {
     expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
   });
 
+  it("客户档案在后续页切换周期时只请求新周期第一页", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(customersApi.page).mockImplementation(async (params) => pageResponse(
+      params?.offset === 10 ? [{ ...customers[1], customer_no: "CUS-PAGE2" }] : [customers[0]],
+      { total: 11, limit: params?.limit ?? 10, offset: params?.offset ?? 0 },
+    ));
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByTitle("2"));
+    await screen.findByText("CUS-PAGE2");
+    vi.mocked(customersApi.page).mockClear();
+    vi.mocked(customersApi.summary).mockClear();
+    await user.click(screen.getByRole("button", { name: "上期" }));
+    await screen.findByText("CUS-0001");
+    expect(customersApi.page).toHaveBeenCalledTimes(1);
+    expect(customersApi.page).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }));
+    expect(customersApi.summary).toHaveBeenCalledTimes(1);
+  });
+
   it("合作方翻页时加载后台下一页", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(counterpartiesApi.page).mockImplementation(async (params) => pageResponse(

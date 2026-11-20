@@ -2,8 +2,8 @@ import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps, InlineError, PermissionButton } from "../shared/ui";
-import { ExtraFieldControl } from "./CustomersPage.fragments";
+import { CustomFormField } from "../business/ConfigurableField";
+import { BusinessActionModal, BusinessRegistrationForm, InlineError, PermissionButton } from "../shared/ui";
 
 export function CustomerEditModal({
   editTarget,
@@ -79,17 +79,7 @@ export function CustomerEditModal({
             <Input.TextArea rows={3} />
           </Form.Item>
           {activeDefs.map((def) => (
-            <Form.Item
-              key={def.field_key}
-              name={def.field_key}
-              label={def.label}
-              valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
-              getValueFromEvent={def.field_type === "DATE" ? dateValueFromEvent : undefined}
-              getValueProps={def.field_type === "DATE" ? dateValueProps : undefined}
-              rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
-            >
-              <ExtraFieldControl def={def} />
-            </Form.Item>
+            <CustomFormField key={def.field_key} def={def} flat />
           ))}
           <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={pending}>
             保存

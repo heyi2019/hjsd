@@ -1,5 +1,6 @@
 import { CustomerPanel } from "@/customer-center/CustomerPanel";
 import { CustomerEditModal } from "@/customer-center/CustomerEditModal";
+import { CustomerCreateModal } from "@/customer-center/CustomerCreateModal";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { Form } from "antd";
 import { act, screen, waitFor, within } from "@testing-library/react";
@@ -1019,6 +1020,30 @@ describe("CustomersPage：扩展字段（BAS-04）", () => {
     await waitFor(() => expect(vi.mocked(customersApi.create)).toHaveBeenCalled());
     expect(vi.mocked(customersApi.create).mock.calls[0][0]).toMatchObject({ display_name: "王五", extra_values: { referrer: "老王" } });
   });
+
+  it.each([["新建", "必填"], ["编辑", "必填"], ["新建", "条件必填"], ["编辑", "条件必填"]])(
+    "客户%s时自定义文本%s不接受纯空白", async (mode, requiredMode) => {
+      const def = { ...liveFieldDefs[2], required: requiredMode === "必填",
+        required_when: requiredMode === "条件必填" ? { field: "phone", op: "filled" as const } : null };
+      const onSubmit = vi.fn();
+      function Harness() {
+        const [form] = Form.useForm();
+        return mode === "新建"
+          ? <CustomerCreateModal createOpen activeDefs={[def]} form={form} onCancel={() => undefined} onSubmit={onSubmit} />
+          : <CustomerEditModal editTarget={customers[0] as never} activeDefs={[def]} editForm={form} onCancel={() => undefined} onSubmit={onSubmit} />;
+      }
+      renderLight(<Harness />, { user: "admin" });
+      if (mode === "新建") {
+        await ui.type(await screen.findByLabelText("名字"), "客户甲");
+        if (requiredMode === "条件必填") await ui.type(screen.getByLabelText("手机号"), "13800008888");
+      }
+      const field = await screen.findByLabelText("转介绍人");
+      await ui.type(field, "   ");
+      await ui.click(screen.getByRole("button", { name: mode === "新建" ? /建\s*档/ : "保存" }));
+      await waitFor(() => expect(field).toHaveAttribute("aria-invalid", "true"));
+      expect(onSubmit).not.toHaveBeenCalled();
+    },
+  );
 
   it("合作方自定义字段提交到 extra_values", async () => {
     const counterpartyFieldDefs = [{

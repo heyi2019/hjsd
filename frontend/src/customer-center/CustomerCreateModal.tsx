@@ -1,9 +1,8 @@
-import { Form, Input, Typography } from "antd";
+import { Input, Typography } from "antd";
 import type { FormInstance } from "antd";
-import { CfgItem, FieldConfigScope } from "../business/ConfigurableField";
+import { CfgItem, CustomFormField, FieldConfigScope } from "../business/ConfigurableField";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, dateValueFromEvent, dateValueProps, InlineError, PermissionButton } from "../shared/ui";
-import { ExtraFieldControl } from "./CustomersPage.fragments";
+import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, InlineError, PermissionButton } from "../shared/ui";
 
 const CUSTOMER_CREATE_FORM_ID = "customer-create-form";
 
@@ -71,17 +70,7 @@ export function CustomerCreateModal({
                 <Input.TextArea rows={3} placeholder="选填：客户来源、偏好、注意事项等" />
               </CfgItem>
               {activeDefs.map((def) => (
-                <Form.Item
-                  key={def.field_key}
-                  name={def.field_key}
-                  label={def.label}
-                  valuePropName={def.field_type === "BOOLEAN" ? "checked" : "value"}
-                  getValueFromEvent={def.field_type === "DATE" ? dateValueFromEvent : undefined}
-                  getValueProps={def.field_type === "DATE" ? dateValueProps : undefined}
-                  rules={def.required ? [{ required: true, message: `请填写${def.label}` }] : []}
-                >
-                  <ExtraFieldControl def={def} />
-                </Form.Item>
+                <CustomFormField key={def.field_key} def={def} flat />
               ))}
               <Typography.Paragraph type="secondary" className="customer-create-note">
                 联系方式允许重复；重复只提示候选，不拦截建档。扩展字段在「设置 › 表单字段 › 客户建档」维护，可随时增删。

@@ -58,9 +58,9 @@ export function resolveOptionItems(
   });
 }
 
-/** 渲染用户自定义字段；值通过 name=['form_extra', field_key] 归集到 form_extra 对象。 */
-export function CustomFormField({ def }: { def: OrderFormField }): ReactElement {
-  const name = ["form_extra", def.field_key] as [string, string];
+/** 默认将值归集到 form_extra；flat 用于已有的平铺字段表单。 */
+export function CustomFormField({ def, flat = false }: { def: OrderFormField; flat?: boolean }): ReactElement {
+  const name = flat ? def.field_key : ["form_extra", def.field_key] as [string, string];
   const condField = def.required_when?.field;
   const depValue = useConditionFieldValue(condField);
   const required =

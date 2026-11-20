@@ -55,6 +55,19 @@ def test_required_multiselect_cannot_be_empty_on_customer_creation(seeded_db):
         create_customer(seeded_db, display_name="空多选", actor="pytest", extra_values={"required_choices": []})
 
 
+@pytest.mark.parametrize("conditional", [False, True])
+def test_required_customer_text_rejects_whitespace(seeded_db, conditional):
+    _add_field(seeded_db, "reference")
+    note = _add_field(seeded_db, "required_note", required=not conditional)
+    if conditional:
+        note.required_when = {"field": "reference", "op": "filled"}
+        seeded_db.flush()
+    with pytest.raises(Validation, match="required_note"):
+        create_customer(seeded_db, display_name="空白客户", actor="pytest", extra_values={"reference": "是", "required_note": "  \t"})
+    saved = create_customer(seeded_db, display_name="正常客户", actor="pytest", extra_values={"reference": "是", "required_note": " 有效 "})
+    assert saved.form_extra["required_note"] == " 有效 "
+
+
 def test_conditional_customer_field_is_required_when_triggered(seeded_db):
     _add_field(seeded_db, "kind", field_type="SELECT",
                options=[{"value": "A", "label": "甲"}, {"value": "B", "label": "乙"}])

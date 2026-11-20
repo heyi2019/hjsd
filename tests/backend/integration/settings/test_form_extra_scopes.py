@@ -17,10 +17,30 @@ from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormFiel
 from app.settings.field_definitions.catalog_seed import seed_catalog
 from app.domain.form_scopes import FORM_SCOPES
 from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
+from app.shared.form_field_value import has_field_value
 from app.business.stocks.profile import update_account_profile
 
 
 D = "2026-10-27"
+
+
+@pytest.mark.parametrize(("value", "present"), [(None, False), ("  ", False), ([], False), (0, True), (False, True), (" 有值 ", True)])
+def test_shared_form_value_presence_preserves_non_text_values(value, present):
+    assert has_field_value(value) is present
+
+
+@pytest.mark.parametrize("conditional", [False, True])
+def test_required_order_text_rejects_whitespace(seeded_db, conditional):
+    definition = OrderFormField(
+        order_type_code="HS", field_key="required_note", label="说明", field_type="TEXT",
+        required=not conditional, required_when={"field": "trigger", "op": "filled"} if conditional else None,
+        is_custom=True, is_active=True, sort_order=1000, created_by="pytest", updated_by="pytest",
+    )
+    seeded_db.add(definition)
+    seeded_db.flush()
+    with pytest.raises(Validation, match="说明"):
+        validate_form_extra(seeded_db, order_type_code="HS", values={"required_note": "  \t"}, context={"trigger": "是"})
+    assert validate_form_extra(seeded_db, order_type_code="HS", values={"required_note": " 正常 "}, context={"trigger": "是"})["required_note"] == " 正常 "
 
 
 def test_form_values_must_use_registered_scope(seeded_db):

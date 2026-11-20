@@ -41,6 +41,8 @@ class FieldDefinition(Protocol):
 
 
 def has_field_value(value: Any) -> bool:
+    if isinstance(value, str):
+        return bool(value.strip())
     return value is not None and value != "" and value != []
 
 
@@ -50,7 +52,7 @@ def field_is_required(definition: Any, values: Mapping[str, Any]) -> bool:
     if condition:
         dependency = values.get(condition.get("field"))
         if condition.get("op") == "filled":
-            return has_field_value(dependency) and (not isinstance(dependency, str) or bool(dependency.strip()))
+            return has_field_value(dependency)
         current = dependency if isinstance(dependency, list) else [dependency]
         def condition_value(item: Any) -> str:
             if item is None:

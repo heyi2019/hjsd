@@ -1,6 +1,6 @@
 /** ListColumnsPanel：列表列显示/顺序配置面板。
  *  覆盖：拉取三张列表、切换列表、隐藏列、上下移动顺序、锁定列不可隐藏。 */
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listColumnsApi } from "@/shared/api/orders.api";
@@ -164,7 +164,7 @@ describe("ListColumnsPanel", () => {
     expect(screen.queryByText("对方 / 来源")).not.toBeInTheDocument();
   });
 
-  it("保存后切走再切回，仍显示刚保存的列配置（不被首次加载快照覆盖）", async () => {
+  it("保存中切换列表，成功或失败都只更新原列表", async () => {
     // 后端保存结果：party 被隐藏。首次 all() 仍是旧快照（party 可见）。
     const savedLedger: ListScopeConfig = {
       ...ledger,
@@ -173,30 +173,44 @@ describe("ListColumnsPanel", () => {
       ),
     };
     vi.mocked(listColumnsApi.all).mockResolvedValue([ledger, inventory]);
-    vi.mocked(listColumnsApi.save).mockResolvedValue(savedLedger);
+    let finishSave!: (value: ListScopeConfig) => void;
+    vi.mocked(listColumnsApi.save).mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
     renderLight(<ListColumnsPanel />, { user: "admin" });
     await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
 
-    // 隐藏 party 并保存，回填后该行应显示「已隐藏」。
+    // 保存订单台账期间先切到库存中心，旧请求不能替换当前表格。
     await userEvent.click(screen.getByRole("button", { name: "显示_party" }));
     await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(
-        within(screen.getByText("对方 / 来源").closest("tr") as HTMLElement).getByText("已隐藏"),
-      ).toBeInTheDocument(),
-    );
-
     const master = screen.getByTestId("list-columns-master");
-    // 切到库存中心。
     await userEvent.click(within(master).getByRole("combobox"));
     await userEvent.click(await screen.findByTitle("库存中心"));
+    await act(async () => { finishSave(savedLedger); });
     await waitFor(() => expect(screen.getByText("库存编号")).toBeInTheDocument());
-    // 切回订单台账：应仍是刚保存的「已隐藏」，而非回退成首次快照的「显示」。
+    expect(screen.queryByText("对方 / 来源")).not.toBeInTheDocument();
+
+    // 切回原列表后仍保留保存结果。
     await userEvent.click(within(master).getByRole("combobox"));
     await userEvent.click(await screen.findByTitle("订单台账"));
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
     const partyRow = screen.getByText("对方 / 来源").closest("tr") as HTMLElement;
     expect(within(partyRow).getByText("已隐藏")).toBeInTheDocument();
+
+    // 库存保存失败时，回滚也只影响库存中心。
+    await userEvent.click(within(master).getByRole("combobox"));
+    await userEvent.click(await screen.findByTitle("库存中心"));
+    await screen.findByText("成本");
+    let failSave!: (reason: Error) => void;
+    vi.mocked(listColumnsApi.save).mockImplementationOnce(() => new Promise((_resolve, reject) => { failSave = reject; }));
+    await userEvent.click(screen.getByRole("button", { name: "显示_cost_amount" }));
+    await userEvent.click(within(master).getByRole("combobox"));
+    await userEvent.click(await screen.findByTitle("订单台账"));
+    await act(async () => { failSave(new Error("保存失败")); });
+    await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
+    expect(screen.queryByText("库存编号")).not.toBeInTheDocument();
+    await userEvent.click(within(master).getByRole("combobox"));
+    await userEvent.click(await screen.findByTitle("库存中心"));
+    const costRow = (await screen.findByText("成本")).closest("tr") as HTMLElement;
+    expect(within(costRow).getByText("显示")).toBeInTheDocument();
   });
 
   it("固定列：选中后随整表提交", async () => {
@@ -224,6 +238,8 @@ describe("ListColumnsPanel", () => {
   });
 
   it("恢复默认：二次确认后清空该列表配置并回填默认列", async () => {
+    let finishReset!: (value: ListScopeConfig) => void;
+    vi.mocked(listColumnsApi.reset).mockImplementationOnce(() => new Promise((resolve) => { finishReset = resolve; }));
     renderLight(<ListColumnsPanel />);
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
 
@@ -231,6 +247,9 @@ describe("ListColumnsPanel", () => {
     await userEvent.click(await screen.findByText("确认恢复"));
 
     await waitFor(() => expect(listColumnsApi.reset).toHaveBeenCalledWith("LEDGER"));
+    // 恢复尚未完成时不能同时发起另一次修改，避免后返回的结果覆盖新配置。
+    expect(screen.getByRole("button", { name: "新增列" })).toBeDisabled();
+    await act(async () => { finishReset(ledger); });
     await waitFor(() => expect(screen.getByText("订单号")).toBeInTheDocument());
     expect(screen.getByText("对方 / 来源")).toBeInTheDocument();
   });

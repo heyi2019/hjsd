@@ -10,16 +10,15 @@ import { appMessage } from "../../shared/ui/appFeedback";
 export function useListColumnsController() {
   const [scopes, setScopes] = useState<ListScopeConfig[]>([]);
   const [activeScope, setActiveScope] = useState<string>("");
-  const [rows, setRows] = useState<ListColumnConfig[]>([]);
+  const rows = scopes.find((item) => item.code === activeScope)?.columns ?? [];
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [saving, setSaving] = useState(false);
+  const saveInFlight = useRef(false);
   // 新增自定义列弹窗状态
   const [addOpen, setAddOpen] = useState(false);
   const [fieldOptions, setFieldOptions] = useState<ListCustomFieldOption[]>([]);
   const [selectedField, setSelectedField] = useState<string | undefined>();
   const [customLabel, setCustomLabel] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [removingKey, setRemovingKey] = useState<string | null>(null);
   /** 批量操作勾选：所有列（含身份列）均可勾选切换显示，与单行隐藏按钮同口径。 */
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
   /** 拖拽排序：记录拖起行的列键，drop 到目标行时重排并整表提交。 */
@@ -29,12 +28,14 @@ export function useListColumnsController() {
     setScopes(items);
     const target = preferred ?? items[0]?.code ?? "";
     setActiveScope(target);
-    setRows(items.find((item) => item.code === target)?.columns ?? []);
   }, []);
 
-  /** 一次保存成功后统一回填行、scope 缓存，并通知所有已挂载列表重排。 */
+  const setScopeRows = useCallback((code: string, columns: ListColumnConfig[]) => {
+    setScopes((items) => items.map((item) => item.code === code ? { ...item, columns } : item));
+  }, []);
+
+  /** 仅更新响应所属的列表，并通知已挂载列表重排。 */
   const applySaved = useCallback((saved: ListScopeConfig) => {
-    setRows(saved.columns);
     setScopes((items) => items.map((item) => (item.code === saved.code ? saved : item)));
     refreshListColumns();
   }, []);
@@ -43,10 +44,7 @@ export function useListColumnsController() {
   const { data: loadedScopes, loading, error: loadError, reload } = useSettingsResource(load);
   const error = mutationError ?? loadError;
 
-  // 切 scope 由 switchScope 自己 setRows；effect 只在首次加载 / reload 时用服务端
-  // 数据重建快照。若把 activeScope 列进 effect 依赖，切换时会用 useSettingsResource
-  // 的旧 data 覆盖 applySaved 刚写入的配置（切走再切回即丢改动）。用 ref 读当前
-  // scope，既保留 reload 时「停在当前列表」的行为，也不会因 scope 变化重跑 effect。
+  // 只在加载结果变化时重建快照；切换列表不应重新应用旧的服务端数据。
   const activeScopeRef = useRef(activeScope);
   activeScopeRef.current = activeScope;
   useEffect(() => {
@@ -60,32 +58,49 @@ export function useListColumnsController() {
 
   const switchScope = (code: string) => {
     setActiveScope(code);
-    setRows(scopes.find((item) => item.code === code)?.columns ?? []);
     setSelectedRowKeys([]);
+  };
+
+  const saveScope = async (
+    write: (scope: string) => Promise<ListScopeConfig>,
+    successText: string,
+    optimisticRows?: ListColumnConfig[],
+  ) => {
+    if (saveInFlight.current) return false;
+    const scope = activeScope;
+    const previous = rows;
+    saveInFlight.current = true;
+    setSaving(true);
+    if (optimisticRows) setScopeRows(scope, optimisticRows);
+    try {
+      const saved = await write(scope);
+      applySaved(saved);
+      appMessage.success(successText);
+      return true;
+    } catch (err) {
+      if (optimisticRows) setScopeRows(scope, previous);
+      throw err;
+    } finally {
+      saveInFlight.current = false;
+      setSaving(false);
+    }
   };
 
   /** 提交整表：顺序即数组顺序，sort_order 由后端按位置归一。 */
   const persist = async (next: ListColumnConfig[], successText: string) => {
-    const previous = rows;
-    setRows(next);
-    setSaving(true);
     try {
-      const saved = await listColumnsApi.save(
-        activeScope,
-        next.map((column, index) => ({
+      await saveScope(
+        (scope) => listColumnsApi.save(scope, next.map((column, index) => ({
           key: column.key,
           is_visible: column.is_visible,
           sort_order: index * 10,
           fixed: column.fixed ?? null,
-        })),
+        }))),
+        successText,
+        next,
       );
-      applySaved(saved);
-      appMessage.success(successText);
     } catch (err) {
-      setRows(previous);
       appMessage.error(normalizeError(err).message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -139,9 +154,7 @@ export function useListColumnsController() {
 
   /** 恢复默认：清空该列表显示配置，回到注册表顺序与全列可见（自定义列定义保留）。 */
   const resetAll = async () => {
-    const saved = await listColumnsApi.reset(activeScope);
-    applySaved(saved);
-    appMessage.success("已恢复默认列配置");
+    await saveScope((scope) => listColumnsApi.reset(scope), "已恢复默认列配置");
   };
 
   /** 打开新增弹窗时才拉候选字段（全部启用中的表单自定义字段）。 */
@@ -163,29 +176,22 @@ export function useListColumnsController() {
       appMessage.info("请先选择一个字段");
       return;
     }
-    setSubmitting(true);
     try {
-      const saved = await listColumnsApi.addCustom(activeScope, selectedField, customLabel);
-      applySaved(saved);
-      setAddOpen(false);
-      appMessage.success("自定义列已新增");
+      const saved = await saveScope(
+        (scope) => listColumnsApi.addCustom(scope, selectedField, customLabel),
+        "自定义列已新增",
+      );
+      if (saved) setAddOpen(false);
     } catch (err) {
       appMessage.error(normalizeError(err).message);
-    } finally {
-      setSubmitting(false);
     }
   };
 
   const removeCustom = async (key: string) => {
-    setRemovingKey(key);
     try {
-      const saved = await listColumnsApi.removeCustom(activeScope, key);
-      applySaved(saved);
-      appMessage.success("自定义列已删除");
+      await saveScope((scope) => listColumnsApi.removeCustom(scope, key), "自定义列已删除");
     } catch (err) {
       appMessage.error(normalizeError(err).message);
-    } finally {
-      setRemovingKey(null);
     }
   };
 
@@ -211,7 +217,7 @@ export function useListColumnsController() {
 
   return {
     scopes, activeScope, rows, error, saving, addOpen, selectedField, customLabel,
-    submitting, removingKey, selectedRowKeys, setSelectedRowKeys, loading, dragKeyRef,
+    selectedRowKeys, setSelectedRowKeys, loading, dragKeyRef,
     setAddOpen, setSelectedField, setCustomLabel,
     reloadPanel, switchScope, persist, toggle, setFixed, move, showAll,
     batchSetVisible, resetAll, openAdd, submitAdd, removeCustom,

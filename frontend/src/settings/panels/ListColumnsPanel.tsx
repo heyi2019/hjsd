@@ -38,7 +38,7 @@ const FIXED_OPTIONS = [
 export function ListColumnsPanel() {
   const {
     scopes, activeScope, rows, error, saving, addOpen, selectedField, customLabel,
-    submitting, removingKey, selectedRowKeys, setSelectedRowKeys, loading, dragKeyRef,
+    selectedRowKeys, setSelectedRowKeys, loading, dragKeyRef,
     setAddOpen, setSelectedField, setCustomLabel,
     reloadPanel, switchScope, persist, toggle, setFixed, move, showAll,
     batchSetVisible, resetAll, openAdd, submitAdd, removeCustom,
@@ -140,7 +140,7 @@ export function ListColumnsPanel() {
                   description="删除后该列从所有列表页消失；行数据里的字段值仍保留。"
                   okText="确认删除"
                   aria-label={`删除_${row.key}`}
-                  disabled={removingKey === row.key || saving}
+                  disabled={saving}
                   onConfirm={() => removeCustom(row.key)}
                 >
                   删除
@@ -209,6 +209,7 @@ export function ListColumnsPanel() {
           okText="确认恢复"
           danger
           aria-label="恢复默认列配置"
+          disabled={saving}
           onConfirm={resetAll}
         >
           恢复默认
@@ -264,7 +265,7 @@ export function ListColumnsPanel() {
         onCancel={() => setAddOpen(false)}
         onOk={() => void submitAdd()}
         okText="确认新增"
-        okButtonProps={{ disabled: !selectedField || submitting }}
+        okButtonProps={{ disabled: !selectedField || saving }}
         cancelText="取消"
         destroyOnHidden
       >

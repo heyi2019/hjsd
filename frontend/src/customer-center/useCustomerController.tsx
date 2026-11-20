@@ -15,6 +15,7 @@ import { useOptionSet } from "../shared/lib/optionSets";
 import { ConfirmButton, PermissionButton, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { collectExtras } from "./CustomersPage.fragments";
 import { loadActiveCustomers } from "./loadActiveCustomers";
 
@@ -46,6 +47,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
   const requestRef = useRef(0);
   const summaryRequestRef = useRef(0);
+  const detailRequest = useLatestRequest();
   const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -163,45 +165,43 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   }, []);
 
   const openDetail = async (row: Customer) => {
+    const request = detailRequest.start();
     setDetailTarget(row);
     setDetailData(null);
     setDetailLoading(true);
     try {
-      setDetailData(await customersApi.detail(row.id));
+      const detail = await customersApi.detail(row.id);
+      if (detailRequest.isCurrent(request)) setDetailData(detail);
     } catch (err) {
-      setError(normalizeError(err));
+      if (detailRequest.isCurrent(request)) setError(normalizeError(err));
     } finally {
-      setDetailLoading(false);
+      if (detailRequest.isCurrent(request)) setDetailLoading(false);
     }
   };
 
   const openDetailById = async (customerId: number) => {
+    const request = detailRequest.start();
     setDetailTarget(null);
     setDetailData(null);
     setDetailLoading(true);
     try {
       const detail = await customersApi.detail(customerId);
+      if (!detailRequest.isCurrent(request)) return;
       setDetailTarget(detail.customer);
       setDetailData(detail);
     } catch (err) {
-      setError(normalizeError(err));
+      if (detailRequest.isCurrent(request)) setError(normalizeError(err));
     } finally {
-      setDetailLoading(false);
+      if (detailRequest.isCurrent(request)) setDetailLoading(false);
     }
   };
 
   const handledFocusRef = useRef<number | null>(null);
   useEffect(() => {
-    if (focusId == null || handledFocusRef.current === focusId || rows === null || loading) return;
-    const row = rows?.find((item) => item.id === focusId);
+    if (!active || focusId == null || handledFocusRef.current === focusId) return;
     handledFocusRef.current = focusId;
-    if (row) {
-      void openDetail(row);
-      return;
-    }
-    // 后端分页后，深链客户可能不在当前页；直接按 ID 从后端取，不依赖列表快照。
     void openDetailById(focusId);
-  }, [focusId, loading, rows]);
+  }, [active, focusId]);
 
   /** 联系方式单元格直接展示已建档原值。 */
   const renderContact = (row: Customer, field: "phone" | "wechat" | "qq") => {
@@ -348,8 +348,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
   const clearActionError = () => { write.clearError(); setCandidateError(null); };
   const cancelEdit = () => { clearActionError(); setEditTarget(null); editForm.resetFields(); };
-  const closeDetail = () => { setDetailTarget(null); setDetailData(null); };
-  const requestEdit = (target: Customer) => { clearActionError(); setEditTarget(target); setDetailTarget(null); };
+  const closeDetail = () => { detailRequest.invalidate(); setDetailTarget(null); setDetailData(null); setDetailLoading(false); };
+  const requestEdit = (target: Customer) => { detailRequest.invalidate(); clearActionError(); setEditTarget(target); setDetailTarget(null); setDetailLoading(false); };
   // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
   // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
   const cancelMerge = () => { clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };

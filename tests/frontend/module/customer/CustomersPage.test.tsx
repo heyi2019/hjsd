@@ -263,11 +263,27 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
   });
 
-  it("深链客户不在当前页时直接使用详情接口打开", async () => {
-    vi.mocked(customersApi.list).mockResolvedValue([]);
+  it("深链客户详情不等待客户列表返回", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof customersApi.page>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof customersApi.page>>>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.page).mockReturnValueOnce(pending);
     renderLight(<CustomersPage focusCustomerId={1} />);
     expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
     expect(customersApi.detail).toHaveBeenCalledWith(1);
+    await act(async () => finish(pageResponse([]) as never));
+  });
+
+  it("切换深链客户时忽略较晚返回的旧详情", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof customersApi.detail>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof customersApi.detail>>>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.detail).mockReturnValueOnce(pending).mockResolvedValueOnce(customerDetail(customers[1]));
+    const view = renderLight(<CustomersPage focusCustomerId={1} />);
+    await waitFor(() => expect(customersApi.detail).toHaveBeenCalledWith(1));
+    view.rerender(<CustomersPage focusCustomerId={2} />);
+    expect(await screen.findByText("客户档案 · CUS-0002")).toBeVisible();
+    await act(async () => finish(customerDetail(customers[0])));
+    expect(screen.getByText("客户档案 · CUS-0002")).toBeVisible();
+    expect(screen.queryByText("客户档案 · CUS-0001")).toBeNull();
   });
 
   it("从客户中心深链参数打开指定合作方卡片", async () => {

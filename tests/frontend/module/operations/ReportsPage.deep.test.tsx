@@ -138,9 +138,11 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
     await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: undefined, to: undefined }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: "2026-10-01", to: "2026-10-31" }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
     expect(successSpy).toHaveBeenCalledWith("报表已导出");
@@ -166,7 +168,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-270：月度损益和业务损益历史空区间清空旧明细", async () => {
     vi.mocked(reportsApi.monthlyPnl).mockImplementation((params) => Promise.resolve(
-      params?.from
+      params?.from === "2026-10-01" && params?.to === "2026-10-31"
         ? reportResponse([], { sales_income: "0", operating_profit: "0" })
         : reportResponse(
             [{ month: "2026-11", sales_income: "100", cost: "50", operating_expense: "0", rebate_income: "0", operating_profit: "50" }],
@@ -174,7 +176,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
           ),
     ) as never);
     vi.mocked(reportsApi.businessPnl).mockImplementation((params) => Promise.resolve(
-      params?.from
+      params?.from === "2026-10-01" && params?.to === "2026-10-31"
         ? reportResponse([], { main_profit: "0" })
         : reportResponse(
             [{ order_type: "HS", business_mode: "SELF", main_income: "100", cost: "50", main_profit: "50" }],
@@ -194,7 +196,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-272：订单利润历史空区间清空收入成本和净利明细", async () => {
     vi.mocked(reportsApi.orderProfit).mockImplementation((params) => Promise.resolve(
-      params?.from
+      params?.from === "2026-10-01" && params?.to === "2026-10-31"
         ? reportResponse([], { income: "0", cost: "0", rebate: "0", net_profit: "0" })
         : reportResponse(
             [{ order_no: "HS-FE272", order_type: "HS", trade_date: "2026-11-01", status: "DONE", income: "100", cost: "60", rebate: "0", net_profit: "40" }],
@@ -212,7 +214,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
 
   it("FE-273：分润对账日期筛选切换到历史空态", async () => {
     vi.mocked(reportsApi.commission).mockImplementation((params) => Promise.resolve(
-      params?.from
+      params?.from === "2026-10-01" && params?.to === "2026-10-31"
         ? commissionResponse([], { order_count: 0, profit_base: "0" })
         : commissionResponse(
             [{ order_id: 273, order_no: "HS-FE273", profit_base: "10", orders: [{ user_id: 1, order_id: 273, order_no: "HS-FE273", profit_base: "10", rate: "0.1" }] }],

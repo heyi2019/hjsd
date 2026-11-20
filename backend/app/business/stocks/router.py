@@ -137,7 +137,7 @@ def inventory_ledger(
     pairs = result["items"]
     accounts = [account for account, _order in pairs]
     orders = [order for _account, order in pairs]
-    account_outputs = _account_outputs(db, accounts, user)
+    account_outputs = _account_outputs(db, accounts, user, loaded_orders=orders)
     order_outputs = build_order_list_payload(db, orders, accounts=accounts)
     return InventoryLedgerOut(
         items=[{"account": account, "order": order}
@@ -178,7 +178,8 @@ def export_inventory_ledger_csv(
         user=user,
     )
     pairs = result["items"]
-    accounts = _account_outputs(db, [account for account, _order in pairs], user)
+    accounts = _account_outputs(db, [account for account, _order in pairs], user,
+                                loaded_orders=[order for _account, order in pairs])
     csv_text, failed_details = build_inventory_ledger_csv(
         pairs,
         accounts,

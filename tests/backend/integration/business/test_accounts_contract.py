@@ -58,6 +58,43 @@ def _buy(seeded_db, account, amount="500"):
     return order
 
 class TestCreateAccountGuards:
+    def test_inventory_ledger_reuses_visible_source_order(self, seeded_client, seeded_db, headers):
+        from sqlalchemy import event
+
+        account = _account(seeded_db, "source-order-reuse")
+        order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id)
+        seeded_db.flush()
+        source_queries = []
+
+        def record_sql(_conn, _cursor, statement, _params, _context, _many):
+            sql = " ".join(statement.lower().split())
+            if "from orders where orders.account_id in" in sql:
+                source_queries.append(sql)
+
+        engine = seeded_db.get_bind()
+        event.listen(engine, "after_cursor_execute", record_sql)
+        try:
+            response = seeded_client.get("/api/v1/stocks/inventory/ledger", headers=headers)
+        finally:
+            event.remove(engine, "after_cursor_execute", record_sql)
+
+        assert response.status_code == 200, response.text
+        row = next(item for item in response.json()["items"] if item["account"]["id"] == account.id)
+        assert row["account"]["source_order_id"] == order.id
+        assert row["account"]["source_order_no"] == order.order_no
+        assert source_queries == []
+
+        from app.business.stocks.router_output import _account_outputs
+        admin = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
+        normal = _account_outputs(seeded_db, [account], admin)[0]
+        reused = _account_outputs(seeded_db, [account], admin, loaded_orders=[order])[0]
+        assert reused.model_dump() == normal.model_dump()
+        restricted = CurrentUser.build(id=999999, username="limited", roles=["VIEWER"], owner_scope="SELF")
+        assert order.owner_id != restricted.id
+        limited = _account_outputs(seeded_db, [account], restricted, loaded_orders=[order])[0]
+        assert limited.source_order_id is None
+        assert limited.source_order_no is None
+
     def test_inventory_ledger_reuses_facet_counts_for_total(self, seeded_db):
         from sqlalchemy import event
 

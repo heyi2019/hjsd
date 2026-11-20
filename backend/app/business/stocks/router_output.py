@@ -67,9 +67,21 @@ def _account_outputs(
     db: Session,
     accounts: list[Account],
     user: CurrentUser | None = None,
+    *,
+    loaded_orders: list[Order] | None = None,
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
-    source_orders = _source_orders(db, [account.id for account in accounts], user)
+    if loaded_orders is not None and user is not None and (user.is_admin or user.owner_scope == "ALL"):
+        account_ids = {account.id for account in accounts}
+        source_orders = {}
+        for order in loaded_orders:
+            if order.account_id not in account_ids:
+                continue
+            if order.account_id in source_orders:
+                raise Validation("库存账号存在多个来源订单", details={"account_id": order.account_id})
+            source_orders[order.account_id] = order
+    else:
+        source_orders = _source_orders(db, [account.id for account in accounts], user)
     responsible_ids = {
         int(item)
         for order in source_orders.values()

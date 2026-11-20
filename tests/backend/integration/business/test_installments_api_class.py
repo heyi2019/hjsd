@@ -183,6 +183,56 @@ class TestInstallmentsApi:
         assert event.form_extra["sale_receipt"] == "凭据A"
         assert seeded_db.get(Order, order.id).form_extra["delivery_responsible_ids"] == [1]
 
+    @pytest.mark.parametrize("installment", [False, True])
+    def test_stock_sale_conditional_fields_use_actual_payment_method(self, seeded_client, seeded_db, headers, installment):
+        account = _account(seeded_db, f"sale-payment-condition-{installment}")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        payment_method = create_order_form_field(
+            seeded_db, order_type_code="SALEREC", field_key="payment_method",
+            label="付款方式", actor="pytest",
+        )
+        payment_method.is_custom = False
+        seeded_db.flush()
+        for method, field_key, label in [
+            ("FULL", "full_receipt", "全款凭据"),
+            ("INSTALLMENT", "installment_receipt", "分期凭据"),
+        ]:
+            create_order_form_field(
+                seeded_db, order_type_code="SALEREC", field_key=field_key, label=label,
+                required_when={"field": "payment_method", "op": "eq", "values": [method]},
+                actor="pytest",
+            )
+        seeded_db.commit()
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        if installment:
+            url = "/api/v1/installments/stock-sale"
+            payload = {"order_id": order.id, "principal": "200", "down_payment": "50",
+                       "periods": 1, "per_period": "150", "first_due_on": TODAY.isoformat(),
+                       "paid_on": TODAY.isoformat(), "pool_id": pool.id, "operator_user_ids": [1]}
+            field_key, expected_label, spoofed_method = "installment_receipt", "分期凭据", "FULL"
+        else:
+            url = f"/api/v1/orders/{order.id}/stock-sale"
+            payload = {"amount": "200", "occurred_on": TODAY.isoformat(),
+                       "pool_id": pool.id, "operator_user_ids": [1]}
+            field_key, expected_label, spoofed_method = "full_receipt", "全款凭据", "INSTALLMENT"
+
+        missing = seeded_client.post(url, headers=headers, json=payload)
+        assert missing.status_code == 422, missing.text
+        assert expected_label in missing.text
+
+        spoofed = seeded_client.post(
+            url, headers=headers, json={**payload, "form_extra": {"payment_method": spoofed_method}},
+        )
+        assert spoofed.status_code == 422, spoofed.text
+        assert expected_label in spoofed.text
+
+        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {field_key: "凭据A"}})
+        assert saved.status_code == 201, saved.text
+        event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+        assert event.form_extra[field_key] == "凭据A"
+        assert "payment_method" not in event.form_extra
+
     def test_buy_does_not_require_unrelated_cashflow_fields(self, seeded_db):
         account = _account(seeded_db, "buy-with-cashflow-custom-field")
         order = _order(seeded_db, order_type="HS", account_id=account.id)

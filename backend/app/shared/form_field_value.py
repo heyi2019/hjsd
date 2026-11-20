@@ -50,9 +50,15 @@ def field_is_required(definition: Any, values: Mapping[str, Any]) -> bool:
     if condition:
         dependency = values.get(condition.get("field"))
         if condition.get("op") == "filled":
-            return has_field_value(dependency)
+            return has_field_value(dependency) and (not isinstance(dependency, str) or bool(dependency.strip()))
         current = dependency if isinstance(dependency, list) else [dependency]
-        hit = any(str(item) in (condition.get("values") or []) for item in current)
+        def condition_value(item: Any) -> str:
+            if item is None:
+                return ""
+            if isinstance(item, bool):
+                return "true" if item else "false"
+            return str(item)
+        hit = any(condition_value(item) in (condition.get("values") or []) for item in current)
         return not hit if condition.get("op") == "ne" else hit
     return required
 

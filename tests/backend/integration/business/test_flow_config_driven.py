@@ -53,3 +53,60 @@ def test_flow_e_form_field_config_drives_validation(seeded_db):
 
     # 必填态：补齐该字段则通过。
     _hs_order(seeded_db, game_account="flow-e-3", with_field="hello")
+
+
+def test_order_custom_field_condition_uses_account_snapshot(seeded_db):
+    game_type = create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="game_type", label="游戏类型", actor="pytest",
+    )
+    game_type.is_custom = False
+    seeded_db.flush()
+    create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="account_receipt", label="账号凭据",
+        required_when={"field": "game_type", "op": "eq", "values": ["王者荣耀"]},
+        section="ACCOUNT_PRODUCT", actor="pytest",
+    )
+
+    common = {"order_type": "HS", "trade_date": TODAY, "actor": "pytest"}
+    snapshot = {"game_account": "conditional-required", "game_type": "王者荣耀"}
+    with pytest.raises(Validation, match="账号凭据"):
+        create_order(seeded_db, **common, account_snapshot=snapshot)
+    with pytest.raises(Validation, match="账号凭据"):
+        create_order(seeded_db, **common, account_snapshot=snapshot, form_extra={"game_type": "其他"})
+
+    order = create_order(
+        seeded_db, **common, account_snapshot=snapshot, form_extra={"account_receipt": "凭据A"},
+    )
+    from app.domain.trade import Account
+    assert seeded_db.get(Account, order.account_id).form_extra["account_receipt"] == "凭据A"
+    create_order(
+        seeded_db, **common, account_snapshot={"game_account": "conditional-optional", "game_type": "其他"},
+    )
+
+
+@pytest.mark.parametrize(("has_secondary", "trigger"), [(True, "有"), (False, "无")])
+def test_order_condition_matches_secondary_display_value(seeded_db, has_secondary, trigger):
+    secondary = create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="has_secondary", label="有无二次", actor="pytest",
+    )
+    secondary.is_custom = False
+    seeded_db.flush()
+    create_order_form_field(
+        seeded_db, order_type_code="HS", field_key="secondary_note", label="二次说明", actor="pytest",
+        required_when={"field": "has_secondary", "op": "eq", "values": [trigger]},
+    )
+    with pytest.raises(Validation, match="二次说明"):
+        create_order(
+            seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+            account_snapshot={"game_account": f"secondary-{trigger}", "has_secondary": has_secondary},
+        )
+    saved = create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+        account_snapshot={"game_account": f"secondary-{trigger}", "has_secondary": has_secondary},
+        form_extra={"secondary_note": "已确认"},
+    )
+    assert saved.form_extra["secondary_note"] == "已确认"
+    create_order(
+        seeded_db, order_type="HS", trade_date=TODAY, actor="pytest",
+        account_snapshot={"game_account": f"secondary-other-{trigger}", "has_secondary": not has_secondary},
+    )

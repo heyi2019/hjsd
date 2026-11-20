@@ -67,6 +67,30 @@ def test_conditional_customer_field_is_required_when_triggered(seeded_db):
     assert created.form_extra == {"kind": "B"}
 
 
+@pytest.mark.parametrize(("choice", "trigger"), [(True, "true"), (False, "false")])
+def test_conditional_customer_field_matches_boolean_switch(seeded_db, choice, trigger):
+    _add_field(seeded_db, "switch_value", field_type="BOOLEAN")
+    note = _add_field(seeded_db, "switch_detail")
+    note.required_when = {"field": "switch_value", "op": "eq", "values": [trigger]}
+    seeded_db.flush()
+    with pytest.raises(Validation, match="switch_detail"):
+        create_customer(seeded_db, display_name="缺开关说明", actor="pytest", extra_values={"switch_value": choice})
+    customer = create_customer(seeded_db, display_name="有开关说明", actor="pytest",
+                               extra_values={"switch_value": choice, "switch_detail": "已确认"})
+    assert customer.form_extra["switch_detail"] == "已确认"
+    create_customer(seeded_db, display_name="未触发开关", actor="pytest", extra_values={"switch_value": not choice})
+
+
+def test_conditional_customer_field_treats_whitespace_dependency_as_empty(seeded_db):
+    _add_field(seeded_db, "optional_reference")
+    note = _add_field(seeded_db, "reference_detail")
+    note.required_when = {"field": "optional_reference", "op": "filled"}
+    seeded_db.flush()
+    customer = create_customer(seeded_db, display_name="空白依赖", actor="pytest",
+                               extra_values={"optional_reference": "   "})
+    assert "reference_detail" not in customer.form_extra
+
+
 def test_conditional_customer_field_tracks_core_field_on_create_and_edit(seeded_db):
     _add_field(seeded_db, "source", is_custom=False)
     note = _add_field(seeded_db, "source_detail")

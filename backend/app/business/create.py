@@ -89,6 +89,17 @@ def create_order(
         session,
         order_type_code=definition.code,
         values=merged_extra,
+        context={
+            **(account_snapshot or {}),
+            "has_secondary": (
+                "有" if (account_snapshot or {}).get("has_secondary") is True
+                else "无" if (account_snapshot or {}).get("has_secondary") is False
+                else None
+            ),
+            "game_account_note": (account_snapshot or {}).get("note"),
+            "trade_date": trade_date,
+            "note": note,
+        },
     )
     validate_business_responsible(
         session,

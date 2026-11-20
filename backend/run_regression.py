@@ -292,6 +292,7 @@ GROUPS = {
         "tests/backend/integration/finance/test_finance_reversal_service.py",
         "tests/backend/integration/business/test_flow_distribution.py",
         "tests/backend/integration/finance/test_cashflow_totals.py",
+        "tests/backend/integration/finance/test_cashflow_write_concurrency.py",
         "tests/backend/integration/finance/test_pool_balances_batch.py",
         "tests/backend/integration/finance/test_studio_cashflow_summary.py",
         # 2026-11-12 金额链路/裁决批次（资金两方向、金额大类口径）
@@ -311,6 +312,7 @@ GROUPS = {
     "reporting": [
         "tests/backend/integration/operations/test_reporting_contract.py",
         "tests/backend/unit/operations/test_report_export_columns.py",
+        "tests/backend/unit/operations/test_xlsx_sheet_capacity.py",
         "tests/backend/integration/operations/test_reporting_service.py",
         "tests/backend/integration/operations/test_reporting_r_consistency.py",
         "tests/backend/integration/operations/test_profit_cashflow_basis.py",

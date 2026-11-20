@@ -191,6 +191,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_rebate_current_contract.py": "D04",
     "test_rebate_rules_contract.py": "D04",
     "test_report_export_columns.py": "E02",
+    "test_xlsx_sheet_capacity.py": "E02",
     "test_reporting_contract.py": "E01",
     "test_reporting_r_consistency.py": "E01",
     "test_reporting_service.py": "E01",

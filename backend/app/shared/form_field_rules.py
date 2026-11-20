@@ -164,6 +164,7 @@ def validate_form_extra(
     *,
     order_type_code: str,
     values: Mapping[str, Any] | None,
+    context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """校验任意设置→表单字段作用域的扩展值。
 
@@ -173,6 +174,7 @@ def validate_form_extra(
     """
     scope = normalize_form_scope(order_type_code)
     normalized = dict(values or {})
+    condition_values = {**normalized, **(context or {})}
     active_custom = list(session.scalars(
         select(OrderFormField).where(
             OrderFormField.order_type_code == scope,
@@ -191,7 +193,7 @@ def validate_form_extra(
         validate_field_value(definition, value, strict=False)
 
     for definition in active_custom:
-        if field_is_required(definition, normalized) and not has_field_value(normalized.get(definition.field_key)):
+        if field_is_required(definition, condition_values) and not has_field_value(normalized.get(definition.field_key)):
             raise Validation(f"字段 {definition.label} 必填", details={"field_key": definition.field_key})
     return normalized
 

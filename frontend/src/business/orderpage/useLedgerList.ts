@@ -39,6 +39,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const previousSummaryQuery = useRef<{ keyword: string | undefined; filters: string } | null>(null);
+  const previousListQuery = useRef<{ keyword: string | undefined; filters: string } | null>(null);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -189,9 +190,23 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
 
   // keep-alive 重新激活、筛选变更、翻页或排序变更时均由后端返回当前页。
   useEffect(() => {
-    if (active && initializedQueryKey === initialQueryKey) void load();
-    return requestSequence.invalidate;
-  }, [active, initializedQueryKey, initialQueryKey, load, requestSequence]);
+    if (!active || initializedQueryKey !== initialQueryKey) {
+      previousListQuery.current = null;
+      return requestSequence.invalidate;
+    }
+    const { keyword: searchKeyword, ...otherFilters } = queryFilters;
+    const filters = JSON.stringify(otherFilters);
+    const previous = previousListQuery.current;
+    const debounceSearch = previous !== null && previous.filters === filters && previous.keyword !== searchKeyword;
+    previousListQuery.current = { keyword: searchKeyword, filters };
+    if (debounceSearch) setLoading(true);
+    const timer = debounceSearch ? window.setTimeout(() => void load(), 250) : undefined;
+    if (!debounceSearch) void load();
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+      requestSequence.invalidate();
+    };
+  }, [active, initializedQueryKey, initialQueryKey, load, queryFilters, requestSequence]);
 
   useEffect(() => {
     if (!active || initializedQueryKey !== initialQueryKey) {

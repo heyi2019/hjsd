@@ -134,25 +134,43 @@ describe("OrdersPage：四类订单台账", () => {
     expect(ordersApi.listPage).toHaveBeenCalledWith(expect.objectContaining({ limit: 10, offset: 0 }));
   });
 
-  it("进入订单台账立即加载统计，输入关键词时合并请求", async () => {
+  it("进入订单台账立即加载列表和统计，输入关键词时合并请求", async () => {
     vi.useFakeTimers();
     try {
       await act(async () => { renderLight(<OrdersPage initialTab="ledger" />); });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
+      expect(ordersApi.listPage).toHaveBeenCalledTimes(1);
       fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "H" } });
       fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "HS" } });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
+      expect(ordersApi.listPage).toHaveBeenCalledTimes(1);
       await act(async () => { await vi.advanceTimersByTimeAsync(249); });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
       await act(async () => { await vi.advanceTimersByTimeAsync(1); });
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(2);
       expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS" }));
+      expect(ordersApi.listPage).toHaveBeenCalledTimes(2);
+      expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS", offset: 0 }));
       fireEvent.click(screen.getByRole("radio", { name: "回收 1" }));
       expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(3);
       expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS", order_type: "HS" }));
+      expect(ordersApi.listPage).toHaveBeenCalledTimes(3);
+      expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS", order_type: "HS" }));
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("输入订单关键词后等待期间忽略旧列表结果", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof ordersApi.listPage>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof ordersApi.listPage>>>((resolve) => { finishOld = resolve; });
+    vi.mocked(ordersApi.listPage).mockReturnValueOnce(pending);
+    renderLight(<OrdersPage initialTab="ledger" />);
+    await waitFor(() => expect(ordersApi.listPage).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "TH-2026" } });
+    await act(async () => finishOld(pageResponse(orders) as never));
+    expect(screen.queryByText("HS-2026-0001")).not.toBeInTheDocument();
+    expect(await screen.findByText("TH-2026-0002")).toBeVisible();
   });
 
   // 默认夹具、只读静态 DOM，合并外壳和已下线能力边界断言，避免重复挂载。
@@ -359,7 +377,7 @@ describe("OrdersPage：四类订单台账", () => {
     await openLedger();
     await ui.type(screen.getByLabelText("搜索订单"), "批量验收");
 
-    expect(screen.getAllByText("DG-2026-0003").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("DG-2026-0003")).length).toBeGreaterThan(0);
     expect(screen.queryByText("HS-2026-0001")).toBeNull();
   });
 

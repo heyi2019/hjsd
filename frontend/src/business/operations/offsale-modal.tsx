@@ -9,7 +9,7 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../../shared/ui";
-import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { consignmentListings, type ConsignmentListing } from "./consignment-logic";
 import { formatDateTimeMinute } from "../../shared/lib/format";
@@ -62,6 +62,7 @@ export function OrderPlatformOffsaleModal(props: {
   const displayRecords: DisplayConsignment[] = systemRecord ? [...props.records, systemRecord] : props.records;
   const [selectedMode, setSelectedMode] = useState<"PLATFORM" | "SYSTEM">("PLATFORM");
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVOID" : undefined);
+  const { labels } = useOrderFormSectionLabels(open ? "INVOID" : undefined);
 
   useEffect(() => {
     if (open) form.resetFields();
@@ -180,7 +181,7 @@ export function OrderPlatformOffsaleModal(props: {
             <Input aria-label="下架原因" placeholder="请输入平台下架原因" />
           </CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
-          <CustomFieldSections testIdSuffix="inv-platform-offsale" />
+          <SectionLabelsContext.Provider value={labels}><CustomFieldSections testIdSuffix="inv-platform-offsale" /></SectionLabelsContext.Provider>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
       <DataTable

@@ -51,6 +51,7 @@ def create_cashflow(
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = "FUNDFLOW",
+    form_extra_context: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入直接入账，业务派生流水不走此入口。"""
@@ -123,7 +124,7 @@ def create_cashflow(
             context={"pool_id": pool_id, "occurred_on": occurred_on, "direction": direction,
                      "accounting_attribute": requested_accounting_attribute or accounting_attribute,
                      "category": category, "amount": amount, "note": note,
-                     "operator_user_ids": operator_user_ids},
+                     "operator_user_ids": operator_user_ids, **(form_extra_context or {})},
         )
         if scope else dict(form_extra or {})
     )

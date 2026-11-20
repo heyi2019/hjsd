@@ -693,11 +693,22 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("分润：按操作四项提交时只传金额、比例一律传 null", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "ALLOCATION" ? [{ id: 9001, order_type_code: scope, field_key: "receipt", label: "分润凭据",
+        field_type: "TEXT", required: true, is_active: true, sort_order: 99, locked: false, is_custom: true,
+        section: "FINANCE" }, { id: 9002, order_type_code: scope, field_key: "optional_number", label: "分润附加数字",
+        field_type: "NUMBER", required: false, is_active: true, sort_order: 100, locked: false, is_custom: true,
+        section: "BUSINESS" }] : []),
+    ] as never);
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse(actionAllocationRows, { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(3);
+    await ui.type(await within(modal).findByLabelText("分润凭据"), "分润凭据A");
+    await ui.type(within(modal).getByLabelText("分润附加数字"), "17");
+    await ui.clear(within(modal).getByLabelText("分润附加数字"));
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
     const [, payload] = vi.mocked(profitAllocationApi.set).mock.calls[0];
@@ -707,6 +718,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     // 比例只读展示，落库与提交唯一口径是金额：比例一律 null，公司行金额留空交后端补。
     expect(payload.every((item) => item.allocation_rate === null)).toBe(true);
     expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: null, allocation_amount: null });
+    expect(vi.mocked(profitAllocationApi.set).mock.calls[0][2]).toEqual(expect.objectContaining({ receipt: "分润凭据A" }));
+    expect(vi.mocked(profitAllocationApi.set).mock.calls[0][2]).not.toHaveProperty("optional_number");
   });
 
   it.each(["切换", "关闭"])("订单资金收支%s后，较早的请求不能打开其他订单", async (action) => {

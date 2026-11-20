@@ -11,9 +11,10 @@ import type { Rebate } from "../../../shared/api/types/finance";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { normalizeError } from "../../../shared/api/client";
 import { today } from "../../../shared/lib/format";
+import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { moneyRules } from "../../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
@@ -31,7 +32,7 @@ function sourceOrder(detail: AccountExecutionDetail | null, sourceOrderId: numbe
   const order = detail?.orders.find((item) => item.order_id === sourceOrderId);
   if (!order) return undefined;
   if (kind === "BUY") return ["HS", "TH"].includes(order.order_type) ? order : undefined;
-  return order.events.some((event) => event.event_type === "SELL") ? order : undefined;
+  return order;
 }
 
 export function InventoryRebateModal(props: {
@@ -57,6 +58,7 @@ export function InventoryRebateModal(props: {
   const session = useRequestSession(props.account);
   const open = Boolean(props.account);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVREBATE" : undefined);
+  const { labels } = useOrderFormSectionLabels(open ? "INVREBATE" : undefined);
 
   useEffect(() => {
     if (!open || !props.account) return;
@@ -109,6 +111,21 @@ export function InventoryRebateModal(props: {
     () => (["BUY", "SELL"] as RebateKind[]).filter((kind) => sourceOrder(detail, props.account?.source_order_id, kind)),
     [detail, props.account?.source_order_id],
   );
+  const rebateOptions = (config.rebate_type?.options?.length
+    ? config.rebate_type.options.filter((option) => option.value === "BUY" || option.value === "SELL")
+    : (["BUY", "SELL"] as RebateKind[]).map((kind) => ({
+      value: kind, label: configurableLabel("REBATE_TYPE", kind, REBATE_KIND_LABEL),
+    })))
+    .map((option) => ({ ...option, disabled: !availableKinds.includes(option.value as RebateKind) }));
+  useEffect(() => {
+    if (!open || loading || !configReady) return;
+    const enabled = rebateOptions.filter((option) => !option.disabled);
+    const selected = form.getFieldValue("rebate_type") as string | undefined;
+    if (!enabled.some((option) => option.value === selected)) {
+      const next = enabled[0]?.value;
+      if (selected !== next) form.setFieldValue("rebate_type", next);
+    }
+  }, [open, loading, configReady, form, rebateOptions]);
 
   const submit = async (values: { rebate_type?: RebateKind; amount?: string; collected_on?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const account = props.account;
@@ -127,7 +144,7 @@ export function InventoryRebateModal(props: {
           channel: kind === "BUY" ? "买号返点" : "卖号返点",
           note: REBATE_KIND_LABEL[kind],
           operator_user_ids: values.operator_user_ids,
-          form_extra: values.form_extra,
+          form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("返点已登记");
         if (session.isCurrent(submittedSession)) {
@@ -220,13 +237,12 @@ export function InventoryRebateModal(props: {
               rules={[{ required: true, message: "请选择一种返点类型" }]}
             >
               <Radio.Group
+                options={rebateOptions}
                 onChange={(event) => {
                   const kind = event.target.value as RebateKind;
                   form.setFieldsValue({ rebate_type: kind });
                 }}
-              >
-                {(["BUY", "SELL"] as RebateKind[]).map((kind) => <Radio key={kind} value={kind} disabled={!availableKinds.includes(kind)}>{configurableLabel("REBATE_TYPE", kind, REBATE_KIND_LABEL)}</Radio>)}
-              </Radio.Group>
+              />
             </CfgItem>
             {!availableKinds.length ? <p className="muted">当前账号没有可关联的业务订单</p> : null}
             <div className="rebate-core-fields">
@@ -239,7 +255,7 @@ export function InventoryRebateModal(props: {
               </CfgItem>
               <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
             </div>
-            <CustomFieldSection testIdSuffix="inventory-rebate" />
+            <SectionLabelsContext.Provider value={labels}><CustomFieldSections testIdSuffix="inventory-rebate" /></SectionLabelsContext.Provider>
           </BusinessRegistrationForm>
         </FieldConfigContext.Provider>
       )}

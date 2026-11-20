@@ -8,6 +8,7 @@
 import { installmentsApi } from "../../../shared/api/installments.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { today } from "../../../shared/lib/format";
+import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { serializeInstallmentSchedule } from "../../InstallmentScheduleFields";
 import type { SaleCustomerInput } from "../../../shared/api/orders-api/orders";
 
@@ -36,7 +37,7 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
     ...(isConsignment && values.sale_amount != null && String(values.sale_amount) !== "" ? { sale_amount: String(values.sale_amount) } : {}),
     customer_input: customerInput,
     delivery_form_extra: deliveryFormExtra,
-    form_extra: values.form_extra as Record<string, unknown> | undefined,
+    form_extra: formExtraOrUndefined(values.form_extra),
   });
 }
 
@@ -69,6 +70,6 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     operator_user_ids: values.operator_user_ids as number[] | undefined,
     customer_input: customerInput,
     delivery_form_extra: deliveryFormExtra,
-    form_extra: values.form_extra as Record<string, unknown> | undefined,
+    form_extra: formExtraOrUndefined(values.form_extra),
   });
 }

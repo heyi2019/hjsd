@@ -82,6 +82,11 @@ def create_rebate(
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
     amount = _positive(amount, field="amount")
     operator_ids = validate_optional_operator_ids(session, operator_user_ids)
+    field_context = {
+        "source_order_id": source_order_id, "rebate_type": rebate_type, "amount": amount,
+        "collected_on": collected_on, "channel": channel, "note": note, "operator_user_ids": operator_ids,
+    }
+    checked_extra = validate_form_extra(session, order_type_code="INVREBATE", values=form_extra, context=field_context)
     record = RebateRecord(
         rebate_no=rebate_no,
         source_order_id=order.id,
@@ -91,7 +96,7 @@ def create_rebate(
         collected_on=collected_on,
         note=note,
         operator_user_ids=operator_ids,
-        form_extra=validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None,
+        form_extra=checked_extra or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -110,7 +115,8 @@ def create_rebate(
         note=note,
         operator_user_ids=operator_ids,
         form_extra_scope="INVREBATE",
-        form_extra=form_extra,
+        form_extra=checked_extra,
+        form_extra_context=field_context,
         source_type=CashflowSourceType.REBATE.value,
         source_id=record.rebate_no,
         user=user,
@@ -131,8 +137,9 @@ def create_rebate(
         source_id=event.event_no,
         operator_user_ids=operator_ids,
         note=note or f"{rebate_type} 返点",
-        form_extra=form_extra,
+        form_extra=checked_extra,
         form_extra_scope="INVREBATE",
+        form_extra_context=field_context,
         user=user,
     )
     record_audit(

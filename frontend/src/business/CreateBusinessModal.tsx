@@ -2,7 +2,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection, FieldConfigStatus } from "./ConfigurableField";
+import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection, CustomFieldSections, FieldConfigStatus } from "./ConfigurableField";
 import { ordersApi } from "../shared/api/orders.api";
 import { normalizeError } from "../shared/api/client";
 import { today } from "../shared/lib/format";
@@ -248,6 +248,9 @@ export function CreateBusinessModal(props: {
             </RecoveryAccountSection> : isTh ? <ThOrderSection pools={pools} gameTypes={gameTypes} employees={employees} /> : <DgOrderSection gameTypes={gameTypes} employees={employees} />}
             {isRecovery ? <RecoveryCustomerSection customerExtras={<CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />} /> : null}
             <CustomFieldSection section="EXTRA" testIdSuffix="extra" />
+            <CustomFieldSections testIdSuffix="remaining" excludeSections={isDg
+              ? ["ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "PARTICIPANT", "EXTRA"]
+              : ["ACCOUNT_PRODUCT", "FINANCE", "PARTICIPANT", "EXTRA"]} />
           </SectionLabelsContext.Provider>
         </FieldConfigContext.Provider>
       </BusinessRegistrationForm>

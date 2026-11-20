@@ -138,6 +138,7 @@ async function clickOperation(row: HTMLElement, item: string) {
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(orderFormFieldsApi.list).mockImplementation(async () => []);
+  vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
@@ -341,6 +342,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     { mode: "平台下架", option: /千寻（上架于/, button: "确认下架" },
     { mode: "代挂出库", option: /本系统（上架于/, button: "确认出库" },
   ])("$mode 显示其他板块字段并过滤清空的值", async ({ button, option }) => {
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({ FINANCE: "下架补充资料" });
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "INVOID" ? [
       { id: 901, order_type_code: scope, field_key: "receipt", label: "下架凭据", field_type: "TEXT",
         required: true, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "FINANCE" },
@@ -355,6 +357,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }));
     await ui.type(within(modal).getByLabelText("下架原因"), "交易结束");
     await ui.type(await within(modal).findByLabelText("下架凭据"), "凭据A");
+    expect(await within(modal).findByText("下架补充资料")).toBeInTheDocument();
     const optional = within(modal).getByLabelText("可选数字");
     await ui.type(optional, "17");
     await ui.clear(optional);

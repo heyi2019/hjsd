@@ -12,7 +12,7 @@ import type { EmployeeOption } from "../../../shared/api/types/org";
 import { currentDevUser, normalizeError } from "../../../shared/api/client";
 import { useSession } from "../../../shared/state/session";
 import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, PermissionButton } from "../../../shared/ui";
-import { CustomFieldSection, FieldConfigScope } from "../../ConfigurableField";
+import { CustomFieldSections, FieldConfigScope } from "../../ConfigurableField";
 import { resizeInstallmentSchedule } from "../../InstallmentScheduleFields";
 import { RecoveryCustomerSection } from "../../recovery/RecoveryCustomerSection";
 import { DeliveryInfoSection } from "../../DeliveryInfoSection";
@@ -275,7 +275,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
             plan={plan}
             pools={pools}
           />
-          <CustomFieldSection testIdSuffix="inventory-sale" />
+          <CustomFieldSections testIdSuffix="inventory-sale" />
         </BusinessRegistrationForm>
       </FieldConfigScope>
     </BusinessActionModal>

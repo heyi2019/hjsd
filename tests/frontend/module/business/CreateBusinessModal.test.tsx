@@ -89,6 +89,19 @@ async function openTypedModal(orderType: string, user = "admin") {
 }
 
 describe("CreateBusinessModal：新建业务写路径", () => {
+it.each(["HS", "TH", "DG"])("%s 建单展示未固定布局的自定义板块且不重复固定板块", async (orderType) => {
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+    ...allFormFields().filter((field) => field.order_type_code === scope),
+    { id: 9001, order_type_code: scope, field_key: "other_detail", label: "其他板块字段", field_type: "TEXT",
+      required: true, is_active: true, sort_order: 99, locked: false, is_custom: true, section: "CUSTOM_SECTION" },
+    { id: 9002, order_type_code: scope, field_key: "account_detail", label: "账号板块字段", field_type: "TEXT",
+      required: false, is_active: true, sort_order: 100, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+  ] as never);
+  const { container } = await openTypedModal(orderType);
+  expect(await within(container).findByLabelText("其他板块字段")).toBeInTheDocument();
+  expect(within(container).getAllByLabelText("账号板块字段")).toHaveLength(1);
+});
+
 it("TH 建单的供货方昵称为选填", async () => {
   await openTypedModal("TH");
   const field = screen.getByLabelText("供货方昵称");
@@ -424,6 +437,12 @@ it("viewer 无 order.create → 提交按钮不渲染（入口由页面层 Permi
   });
 
 it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "HS" ? [{ id: 9001, order_type_code: scope, field_key: "extra_receipt", label: "自定义凭据",
+        field_type: "TEXT", required: true, is_active: true, sort_order: 99, locked: false, is_custom: true,
+        section: "CUSTOM_SECTION" }] : []),
+    ] as never);
     clearOptionSetsCache();
     vi.mocked(optionSetsApi.list).mockResolvedValueOnce({
       items: [
@@ -442,6 +461,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     await ui.type(screen.getByLabelText("账号密码"), "secret");
     await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
+    await ui.type(await screen.findByLabelText("自定义凭据"), "凭据A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
     await pickMainPool();
     // 交付信息
@@ -460,6 +480,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     expect(formExtra.intermediary_type).toBe("包赔");
     expect(formExtra.compensation_type).toBe("shoubao");
     expect(formExtra.bound_phone_owner).toBe("张三");
+    expect(formExtra.extra_receipt).toBe("凭据A");
   });
 
   it("P2-198：仅展开下拉未改值，关闭直接关闭不弹放弃确认", async () => {

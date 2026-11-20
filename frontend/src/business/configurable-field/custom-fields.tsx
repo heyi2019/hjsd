@@ -36,10 +36,10 @@ export function CustomFieldSection(props: { testIdSuffix?: string; section?: Ord
 }
 
 /** 在没有固定板块布局的表单中展示所有已配置的自定义字段。 */
-export function CustomFieldSections({ testIdSuffix }: { testIdSuffix?: string }): ReactElement {
+export function CustomFieldSections({ testIdSuffix, excludeSections = [] }: { testIdSuffix?: string; excludeSections?: string[] }): ReactElement {
   const cfg = useFieldConfig();
   const sections = [...new Set(Object.values(cfg)
-    .filter((field) => field.is_custom && field.is_active)
+    .filter((field) => field.is_custom && field.is_active && !excludeSections.includes(field.section ?? "EXTRA"))
     .map((field) => field.section ?? "EXTRA"))];
   return <>{sections.map((section) => <CustomFieldSection key={section} section={section}
     testIdSuffix={testIdSuffix ? `${testIdSuffix}-${section.toLowerCase()}` : undefined} />)}</>;

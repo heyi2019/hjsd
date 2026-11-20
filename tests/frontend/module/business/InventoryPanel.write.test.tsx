@@ -62,6 +62,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   clearOptionSetsCache();
   vi.clearAllMocks();
+  vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   seedOptionSets();
   vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([{
       account: accounts[0],
@@ -943,6 +944,15 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 
   it("寄售登记到来源订单，不创建 DG 代挂订单", async () => {
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({ FINANCE: "上架补充资料" });
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "CONSIGN" ? [{ id: 9001, order_type_code: scope, field_key: "receipt", label: "上架凭据",
+        field_type: "TEXT", required: true, is_active: true, sort_order: 99, locked: false, is_custom: true,
+        section: "FINANCE" }, { id: 9002, order_type_code: scope, field_key: "optional_number", label: "上架附加数字",
+        field_type: "NUMBER", required: false, is_active: true, sort_order: 100, locked: false, is_custom: true,
+        section: "BUSINESS" }] : []),
+    ] as never);
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
@@ -953,6 +963,10 @@ describe("InventoryPanel：写入与长路径", () => {
 
     await ui.click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.type(await screen.findByLabelText("上架凭据"), "寄售凭据");
+    expect(await screen.findByText("上架补充资料")).toBeInTheDocument();
+    await ui.type(screen.getByLabelText("上架附加数字"), "17");
+    await ui.clear(screen.getByLabelText("上架附加数字"));
     await ui.click(screen.getByRole("button", { name: "确认上架" }));
 
     await waitFor(() => expect(vi.mocked(ordersApi.postEvent)).toHaveBeenCalledWith(21, expect.objectContaining({
@@ -960,7 +974,9 @@ describe("InventoryPanel：写入与长路径", () => {
       operation_type: "CONSIGNMENT",
       form_extra_scope: "CONSIGN",
       operator_user_ids: [1],
+      form_extra: expect.objectContaining({ receipt: "寄售凭据" }),
     })));
+    expect(vi.mocked(ordersApi.postEvent).mock.calls[0][1].form_extra).not.toHaveProperty("optional_number");
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
 
@@ -980,26 +996,40 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 
   it("返点按买入与售出订单区分类型并登记", async () => {
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({ FINANCE: "返点补充资料" });
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "INVREBATE" ? [{ id: 9001, order_type_code: scope, field_key: "receipt", label: "返点凭据",
+        field_type: "TEXT", required: true, is_active: true, sort_order: 99, locked: false, is_custom: true,
+        section: "FINANCE" }, { id: 9002, order_type_code: scope, field_key: "optional_number", label: "返点附加数字",
+        field_type: "NUMBER", required: false, is_active: true, sort_order: 100, locked: false, is_custom: true,
+        section: "BUSINESS" }] : []),
+    ] as never);
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");
     await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "返点" }));
     expect(await screen.findByText("登记返点")).toBeInTheDocument();
+    const receipt = await screen.findByLabelText("返点凭据");
+    expect(await screen.findByText("返点补充资料")).toBeInTheDocument();
     expect(screen.queryByLabelText("返点日期")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("返点比例")).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "比例" })).not.toBeInTheDocument();
     expect(screen.queryByText(/关联业务订单创建后即可登记返点/)).toBeNull();
-    expect(screen.getByLabelText("买号返点（对应回收/提号）")).toBeChecked();
-    expect(screen.getByLabelText("卖号返点（对应售出）")).toBeEnabled();
-    await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
-    expect(screen.getByLabelText("买号返点（对应回收/提号）")).not.toBeChecked();
-    expect(screen.getByLabelText("卖号返点（对应售出）")).toBeChecked();
-    await ui.click(screen.getByLabelText("买号返点（对应回收/提号）"));
-    expect(screen.getByLabelText("买号返点（对应回收/提号）")).toBeChecked();
-    expect(screen.getByLabelText("卖号返点（对应售出）")).not.toBeChecked();
-    await ui.click(screen.getByLabelText("卖号返点（对应售出）"));
+    expect(await screen.findByLabelText(/^买号返点/)).toBeChecked();
+    expect(screen.getByLabelText(/^卖号返点/)).toBeEnabled();
+    await ui.click(screen.getByLabelText(/^卖号返点/));
+    expect(screen.getByLabelText(/^买号返点/)).not.toBeChecked();
+    expect(screen.getByLabelText(/^卖号返点/)).toBeChecked();
+    await ui.click(screen.getByLabelText(/^买号返点/));
+    expect(screen.getByLabelText(/^买号返点/)).toBeChecked();
+    expect(screen.getByLabelText(/^卖号返点/)).not.toBeChecked();
+    await ui.click(screen.getByLabelText(/^卖号返点/));
     await ui.clear(screen.getByLabelText("返点金额"));
     await ui.type(screen.getByLabelText("返点金额"), "350.00");
+    await ui.type(receipt, "返点凭据A");
+    await ui.type(screen.getByLabelText("返点附加数字"), "17");
+    await ui.clear(screen.getByLabelText("返点附加数字"));
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
 
     await waitFor(() => expect(vi.mocked(rebatesApi.create)).toHaveBeenCalled());
@@ -1008,7 +1038,9 @@ describe("InventoryPanel：写入与长路径", () => {
       rebate_type: "SELL",
       amount: "350.00",
       channel: "卖号返点",
+      form_extra: { receipt: "返点凭据A" },
     });
+    expect(vi.mocked(rebatesApi.create).mock.calls[0][0].form_extra).toEqual({ receipt: "返点凭据A" });
   });
 
   it("编辑返点保存中防止重复请求，失败后在弹窗内提示并可重试", async () => {
@@ -1071,6 +1103,7 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 
   it("提号分销已登记 BUY 后可登记买号返点", async () => {
+    seedOrderFormFields();
     resolveMock(vi.mocked(ordersApi.executionDetail), {
       account: accounts[1],
       orders: [{
@@ -1079,7 +1112,39 @@ describe("InventoryPanel：写入与长路径", () => {
       }],
     });
     renderLight(<InventoryRebateModal account={accounts[1]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
-    expect(await screen.findByLabelText("买号返点（对应回收/提号）")).toBeChecked();
+    expect(await screen.findByLabelText(/^买号返点/)).toBeChecked();
+    expect(screen.getByLabelText(/^卖号返点/)).toBeEnabled();
+  });
+
+  it("未售出代挂单可登记卖号返点，不能登记买号返点", async () => {
+    seedOrderFormFields();
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: { ...accounts[0], inventory_type: "CONSIGNMENT" },
+      orders: [{ order_id: 21, order_no: "DG0001", order_type: "DG", status: "ACTIVE", events: [] }],
+    } as never);
+    renderLight(<InventoryRebateModal account={{ ...accounts[0], inventory_type: "CONSIGNMENT" }} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    expect(await screen.findByLabelText(/^卖号返点/)).toBeChecked();
+    expect(screen.getByLabelText(/^卖号返点/)).toBeEnabled();
+    expect(screen.getByLabelText(/^买号返点/)).toBeDisabled();
+    await ui.type(screen.getByLabelText("返点金额"), "80");
+    await ui.click(screen.getByRole("button", { name: "确认登记" }));
+    await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      source_order_id: 21, rebate_type: "SELL", amount: "80",
+    })));
+  });
+
+  it("返点配置仅保留卖号选项时默认并提交卖号返点", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => allFormFields()
+      .filter((field) => field.order_type_code === scope)
+      .map((field) => scope === "INVREBATE" && field.field_key === "rebate_type"
+        ? { ...field, options: [{ value: "SELL", label: "卖号返点" }] } : field));
+    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    expect(await screen.findByLabelText("卖号返点")).toBeChecked();
+    await ui.type(screen.getByLabelText("返点金额"), "80");
+    await ui.click(screen.getByRole("button", { name: "确认登记" }));
+    await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      source_order_id: 21, rebate_type: "SELL", amount: "80",
+    })));
   });
 });
 // 原 InventoryConsignmentModal.test.tsx：只读 executionDetail，「已上架记录」的平台名来源（L234）
@@ -1647,7 +1712,8 @@ describe("库存售出三表单分支", () => {
   it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提供分期并挂寄售方", async () => {
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
       ...allFormFields().filter((field) => field.order_type_code === scope),
-      ...(scope === "SALEDG" ? [{ id: 9001, order_type_code: scope, field_key: "sale_receipt", label: "售出凭据", field_type: "TEXT", options: [], required: true, is_active: true, sort_order: 99, locked: false, is_custom: true, note: null }] : []),
+      ...(scope === "SALEDG" ? [{ id: 9001, order_type_code: scope, field_key: "sale_receipt", label: "售出凭据", field_type: "TEXT", options: [], required: true, is_active: true, sort_order: 99, locked: false, is_custom: true, section: "FINANCE", note: null },
+        { id: 9002, order_type_code: scope, field_key: "optional_number", label: "售出附加数字", field_type: "NUMBER", required: false, is_active: true, sort_order: 100, locked: false, is_custom: true, section: "BUSINESS" }] : []),
     ] as never);
     const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
@@ -1666,6 +1732,8 @@ describe("库存售出三表单分支", () => {
     await saleUi.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await saleUi.type(screen.getByPlaceholderText("代挂无买入价，此处仅作记录，不计入利润"), "1000");
     await saleUi.type(await screen.findByLabelText("售出凭据"), "全款凭据");
+    await saleUi.type(screen.getByLabelText("售出附加数字"), "17");
+    await saleUi.clear(screen.getByLabelText("售出附加数字"));
     await saleUi.click(screen.getByLabelText("资金账户"));
     await saleUi.click(await screen.findByText(/利润池/));
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));

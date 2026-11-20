@@ -1,6 +1,6 @@
 import { Alert, Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
-import { CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
+import { CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
 import {
   AdaptiveFormGrid,
   BusinessActionModal,
@@ -13,6 +13,7 @@ import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { useKeyedLatestRequest } from "../../shared/hooks/useLatestRequest";
 import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { moneyRules } from "../../shared/lib/validators";
+import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
 import type { OrdersPageController } from "./useOrdersPageController";
 import {
@@ -192,7 +193,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
     await write.run(async () => {
       try {
         const sourceFormExtra = {
-          ...(values.form_extra ?? {}),
+          ...formExtraOrUndefined(values.form_extra),
           business_responsible_ids: [...new Set(rows
             .filter((item) => item.allocation_type === "BUY")
             .flatMap((item) => item.employee_ids ?? []))],
@@ -272,7 +273,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           watchedRows={watchedRows}
         />
         <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>
-          <CustomFieldSection testIdSuffix="order-allocation" />
+          <CustomFieldSections testIdSuffix="order-allocation" />
         </FieldConfigScope>
       </BusinessRegistrationForm>
     </BusinessActionModal>

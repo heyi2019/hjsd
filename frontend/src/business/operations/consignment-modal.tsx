@@ -10,11 +10,12 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { InventoryAccountSummary } from "../stocks/InventoryAccountSummary";
 import { useLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { activeConsignmentListings } from "./consignment-logic";
 import "./consignment-modal.css";
 
@@ -41,6 +42,7 @@ export function OrderConsignmentModal(props: {
   const [form] = Form.useForm();
   const open = Boolean(props.account);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "CONSIGN" : undefined);
+  const { labels } = useOrderFormSectionLabels(open ? "CONSIGN" : undefined);
   const platforms = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
   const availablePlatforms = platforms.filter((option) => !listed.some((item) => item.platform === option.value));
 
@@ -115,7 +117,7 @@ export function OrderConsignmentModal(props: {
           note: `寄售上架：${values.platform}`,
           form_extra_scope: "CONSIGN",
           form_extra: {
-            ...values.form_extra,
+            ...formExtraOrUndefined(values.form_extra),
             consignment_platforms: [values.platform],
             ...(price === undefined ? {} : { consignment_price: price }),
             listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
@@ -226,8 +228,7 @@ export function OrderConsignmentModal(props: {
               ]}
             />
           </section>
-          <CustomFieldSection section="OPERATION" testIdSuffix="inventory-consignment-operation" />
-          <CustomFieldSection testIdSuffix="inventory-consignment" />
+          <SectionLabelsContext.Provider value={labels}><CustomFieldSections testIdSuffix="inventory-consignment" /></SectionLabelsContext.Provider>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal>

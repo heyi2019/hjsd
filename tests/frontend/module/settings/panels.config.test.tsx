@@ -8,6 +8,7 @@ import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { SequencesPanel } from "@/settings/panels/SequencesPanel";
 import { BusinessReminderSettingsPanel } from "@/settings/panels/BusinessReminderSettingsPanel";
 import { BusinessPeriodSettingsPanel } from "@/settings/panels/BusinessPeriodSettingsPanel";
+import { OptionDictionarySection } from "@/settings/panels/IntermediaryPlatformSettingsPanel";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -139,6 +140,34 @@ describe("BusinessReminderSettingsPanel", () => {
     await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS", expect.objectContaining({
       options: expect.arrayContaining([{ value: "profit_notifications_enabled", label: "1" }]),
     })));
+  });
+});
+
+describe("OptionDictionarySection", () => {
+  it("读取失败时禁止覆盖字典，重试成功后保留已有选项", async () => {
+    let rejectLoad!: (error: Error) => void;
+    vi.mocked(optionSetsApi.get).mockReturnValueOnce(new Promise((_resolve, reject) => { rejectLoad = reject; }));
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+    renderLight(<OptionDictionarySection code="TEST_DICT" title="测试字典" description="字典" />, { user: "admin" });
+    const input = await screen.findByPlaceholderText("请输入测试字典");
+    expect(screen.getByRole("button", { name: "新增测试字典" })).toBeDisabled();
+    await act(async () => rejectLoad(new Error("字典读取失败")));
+    expect(await screen.findByText(/字典读取失败/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增测试字典" })).toBeDisabled();
+    fireEvent.change(input, { target: { value: "新选项" } });
+    await act(async () => { fireEvent.submit(input.closest("form")!); });
+    expect(optionSetsApi.update).not.toHaveBeenCalled();
+    vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [{ value: "原选项", label: "原选项" }] } as never);
+    vi.mocked(optionSetsApi.update).mockResolvedValue(undefined as never);
+    fireEvent.click(screen.getByRole("button", { name: /重新加载/ }));
+    expect(await screen.findByText("原选项")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "新增测试字典" })).toBeEnabled());
+    fireEvent.change(input, { target: { value: "新选项" } });
+    await act(async () => { fireEvent.submit(input.closest("form")!); });
+    await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("TEST_DICT", {
+      options: [{ value: "原选项", label: "原选项" }, { value: "新选项", label: "新选项" }],
+    }));
   });
 });
 

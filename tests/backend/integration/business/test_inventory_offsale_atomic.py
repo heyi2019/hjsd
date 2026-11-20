@@ -14,7 +14,128 @@ from app.business.routers.order_events_router import inventory_offsale
 from app.core.errors import Validation
 from app.core.database import get_db
 from app.core.security import DEV_USERS
-from app.domain.trade import Account, Cashflow, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Order, OrderEvent, OrderFormField
+
+
+def _conditional_receipt(seeded_db, scope, dependency):
+    core = seeded_db.scalar(select(OrderFormField).where(
+        OrderFormField.order_type_code == scope, OrderFormField.field_key == dependency,
+    ))
+    if core is None:
+        core = create_order_form_field(seeded_db, order_type_code=scope, field_key=dependency,
+                                       label="依赖字段", actor="pytest")
+        core.is_custom = False
+        seeded_db.flush()
+    create_order_form_field(
+        seeded_db, order_type_code=scope, field_key="receipt", label="条件凭据", actor="pytest",
+        required_when={"field": dependency, "op": "filled"},
+    )
+
+
+@pytest.mark.parametrize(("order_type", "amount", "dependency"), [
+    ("HS", "0", "reason"), ("HS", "30", "reason"), ("TH", "0", "reason"),
+    ("TH", "30", "reason"), ("DG", None, "reason"),
+    ("HS", "30", "amount"), ("DG", None, "listing_id"),
+])
+def test_inventory_cancellation_conditions_use_parent_form_values(seeded_db, seeded_client, headers, order_type, amount, dependency):
+    order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": f"condition-{order_type}-{amount}"})
+    buy = None
+    if order_type != "DG":
+        buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100",
+                            occurred_on=date(2026, 11, 1), actor="pytest")
+    register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+                         form_extra={"consignment_platforms": ["测试平台"]})
+    scope = "INVOID" if order_type == "DG" else "INVREFUND"
+    _conditional_receipt(seeded_db, scope, dependency)
+    seeded_db.commit()
+    payload = {"reason": "取消交易", "occurred_on": "2026-11-02", "unlisted_at": "2026-11-02T12:00"}
+    if amount is not None:
+        payload["amount"] = amount
+    if buy is not None and amount != "0":
+        payload.update(pool_id=buy.pool_id, offset_event_id=buy.id)
+    url = f"/api/v1/orders/{order.id}/inventory-offsale"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "条件凭据" in missing.text
+    assert seeded_db.get(Order, order.id).status == "ACTIVE"
+    spoofed = seeded_client.post(url, json={**payload, "form_extra": {dependency: ""}}, headers=headers)
+    assert spoofed.status_code == 422 and "条件凭据" in spoofed.text
+    saved = seeded_client.post(url, json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert seeded_db.get(Order, order.id).form_extra["receipt"] == "凭据A"
+
+
+def test_plain_order_cancellation_conditions_use_reason(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": "plain-conditional-cancel"})
+    _conditional_receipt(seeded_db, "ORDERCANC", "reason")
+    seeded_db.commit()
+    url = f"/api/v1/orders/{order.id}/cancel"
+    missing = seeded_client.post(url, json={"reason": "取消交易"}, headers=headers)
+    assert missing.status_code == 422 and "条件凭据" in missing.text
+    saved = seeded_client.post(url, json={"reason": "取消交易", "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert seeded_db.get(Order, order.id).form_extra["receipt"] == "凭据A"
+
+
+def test_inventory_refund_records_selected_operators(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": "refund-operators"})
+    buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100",
+                        occurred_on=date(2026, 11, 1), actor="pytest")
+    seeded_db.commit()
+    response = seeded_client.post(f"/api/v1/orders/{order.id}/inventory-offsale", headers=headers, json={
+        "reason": "取消交易", "amount": "30", "pool_id": buy.pool_id, "offset_event_id": buy.id,
+        "occurred_on": "2026-11-02", "unlisted_at": "2026-11-02T12:00", "operator_user_ids": [1, 2],
+    })
+    assert response.status_code == 200, response.text
+    refund = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "CANCEL"))
+    assert refund.operator_user_ids == [1, 2]
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == refund.event_no))
+    assert flow is not None and flow.operator_user_ids == [1, 2]
+
+
+@pytest.mark.parametrize(("is_sale", "dependency"), [
+    (False, "reason"), (False, "refund_amount"), (True, "amount"), (True, "cancel_amount"),
+])
+def test_cancel_event_conditions_use_reason_and_amount(seeded_db, seeded_client, headers, is_sale, dependency):
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": f"conditional-event-{is_sale}"})
+    buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+    source = buy
+    if is_sale:
+        source, _ = post_event(seeded_db, order.id, event_type="SELL", amount="200",
+                               occurred_on=date(2026, 11, 1), actor="pytest")
+    _conditional_receipt(seeded_db, "ORDERCANC" if is_sale else "INVREFUND", dependency)
+    seeded_db.commit()
+    payload = {"event_type": "CANCEL", "amount": "30", "occurred_on": "2026-11-02", "reason": "取消交易",
+               "offset_event_id": source.id, "pool_id": source.pool_id, "finalize_sale_cancel": is_sale}
+    url = f"/api/v1/orders/{order.id}/events"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422 and "条件凭据" in missing.text
+    saved = seeded_client.post(url, json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["event"]["form_extra"]["receipt"] == "凭据A"
+
+
+@pytest.mark.parametrize("dependency", ["reason", "listing_id", "unlisted_at"])
+def test_platform_unlist_conditions_use_original_form_values(seeded_db, seeded_client, headers, dependency):
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": f"platform-condition-{dependency}"})
+    listing, _ = register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+                                      form_extra={"consignment_platforms": ["测试平台"]})
+    _conditional_receipt(seeded_db, "INVOID", dependency)
+    seeded_db.commit()
+    payload = {"event_type": "OPERATE", "operation_type": "UNLIST", "occurred_on": "2026-11-02", "reason": "平台下架",
+               "form_extra": {"consignment_event_id": listing.id, "consignment_platforms": ["测试平台"],
+                              "platform_unlisted_at": "2026-11-02T12:00", "platform_unlist_scope": "PLATFORM"}}
+    url = f"/api/v1/orders/{order.id}/events"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422 and "条件凭据" in missing.text
+    saved = seeded_client.post(url, json={**payload, "form_extra": {**payload["form_extra"], "receipt": "凭据A"}}, headers=headers)
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["event"]["form_extra"]["receipt"] == "凭据A"
 
 
 @pytest.mark.parametrize(("order_type", "amount", "scope", "other_scope"), [

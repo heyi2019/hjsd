@@ -10,6 +10,7 @@ import type { Account } from "../../../shared/api/types/accounts";
 import type { Pool } from "../../../shared/api/types/finance";
 import { normalizeError } from "../../../shared/api/client";
 import { today } from "../../../shared/lib/format";
+import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { consignmentRecords, type ActiveConsignment } from "../../operations";
 import { type OrderPartyLink } from "../../OrderDetailView/OrderDetail.shared";
 import { type OrderProfileTarget } from "../../operations";
@@ -226,7 +227,7 @@ export function useInventoryActions(params: {
           portion: target.portion,
           ...(target.eventId != null && Number(values.amount) > 0 ? { offset_event_id: target.eventId } : {}),
           reason: values.reason.trim(),
-          form_extra: values.form_extra,
+          form_extra: formExtraOrUndefined(values.form_extra),
         };
         await ordersApi.inventoryOffsale(target.orderId, { ...payload, unlisted_at: dayjs().format("YYYY-MM-DDTHH:mm") });
         const success = "入库已取消，账号已退出库存";

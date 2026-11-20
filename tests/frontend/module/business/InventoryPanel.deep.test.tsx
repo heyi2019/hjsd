@@ -7,7 +7,7 @@ import { InventoryPanel } from "@/business/stocks/InventoryPanel";
 import { consignmentRecords } from "@/business/operations/offsale";
 import { OrderPlatformOffsaleModal } from "@/business/operations";
 import { installmentsApi } from "@/shared/api/installments.api";
-import { ordersApi } from "@/shared/api/orders.api";
+import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { stocksApi } from "@/shared/api/stocks.api";
@@ -137,6 +137,7 @@ async function clickOperation(row: HTMLElement, item: string) {
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async () => []);
   URL.createObjectURL = vi.fn().mockReturnValue("blob:mock");
   URL.revokeObjectURL = vi.fn();
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
@@ -309,6 +310,60 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
     await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.objectContaining({ amount: "0.00", reason: "取消交易" })));
     expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21, expect.not.objectContaining({ pool_id: expect.anything() }));
+  });
+
+  it("库存取消入库使用退款表单字段并过滤已清空的值", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "INVREFUND" ? [
+      { id: 901, order_type_code: scope, field_key: "receipt", label: "取消凭据", field_type: "TEXT",
+        required: true, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "FINANCE" },
+      { id: 902, order_type_code: scope, field_key: "optional_number", label: "可选数字", field_type: "NUMBER",
+        required: false, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "BUSINESS" },
+    ] : []);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: inStockRow, orders: [{
+      order_id: 21, order_type: "HS", status: "ACTIVE", events: [],
+    }] } as unknown as AccountExecutionDetail);
+    vi.mocked(poolsApi.list).mockResolvedValue([]);
+    await openPanel([inStockRow]);
+    await clickOperation(rowOf(1), "取消");
+    const modal = await screen.findByRole("dialog");
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消交易");
+    await ui.type(await within(modal).findByLabelText("取消凭据"), "凭据A");
+    const optional = within(modal).getByLabelText("可选数字");
+    await ui.type(optional, "17");
+    await ui.clear(optional);
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(21,
+      expect.objectContaining({ amount: "0.00", form_extra: { receipt: "凭据A" } })));
+    expect(orderFormFieldsApi.list).toHaveBeenCalledWith("INVREFUND", true);
+  });
+
+  it.each([
+    { mode: "平台下架", option: /千寻（上架于/, button: "确认下架" },
+    { mode: "代挂出库", option: /本系统（上架于/, button: "确认出库" },
+  ])("$mode 显示其他板块字段并过滤清空的值", async ({ button, option }) => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "INVOID" ? [
+      { id: 901, order_type_code: scope, field_key: "receipt", label: "下架凭据", field_type: "TEXT",
+        required: true, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "FINANCE" },
+      { id: 902, order_type_code: scope, field_key: "optional_number", label: "可选数字", field_type: "NUMBER",
+        required: false, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "BUSINESS" },
+    ] : []);
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(consignmentDetail);
+    await openPanel([consignmentRow]);
+    await clickOperation(rowOf(1), "下架");
+    const modal = await screen.findByRole("dialog");
+    await ui.click(within(modal).getByRole("combobox", { name: "下架平台" }));
+    await ui.click(await screen.findByText(option, { selector: ".ant-select-item-option-content" }));
+    await ui.type(within(modal).getByLabelText("下架原因"), "交易结束");
+    await ui.type(await within(modal).findByLabelText("下架凭据"), "凭据A");
+    const optional = within(modal).getByLabelText("可选数字");
+    await ui.type(optional, "17");
+    await ui.clear(optional);
+    await ui.click(within(modal).getByRole("button", { name: button }));
+    const request = button === "确认下架" ? ordersApi.postEvent : ordersApi.inventoryOffsale;
+    await waitFor(() => expect(request).toHaveBeenCalled());
+    const payload = vi.mocked(request).mock.calls[0][1] as { form_extra?: Record<string, unknown> };
+    expect(payload.form_extra).toEqual(expect.objectContaining({ receipt: "凭据A" }));
+    expect(payload.form_extra).not.toHaveProperty("optional_number");
   });
 
   it("代挂下架平台选项包含本系统并显示入库时间", async () => {

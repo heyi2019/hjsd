@@ -192,6 +192,7 @@ def cancel_order(
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = None,
+    form_extra_context: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Order:
     """取消没有已登记业务/资金事件的订单。"""
@@ -209,6 +210,7 @@ def cancel_order(
         raise Validation("订单已有登记事件，不能直接取消，请先冲销")
     checked = validate_form_extra(
         session, order_type_code=form_extra_scope or "ORDERCANC", values=form_extra,
+        context={**(form_extra_context or {}), "reason": reason},
     )
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     _retire_account_on_plain_cancel(session, order, form_extra=form_extra, actor=actor)

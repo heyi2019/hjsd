@@ -9,10 +9,11 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, PermissionButton, Select } from "../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, useOrderFormConfig } from "../ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 import { consignmentListings, type ConsignmentListing } from "./consignment-logic";
 import { formatDateTimeMinute } from "../../shared/lib/format";
+import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { useLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
 
@@ -86,7 +87,7 @@ export function OrderPlatformOffsaleModal(props: {
       await write.run(async () => {
         setError(null);
         try {
-          await props.onSystemOffsale({ reason: values.reason.trim(), unlisted_at: (values.unlisted_at ?? dayjs()).format("YYYY-MM-DDTHH:mm"), operator_user_ids: values.operator_user_ids, form_extra: values.form_extra });
+          await props.onSystemOffsale({ reason: values.reason.trim(), unlisted_at: (values.unlisted_at ?? dayjs()).format("YYYY-MM-DDTHH:mm"), operator_user_ids: values.operator_user_ids, form_extra: formExtraOrUndefined(values.form_extra) });
           if (session.isCurrent(submittedSession)) {
             form.resetFields();
             close();
@@ -114,7 +115,7 @@ export function OrderPlatformOffsaleModal(props: {
           note: `寄售下架：${selected.platform}`,
           form_extra_scope: "INVOID",
           form_extra: {
-            ...values.form_extra,
+            ...formExtraOrUndefined(values.form_extra),
             ...(selected.eventId == null ? {} : { consignment_event_id: selected.eventId }),
             consignment_platforms: [selected.platform],
             platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
@@ -179,7 +180,7 @@ export function OrderPlatformOffsaleModal(props: {
             <Input aria-label="下架原因" placeholder="请输入平台下架原因" />
           </CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
-          <CustomFieldSection testIdSuffix="inv-platform-offsale" />
+          <CustomFieldSections testIdSuffix="inv-platform-offsale" />
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
       <DataTable

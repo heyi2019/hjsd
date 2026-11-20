@@ -70,6 +70,7 @@ def post_event(
     bound_phone_owner: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     form_extra_scope: str | None = None,
+    form_extra_context: Mapping[str, Any] | None = None,
     source_type: str | None = None,
     source_id: str | None = None,
     user: CurrentUser | None = None,
@@ -198,6 +199,22 @@ def post_event(
         )
         historical_sale_refund = latest_sell_id != offset.id
 
+    field_context: dict[str, Any] = {}
+    if event_type == EventType.CANCEL.value:
+        field_context.update({
+            "amount": amount, "cancel_amount": amount, "refund_amount": amount,
+            "cancelled_on": occurred_on, "offset_event_id": offset_event_id,
+            "pool_id": pool_id, "reason": reason, "operator_user_ids": operator_user_ids,
+        })
+    if event_type == EventType.OPERATE.value and operation_type == "UNLIST":
+        extra = form_extra or {}
+        platforms = extra.get("consignment_platforms")
+        listing_event_id = extra.get("consignment_event_id")
+        if isinstance(platforms, list) and len(platforms) == 1 and listing_event_id is not None:
+            field_context["listing_id"] = f"{order.id}:{listing_event_id}:{platforms[0]}"
+        field_context.update({"unlisted_at": extra.get("platform_unlisted_at"), "reason": reason,
+                              "operator_user_ids": operator_user_ids})
+    field_context.update(form_extra_context or {})
     event_form_extra = _build_event_form_extra(
         session,
         order,
@@ -209,6 +226,7 @@ def post_event(
         bound_phone_owner=bound_phone_owner,
         form_extra=form_extra,
         form_extra_scope=form_extra_scope,
+        form_extra_context=field_context,
         actor=actor,
     )
 

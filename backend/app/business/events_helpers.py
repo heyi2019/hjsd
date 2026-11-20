@@ -290,6 +290,7 @@ def _build_event_form_extra(
     bound_phone_owner: str | None,
     form_extra: Mapping[str, Any] | None,
     form_extra_scope: str | None,
+    form_extra_context: Mapping[str, Any] | None,
     actor: str,
 ) -> dict[str, Any]:
     """规范化绑定手机、校验扩展字段，并在 SELL 时写入账号/订单快照。
@@ -303,7 +304,8 @@ def _build_event_form_extra(
     event_form_extra = (
         validate_form_extra(
             session, order_type_code=scope, values=form_extra,
-            context={"payment_method": sale_mode} if event_type == EventType.SELL.value else None,
+            context={**(form_extra_context or {}),
+                     **({"payment_method": sale_mode} if event_type == EventType.SELL.value else {})},
         )
         if scope else dict(form_extra or {})
     )

@@ -72,7 +72,15 @@ def inventory_offsale(
     if not user.has(PERM_ORDER_EVENT_POST):
         raise PermissionDenied("当前角色无权登记库存下架事件")
     form_scope = "INVOID" if order.order_type == "DG" else "INVREFUND"
-    checked_extra = validate_form_extra(db, order_type_code=form_scope, values=payload.form_extra)
+    field_context = {
+        "reason": payload.reason, "amount": payload.amount, "pool_id": payload.pool_id,
+        "offset_event_id": payload.offset_event_id, "operator_user_ids": payload.operator_user_ids,
+        "occurred_on": payload.occurred_on, "unlisted_at": payload.unlisted_at,
+        "listing_id": "SYSTEM" if order.order_type == "DG" else None,
+    }
+    checked_extra = validate_form_extra(
+        db, order_type_code=form_scope, values=payload.form_extra, context=field_context,
+    )
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all())
     if order.order_type != "DG":
         if payload.amount is None:
@@ -109,17 +117,19 @@ def inventory_offsale(
                 continue
             orders_post_event(db, order.id, event_type="OPERATE", operation_type="UNLIST",
                 occurred_on=payload.occurred_on, actor=_actor(user), operator_user_ids=payload.operator_user_ids,
-                note="系统下架同步取消寄售平台上架", form_extra_scope=form_scope,
+                note="系统下架同步取消寄售平台上架", form_extra_scope=form_scope, form_extra_context=field_context,
                 form_extra={**extra_base, "platform_unlist_scope": "SYSTEM" if order.order_type == "DG" else "PLATFORM", "consignment_event_id": event.id, "consignment_platforms": [platform]}, user=user)
     if order.order_type == "DG":
         orders_cancel_order(db, order.id, actor=_actor(user), reason=payload.reason,
-            form_extra=extra_base, form_extra_scope="INVOID", user=user)
+            form_extra=extra_base, form_extra_scope="INVOID", form_extra_context=field_context, user=user)
     else:
         if payload.amount > 0:
             orders_post_event(db, order.id, event_type="CANCEL", amount=payload.amount,
                 occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
                 portion=payload.portion, offset_event_id=payload.offset_event_id, reason=payload.reason,
-                form_extra=checked_extra, form_extra_scope=form_scope, note="取消入库，冲销买入", user=user)
+                operator_user_ids=payload.operator_user_ids,
+                form_extra=checked_extra, form_extra_scope=form_scope, form_extra_context=field_context,
+                note="取消入库，冲销买入", user=user)
         if order.status != "CANCELLED":
             before = {"order_status": order.status, "account_status": account.status}
             order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")

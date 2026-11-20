@@ -116,7 +116,7 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         okText="确认冲销"
         submitting={voiding}
         form={voidForm}
-        scope="INVOID"
+        scope="INVREFUND"
         amount={voidTarget?.amount ?? "0.00"}
         allowZeroRefund
         pools={voidPools}

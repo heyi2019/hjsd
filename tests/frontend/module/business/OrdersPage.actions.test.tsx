@@ -1117,6 +1117,28 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(1, expect.objectContaining({ amount: "0.00", reason: "取消交易" })));
   });
 
+  it("订单入口取消入库展示所有板块字段并过滤空值", async () => {
+    const fields = [...allFormFields(),
+      { id: 901, order_type_code: "INVREFUND", field_key: "receipt", label: "取消凭据", field_type: "TEXT",
+        required: true, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "FINANCE" },
+      { id: 902, order_type_code: "INVREFUND", field_key: "optional_number", label: "可选数字", field_type: "NUMBER",
+        required: false, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "BUSINESS" },
+    ];
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => fields.filter((field) => field.order_type_code === scope));
+    vi.mocked(ordersApi.get).mockResolvedValue({ ...order1, events: [] });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "取消");
+    const modal = await modalOf(/取消 · HS-2026-0001/);
+    await ui.type(within(modal).getByLabelText("取消原因"), "取消交易");
+    await ui.type(await within(modal).findByLabelText("取消凭据"), "凭据A");
+    const optional = within(modal).getByLabelText("可选数字");
+    await ui.type(optional, "17");
+    await ui.clear(optional);
+    await clickModalOk(modal);
+    await waitFor(() => expect(ordersApi.inventoryOffsale).toHaveBeenCalledWith(1,
+      expect.objectContaining({ amount: "0.00", form_extra: { receipt: "凭据A" } })));
+  });
+
   it("取消：按售出流水做部分退款冲销", async () => {
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,

@@ -10,7 +10,7 @@ import {
   MoneyInput,
   Select,
 } from "../../shared/ui";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
 import { money } from "../../shared/lib/format";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 
@@ -137,7 +137,7 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
           <CfgItem alwaysActive name="reason" label="取消原因" fixedLabel="取消原因" rules={[{ required: true, whitespace: true, message: "请填写取消原因" }]}>
             <Input.TextArea aria-label="取消原因" rows={3} placeholder="请输入取消原因" />
           </CfgItem>
-          <CustomFieldSection testIdSuffix={props.scope === "INVOID" ? "inv-void" : props.scope === "INVREFUND" ? "inv-refund" : "order-cancel"} />
+          <CustomFieldSections testIdSuffix={props.scope === "INVOID" ? "inv-void" : props.scope === "INVREFUND" ? "inv-refund" : "order-cancel"} />
         </FieldConfigScope>
       </BusinessRegistrationForm>
     </BusinessActionModal>

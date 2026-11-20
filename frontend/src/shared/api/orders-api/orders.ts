@@ -65,7 +65,7 @@ export const ordersApi = {
   stockSale: (orderId: number, payload: {
     amount: string; occurred_on: string; pool_id?: number; operator_user_ids?: number[];
     note?: string; bound_phone?: string; bound_phone_owner?: string; sale_amount?: string;
-    customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown>;
+    customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown>; form_extra?: Record<string, unknown>;
   }) => api.post<EventPostResult>(`/orders/${orderId}/stock-sale`, payload).then((r) => r.data),
   ledgerSummary: (params?: {
     mine?: boolean;

@@ -176,7 +176,8 @@ def create_stock_sale(
     orders_post_event(
         db, payload.order_id, event_type="SELL", sale_mode="INSTALLMENT",
         amount=payload.principal, occurred_on=payload.paid_on, actor=_actor(user),
-        portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note, user=user,
+        portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
+        form_extra=payload.form_extra, user=user,
     )
     item = inst_create.create_installment(
         db, order_id=payload.order_id, contract_type="STOCK_SALE", principal=payload.principal,

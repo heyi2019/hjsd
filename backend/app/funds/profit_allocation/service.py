@@ -28,6 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
+from app.shared.form_field_rules import validate_form_extra
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
 from app.domain.notifications import Notification
@@ -95,9 +96,10 @@ def set_allocations(
         Notification.entity_id == order.order_no, Notification.read_at.is_(None),
     ).limit(1)) is not None
 
+    checked_extra = validate_form_extra(session, order_type_code="ALLOCATION", values=form_extra)
     original_form_extra = order.form_extra
-    if form_extra:
-        order.form_extra = {**(order.form_extra or {}), **dict(form_extra)}
+    if checked_extra:
+        order.form_extra = {**(order.form_extra or {}), **checked_extra}
     try:
         normalized_items = [_normalize_allocation_item(item) for item in items]
         typed = [item for item in normalized_items if item.get("allocation_type")]
@@ -119,7 +121,7 @@ def set_allocations(
                 session, order, items=normalized_items, actor=actor
             )
     except Exception:
-        if form_extra:
+        if checked_extra:
             order.form_extra = original_form_extra
         raise
     # 分润配置保存完成 → 通知利润接收人（幂等，重复保存不重复打扰）。

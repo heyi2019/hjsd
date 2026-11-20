@@ -298,8 +298,11 @@ def _build_event_form_extra(
     """
     normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
     normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
-    event_form_extra = validate_form_extra(
-        session, order_type_code=(form_extra_scope or "REFUND"), values=form_extra
+    sale_scope = {"HS": "SALEREC", "TH": "SALETH", "DG": "SALEDG"}.get(order.order_type)
+    scope = sale_scope if event_type == EventType.SELL.value and sale_scope else form_extra_scope
+    event_form_extra = (
+        validate_form_extra(session, order_type_code=scope, values=form_extra)
+        if scope else dict(form_extra or {})
     )
     if event_type == EventType.SELL.value and sale_mode is not None:
         event_form_extra["sale_mode"] = sale_mode

@@ -293,7 +293,7 @@ def cancel_order(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
-        form_extra_scope=payload.form_extra_scope,
+        form_extra_scope="ORDERCANC",
         user=user,
     )
     return _order_output(order)

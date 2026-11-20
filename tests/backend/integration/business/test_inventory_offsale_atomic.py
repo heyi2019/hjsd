@@ -9,11 +9,100 @@ from app.business import schemas
 from app.business.consignment import platform_unlist_consignment, register_consignment
 from app.business.create import create_order
 from app.business.events import post_event
+from app.business.form_fields import create_order_form_field
 from app.business.routers.order_events_router import inventory_offsale
 from app.core.errors import Validation
 from app.core.database import get_db
 from app.core.security import DEV_USERS
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
+
+
+@pytest.mark.parametrize(("order_type", "amount", "scope", "other_scope"), [
+    ("HS", "0", "INVREFUND", "INVOID"),
+    ("HS", "30", "INVREFUND", "INVOID"),
+    ("DG", None, "INVOID", "INVREFUND"),
+])
+def test_offsale_uses_its_own_custom_fields(seeded_db, seeded_client, headers, order_type, amount, scope, other_scope):
+    order = create_order(seeded_db, order_type=order_type, trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": f"fields-{order_type}-{amount}"})
+    buy = None
+    if order_type == "HS":
+        buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100",
+                            occurred_on=date(2026, 11, 1), actor="pytest")
+    register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+                         form_extra={"consignment_platforms": ["测试平台"]})
+    for field_scope, key, label in [(scope, "receipt", "取消凭据"), (other_scope, "other", "其他操作凭据")]:
+        create_order_form_field(seeded_db, order_type_code=field_scope, field_key=key,
+                                label=label, required=True, actor="pytest")
+    seeded_db.commit()
+    payload = {"reason": "取消", "occurred_on": "2026-11-02", "unlisted_at": "2026-11-02T12:00"}
+    if amount is not None:
+        payload["amount"] = amount
+    if buy is not None and amount != "0":
+        payload.update(pool_id=buy.pool_id, offset_event_id=buy.id)
+    url = f"/api/v1/orders/{order.id}/inventory-offsale"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "取消凭据" in missing.text
+    assert seeded_db.get(Order, order.id).status == "ACTIVE"
+    done = seeded_client.post(url, json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    assert done.status_code == 200, done.text
+    assert seeded_db.get(Order, order.id).form_extra["receipt"] == "凭据A"
+
+
+def test_plain_order_cancel_cannot_skip_required_fields(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": "plain-cancel-fields"})
+    create_order_form_field(seeded_db, order_type_code="ORDERCANC", field_key="receipt",
+                            label="取消凭据", required=True, actor="pytest")
+    seeded_db.commit()
+    url = f"/api/v1/orders/{order.id}/cancel"
+    missing = seeded_client.post(url, json={"reason": "取消", "form_extra_scope": "REFUND"}, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "取消凭据" in missing.text
+    assert seeded_db.get(Order, order.id).status == "ACTIVE"
+    done = seeded_client.post(url, json={"reason": "取消", "form_extra_scope": "REFUND",
+                                        "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    assert done.status_code == 200, done.text
+    assert seeded_db.get(Order, order.id).form_extra["receipt"] == "凭据A"
+
+
+def test_sale_cancel_event_cannot_change_field_scope(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": "cancel-sale-fields"})
+    post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+    sale, _ = post_event(seeded_db, order.id, event_type="SELL", sale_mode="FULL", amount="200",
+                         occurred_on=date(2026, 11, 1), actor="pytest")
+    create_order_form_field(seeded_db, order_type_code="ORDERCANC", field_key="receipt",
+                            label="取消凭据", required=True, actor="pytest")
+    seeded_db.commit()
+    payload = {"event_type": "CANCEL", "finalize_sale_cancel": True, "amount": "50",
+               "occurred_on": "2026-11-02", "offset_event_id": sale.id, "pool_id": sale.pool_id,
+               "reason": "退货", "form_extra_scope": "REFUND"}
+    url = f"/api/v1/orders/{order.id}/events"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "取消凭据" in missing.text
+    done = seeded_client.post(url, json={**payload, "form_extra": {"receipt": "凭据A"}}, headers=headers)
+    assert done.status_code == 201, done.text
+    assert done.json()["event"]["form_extra"]["receipt"] == "凭据A"
+
+
+def test_consignment_event_cannot_change_field_scope(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": "consignment-fields"})
+    create_order_form_field(seeded_db, order_type_code="CONSIGN", field_key="receipt",
+                            label="上架凭据", required=True, actor="pytest")
+    seeded_db.commit()
+    payload = {"event_type": "OPERATE", "operation_type": "CONSIGNMENT", "occurred_on": "2026-11-02",
+               "form_extra_scope": "REFUND", "form_extra": {"consignment_platforms": ["测试平台"]}}
+    url = f"/api/v1/orders/{order.id}/events"
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422, missing.text
+    assert "上架凭据" in missing.text
+    done = seeded_client.post(url, json={**payload, "form_extra": {**payload["form_extra"], "receipt": "凭据A"}}, headers=headers)
+    assert done.status_code == 201, done.text
+    assert done.json()["event"]["form_extra"]["receipt"] == "凭据A"
 
 
 def test_failed_system_offsale_rolls_back_platform_events(seeded_db):

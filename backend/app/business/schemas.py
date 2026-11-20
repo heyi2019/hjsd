@@ -57,6 +57,7 @@ class StockSaleIn(BaseModel):
     sale_amount: Decimal | None = Field(default=None, ge=0)
     customer_input: CustomerDraftInput | None = None
     delivery_form_extra: dict[str, object] | None = None
+    form_extra: dict[str, object] | None = None
 
 
 class CounterpartyDraftInput(BaseModel):

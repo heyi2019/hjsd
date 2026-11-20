@@ -207,14 +207,12 @@ def cancel_order(
     )
     if posted_events and not _can_cancel_after_consignment(order, posted_events):
         raise Validation("订单已有登记事件，不能直接取消，请先冲销")
+    checked = validate_form_extra(
+        session, order_type_code=form_extra_scope or "ORDERCANC", values=form_extra,
+    )
     order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
     _retire_account_on_plain_cancel(session, order, form_extra=form_extra, actor=actor)
-    if form_extra:
-        checked = validate_form_extra(
-            session,
-            order_type_code=form_extra_scope or "ORDERCANC",
-            values=form_extra,
-        )
+    if checked:
         order.form_extra = {**(order.form_extra or {}), **checked}
     order.updated_by = actor
     session.flush()

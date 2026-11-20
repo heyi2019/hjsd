@@ -22,6 +22,7 @@ from app.funds.installments import recovery as inst_recovery
 from app.funds.installments.repayments.pay import pay as inst_pay
 from app.business.create import create_order
 from app.business.events import post_event
+from app.business.form_fields import create_order_form_field
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
@@ -78,6 +79,60 @@ def _contract(
 
 
 class TestInstallmentsApi:
+    @pytest.mark.parametrize(("order_type", "scope", "installment"), [
+        ("HS", "SALEREC", False), ("TH", "SALETH", False), ("DG", "SALEDG", False),
+        ("HS", "SALEREC", True), ("TH", "SALETH", True),
+    ])
+    def test_stock_sale_uses_its_own_custom_fields(self, seeded_client, seeded_db, headers, order_type, scope, installment):
+        from app.business.stocks.profile import create_account
+
+        inventory_type = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type]
+        account = create_account(
+            seeded_db, game_account=f"sale-fields-{order_type}-{installment}",
+            business_mode="SELF" if order_type == "HS" else "DISTRIBUTION",
+            inventory_type=inventory_type, actor="pytest",
+        )
+        order = _order(seeded_db, order_type=order_type, account_id=account.id)
+        if order_type != "DG":
+            _buy(seeded_db, order.id, "100")
+        for field_scope, key, label in [
+            (scope, "sale_receipt", "售出凭据"),
+            ("REFUND", "cashflow_receipt", "收支凭据"),
+            ("ORDEREDIT", "edit_receipt", "订单编辑凭据"),
+        ]:
+            create_order_form_field(seeded_db, order_type_code=field_scope, field_key=key,
+                                    label=label, required=True, actor="pytest")
+        seeded_db.commit()
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        if installment:
+            url = "/api/v1/installments/stock-sale"
+            payload = {"order_id": order.id, "principal": "200", "down_payment": "50",
+                       "periods": 1, "per_period": "150", "first_due_on": TODAY.isoformat(),
+                       "paid_on": TODAY.isoformat(), "pool_id": pool.id, "operator_user_ids": [1]}
+        else:
+            url = f"/api/v1/orders/{order.id}/stock-sale"
+            payload = {"amount": "200", "occurred_on": TODAY.isoformat(),
+                       "pool_id": pool.id, "operator_user_ids": [1]}
+        payload["delivery_form_extra"] = {"delivery_responsible_ids": [1]}
+
+        missing = seeded_client.post(url, headers=headers, json=payload)
+        assert missing.status_code == 422, missing.text
+        assert "售出凭据" in missing.text
+
+        created = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"sale_receipt": "凭据A"}})
+        assert created.status_code == 201, created.text
+        event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+        assert event.form_extra["sale_receipt"] == "凭据A"
+        assert seeded_db.get(Order, order.id).form_extra["delivery_responsible_ids"] == [1]
+
+    def test_buy_does_not_require_unrelated_cashflow_fields(self, seeded_db):
+        account = _account(seeded_db, "buy-with-cashflow-custom-field")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        create_order_form_field(seeded_db, order_type_code="REFUND", field_key="receipt",
+                                label="收支凭据", required=True, actor="pytest")
+        _buy(seeded_db, order.id, "100")
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "BUY"))
+
     def test_sale_customer_creation_keeps_customer_permission_check(self, seeded_db):
         from app.business.sale import apply_sale_details
         from app.business.schemas import CustomerDraftInput

@@ -139,6 +139,7 @@ def update_order(
     note: str | None | object = _UNSET,
     extra_values: Mapping[str, Any] | None | object = _UNSET,
     form_extra: Mapping[str, Any] | None | object = _UNSET,
+    form_extra_scope: str | None = "ORDEREDIT",
     user: CurrentUser | None = None,
 ) -> Order:
     """受控编辑订单主字段。
@@ -192,7 +193,10 @@ def update_order(
         )
     if form_extra is not _UNSET and form_extra:
         # ORDEREDIT 作用域自定义字段值合并进订单 form_extra。
-        checked = validate_form_extra(session, order_type_code="ORDEREDIT", values=form_extra)
+        checked = (
+            validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra)
+            if form_extra_scope else dict(form_extra)
+        )
         order.form_extra = {**(order.form_extra or {}), **checked}
     record_audit(
         session,

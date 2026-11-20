@@ -26,4 +26,5 @@ def apply_sale_details(
         customer_id, role = resolve_customer_role(db, customer_input, user, require_create_permission=True)
         add_customer_role(db, order_id, customer_id, role, actor=user.username, user=user)
     if delivery_form_extra:
-        update_order(db, order_id, actor=user.username, form_extra=delivery_form_extra, user=user)
+        update_order(db, order_id, actor=user.username, form_extra=delivery_form_extra,
+                     form_extra_scope=None, user=user)

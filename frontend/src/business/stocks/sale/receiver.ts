@@ -36,6 +36,7 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
     ...(isConsignment && values.sale_amount != null && String(values.sale_amount) !== "" ? { sale_amount: String(values.sale_amount) } : {}),
     customer_input: customerInput,
     delivery_form_extra: deliveryFormExtra,
+    form_extra: values.form_extra as Record<string, unknown> | undefined,
   });
 }
 
@@ -68,5 +69,6 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     operator_user_ids: values.operator_user_ids as number[] | undefined,
     customer_input: customerInput,
     delivery_form_extra: deliveryFormExtra,
+    form_extra: values.form_extra as Record<string, unknown> | undefined,
   });
 }

@@ -23,6 +23,7 @@ from app.settings.auth.session import (
 )
 from app.domain.trade import Account, Order, OrderEvent
 from app.shared.audit import record_audit
+from app.shared.form_field_rules import validate_form_extra
 from app.business import schemas
 from app.shared.order_access import get_order as orders_get_order
 from app.business.consignment import post_consignment_operation
@@ -70,6 +71,8 @@ def inventory_offsale(
         raise Validation("取消必须填写原因")
     if not user.has(PERM_ORDER_EVENT_POST):
         raise PermissionDenied("当前角色无权登记库存下架事件")
+    form_scope = "INVOID" if order.order_type == "DG" else "INVREFUND"
+    checked_extra = validate_form_extra(db, order_type_code=form_scope, values=payload.form_extra)
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == order.id)).all())
     if order.order_type != "DG":
         if payload.amount is None:
@@ -93,7 +96,7 @@ def inventory_offsale(
                     system_unlisted_event_ids.add(str(extra["consignment_event_id"]))
             for platform in extra.get("consignment_platforms") or []:
                 unlisted.add((str(extra.get("consignment_event_id")), str(platform).strip()))
-    extra_base = {**(payload.form_extra or {}), "platform_unlist_scope": "SYSTEM", "platform_unlisted_at": payload.unlisted_at.isoformat(timespec="minutes")}
+    extra_base = {**checked_extra, "platform_unlist_scope": "SYSTEM", "platform_unlisted_at": payload.unlisted_at.isoformat(timespec="minutes")}
     for event in events:
         extra = event.form_extra or {}
         if event.event_type != "OPERATE" or extra.get("operation_type") != "CONSIGNMENT":
@@ -106,7 +109,7 @@ def inventory_offsale(
                 continue
             orders_post_event(db, order.id, event_type="OPERATE", operation_type="UNLIST",
                 occurred_on=payload.occurred_on, actor=_actor(user), operator_user_ids=payload.operator_user_ids,
-                note="系统下架同步取消寄售平台上架", form_extra_scope="INVOID",
+                note="系统下架同步取消寄售平台上架", form_extra_scope=form_scope,
                 form_extra={**extra_base, "platform_unlist_scope": "SYSTEM" if order.order_type == "DG" else "PLATFORM", "consignment_event_id": event.id, "consignment_platforms": [platform]}, user=user)
     if order.order_type == "DG":
         orders_cancel_order(db, order.id, actor=_actor(user), reason=payload.reason,
@@ -116,11 +119,13 @@ def inventory_offsale(
             orders_post_event(db, order.id, event_type="CANCEL", amount=payload.amount,
                 occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
                 portion=payload.portion, offset_event_id=payload.offset_event_id, reason=payload.reason,
-                form_extra=payload.form_extra, note="取消入库，冲销买入", user=user)
+                form_extra=checked_extra, form_extra_scope=form_scope, note="取消入库，冲销买入", user=user)
         if order.status != "CANCELLED":
             before = {"order_status": order.status, "account_status": account.status}
             order.status = transition(ORDER_TRANSITIONS, order.status, "CANCEL", entity="订单")
             account.status = transition(ACCOUNT_TRANSITIONS, account.status, "VOID", entity="账号")
+            if checked_extra:
+                order.form_extra = {**(order.form_extra or {}), **checked_extra}
             order.updated_by = account.updated_by = _actor(user)
             record_audit(db, action="ORDER_CANCEL", entity_type="inventory_cancel", entity_id=order.order_no,
                 actor=_actor(user), before=before, after={"order_status": order.status, "account_status": account.status}, reason=payload.reason)
@@ -140,7 +145,7 @@ def stock_sale(
         occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
         portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
         bound_phone=payload.bound_phone, bound_phone_owner=payload.bound_phone_owner,
-        form_extra={"sale_amount": str(payload.sale_amount)} if payload.sale_amount is not None else None,
+        form_extra={**(payload.form_extra or {}), **({"sale_amount": str(payload.sale_amount)} if payload.sale_amount is not None else {})},
         user=user,
     )
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all())
@@ -186,10 +191,14 @@ def post_event(
             reason=payload.reason,
             operator_user_ids=payload.operator_user_ids,
             form_extra=payload.form_extra,
-            form_extra_scope=payload.form_extra_scope,
+            form_extra_scope="CONSIGN" if operation_type == "CONSIGNMENT" else "INVOID",
             user=user,
         )
     else:
+        form_scope = payload.form_extra_scope
+        if event_type == "CANCEL":
+            offset = db.get(OrderEvent, payload.offset_event_id) if payload.offset_event_id else None
+            form_scope = "INVREFUND" if offset is not None and offset.event_type == "BUY" else "ORDERCANC"
         event, flow = orders_post_event(
             db,
             order_id,
@@ -209,7 +218,7 @@ def post_event(
             note=payload.note,
             bound_phone=payload.bound_phone,
             bound_phone_owner=payload.bound_phone_owner,
-            form_extra_scope=payload.form_extra_scope,
+            form_extra_scope=form_scope,
             form_extra=payload.form_extra,
             user=user,
         )

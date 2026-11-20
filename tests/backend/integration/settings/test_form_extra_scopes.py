@@ -216,9 +216,19 @@ def test_patch_order_merges_form_extra(seeded_client, seeded_db, headers):
 
 
 def test_profit_allocations_merge_form_extra(seeded_client, seeded_db, headers):
+    from app.business.form_fields import create_order_form_field
     order = _create_order(seeded_client, headers)
     seeded_db.get(Order, order["id"]).status = "COMPLETED"
+    create_order_form_field(seeded_db, order_type_code="ALLOCATION", field_key="remark",
+                            label="分润备注", required=True, actor="pytest")
     seeded_db.flush()
+    missing = seeded_client.put(
+        f"/api/v1/orders/{order['id']}/profit-allocations",
+        json={"items": [{"user_id": None, "role": "OWNER", "allocation_rate": "100", "allocation_amount": "0"}]},
+        headers=headers,
+    )
+    assert missing.status_code == 422, missing.text
+    assert "分润备注" in missing.text
     response = seeded_client.put(
         f"/api/v1/orders/{order['id']}/profit-allocations",
         json={

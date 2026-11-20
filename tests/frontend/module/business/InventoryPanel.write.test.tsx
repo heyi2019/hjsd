@@ -27,7 +27,7 @@ import { poolsApi } from "@/shared/api/pools.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
-import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { inventoryLedgerResponse } from "@fixtures/api-responses";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
@@ -1584,6 +1584,10 @@ it("库存售出：成功后立即从库存列表移除账号，即使列表重�
 
 describe("库存售出三表单分支", () => {
   it("代挂账号售出：全款收佣金入账、售出金额仅记录、不提供分期并挂寄售方", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "SALEDG" ? [{ id: 9001, order_type_code: scope, field_key: "sale_receipt", label: "售出凭据", field_type: "TEXT", options: [], required: true, is_active: true, sort_order: 99, locked: false, is_custom: true, note: null }] : []),
+    ] as never);
     const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
       account: { ...accounts[0], id: 5, source_order_id: 21, game_account: "acc-5", inventory_type: "CONSIGNMENT" },
@@ -1600,13 +1604,14 @@ describe("库存售出三表单分支", () => {
     await saleUi.type(screen.getByLabelText("客户昵称"), "买家A");
     await saleUi.type(screen.getByPlaceholderText("请输入利润（代挂佣金）"), "200");
     await saleUi.type(screen.getByPlaceholderText("代挂无买入价，此处仅作记录，不计入利润"), "1000");
+    await saleUi.type(await screen.findByLabelText("售出凭据"), "全款凭据");
     await saleUi.click(screen.getByLabelText("资金账户"));
     await saleUi.click(await screen.findByText(/利润池/));
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalled());
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
-      amount: "200", pool_id: 3, sale_amount: "1000", customer_input: expect.objectContaining({ display_name: "买家A", role: "CONSIGNOR" }),
+      amount: "200", pool_id: 3, sale_amount: "1000", form_extra: { sale_receipt: "全款凭据" }, customer_input: expect.objectContaining({ display_name: "买家A", role: "CONSIGNOR" }),
     }));
     expect(vi.mocked(ordersApi.addCustomerRole)).not.toHaveBeenCalled();
     expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
@@ -1640,6 +1645,10 @@ describe("库存售出三表单分支", () => {
   });
 
   it("提号库存售出可选择分期出售，确立时收首付", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "SALETH" ? [{ id: 9002, order_type_code: scope, field_key: "sale_receipt", label: "售出凭据", field_type: "TEXT", options: [], required: true, is_active: true, sort_order: 99, locked: false, is_custom: true, note: null }] : []),
+    ] as never);
     const saleUi = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(stocksApi.inventoryLedger).mockResolvedValueOnce(inventoryLedgerResponse([{
       account: { ...accounts[0], id: 6, source_order_id: 21, game_account: "pickup-acc", inventory_type: "PICKUP", cost_amount: "0.00" },
@@ -1660,12 +1669,13 @@ describe("库存售出三表单分支", () => {
     await saleUi.type(screen.getByLabelText("分期期数"), "2");
     await saleUi.clear(screen.getByLabelText("每期金额"));
     await saleUi.type(screen.getByLabelText("每期金额"), "600");
+    await saleUi.type(await screen.findByLabelText("售出凭据"), "分期凭据");
     expect(screen.getByLabelText("第 1 期到期日")).toBeInTheDocument();
     expect(screen.getByLabelText("第 2 期到期日")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /确认售出/ }));
 
     await waitFor(() => expect(vi.mocked(installmentsApi.stockSale)).toHaveBeenCalledWith(expect.objectContaining({
-      order_id: 21, principal: "1200", down_payment: "300", pool_id: 3, operator_user_ids: [1],
+      order_id: 21, principal: "1200", down_payment: "300", pool_id: 3, operator_user_ids: [1], form_extra: { sale_receipt: "分期凭据" },
     })));
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();

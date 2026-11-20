@@ -22,6 +22,12 @@ export const usersApi = {
 
 export const teamsApi = {
   list: () => api.get<Team[]>("/teams").then((r) => r.data),
-  create: (payload: Record<string, unknown>) => api.post<Team>("/teams", payload).then((r) => r.data),
-  update: (id: number, payload: Record<string, unknown>) => api.patch<Team>(`/teams/${id}`, payload).then((r) => r.data),
+  create: (payload: Record<string, unknown>) => api.post<Team>("/teams", payload).then((r) => {
+    notifyReferenceDataChanged("teams");
+    return r.data;
+  }),
+  update: (id: number, payload: Record<string, unknown>) => api.patch<Team>(`/teams/${id}`, payload).then((r) => {
+    notifyReferenceDataChanged("teams");
+    return r.data;
+  }),
 };

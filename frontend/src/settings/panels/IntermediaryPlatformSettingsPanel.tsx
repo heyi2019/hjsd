@@ -7,6 +7,7 @@ import { optionSetsApi } from "../../shared/api/options.api";
 import type { OptionItem } from "../../shared/api/types/common";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
+import { useReferenceRefresh } from "../../shared/hooks/useReferenceRefresh";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
 export function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
@@ -20,6 +21,7 @@ export function OptionDictionarySection({ code, title, description }: { code: st
     return set.options ?? [];
   }, [code]);
   const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
+  useReferenceRefresh("optionSets", reload, true);
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
   const canEdit = !loading && !saving && !error && loadedRows !== null;

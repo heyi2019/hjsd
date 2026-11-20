@@ -5,6 +5,7 @@ import { normalizeError } from "../shared/api/client";
 import { teamsApi } from "../shared/api/org.api";
 import type { Team } from "../shared/api/types/org";
 import { useSettingsResource } from "../shared/state/useSettingsResource";
+import { useReferenceRefresh } from "../shared/hooks/useReferenceRefresh";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton } from "../shared/ui";
 
 export function TeamsPanel() {
@@ -14,6 +15,7 @@ export function TeamsPanel() {
     appMessage.error(cause.message);
   }, []);
   const { data: loadedRows, loading, error, reload } = useSettingsResource(load, { onError: handleLoadError });
+  useReferenceRefresh("teams", reload, true);
   const rows = loadedRows ?? [];
   const submit = async (values: Record<string, string>) => {
     const code = String(values.code ?? "").trim();

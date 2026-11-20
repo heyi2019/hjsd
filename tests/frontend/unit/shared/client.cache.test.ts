@@ -71,6 +71,7 @@ vi.mock("axios", () => {
 
 import axios from "axios";
 import { clearApiCache, setDevUser } from "@/shared/api/client";
+import "@/shared/state/referenceDataEvents";
 
 function apiInstance() {
   return (axios as any).__instances[0];
@@ -127,6 +128,18 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     // 缓存被清空，重新走网络，拿到与 g1 不同的新响应
     expect(g2.data).not.toBe(g1.data);
     expect(g2.data).toMatch(/^NET-\d+$/);
+  });
+
+  it("其他标签页变更基础资料后，本页清除旧 GET 缓存", async () => {
+    const api = apiInstance();
+    const first = await api.request({ method: "get", url: "/users/options" });
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: "hj.reference-data-changed",
+      newValue: JSON.stringify({ resource: "employees", id: "another-tab" }),
+    }));
+    const refreshed = await api.request({ method: "get", url: "/users/options" });
+    expect(refreshed.data).not.toBe(first.data);
+    expect((axios as any).__getCallCount()).toBe(2);
   });
 
   it("写入后旧的进行中读取不会重新填充缓存", async () => {

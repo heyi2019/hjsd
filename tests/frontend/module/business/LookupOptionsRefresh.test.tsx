@@ -8,7 +8,7 @@ import { useOrderDetailEditor } from "@/business/OrderDetailView/editing/use-ord
 import { EmployeeSelectControl } from "@/business/ResponsibleEmployeeSelect";
 import { api } from "@/shared/api/client";
 import { gameTypesApi } from "@/shared/api/misc.api";
-import { employeesApi, usersApi } from "@/shared/api/org.api";
+import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
@@ -16,6 +16,8 @@ import type { Account } from "@/shared/api/types/accounts";
 import type { EmployeeOption } from "@/shared/api/types/org";
 import { clearOptionSetsCache, useOptionSet } from "@/shared/lib/optionSets";
 import { useOrderFormConfig, useOrderFormSectionLabels } from "@/business/configurable-field/context";
+import { UsersPanel } from "@/users/UsersPanel";
+import { TeamsPanel } from "@/users/TeamsPanel";
 
 const original: EmployeeOption = { id: 1, username: "admin", display_name: "管理员", is_active: true };
 const added: EmployeeOption = { id: 2, username: "new-user", display_name: "新员工", is_active: true };
@@ -38,6 +40,7 @@ function EmployeeSelectors() {
     <button onClick={() => void editor.openEditor({ id: 1, extra_values: {} } as Account)}>编辑订单</button>
     <EmployeeSelectControl aria-label="详情操作人" employees={editor.employees} />
     <output data-testid="详情在职员工">{editor.employees.filter((item) => item.is_active).map((item) => item.display_name).join("、")}</output>
+    <output data-testid="详情账户">{editor.pools.map((item) => item.name).join("、")}</output>
   </>;
 }
 
@@ -74,15 +77,88 @@ beforeEach(() => {
 
 describe("基础资料变更后的选项", () => {
   it("新增资金账户和游戏类型后已打开的建单资料同步更新", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "旧账户", code: "OLD", pool_type: "OPERATING", status: "ACTIVE" }]);
     renderLight(<EmployeeSelectors />, { user: "admin" });
     await screen.findByText("管理员", { selector: "output" });
+    await user.click(screen.getByRole("button", { name: "编辑订单" }));
+    await waitFor(() => expect(screen.getByTestId("详情账户")).toHaveTextContent("旧账户"));
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, name: "新增账户", code: "NEW", pool_type: "OPERATING", status: "ACTIVE" }]);
     vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 4, name: "新增游戏", sort_order: 1, is_active: true, is_default: false }]);
 
     await act(async () => { await poolsApi.create({ name: "新增账户" }); });
     await waitFor(() => expect(screen.getByTestId("建单账户")).toHaveTextContent("新增账户"));
+    await waitFor(() => expect(screen.getByTestId("详情账户")).toHaveTextContent("新增账户"));
     await act(async () => { await gameTypesApi.create({ name: "新增游戏" }); });
     await waitFor(() => expect(screen.getByTestId("建单游戏")).toHaveTextContent("新增游戏"));
+  });
+
+  it("新增团队后用户管理的团队选项更新，迟到的旧请求不会覆盖新结果", async () => {
+    let resolveOld!: (items: Awaited<ReturnType<typeof usersApi.list>>) => void;
+    const userList = vi.spyOn(usersApi, "list").mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; })).mockResolvedValue([]);
+    let teams: Awaited<ReturnType<typeof teamsApi.list>> = [];
+    const teamList = vi.spyOn(teamsApi, "list").mockImplementation(async () => [...teams]);
+    vi.spyOn(optionSetsApi, "list").mockResolvedValue({ items: [] } as never);
+    vi.mocked(api.post).mockImplementation(async () => {
+      teams = [{ id: 2, code: "T2", name: "新团队", is_active: true }];
+      return { data: teams[0] } as never;
+    });
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<UsersPanel />, { user: "admin" });
+    await waitFor(() => expect(teamList).toHaveBeenCalledTimes(1));
+
+    await act(async () => { await teamsApi.create({ code: "T2", name: "新团队" }); });
+    await waitFor(() => expect(userList).toHaveBeenCalledTimes(2));
+    await act(async () => { resolveOld([]); });
+    await user.click(screen.getByRole("combobox", { name: "所属团队" }));
+    expect(await screen.findByText("新团队", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
+  it("另一个标签页修改员工后，当前页面自动更新操作人选项", async () => {
+    renderLight(<EmployeeSelectors />, { user: "admin" });
+    await screen.findByText("管理员", { selector: "output" });
+    employees = [original, added];
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent("storage", {
+        key: "hj.reference-data-changed",
+        newValue: JSON.stringify({ resource: "employees", id: "other-tab" }),
+      }));
+    });
+    await waitFor(() => expect(screen.getByTestId("建单员工")).toHaveTextContent("新员工"));
+  });
+
+  it("另一个标签页新增员工后，用户管理列表也自动更新", async () => {
+    let users: Awaited<ReturnType<typeof usersApi.list>> = [];
+    vi.spyOn(usersApi, "list").mockImplementation(async () => [...users]);
+    vi.spyOn(teamsApi, "list").mockResolvedValue([]);
+    vi.spyOn(optionSetsApi, "list").mockResolvedValue({ items: [] } as never);
+    renderLight(<UsersPanel />, { user: "admin" });
+    await screen.findByText("暂无用户");
+    users = [{ ...added, role: "VIEWER", owner_scope: "SELF", pool_ids: [], team_ids: [], must_change_password: false }];
+
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent("storage", {
+        key: "hj.reference-data-changed",
+        newValue: JSON.stringify({ resource: "employees", id: "other-tab" }),
+      }));
+    });
+    expect(await screen.findByText("new-user")).toBeInTheDocument();
+  });
+
+  it("另一个标签页新增团队后，团队管理列表自动更新", async () => {
+    let teams: Awaited<ReturnType<typeof teamsApi.list>> = [];
+    vi.spyOn(teamsApi, "list").mockImplementation(async () => [...teams]);
+    renderLight(<TeamsPanel />, { user: "admin" });
+    await screen.findByText("暂无团队");
+    teams = [{ id: 2, code: "T2", name: "新团队", is_active: true }];
+
+    await act(async () => {
+      window.dispatchEvent(new StorageEvent("storage", {
+        key: "hj.reference-data-changed",
+        newValue: JSON.stringify({ resource: "teams", id: "other-tab" }),
+      }));
+    });
+    expect(await screen.findByText("新团队")).toBeInTheDocument();
   });
 
   it("选项字典更新后，已打开页面使用新选项，旧请求不能覆盖新选项", async () => {
@@ -145,6 +221,7 @@ describe("员工变更后的操作人选项", () => {
     await waitFor(() => expect(employeesApi.list).toHaveBeenCalledTimes(2));
 
     await act(async () => { await usersApi.create({ username: added.username }); });
+    expect(JSON.parse(localStorage.getItem("hj.reference-data-changed") ?? "null")).toMatchObject({ resource: "employees" });
 
     for (const label of ["建单操作人", "详情操作人"]) {
       await user.click(screen.getByRole("combobox", { name: label }));
@@ -186,9 +263,11 @@ describe("员工变更后的操作人选项", () => {
     renderLight(<EmployeeSelectors />, { user: "admin" });
     await screen.findByText("管理员", { selector: "output" });
     vi.mocked(api.post).mockRejectedValueOnce(new Error("保存失败"));
+    const previousNotification = localStorage.getItem("hj.reference-data-changed");
 
     await act(async () => { await expect(usersApi.create({ username: added.username })).rejects.toThrow("保存失败"); });
     expect(employeesApi.list).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("建单员工")).toHaveTextContent("管理员");
+    expect(localStorage.getItem("hj.reference-data-changed")).toBe(previousNotification);
   });
 });

@@ -2,11 +2,9 @@ import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../business/ConfigurableField";
+import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue, useOrderFormConfig } from "../business/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
-import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Counterparty } from "../shared/api/types/customers";
-import type { OrderFormField } from "../shared/api/types/forms";
 import { normalizeError } from "../shared/api/client";
 import { configurableLabel, useOptionSet } from "../shared/lib/optionSets";
 import { money } from "../shared/lib/format";
@@ -31,7 +29,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
+  const { config: fieldConfig, ready: fieldConfigReady, error: fieldConfigError, retry: retryFieldConfig } = useOrderFormConfig("COUNTERPARTY");
+  const fieldDefs = Object.values(fieldConfig).filter((field) => field.is_custom);
   const [open, setOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Counterparty | null>(null);
   const [detailTarget, setDetailTarget] = useState<Counterparty | null>(null);
@@ -88,12 +87,6 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     return () => { requestRef.current += 1; };
   }, [active, load, page, resetKey]);
 
-  useEffect(() => {
-    orderFormFieldsApi.list("COUNTERPARTY", true)
-      .then((items) => setFieldDefs((items ?? []).filter((item) => item.is_custom)))
-      .catch(() => setFieldDefs([]));
-  }, []);
-
   const openDetail = async (row: Counterparty, loadedDetail?: Counterparty) => {
     setDetailTarget(row);
     setDetailData(loadedDetail ?? null);
@@ -123,6 +116,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   }, [focusId, rows]);
 
   const submit = async (values: Record<string, unknown>) => {
+    if (!fieldConfigReady) return;
     await write.run(async () => {
       await counterpartiesApi.create({
         display_name: values.display_name as string,
@@ -142,7 +136,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   };
 
   const submitEdit = async (values: Record<string, unknown>) => {
-    if (!editTarget) return;
+    if (!editTarget || !fieldConfigReady) return;
     await write.run(async () => {
       await counterpartiesApi.patch(editTarget.id, {
         display_name: values.display_name as string,
@@ -241,6 +235,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
      />
       <BusinessActionModal title="新建合作方" fieldCount={5} open={open} onCancel={() => { write.clearError(); setOpen(false); }} footer={null}>
         <InlineError error={write.error} />
+        <ErrorBanner error={fieldConfigError} onRetry={retryFieldConfig} />
         <FieldConfigScope scope="COUNTERPARTY" active={open}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -263,7 +258,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
             <Input />
           </CfgItem>
           <CustomFieldSection testIdSuffix="counterparty-create" />
-          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" loading={write.pending} disabled={Boolean(error) || !counterpartyTypeOptions}>
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" loading={write.pending} disabled={Boolean(error) || !counterpartyTypeOptions || !fieldConfigReady}>
             建档
           </PermissionButton>
         </BusinessRegistrationForm>
@@ -283,6 +278,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
         destroyOnHidden
       >
         <InlineError error={write.error} />
+        <ErrorBanner error={fieldConfigError} onRetry={retryFieldConfig} />
         <FieldConfigScope scope="COUNTERPARTY" active={Boolean(editTarget)}>
         <BusinessRegistrationForm
           layout="horizontal"
@@ -329,7 +325,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
             <Input.TextArea rows={3} />
           </Form.Item>
           <CustomFieldSection testIdSuffix="counterparty-edit" />
-          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" loading={write.pending}>
+          <PermissionButton permission="counterparty.manage" type="primary" htmlType="submit" loading={write.pending} disabled={!fieldConfigReady}>
             保存
           </PermissionButton>
         </BusinessRegistrationForm>

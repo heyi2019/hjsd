@@ -12,6 +12,7 @@ import { appMessage } from "../../../shared/ui/appFeedback";
 import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useEmployeeOptions } from "../../../shared/hooks/useEmployeeOptions";
+import { useReferenceList } from "../../../shared/hooks/useReferenceList";
 import { buildEventEdits, buildOperationEventCreates, buildOrderEdits } from "./execution-edit-payload";
 import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
 import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
@@ -39,7 +40,7 @@ export function useOrderDetailEditor(params: {
   const [orderDrafts, setOrderDrafts] = useState<Record<number, OrderDraft>>({});
   const [partyDrafts, setPartyDrafts] = useState<Record<number, PartyAddition[]>>({});
   const { employees, reload: reloadEmployees } = useEmployeeOptions(false);
-  const [pools, setPools] = useState<Pool[]>([]);
+  const { items: pools, reload: reloadPools } = useReferenceList("pools", poolsApi.list, false);
   const [invEditExtraForm] = Form.useForm();
   const originalAccountExtras = useRef<Record<string, unknown>>({});
   const saveAction = useAsyncAction();
@@ -60,12 +61,8 @@ export function useOrderDetailEditor(params: {
   async function ensurePools(): Promise<Pool[]> {
     if (pools.length) return pools;
     try {
-      const list = await poolsApi.list();
-      const visiblePools = Array.isArray(list) ? list : [];
-      setPools(visiblePools);
-      return visiblePools;
+      return await reloadPools();
     } catch {
-      setPools([]);
       return [];
     }
   }

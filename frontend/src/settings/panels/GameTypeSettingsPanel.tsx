@@ -7,6 +7,7 @@ import { gameTypesApi } from "../../shared/api/misc.api";
 import type { GameTypeOption } from "../../shared/api/types/org";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
+import { useReferenceRefresh } from "../../shared/hooks/useReferenceRefresh";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
 import "./GameTypeSettingsPanel.css";
 
@@ -17,6 +18,7 @@ export function GameTypeSettingsPanel() {
 
   const load = useCallback(() => gameTypesApi.list({ include_inactive: true }), []);
   const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
+  useReferenceRefresh("gameTypes", reload, true);
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
 

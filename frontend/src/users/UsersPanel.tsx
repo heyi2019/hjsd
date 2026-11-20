@@ -7,6 +7,7 @@ import { poolsApi } from "../shared/api/pools.api";
 import type { Pool } from "../shared/api/types/finance";
 import type { ManagedUser, Team } from "../shared/api/types/org";
 import { useSettingsResource } from "../shared/state/useSettingsResource";
+import { useReferenceRefresh } from "../shared/hooks/useReferenceRefresh";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
@@ -55,6 +56,9 @@ export function UsersPanel() {
     appMessage.error(cause.message);
   }, []);
   const { data: loaded, error: loadError, reload } = useSettingsResource(load, { onError: handleLoadError });
+  useReferenceRefresh("employees", reload, true);
+  useReferenceRefresh("teams", reload);
+  useReferenceRefresh("pools", reload);
   const rows = loaded?.rows ?? [];
   const teams = loaded?.teams ?? [];
   const pools = loaded?.pools ?? [];

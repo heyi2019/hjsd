@@ -1,12 +1,10 @@
 import { Form, Space, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { buildFormExtraDisplay, formatExtraDisplayValue } from "../business/ConfigurableField";
+import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../business/ConfigurableField";
 import { customersApi } from "../shared/api/customers.api";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
-import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Customer, CustomerDetail } from "../shared/api/types/customers";
-import type { OrderFormField } from "../shared/api/types/forms";
 import { normalizeError } from "../shared/api/client";
 import { downloadBlob } from "../shared/api/download";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
@@ -26,7 +24,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [summary, setSummary] = useState<{ month_count: number; today_count: number } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
-  const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
+  const { config: fieldConfig } = useOrderFormConfig("CUSTOMER");
+  const fieldDefs = Object.values(fieldConfig).filter((field) => field.is_custom);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
@@ -147,14 +146,6 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     void loadSummary();
     return () => { summaryRequestRef.current += 1; };
   }, [active, loadSummary]);
-
-  useEffect(() => {
-    // 扩展字段定义来自「客户建档」表单的自定义字段；加载失败不阻断客户页
-    orderFormFieldsApi
-      .list("CUSTOMER", true)
-      .then((rows) => setFieldDefs((rows ?? []).filter((row) => row.is_custom)))
-      .catch(() => setFieldDefs([]));
-  }, []);
 
   const openDetail = async (row: Customer) => {
     const request = detailRequest.start();

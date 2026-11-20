@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { normalizeError, type NormalizedError } from "../api/client";
 
 interface SettingsResourceState<T> {
@@ -23,24 +23,31 @@ export function useSettingsResource<T>(
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<NormalizedError | null>(null);
+  const sequence = useRef(0);
 
   const reload = useCallback(async () => {
+    const request = ++sequence.current;
     setLoading(true);
     try {
       const next = await load();
-      setData(next);
-      setError(null);
+      if (request === sequence.current) {
+        setData(next);
+        setError(null);
+      }
     } catch (cause) {
-      const normalized = normalizeError(cause);
-      setError(normalized);
-      options.onError?.(normalized);
+      if (request === sequence.current) {
+        const normalized = normalizeError(cause);
+        setError(normalized);
+        options.onError?.(normalized);
+      }
     } finally {
-      setLoading(false);
+      if (request === sequence.current) setLoading(false);
     }
   }, [load, options.onError]);
 
   useEffect(() => {
     void reload();
+    return () => { sequence.current += 1; };
   }, [reload]);
 
   return { data, loading, error, reload };

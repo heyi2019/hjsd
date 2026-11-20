@@ -9,6 +9,7 @@ import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { POOL_TYPE_LABEL } from "../../shared/lib/labels";
 import { configurableLabel, useOptionSet } from "../../shared/lib/optionSets";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
+import { useReferenceRefresh } from "../../shared/hooks/useReferenceRefresh";
 import { BusinessActionModal, BusinessRegistrationForm, Select } from "../../shared/ui";
 
 /** 词典未加载/未打桩时的回落值，与改造前硬编码完全一致，保证零行为变化。 */
@@ -27,6 +28,7 @@ export function PoolsPanel() {
   const [editing, setEditing] = useState<Pool | null>(null);
   const load = useCallback(() => poolsApi.list(), []);
   const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
+  useReferenceRefresh("pools", reload, true);
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
   const reloadPanel = useCallback(async () => {

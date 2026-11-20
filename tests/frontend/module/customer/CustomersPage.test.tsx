@@ -17,6 +17,7 @@ import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { resolveMockOnce } from "@fixtures/mock-api";
 import { customerDetail, customerSummary, pageResponse } from "@fixtures/api-responses";
 import { currentReportPeriod } from "@/reporting/reportPeriod";
+import { notifyReferenceDataChanged } from "@/shared/state/referenceDataEvents";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
@@ -459,6 +460,69 @@ describe("CustomersPage：客户档案", () => {
     await user.click((await screen.findByRole("button", { name: /新建合作方$/ })));
     await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("COUNTERPARTY", true));
     expect(screen.getByLabelText("合作类型")).toBeInTheDocument();
+  });
+
+  it("客户和合作方页面已打开时，自定义字段变更后无需刷新即可使用", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    let updated = false;
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => updated ? [{
+      id: scope === "CUSTOMER" ? 201 : 202,
+      order_type_code: scope,
+      field_key: "new_custom_field",
+      label: scope === "CUSTOMER" ? "客户新字段" : "合作方新字段",
+      field_type: "TEXT",
+      options: null,
+      required: false,
+      is_active: true,
+      sort_order: 1,
+      locked: false,
+      is_custom: true,
+    }] as never : []);
+    vi.mocked(counterpartiesApi.create).mockResolvedValue({ id: 12 } as never);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("COUNTERPARTY", true));
+
+    updated = true;
+    await act(async () => { notifyReferenceDataChanged("formFields"); });
+    await user.click(screen.getByRole("button", { name: /新建合作方$/ }));
+    await user.type(await screen.findByLabelText("名称"), "新合作方");
+    await user.type(await screen.findByLabelText("合作方新字段"), "更新后的字段值");
+    await user.click(screen.getByRole("button", { name: "建档" }));
+    await waitFor(() => expect(counterpartiesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      extra_values: { new_custom_field: "更新后的字段值" },
+    })));
+    await user.click(screen.getByRole("tab", { name: "客户档案" }));
+    await user.click(screen.getByRole("button", { name: /新建客户$/ }));
+    expect(await screen.findByLabelText("客户新字段")).toBeInTheDocument();
+  });
+
+  it("合作方字段配置失败后必须重新加载，不能丢弃已填写的扩展字段", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    let calls = 0;
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => {
+      if (scope !== "COUNTERPARTY") return [];
+      calls += 1;
+      if (calls === 1) throw new Error("字段配置暂不可用");
+      return [{ id: 202, order_type_code: scope, field_key: "new_custom_field", label: "合作方新字段", field_type: "TEXT", options: null, required: false, is_active: true, sort_order: 1, locked: false, is_custom: true }] as never;
+    });
+    vi.mocked(counterpartiesApi.create).mockResolvedValue({ id: 12 } as never);
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await waitFor(() => expect(calls).toBe(1));
+    await user.click(screen.getByRole("button", { name: /新建合作方$/ }));
+    expect(await screen.findByText(/字段配置暂不可用/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "建档" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "建档" })).toBeEnabled());
+    await user.type(screen.getByLabelText("名称"), "新合作方");
+    await user.type(await screen.findByLabelText("合作方新字段"), "保留字段值");
+    await user.click(screen.getByRole("button", { name: "建档" }));
+    await waitFor(() => expect(counterpartiesApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      extra_values: { new_custom_field: "保留字段值" },
+    })));
   });
 
   it("统计区只展示总数、本月新增和今日新增", async () => {

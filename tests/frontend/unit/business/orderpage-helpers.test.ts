@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { pickCancelableEvent, resolveCancelAmount } from "@/business/orderpage/helpers";
+import { pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators } from "@/business/orderpage/helpers";
 
 describe("订单台账冲销 helpers", () => {
+  it("冲销操作人优先使用表单选择，其次匹配当前员工，最后匹配登录会话", async () => {
+    const employees = [{ id: 1, username: "alice" }, { id: 2, username: "bob" }];
+    const session = async () => ({ id: 2, username: "bob" });
+    expect(await resolveCancellationOperators([7], employees, "alice", session)).toEqual([7]);
+    expect(await resolveCancellationOperators([], employees, "alice", session)).toEqual([1]);
+    expect(await resolveCancellationOperators([], employees, "unknown", session)).toEqual([2]);
+    expect(await resolveCancellationOperators([], [employees[0]], "unknown", session)).toEqual([1]);
+    expect(await resolveCancellationOperators([], employees, "unknown", async () => { throw new Error("offline"); })).toBeUndefined();
+  });
   const remaining = "500.00";
 
   it("留空时按后端剩余金额全额冲销", () => {

@@ -15,7 +15,7 @@ import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
-import { pickCancelableEvent, resolveCancelAmount, type CancelFormScope } from "./helpers";
+import { pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators, type CancelFormScope } from "./helpers";
 
 /**
  * 订单「冲销 / 取消」域：普通订单的分笔冲销、原路退款与分期合约取消。
@@ -154,19 +154,7 @@ export function useOrderCancellation(params: {
           const selected = pickCancelableEvent(reversible, values.offset_event_id);
           if (cancelScope === "INVREFUND" && order.account_id != null) {
             const amount = values.amount ?? selected?.remaining ?? "0.00";
-            let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
-            if (!operatorUserIds?.length) {
-              const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
-              if (byDevUser) operatorUserIds = [byDevUser.id];
-              else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
-              else if (cancelEmployees.length > 0) {
-                try {
-                  const current = await currentUser();
-                  const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
-                  if (bySessionUser) operatorUserIds = [bySessionUser.id];
-                } catch { /* 无法取得当前人员时交给后端校验。 */ }
-              }
-            }
+            const operatorUserIds = await resolveCancellationOperators(values.operator_user_ids, cancelEmployees, currentOperator, currentUser);
             await ordersApi.inventoryOffsale(order.id, {
               amount,
               occurred_on: values.cancelled_on,
@@ -187,23 +175,7 @@ export function useOrderCancellation(params: {
               return;
             }
             const amount = resolved.amount;
-            // 操作人是业务事实的一部分，不能依赖异步下拉组件恰好先完成默认值注入。
-            // 用户直接确认弹窗时，最后一次从当前会话解析员工 ID，确保后端收到显式操作人。
-            let operatorUserIds = values.operator_user_ids?.length ? values.operator_user_ids : undefined;
-            if (!operatorUserIds?.length) {
-              const byDevUser = cancelEmployees.find((employee) => employee.username === currentOperator);
-              if (byDevUser) operatorUserIds = [byDevUser.id];
-              else if (cancelEmployees.length === 1) operatorUserIds = [cancelEmployees[0].id];
-              else if (cancelEmployees.length > 0) {
-                try {
-                  const current = await currentUser();
-                  const bySessionUser = cancelEmployees.find((employee) => employee.id === current.id || employee.username === current.username);
-                  if (bySessionUser) operatorUserIds = [bySessionUser.id];
-                } catch {
-                  // 下拉组件已尝试默认当前员工；解析失败时保留空值，让后端按必填规则返回明确错误。
-                }
-              }
-            }
+            const operatorUserIds = await resolveCancellationOperators(values.operator_user_ids, cancelEmployees, currentOperator, currentUser);
             const result = await ordersApi.postEvent(order.id, {
               event_type: "CANCEL",
               finalize_sale_cancel: ["HS", "TH"].includes(order.order_type),

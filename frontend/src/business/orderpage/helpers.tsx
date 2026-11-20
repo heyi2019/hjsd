@@ -1,6 +1,27 @@
 import type { Order } from "../../shared/api/types/orders";
 import { money } from "../../shared/lib/format";
 
+export async function resolveCancellationOperators(
+  selected: number[] | undefined,
+  employees: Array<{ id: number; username: string }>,
+  currentOperator: string | undefined,
+  getCurrentUser: () => Promise<{ id: number; username: string }>,
+): Promise<number[] | undefined> {
+  if (selected?.length) return selected;
+  const employee = employees.find((item) => item.username === currentOperator)
+    ?? (employees.length === 1 ? employees[0] : undefined);
+  if (employee) return [employee.id];
+  if (!employees.length) return undefined;
+  try {
+    const current = await getCurrentUser();
+    const match = employees.find((item) => item.id === current.id || item.username === current.username);
+    return match ? [match.id] : undefined;
+  } catch {
+    // 无法取得当前人员时交给后端校验。
+    return undefined;
+  }
+}
+
 export type BusinessFilterKey = "all" | "HS" | "TH" | "DG";
 export type BusinessModeFilterKey = "all" | "SELF" | "DISTRIBUTION";
 

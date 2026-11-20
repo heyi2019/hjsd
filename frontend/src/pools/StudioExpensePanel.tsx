@@ -144,18 +144,20 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     const seq = ++loadSeqRef.current;
     setLoading(true);
     try {
-      const savedItems = await readOptionSet(ITEM_SET_CODE);
-      if (seq !== loadSeqRef.current) return;
-      setExpenseItems(savedItems);
       // 明细与已入账汇总一次取回：什么算工作室收支、收入/支出/净额怎么加，全在
       // service.studio_summary 里。前端不再拉两次、不再按 source 过滤、不再 reduce。
-      const result = await studioExpensesApi.summary({
-        occurred_from: from || undefined,
-        occurred_to: to || undefined,
-        category,
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-      });
+      const [, result] = await Promise.all([
+        readOptionSet(ITEM_SET_CODE).then((savedItems) => {
+          if (seq === loadSeqRef.current) setExpenseItems(savedItems);
+        }),
+        studioExpensesApi.summary({
+          occurred_from: from || undefined,
+          occurred_to: to || undefined,
+          category,
+          limit: pageSize,
+          offset: (page - 1) * pageSize,
+        }),
+      ]);
       if (seq !== loadSeqRef.current) return;
       const lastPage = Math.max(1, Math.ceil(result.count / pageSize));
       if (page > lastPage) {

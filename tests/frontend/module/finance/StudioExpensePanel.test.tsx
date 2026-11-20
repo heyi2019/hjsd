@@ -93,6 +93,59 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
 }
 
 describe("StudioExpensePanel：工作室支出", () => {
+  it("费用科目尚未返回时，收支汇总仍同时开始加载", async () => {
+    let finishOptions!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof optionSetsApi.get>>>((resolve) => { finishOptions = resolve; });
+    vi.mocked(optionSetsApi.get).mockImplementation((code) => {
+      if (code === "STUDIO_EXPENSE_ITEM") return pending;
+      if (code === "BUSINESS_PERIOD") return Promise.resolve({ code, options: [{ value: "start_day", label: "16" }] } as never);
+      throw new Error(`unexpected option set: ${code}`);
+    });
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+
+    try {
+      await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenCalled());
+    } finally {
+      await act(async () => {
+        finishOptions({ id: 92, code: "STUDIO_EXPENSE_ITEM", label: "工作室支出费用科目", group: "FUND", editable: true, options: [{ value: "房租", label: "房租" }] } as never);
+        await pending;
+      });
+    }
+    expect(await screen.findByText("CF-001")).toBeInTheDocument();
+  });
+
+  it("费用科目失败后重试成功，旧汇总结果不能覆盖新结果", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof studioExpensesApi.summary>>) => void;
+    const oldSummary = new Promise<Awaited<ReturnType<typeof studioExpensesApi.summary>>>((resolve) => { finishOld = resolve; });
+    let optionLoads = 0;
+    vi.mocked(optionSetsApi.get).mockImplementation(async (code) => {
+      if (code === "BUSINESS_PERIOD") return { code, options: [{ value: "start_day", label: "16" }] } as never;
+      if (code === "STUDIO_EXPENSE_ITEM") {
+        optionLoads += 1;
+        if (optionLoads === 1) throw new Error("科目配置读取失败");
+        return { id: 92, code, label: "工作室支出费用科目", group: "FUND", editable: true, options: [{ value: "房租", label: "房租" }] } as never;
+      }
+      throw new Error(`unexpected option set: ${code}`);
+    });
+    vi.mocked(studioExpensesApi.summary)
+      .mockReturnValueOnce(oldSummary)
+      .mockResolvedValueOnce(studioExpenseSummary([{ ...expenseFlows[0], flow_no: "CF-NEW" }] as never));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+
+    try {
+      expect(await screen.findByText(/科目配置读取失败/)).toBeInTheDocument();
+      await ui.click(screen.getByRole("button", { name: "重新加载" }));
+      expect(await screen.findByText("CF-NEW")).toBeInTheDocument();
+    } finally {
+      await act(async () => {
+        finishOld(studioExpenseSummary(expenseFlows as never));
+        await oldSummary;
+      });
+    }
+    expect(screen.getByText("CF-NEW")).toBeInTheDocument();
+    expect(screen.queryByText("CF-001")).not.toBeInTheDocument();
+  });
+
   it("科目筛选可选择工作室收入科目", async () => {
     const income = { ...expenseFlows[0], flow_no: "CF-IN", category: "货款", direction: "IN", amount: "800.00" };
     vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>

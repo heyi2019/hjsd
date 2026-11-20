@@ -62,7 +62,6 @@ export function CreateBusinessModal(props: {
   const submitting = write.pending;
   const session = useRequestSession(props.open ? orderType : null);
   const [form] = Form.useForm();
-  const repurchaseConfirmedFor = useRef<string | null>(null);
   const submitErrorVisible = useRef(false);
   const [repurchasePrompt, setRepurchasePrompt] = useState<{ values: Record<string, unknown>; gameAccount: string } | null>(null);
   const [abandonConfirmOpen, setAbandonConfirmOpen] = useState(false);
@@ -79,7 +78,6 @@ export function CreateBusinessModal(props: {
   useEffect(() => {
     if (!props.open) {
       form.resetFields();
-      repurchaseConfirmedFor.current = null;
       initializedFormRef.current = false;
       userChangedFormRef.current = false;
     }
@@ -108,7 +106,7 @@ export function CreateBusinessModal(props: {
     }
   }, [form, gameTypes, isRecovery, isTh, orderType, props.open]);
 
-  const submit = async (values: Record<string, unknown>) => {
+  const submit = async (values: Record<string, unknown>, confirmRepurchase = false) => {
     if (!configReady) return;
     const prefix = isTh ? "supplier_" : isDg ? "dg_customer_" : "customer_";
     const nicknameField = `${prefix}nickname`;
@@ -125,7 +123,6 @@ export function CreateBusinessModal(props: {
     const submittedSession = session.current();
     await write.run(async () => {
       try {
-        const gameAccount = String(values.game_account ?? "").trim();
         // 判重已后移到后端（POST /orders）：未售出重复由后端返回 INVENTORY_ACCOUNT_IN_STOCK
         // 并在 game_account 字段上提示；已售出重复返回 REPURCHASE_CONFIRM_REQUIRED，
         // 由确认弹窗决定是否按复购回流继续。前端不再拉库存台账自行比对。
@@ -141,7 +138,7 @@ export function CreateBusinessModal(props: {
           account_snapshot: buildAccountSnapshot(values, accountExtraValues),
           account_id: undefined,
           // 后端判重：仅当用户已确认复购回流时，同一「已售出」账号才放行。
-          confirm_repurchase: repurchaseConfirmedFor.current === gameAccount,
+          confirm_repurchase: confirmRepurchase,
           note,
           customer_input: buildCustomerInput({ values, isRecovery, isDg, resolvedCustomerSource }),
           counterparty_input: buildCounterpartyInput({ values, isTh }),
@@ -280,11 +277,10 @@ export function CreateBusinessModal(props: {
       onConfirm={async () => {
         const prompt = repurchasePrompt;
         if (!prompt) return;
-        repurchaseConfirmedFor.current = prompt.gameAccount;
         form.setFields([{ name: "game_account", errors: [] }]);
         setLoadError(null);
         setRepurchasePrompt(null);
-        await submit(prompt.values);
+        await submit(prompt.values, true);
       }}
       onCancel={() => setRepurchasePrompt(null)}
     />

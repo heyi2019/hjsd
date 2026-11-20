@@ -375,6 +375,30 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
     );
   });
 
+it("复购确认后提交失败，再换游戏类型时不能沿用旧确认", async () => {
+  vi.mocked(ordersApi.create)
+    .mockRejectedValueOnce({ isAxiosError: true, response: { data: { code: "REPURCHASE_CONFIRM_REQUIRED", message: "请确认复购" } }, message: "failed" })
+    .mockRejectedValueOnce({ isAxiosError: true, response: { data: { code: "OTHER", message: "提交失败" } }, message: "failed" })
+    .mockRejectedValueOnce({ isAxiosError: true, response: { data: { code: "REPURCHASE_CONFIRM_REQUIRED", message: "请确认复购" } }, message: "failed" });
+  await openTypedModal("TH");
+  await ui.type(screen.getByLabelText("游戏账号"), "same-account");
+  await ui.type(screen.getByLabelText("账号密码"), "secret");
+  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
+  await pickMainPool();
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  await ui.click(await screen.findByRole("button", { name: "是，继续建单" }));
+  expect(await screen.findByText("提交失败")).toBeInTheDocument();
+  await ui.click(screen.getByLabelText("游戏类型").closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+  await ui.click(await screen.findByText("原神", { selector: ".ant-select-item-option-content" }));
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  await waitFor(() => expect(ordersApi.create).toHaveBeenCalledTimes(3));
+  expect(ordersApi.create).toHaveBeenLastCalledWith(expect.objectContaining({
+    confirm_repurchase: false,
+    account_snapshot: expect.objectContaining({ game_type: "原神" }),
+  }));
+});
+
 it.each(["HS", "TH", "DG"])("%s 建单等待时显示进度且重复提交只发一次", async (orderType) => {
     let finish!: (value: never) => void;
     const pending = new Promise<never>((resolve) => { finish = resolve; });

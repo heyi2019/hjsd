@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser
-from app.shared.scope import owner_scope_filter
+from app.shared.scope import owner_scope_filter, owner_scope_ids
 from app.core.errors import Validation
 from app.domain.trade import Account, Order
 from app.domain.users import User
@@ -71,11 +71,12 @@ def _account_outputs(
     loaded_orders: list[Order] | None = None,
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
-    if loaded_orders is not None and user is not None and (user.is_admin or user.owner_scope == "ALL"):
+    if loaded_orders is not None and user is not None:
         account_ids = {account.id for account in accounts}
+        visible_owner_ids = owner_scope_ids(db, user)
         source_orders = {}
         for order in loaded_orders:
-            if order.account_id not in account_ids:
+            if order.account_id not in account_ids or (visible_owner_ids is not None and order.owner_id not in visible_owner_ids):
                 continue
             if order.account_id in source_orders:
                 raise Validation("库存账号存在多个来源订单", details={"account_id": order.account_id})

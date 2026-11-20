@@ -95,6 +95,27 @@ class TestCreateAccountGuards:
         assert limited.source_order_id is None
         assert limited.source_order_no is None
 
+        owner = seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).first()
+        owner.team_ids = [42042]
+        order.owner_id = owner.id
+        seeded_db.flush()
+        scoped_users = [
+            CurrentUser.build(id=owner.id, username=owner.username, roles=["VIEWER"], owner_scope="SELF"),
+            CurrentUser.build(id=999999, username="team", roles=["VIEWER"], owner_scope="TEAM", team_ids=frozenset({42042})),
+            restricted,
+            CurrentUser.build(id=999999, username="other-team", roles=["VIEWER"], owner_scope="TEAM", team_ids=frozenset({42043})),
+        ]
+        for scoped_user in scoped_users:
+            expected = _account_outputs(seeded_db, [account], scoped_user)[0]
+            source_queries.clear()
+            event.listen(engine, "after_cursor_execute", record_sql)
+            try:
+                actual = _account_outputs(seeded_db, [account], scoped_user, loaded_orders=[order])[0]
+            finally:
+                event.remove(engine, "after_cursor_execute", record_sql)
+            assert actual.model_dump() == expected.model_dump()
+            assert source_queries == []
+
     def test_inventory_ledger_reuses_facet_counts_for_total(self, seeded_db):
         from sqlalchemy import event
 

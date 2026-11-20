@@ -257,6 +257,24 @@ it("必填校验失败时显示表单级提示，避免误认为点击无效", a
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
 
+it("关闭并重新打开建单时不保留上一单的校验错误", async () => {
+  const onClose = vi.fn();
+  const onCreated = vi.fn();
+  const { rerender } = renderLight(
+    <CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType="HS" />,
+    { user: "admin" },
+  );
+  await screen.findByLabelText("游戏账号");
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("请补齐必填项");
+  await ui.click(screen.getByRole("button", { name: "Close" }));
+  expect(onClose).toHaveBeenCalledOnce();
+  rerender(<CreateBusinessModal open={false} onClose={onClose} onCreated={onCreated} initialOrderType="HS" />);
+  rerender(<CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType="HS" />);
+  await screen.findByLabelText("游戏账号");
+  expect(screen.queryByText("请补齐必填项后再创建订单")).not.toBeInTheDocument();
+});
+
 it.each([
   ["HS", "customer_phone", "客户昵称"],
   ["TH", "supplier_phone", "供货方昵称"],

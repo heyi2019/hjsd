@@ -78,10 +78,12 @@ export function CreateBusinessModal(props: {
   useEffect(() => {
     if (!props.open) {
       form.resetFields();
+      setLoadError(null);
+      submitErrorVisible.current = false;
       initializedFormRef.current = false;
       userChangedFormRef.current = false;
     }
-  }, [props.open, form]);
+  }, [props.open, form, setLoadError]);
 
   useEffect(() => {
     if (!props.open || !orderType) return;

@@ -10,7 +10,7 @@ import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummar
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/deposits.api";
 import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
-import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
+import { listColumnsApi, orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";
 import { transfersApi } from "@/shared/api/transfers.api";
@@ -93,7 +93,221 @@ function modalContent(): HTMLElement {
   return document.querySelector(".ant-modal-content") as HTMLElement;
 }
 
+function customReceipt(scope: string) {
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async (actualScope) => actualScope === scope ? [{
+    id: 901, order_type_code: scope, field_key: "receipt", label: "自定义凭据",
+    field_type: "TEXT", required: true, is_active: true, sort_order: 1,
+    locked: false, is_custom: true, section: "FINANCE",
+  }] : []);
+}
+
 describe("FundsPage：资金写路径深覆盖", () => {
+  it("资金账户划转展示并提交配置的自定义字段", async () => {
+    customReceipt("FUNDTRANSFER");
+    resolveMockOnce(vi.mocked(transfersApi.create), { transfer_id: "TRF-200" });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(await screen.findByRole("button", { name: /资金账户划转/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    await pickSelect(modal, 1, /押金池/);
+    await ui.type(within(modal).getByLabelText("划转金额"), "100.00");
+    const receipt = await within(modal).findByLabelText("自定义凭据");
+    await ui.click(within(modal).getByRole("button", { name: /确认划转/ }));
+    expect(vi.mocked(transfersApi.create)).not.toHaveBeenCalled();
+    await ui.type(receipt, "划转凭据");
+    await ui.click(within(modal).getByRole("button", { name: /确认划转/ }));
+    await waitFor(() => expect(vi.mocked(transfersApi.create)).toHaveBeenCalledWith(
+      expect.objectContaining({ form_extra: { receipt: "划转凭据" } }),
+    ));
+  });
+
+  it("取消划转后重新打开不会带入上次的自定义字段", async () => {
+    customReceipt("FUNDTRANSFER");
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(await screen.findByRole("button", { name: /资金账户划转/ }));
+    await ui.type(await screen.findByLabelText("自定义凭据"), "上一笔");
+    await ui.click(within(modalContent()).getByRole("button", { name: "Close" }));
+    await ui.click(await screen.findByRole("button", { name: /资金账户划转/ }));
+    expect(await screen.findByLabelText("自定义凭据")).toHaveValue("");
+  });
+
+  it("新增押金提交配置的自定义字段", async () => {
+    customReceipt("FUNDDEPOSIT");
+    resolveMockOnce(vi.mocked(depositsApi.create), { id: 12 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /新增占用/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    await ui.type(within(modal).getByLabelText("占用金额"), "100");
+    await ui.type(await within(modal).findByLabelText("自定义凭据"), "押金凭据");
+    await ui.click(within(modal).getByRole("button", { name: /提\s*交/ }));
+    await waitFor(() => expect(vi.mocked(depositsApi.create)).toHaveBeenCalledWith(
+      expect.objectContaining({ form_extra: { receipt: "押金凭据" } }),
+    ));
+  });
+
+  it("编辑押金回填自定义字段并保留其他操作的历史字段", async () => {
+    customReceipt("FUNDDEPOSIT");
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      form_extra: { receipt: "原始凭据", old_action: "历史信息" },
+    }] as never);
+    resolveMockOnce(vi.mocked(depositsApi.update), { id: 11 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    const row = screen.getByText("#99").closest("tr") as HTMLElement;
+    await ui.click(within(row).getByRole("button", { name: "编辑" }));
+    const receipt = await screen.findByLabelText("自定义凭据");
+    expect(receipt).toHaveValue("原始凭据");
+    await ui.clear(receipt);
+    await ui.type(receipt, "更新凭据");
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(vi.mocked(depositsApi.update)).toHaveBeenCalledWith(11,
+      expect.objectContaining({ form_extra: { receipt: "更新凭据", old_action: "历史信息" } }),
+    ));
+  });
+
+  it("编辑押金时清空可选数字字段并保留其他历史字段", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "FUNDDEPOSIT" ? [{
+      id: 902, order_type_code: scope, field_key: "optional_number", label: "可选数字",
+      field_type: "NUMBER", required: false, is_active: true, sort_order: 1,
+      locked: false, is_custom: true, section: "EXTRA",
+    }] : []);
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      form_extra: { optional_number: 17, old_action: "历史信息" },
+    }] as never);
+    resolveMockOnce(vi.mocked(depositsApi.update), { id: 11 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(within(screen.getByText("#99").closest("tr") as HTMLElement).getByRole("button", { name: "编辑" }));
+    const optionalNumber = await screen.findByLabelText("可选数字");
+    expect(optionalNumber).toHaveValue("17");
+    await ui.clear(optionalNumber);
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(vi.mocked(depositsApi.update)).toHaveBeenCalledWith(11,
+      expect.objectContaining({ form_extra: { old_action: "历史信息" } }),
+    ));
+  });
+
+  it("编辑押金时清空唯一可选字段仍会提交空对象", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "FUNDDEPOSIT" ? [{
+      id: 903, order_type_code: scope, field_key: "optional_number", label: "可选数字",
+      field_type: "NUMBER", required: false, is_active: true, sort_order: 1,
+      locked: false, is_custom: true, section: "EXTRA",
+    }] : []);
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      form_extra: { optional_number: 17 },
+    }] as never);
+    resolveMockOnce(vi.mocked(depositsApi.update), { id: 11 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(within(screen.getByText("#99").closest("tr") as HTMLElement).getByRole("button", { name: "编辑" }));
+    await ui.clear(await screen.findByLabelText("可选数字"));
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(vi.mocked(depositsApi.update)).toHaveBeenCalledWith(11,
+      expect.objectContaining({ form_extra: {} }),
+    ));
+  });
+
+  it("押金释放提交配置的自定义字段", async () => {
+    customReceipt("FUNDRELEASE");
+    resolveMockOnce(vi.mocked(depositsApi.release), { id: 11 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /释\s*放/ }));
+    const modal = modalContent();
+    await ui.type(within(modal).getByLabelText("释放金额"), "100");
+    await ui.type(within(modal).getByLabelText("释放日期"), "2026-10-19");
+    await ui.type(await within(modal).findByLabelText("自定义凭据"), "释放凭据");
+    await ui.click(within(modal).getByRole("button", { name: /确认释放/ }));
+    await waitFor(() => expect(vi.mocked(depositsApi.release)).toHaveBeenCalledWith(11,
+      expect.objectContaining({ form_extra: { receipt: "释放凭据" } }),
+    ));
+  });
+
+  it("押金损失提交配置的自定义字段", async () => {
+    customReceipt("FUNDLOSS");
+    resolveMockOnce(vi.mocked(depositsApi.loss), { id: 91 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /登记损失/ }));
+    const modal = modalContent();
+    await ui.type(within(modal).getByLabelText("损失金额"), "100");
+    await ui.type(within(modal).getByLabelText("费用分类"), "违约损失");
+    await ui.type(within(modal).getByLabelText("损失原因"), "未返还");
+    await ui.type(await within(modal).findByLabelText("自定义凭据"), "损失凭据");
+    await ui.click(within(modal).getByRole("button", { name: /确认损失/ }));
+    await waitFor(() => expect(vi.mocked(depositsApi.loss)).toHaveBeenCalledWith(11,
+      expect.objectContaining({ form_extra: { receipt: "损失凭据" } }),
+    ));
+  });
+
+  it("取消押金提交配置的自定义字段", async () => {
+    customReceipt("FUNDCANCEL");
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+    }] as never);
+    resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 11 });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /取\s*消/ }));
+    const modal = modalContent();
+    await ui.type(within(modal).getByLabelText("取消原因"), "登记有误");
+    await ui.type(await within(modal).findByLabelText("自定义凭据"), "取消凭据");
+    await ui.click(within(modal).getByRole("button", { name: /确认取消/ }));
+    await waitFor(() => expect(vi.mocked(depositsApi.cancel)).toHaveBeenCalledWith(11,
+      expect.objectContaining({ form_extra: { receipt: "取消凭据" } }),
+    ));
+  });
+
+  it("新增对账提交配置的自定义字段", async () => {
+    customReceipt("FUNDRECON");
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    await ui.click(await screen.findByRole("button", { name: /新增对账/ }));
+    const modal = modalContent();
+    await pickSelect(modal, 0, /经营主池/);
+    await ui.type(within(modal).getByLabelText("对账账户"), "账户A");
+    await ui.type(within(modal).getByLabelText("账面余额"), "800");
+    await ui.type(await within(modal).findByLabelText("自定义凭据"), "对账凭据");
+    await ui.click(within(modal).getByRole("button", { name: /提交对账/ }));
+    await waitFor(() => expect(vi.mocked(reconciliationsApi.create)).toHaveBeenCalledWith(
+      expect.objectContaining({ form_extra: { receipt: "对账凭据" } }),
+    ));
+  });
+
+  it("核销对账提交配置的自定义字段", async () => {
+    customReceipt("FUNDCLEAR");
+    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([{
+      id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户",
+      system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN",
+    }]);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    await ui.click(await screen.findByRole("button", { name: /核销/ }));
+    const modal = modalContent();
+    await ui.type(within(modal).getByLabelText("处理说明"), "完成核对");
+    await ui.type(await within(modal).findByLabelText("自定义凭据"), "核销凭据");
+    await ui.click(within(modal).getByRole("button", { name: /确认核销/ }));
+    await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(
+      21, "完成核对", [1], { receipt: "核销凭据" },
+    ));
+  });
+
   it("资金账户划转提交调用 transfersApi.create", async () => {
     resolveMockOnce(vi.mocked(transfersApi.create), { id: 200, transfer_id: "TRF-200" });
     renderLight(<FundsPage />, { user: "admin" });
@@ -185,7 +399,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
     await ui.type(modal.querySelector("#reason") ?? modal, "已补录漏记流水");
     await ui.click(screen.getByRole("button", { name: /确认核销/ }));
-    await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水", [1]));
+    await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水", [1], undefined));
   });
 
   it("押金释放提交调用 depositsApi.release", async () => {

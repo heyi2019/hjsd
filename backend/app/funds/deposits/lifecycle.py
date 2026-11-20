@@ -59,7 +59,10 @@ def return_deposit(
             details={"deposit_id": deposit.id, "outstanding": str(outstanding)},
         )
 
-    checked_extra = validate_form_extra(session, order_type_code="FUNDRELEASE", values=form_extra)
+    checked_extra = validate_form_extra(
+        session, order_type_code="FUNDRELEASE", values=form_extra,
+        context={"amount": amount, "released_on": released_on, "operator_user_ids": operator_user_ids},
+    )
     deposit.returned_amount = to_money(deposit.returned_amount) + money
     deposit.released_on = released_on
     deposit.status = _status_after_return(deposit)
@@ -140,7 +143,10 @@ def cancel_deposit(
             },
         )
     text = _text(reason, field="reason", message="取消押金必须填写理由")
-    checked_extra = validate_form_extra(session, order_type_code="FUNDCANCEL", values=form_extra)
+    checked_extra = validate_form_extra(
+        session, order_type_code="FUNDCANCEL", values=form_extra,
+        context={"cancelled_on": cancelled_on, "reason": reason, "operator_user_ids": operator_user_ids},
+    )
     money = to_money(deposit.paid_amount)
     deposit.status = DepositStatus.CANCELLED.value
     # 反向流水 DEPOSIT_CANCEL（IN）已把资金余额冲平；台账侧同步回填已退金额，
@@ -236,6 +242,11 @@ def lose_deposit(
             code=ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE,
             details={"deposit_id": deposit.id, "outstanding": str(outstanding)},
         )
+    checked_extra = validate_form_extra(
+        session, order_type_code="FUNDLOSS", values=form_extra,
+        context={"amount": amount, "lost_on": lost_on, "category": category,
+                 "reason": reason, "operator_user_ids": operator_user_ids},
+    )
     deposit.lost_amount = to_money(deposit.lost_amount) + money
     deposit.lost_on = lost_on
     deposit.status = _status_after_loss(deposit)
@@ -255,7 +266,7 @@ def lose_deposit(
         reviewed_by=actor,
         reviewed_at=now_second(),
         note=text_reason,
-        form_extra=validate_form_extra(session, order_type_code="FUNDLOSS", values=form_extra) or None,
+        form_extra=checked_extra or None,
         created_by=actor,
         updated_by=actor,
     )

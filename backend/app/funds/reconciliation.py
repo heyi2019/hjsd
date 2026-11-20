@@ -151,7 +151,12 @@ def create_reconciliation(
         reason=text_reason or None,
         unmatched_flow_ids=raw_ids,
         note=note,
-        form_extra=validate_form_extra(session, order_type_code="FUNDRECON", values=form_extra) or None,
+        form_extra=validate_form_extra(
+            session, order_type_code="FUNDRECON", values=form_extra,
+            context={"pool_id": pool_id, "reconciled_on": reconciled_on, "account_label": account_label,
+                     "statement_balance": statement_balance, "unmatched_flow_ids": raw_ids,
+                     "reason": reason, "note": note, "operator_user_ids": operator_user_ids},
+        ) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -253,7 +258,10 @@ def resolve_reconciliation(
     item = _get_reconciliation(session, reconciliation_id, user)
     if item.status != ReconciliationStatus.OPEN.value:
         raise Validation("该对账记录已核销", details={"reconciliation_id": item.id})
-    checked_extra = validate_form_extra(session, order_type_code="FUNDCLEAR", values=form_extra)
+    checked_extra = validate_form_extra(
+        session, order_type_code="FUNDCLEAR", values=form_extra,
+        context={"reason": reason, "operator_user_ids": operator_user_ids},
+    )
     item.status = ReconciliationStatus.RESOLVED.value
     item.resolved_by = actor
     item.resolved_at = now_second()

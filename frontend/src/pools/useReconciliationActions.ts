@@ -4,6 +4,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { reconciliationsApi } from "../shared/api/reconciliations.api";
 import type { Reconciliation } from "../shared/api/types/finance";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { mergeFormExtra } from "./formExtra";
 
 interface ReconciliationActionsDeps {
   load: () => Promise<void>;
@@ -32,6 +33,7 @@ export function useReconciliationActions({ load, reconciliations, write }: Recon
     }
 
     await write.run(async () => {
+      const formExtra = mergeFormExtra(values.form_extra);
       await reconciliationsApi.create({
         pool_id: poolId,
         reconciled_on: reconciledOn,
@@ -39,6 +41,7 @@ export function useReconciliationActions({ load, reconciliations, write }: Recon
         statement_balance: values.statement_balance as string,
         reason: values.reason as string,
         note: values.note as string,
+        ...(Object.keys(formExtra).length ? { form_extra: formExtra } : {}),
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("对账记录已提交");
@@ -52,7 +55,9 @@ export function useReconciliationActions({ load, reconciliations, write }: Recon
     if (!resolveTarget) return;
     const targetId = resolveTarget.id;
     await write.run(async () => {
-      await reconciliationsApi.resolve(targetId, values.reason as string, values.operator_user_ids as number[] | undefined);
+      const formExtra = mergeFormExtra(values.form_extra);
+      await reconciliationsApi.resolve(targetId, values.reason as string, values.operator_user_ids as number[] | undefined,
+        Object.keys(formExtra).length ? formExtra : undefined);
       appMessage.success("对账差异已核销");
       setResolveTarget(null);
       resolveForm.resetFields();

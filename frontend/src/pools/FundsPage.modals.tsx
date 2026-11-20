@@ -9,7 +9,7 @@ import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, In
 import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
 import type { EmployeeOption } from "../shared/api/types/org";
-import { CfgItem, FieldConfigScope } from "../business/ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../business/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
@@ -59,7 +59,7 @@ interface FundsActionModalProps {
 /**
  * 资金中心 10 个表单弹窗的共用骨架：BusinessActionModal + InlineError + FieldConfigScope +
  * BusinessRegistrationForm 的布局属性完全一致，差异（标题/字段数/字段/文案/权限/危险态/初始值）
- * 通过 props 与 children 表达。注意资金弹窗不渲染 CustomFieldSection，与分期弹窗不同。
+ * 通过 props 与 children 表达，并展示当前作用域配置的自定义字段。
  */
 function FundsActionModal({
   title,
@@ -100,6 +100,7 @@ function FundsActionModal({
         >
           {formIntro}
           {children}
+          <CustomFieldSections testIdSuffix={scope.toLowerCase()} />
           {showOperator ? <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} /> : null}
           <PermissionButton
             permission={permission}
@@ -161,7 +162,7 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <FundsActionModal
       title="资金账户划转" fieldCount={6}
-      open={transferOpen} onCancel={() => setTransferOpen(false)}
+      open={transferOpen} onCancel={() => { setTransferOpen(false); transferForm.resetFields(); }}
       scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer}
       initialValues={{ occurred_on: today() }}
       write={write} permission="finance.transfer" submitLabel="确认划转" employees={employees} showOperator
@@ -180,7 +181,7 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <FundsActionModal
       title="新增资金对账" fieldCount={8}
-      open={reconciliationOpen} onCancel={() => setReconciliationOpen(false)}
+      open={reconciliationOpen} onCancel={() => { setReconciliationOpen(false); reconciliationForm.resetFields(); }}
       scope="FUNDRECON" form={reconciliationForm} onFinish={submitReconciliation}
       initialValues={{ reconciled_on: today() }}
       write={write} permission="deposit.post" submitLabel="提交对账" employees={employees} showOperator
@@ -200,7 +201,7 @@ export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <FundsActionModal
       title="核销对账差异" fieldCount={2}
-      open={Boolean(resolveTarget)} onCancel={() => setResolveTarget(null)}
+      open={Boolean(resolveTarget)} onCancel={() => { setResolveTarget(null); resolveForm.resetFields(); }}
       scope="FUNDCLEAR" form={resolveForm} onFinish={resolveReconciliation}
       write={write} permission="deposit.post" submitLabel="确认核销" employees={employees} showOperator
     >
@@ -214,7 +215,7 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <FundsActionModal
       title="押金释放" fieldCount={3}
-      open={Boolean(returnTarget)} onCancel={() => setReturnTarget(null)}
+      open={Boolean(returnTarget)} onCancel={() => { setReturnTarget(null); returnForm.resetFields(); }}
       scope="FUNDRELEASE" form={returnForm} onFinish={submitReturn}
       write={write} permission="deposit.post" submitLabel="确认释放"
       employees={employees} showOperator
@@ -263,7 +264,7 @@ export function LossModal({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <FundsActionModal
       title="登记押金损失" fieldCount={5}
-      open={Boolean(lossTarget)} onCancel={() => setLossTarget(null)}
+      open={Boolean(lossTarget)} onCancel={() => { setLossTarget(null); lossForm.resetFields(); }}
       scope="FUNDLOSS" form={lossForm} onFinish={submitLoss}
       write={write} permission="deposit.post" submitLabel="确认损失"
       employees={employees} showOperator
@@ -286,7 +287,7 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
   return (
     <FundsActionModal
       title="取消押金" fieldCount={3}
-      open={Boolean(cancelTarget)} onCancel={() => setCancelTarget(null)}
+      open={Boolean(cancelTarget)} onCancel={() => { setCancelTarget(null); cancelForm.resetFields(); }}
       scope="FUNDCANCEL" form={cancelForm} onFinish={submitCancelDeposit}
       write={write} permission="deposit.post" submitLabel="确认取消" danger
       employees={employees} showOperator

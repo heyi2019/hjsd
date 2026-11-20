@@ -5,6 +5,7 @@ import { depositsApi } from "../shared/api/deposits.api";
 import type { Deposit } from "../shared/api/types/finance";
 import { today } from "../shared/lib/format";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { mergeFormExtra } from "./formExtra";
 
 interface DepositActionsDeps {
   load: () => Promise<void>;
@@ -32,6 +33,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
 
   const openDepositEdit = (target: Deposit) => {
     setDepositEditTarget(target);
+    depositForm.resetFields();
     depositForm.setFieldsValue({
       pool_id: target.pool_id,
       ledger_type: target.ledger_type ?? "BUSINESS",
@@ -41,6 +43,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
       source_order_id: target.source_order_id ?? undefined,
       expected_release_on: target.expected_release_on ?? undefined,
       note: target.note ?? undefined,
+      form_extra: target.form_extra ?? undefined,
       operator_user_ids: target.operation_operators?.find((item) => item.operation_key === "CREATE")?.operator_user_ids,
     });
     setDepositOpen(true);
@@ -56,6 +59,7 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     const editing = depositEditTarget;
     await write.run(async () => {
       const ledgerType = (values.ledger_type as string) || "BUSINESS";
+      const formExtra = mergeFormExtra(values.form_extra, editing?.form_extra);
       const payload = {
         pool_id: Number(values.pool_id),
         amount: values.amount as string,
@@ -66,6 +70,8 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
         source_order_id: ledgerType === "STUDIO" ? undefined : values.source_order_id ? Number(values.source_order_id) : undefined,
         expected_release_on: values.expected_release_on as string | undefined,
         note: values.note as string,
+        ...(Object.keys(formExtra).length || (editing && (editing.form_extra != null || values.form_extra != null))
+          ? { form_extra: formExtra } : {}),
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       };
       if (editing) {
@@ -92,9 +98,11 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     if (!returnTarget) return;
     const targetId = returnTarget.id;
     await write.run(async () => {
+      const formExtra = mergeFormExtra(values.form_extra);
       await depositsApi.release(targetId, {
         amount: values.amount as string,
         released_on: values.released_on as string,
+        ...(Object.keys(formExtra).length ? { form_extra: formExtra } : {}),
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("押金释放已登记");
@@ -108,11 +116,13 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     if (!lossTarget) return;
     const targetId = lossTarget.id;
     await write.run(async () => {
+      const formExtra = mergeFormExtra(values.form_extra);
       await depositsApi.loss(targetId, {
         amount: values.amount as string,
         lost_on: values.lost_on as string,
         category: values.category as string,
         reason: values.reason as string,
+        ...(Object.keys(formExtra).length ? { form_extra: formExtra } : {}),
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("押金损失已登记");
@@ -126,9 +136,11 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     if (!cancelTarget) return;
     const targetId = cancelTarget.id;
     await write.run(async () => {
+      const formExtra = mergeFormExtra(values.form_extra);
       await depositsApi.cancel(targetId, {
         cancelled_on: values.cancelled_on as string,
         reason: values.reason as string,
+        ...(Object.keys(formExtra).length ? { form_extra: formExtra } : {}),
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("押金已取消，已生成全额冲正流水");

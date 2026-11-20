@@ -15,7 +15,7 @@ from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
-from app.domain.trade import Cashflow
+from app.domain.trade import Cashflow, OrderFormField
 from app.funds.cashflow_queries import list_cashflows
 from app.funds.cashflows import create_cashflow
 from app.funds.deposits.writes import create_deposit
@@ -58,6 +58,149 @@ def _active_order(seeded_db) -> int:
 
 
 class TestFinanceApi:
+    @pytest.mark.parametrize(("action", "scope", "dependency"), [
+        ("deposit", "FUNDDEPOSIT", "pool_id"),
+        ("deposit-edit", "FUNDDEPOSIT", "pool_id"),
+        ("transfer", "FUNDTRANSFER", "source_pool_id"),
+        ("reconcile", "FUNDRECON", "account_label"),
+        ("resolve", "FUNDCLEAR", "reason"),
+        ("return", "FUNDRELEASE", "released_on"),
+        ("loss", "FUNDLOSS", "category"),
+        ("cancel", "FUNDCANCEL", "reason"),
+    ])
+    def test_finance_conditional_custom_fields_follow_form_values(
+        self, seeded_client, seeded_db, headers, action, scope, dependency,
+    ):
+        pool = _pool(seeded_db, "HJ_INVEST")
+        if action == "transfer":
+            target = _pool(seeded_db, "HJ_PROFIT")
+            create_cashflow(seeded_db, pool_id=pool.id, occurred_on=TODAY, direction="IN",
+                            category="OTHER", amount=Decimal("200"), actor="pytest")
+            url = "/api/v1/transfers"
+            payload = {"source_pool_id": pool.id, "target_pool_id": target.id,
+                       "amount": "10", "occurred_on": TODAY.isoformat()}
+        elif action in {"deposit", "deposit-edit"}:
+            payload = {"pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat()}
+            if action == "deposit":
+                url = "/api/v1/deposits"
+            else:
+                deposit = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("100"),
+                                         paid_on=TODAY, actor="pytest")
+                url = f"/api/v1/deposits/{deposit.id}"
+        elif action == "reconcile":
+            url = "/api/v1/reconciliations"
+            payload = {"pool_id": pool.id, "reconciled_on": TODAY.isoformat(),
+                       "statement_balance": "0", "account_label": "对账账户"}
+        elif action == "resolve":
+            created = seeded_client.post("/api/v1/reconciliations", headers=headers, json={
+                "pool_id": pool.id, "reconciled_on": TODAY.isoformat(),
+                "statement_balance": "0", "account_label": "对账账户",
+            })
+            assert created.status_code == 201, created.text
+            url = f"/api/v1/reconciliations/{created.json()['id']}/resolve"
+            payload = {"reason": "核对完成"}
+        else:
+            deposit = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("100"),
+                                     paid_on=TODAY, actor="pytest")
+            if action == "return":
+                url = f"/api/v1/deposits/{deposit.id}/returns"
+                payload = {"amount": "30", "released_on": TODAY.isoformat()}
+            elif action == "loss":
+                url = f"/api/v1/deposits/{deposit.id}/losses"
+                payload = {"amount": "30", "lost_on": TODAY.isoformat(),
+                           "category": "违约损失", "reason": "押金未返还"}
+            else:
+                url = f"/api/v1/deposits/{deposit.id}/cancel"
+                payload = {"reason": "登记错误", "cancelled_on": TODAY.isoformat()}
+
+        core_field = seeded_db.scalar(select(OrderFormField).where(
+            OrderFormField.order_type_code == scope, OrderFormField.field_key == dependency,
+        ))
+        if core_field is None:
+            core_field = create_order_form_field(seeded_db, order_type_code=scope, field_key=dependency,
+                                                 label="依赖字段", actor="pytest")
+            core_field.is_custom = False
+            seeded_db.flush()
+        create_order_form_field(
+            seeded_db, order_type_code=scope, field_key="receipt", label="条件凭据", actor="pytest",
+            required_when={"field": dependency, "op": "filled"},
+        )
+        seeded_db.commit()
+        request = seeded_client.put if action == "deposit-edit" else seeded_client.post
+        missing = request(url, headers=headers, json=payload)
+        assert missing.status_code == 422, missing.text
+        assert "条件凭据" in missing.text
+
+        spoofed = request(url, headers=headers, json={**payload, "form_extra": {dependency: ""}})
+        assert spoofed.status_code == 422, spoofed.text
+        assert "条件凭据" in spoofed.text
+
+        saved = request(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+        assert saved.status_code == (201 if action in {"deposit", "transfer", "reconcile"} else 200), saved.text
+        if action == "transfer":
+            assert all(flow["form_extra"]["receipt"] == "凭据A" for flow in saved.json()["cashflows"])
+        else:
+            assert saved.json()["form_extra"]["receipt"] == "凭据A"
+
+    def test_deposit_edit_preserves_existing_fields_and_validates_clear(self, seeded_client, seeded_db, headers):
+        pool = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=pool.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest",
+            form_extra={"receipt": "原始凭据", "past_action": "历史信息"},
+        )
+        core_field = create_order_form_field(seeded_db, order_type_code="FUNDDEPOSIT", field_key="pool_id",
+                                             label="资金账户", actor="pytest")
+        core_field.is_custom = False
+        seeded_db.flush()
+        create_order_form_field(
+            seeded_db, order_type_code="FUNDDEPOSIT", field_key="receipt", label="条件凭据", actor="pytest",
+            required_when={"field": "pool_id", "op": "filled"},
+        )
+        seeded_db.commit()
+        payload = {"pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat()}
+        url = f"/api/v1/deposits/{deposit.id}"
+        saved = seeded_client.put(url, headers=headers, json=payload)
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["form_extra"] == {"receipt": "原始凭据", "past_action": "历史信息"}
+        changed = seeded_client.put(url, headers=headers, json={**payload, "form_extra": {"receipt": "更新凭据"}})
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["form_extra"] == {"receipt": "更新凭据", "past_action": "历史信息"}
+        cleared = seeded_client.put(url, headers=headers, json={**payload, "form_extra": {"receipt": ""}})
+        assert cleared.status_code == 422, cleared.text
+        assert "条件凭据" in cleared.text
+
+    def test_deposit_condition_is_optional_when_account_does_not_match(self, seeded_client, seeded_db, headers):
+        pool = _pool(seeded_db, "HJ_INVEST")
+        other = _pool(seeded_db, "HJ_PROFIT")
+        core_field = create_order_form_field(seeded_db, order_type_code="FUNDDEPOSIT", field_key="pool_id",
+                                             label="资金账户", actor="pytest")
+        core_field.is_custom = False
+        seeded_db.flush()
+        create_order_form_field(
+            seeded_db, order_type_code="FUNDDEPOSIT", field_key="receipt", label="条件凭据", actor="pytest",
+            required_when={"field": "pool_id", "op": "eq", "values": [str(other.id)]},
+        )
+        seeded_db.commit()
+        response = seeded_client.post("/api/v1/deposits", headers=headers, json={
+            "pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat(),
+        })
+        assert response.status_code == 201, response.text
+
+    def test_deposit_edit_can_clear_optional_number(self, seeded_client, seeded_db, headers):
+        pool = _pool(seeded_db, "HJ_INVEST")
+        deposit = create_deposit(
+            seeded_db, pool_id=pool.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest",
+            form_extra={"optional_number": 17},
+        )
+        create_order_form_field(seeded_db, order_type_code="FUNDDEPOSIT", field_key="optional_number",
+                                label="可选数字", field_type="NUMBER", actor="pytest")
+        seeded_db.commit()
+        saved = seeded_client.put(f"/api/v1/deposits/{deposit.id}", headers=headers, json={
+            "pool_id": pool.id, "amount": "100", "paid_on": TODAY.isoformat(), "form_extra": {},
+        })
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["form_extra"] is None
+
     @pytest.mark.parametrize(("action", "scope"), [
         ("return", "FUNDRELEASE"), ("cancel", "FUNDCANCEL"), ("resolve", "FUNDCLEAR"),
     ])

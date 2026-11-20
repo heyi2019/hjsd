@@ -23,7 +23,7 @@ from app.domain.enums import (
     DepositStatus,
     Direction,
 )
-from app.domain.trade import Cashflow, Deposit
+from app.domain.trade import Cashflow, Deposit, OrderFormField
 from app.settings.field_definitions.pools import assert_pool_usable
 from app.shared.order_access import get_order
 from app.shared.form_field_rules import validate_form_extra
@@ -82,7 +82,13 @@ def create_deposit(
         paid_on=paid_on,
         expected_release_on=expected_release_on,
         note=note,
-        form_extra=validate_form_extra(session, order_type_code="FUNDDEPOSIT", values=form_extra) or None,
+        form_extra=validate_form_extra(
+            session, order_type_code="FUNDDEPOSIT", values=form_extra,
+            context={"pool_id": pool_id, "amount": amount, "paid_on": paid_on,
+                     "ledger_type": ledger_type, "counterparty_id": counterparty_id,
+                     "source_order_id": source_order_id, "expected_release_on": expected_release_on,
+                     "note": note, "operator_user_ids": operator_user_ids},
+        ) or None,
         created_by=actor,
         updated_by=actor,
     )
@@ -193,6 +199,26 @@ def update_deposit(
     if hold is None:
         raise Validation("押金占用对应流水不存在，无法编辑", details={"deposit_id": deposit.id})
 
+    if form_extra is None:
+        effective_extra = deposit.form_extra
+    else:
+        editable_keys = set(session.scalars(select(OrderFormField.field_key).where(
+            OrderFormField.order_type_code == "FUNDDEPOSIT",
+            OrderFormField.is_custom.is_(True),
+            OrderFormField.is_active.is_(True),
+        )))
+        effective_extra = {
+            **{key: value for key, value in (deposit.form_extra or {}).items() if key not in editable_keys},
+            **form_extra,
+        }
+    checked_extra = validate_form_extra(
+        session, order_type_code="FUNDDEPOSIT",
+        values=effective_extra,
+        context={"pool_id": pool_id, "amount": amount, "paid_on": paid_on,
+                 "ledger_type": ledger_type, "counterparty_id": counterparty_id,
+                 "source_order_id": source_order_id, "expected_release_on": expected_release_on,
+                 "note": note, "operator_user_ids": operator_user_ids},
+    )
     before = {
         "pool_id": deposit.pool_id,
         "ledger_type": deposit.ledger_type,
@@ -212,8 +238,7 @@ def update_deposit(
     deposit.expected_release_on = expected_release_on
     deposit.note = note
     deposit.updated_by = actor
-    if form_extra is not None:
-        deposit.form_extra = validate_form_extra(session, order_type_code="FUNDDEPOSIT", values=form_extra) or None
+    deposit.form_extra = checked_extra or None
 
     hold.pool_id = pool.id
     hold.ledger_type = normalized_ledger_type

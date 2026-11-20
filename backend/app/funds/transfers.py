@@ -66,7 +66,12 @@ def create_transfer(
         "amount": money,
         "created_by": actor,
         "updated_by": actor,
-        "form_extra": validate_form_extra(session, order_type_code="FUNDTRANSFER", values=form_extra) or None,
+        "form_extra": validate_form_extra(
+            session, order_type_code="FUNDTRANSFER", values=form_extra,
+            context={"source_pool_id": source_pool_id, "target_pool_id": target_pool_id,
+                     "amount": amount, "occurred_on": occurred_on, "note": note,
+                     "operator_user_ids": operator_user_ids},
+        ) or None,
     }
     outgoing = Cashflow(
         flow_no=allocate_flow_no(session, Direction.OUT.value),

@@ -48,6 +48,7 @@ export interface Deposit {
   expected_release_on?: string | null;
   released_on?: string | null;
   note?: string | null;
+  form_extra?: Record<string, unknown> | null;
   /** 押金剩余：实收 − 已退 − 已损失，且不小于 0；后端下发，前端不再相减。 */
   remaining_amount: string;
   operator?: string | null;

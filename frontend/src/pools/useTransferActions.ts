@@ -3,6 +3,7 @@ import { useState } from "react";
 import { appMessage } from "../shared/ui/appFeedback";
 import { transfersApi } from "../shared/api/transfers.api";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { mergeFormExtra } from "./formExtra";
 
 interface TransferActionsDeps {
   load: () => Promise<void>;
@@ -16,12 +17,14 @@ export function useTransferActions({ load, write }: TransferActionsDeps) {
 
   const submitTransfer = async (values: Record<string, unknown>) => {
     await write.run(async () => {
+      const formExtra = mergeFormExtra(values.form_extra);
       await transfersApi.create({
         source_pool_id: Number(values.source_pool_id),
         target_pool_id: Number(values.target_pool_id),
         amount: values.amount as string,
         occurred_on: values.occurred_on as string,
         note: values.note as string,
+        ...(Object.keys(formExtra).length ? { form_extra: formExtra } : {}),
         operator_user_ids: values.operator_user_ids as number[] | undefined,
       });
       appMessage.success("资金账户划转已登记");

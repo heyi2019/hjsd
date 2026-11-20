@@ -147,6 +147,12 @@ def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_typ
     post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=D, actor="pytest")
     sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=D, actor="pytest", bound_phone="13900000002", form_extra_context={"intermediary_platform": "第一次售出平台", "delivery_responsible_ids": [1]})
     assert order.form_extra["sell_intermediary_platform"] == "第一次售出平台"
+    first_delivery, _ = post_event(
+        seeded_db, order.id, event_type="DELIVER", delivery_direction="SELL",
+        occurred_on=D, actor="pytest", note="第一次交付凭证", bound_phone="13900000002",
+    )
+    with pytest.raises(Validation, match="已经登记过卖号交付"):
+        post_event(seeded_db, order.id, event_type="DELIVER", delivery_direction="SELL", occurred_on=D, actor="pytest", note="重复交付")
     post_event(seeded_db, order.id, event_type="CANCEL", amount=Decimal("200"), occurred_on=D, actor="pytest", offset_event_id=sell.id, pool_id=sell.pool_id, reason="取消售出")
     account = seeded_db.get(Account, order.account_id)
     assert account.status == AccountStatus.WAITING.value
@@ -159,6 +165,18 @@ def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_typ
     assert order.form_extra["bound_phone"] == "13700000001"
     assert order.form_extra["sell_intermediary_platform"] is None
     assert order.form_extra["sell_delivery_responsible_ids"] is None
+    second_delivery, flow = post_event(
+        seeded_db, order.id, event_type="DELIVER", delivery_direction="SELL",
+        occurred_on=D, actor="pytest", note="再次售出的交付凭证", bound_phone="13900000003",
+    )
+    assert flow is None
+    assert first_delivery.id < resold.id < second_delivery.id
+    assert first_delivery.form_extra["bound_phone"] == "13900000002"
+    assert second_delivery.form_extra["bound_phone"] == "13900000003"
+    assert order.form_extra["bound_phone"] == "13700000001"
+    assert order.form_extra["sell_bound_phone"] == "13900000003"
+    with pytest.raises(Validation, match="已经登记过卖号交付"):
+        post_event(seeded_db, order.id, event_type="DELIVER", delivery_direction="SELL", occurred_on=D, actor="pytest", note="再次重复交付")
     set_allocations(seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}], actor="pytest")
     group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
     assert group["outbound_date"] == date(2026, 11, 2)

@@ -208,16 +208,27 @@ def _post_deliver(
     note = note.strip()
     normalized_bound_phone = bound_phone.strip() if isinstance(bound_phone, str) and bound_phone.strip() else None
     normalized_bound_phone_owner = bound_phone_owner.strip() if isinstance(bound_phone_owner, str) and bound_phone_owner.strip() else None
+    latest_sell_id = None
+    if direction == "SELL":
+        latest_sell_id = session.scalar(
+            select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id,
+                OrderEvent.event_type == EventType.SELL.value,
+                OrderEvent.is_posted.is_(True),
+            ).order_by(OrderEvent.id.desc()).limit(1)
+        )
+    delivery_query = select(OrderEvent).where(
+        OrderEvent.order_id == order.id,
+        OrderEvent.event_type == EventType.DELIVER.value,
+        OrderEvent.is_posted.is_(True),
+    )
+    if latest_sell_id is not None:
+        # 撤销后重售仍使用同一订单；按登记顺序区分新旧交易，日期可能被补录。
+        delivery_query = delivery_query.where(OrderEvent.id > latest_sell_id)
     previous_delivery = next(
         (
             event
-            for event in session.scalars(
-                select(OrderEvent).where(
-                    OrderEvent.order_id == order.id,
-                    OrderEvent.event_type == EventType.DELIVER.value,
-                    OrderEvent.is_posted.is_(True),
-                )
-            ).all()
+            for event in session.scalars(delivery_query).all()
             if (event.form_extra or {}).get("delivery_direction") == direction
         ),
         None,
@@ -243,7 +254,7 @@ def _post_deliver(
             raise Validation("分期 DELIVER 必须通过分期交付流程")
     else:
         required_event = EventType.SELL.value if direction == "SELL" else EventType.BUY.value
-        has_required_event = session.scalar(
+        has_required_event = latest_sell_id if direction == "SELL" else session.scalar(
             select(OrderEvent.id).where(
                 OrderEvent.order_id == order.id,
                 OrderEvent.event_type == required_event,

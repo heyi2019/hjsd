@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useCashflowResources } from "./useCashflowResources";
 import { useDepositResources } from "./useDepositResources";
@@ -10,12 +10,15 @@ import type { PeriodState } from "../shared/state/businessPeriod";
 
 /** 资金中心数据/查询层：资金账户、余额、押金、流水、对账的加载与筛选，以及派生统计。
  *  逐字切片自原 useFundsPageController，仅按职责归位；写操作见 useFundsFormActions。 */
-export function useFundsResources(active: boolean, periodState: PeriodState) {
+export function useFundsResources(active: boolean, periodState: PeriodState, cashflowsActive: boolean) {
   const poolResources = usePoolResources();
   const depositResources = useDepositResources();
   const reconciliationResources = useReconciliationResources();
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const cashflow = useCashflowResources(active && periodState.ready, periodState);
+  const cashflowEnabled = cashflowsActive && periodState.ready;
+  const cashflowEnabledRef = useRef(cashflowEnabled);
+  cashflowEnabledRef.current = cashflowEnabled;
+  const cashflow = useCashflowResources(cashflowEnabled, periodState);
 
   useEffect(() => {
     let cancelled = false;
@@ -32,9 +35,9 @@ export function useFundsResources(active: boolean, periodState: PeriodState) {
       poolResources.loadPools(),
       depositResources.loadDeposits(),
       reconciliationResources.loadReconciliations(),
-      ...(includeCashflow && periodState.ready ? [cashflow.fetchCashflows()] : []),
+      ...(includeCashflow && cashflowEnabledRef.current ? [cashflow.fetchCashflows()] : []),
     ]);
-  }, [cashflow.fetchCashflows, depositResources.loadDeposits, poolResources.loadPools, reconciliationResources.loadReconciliations, periodState.ready]);
+  }, [cashflow.fetchCashflows, depositResources.loadDeposits, poolResources.loadPools, reconciliationResources.loadReconciliations]);
 
   // keep-alive：建单（initial_buy/initial_costs）与退款都会生成资金流水，重新激活时重拉避免资金中心过期。
   useReloadOnActive(active, () => load(false));

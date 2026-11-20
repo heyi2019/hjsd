@@ -1,8 +1,9 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FundsPage } from "@/pools/FundsPage";
+import { useFundsResources } from "@/pools/useFundsResources";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
@@ -17,7 +18,7 @@ import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 import { optionSetsApi } from "@/shared/api/options.api";
-import { BusinessPeriodProvider } from "@/shared/state/businessPeriod";
+import { BusinessPeriodProvider, useBusinessPeriod } from "@/shared/state/businessPeriod";
 import { previousReportPeriod } from "@/reporting/reportPeriod";
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -90,6 +91,10 @@ async function pickSelect(modal: HTMLElement, index: number, title: RegExp) {
   const current = dropdowns[dropdowns.length - 1] as HTMLElement;
   const option = await within(current).findByTitle(title);
   await ui.click(option);
+}
+
+function PeriodReadyProbe() {
+  return <span>{useBusinessPeriod().ready ? "周期已就绪" : "周期加载中"}</span>;
 }
 
 describe("FundsPage：资金账户卡片", () => {
@@ -446,10 +451,6 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("资金中心将工作室运营、对账和押金作为一级入口", async () => {
-    vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([
-        { ...cashflows[0], id: 31, source_type: "TRANSFER", source_id: "TRF-PAIRED-01", direction: "OUT" },
-        { ...cashflows[0], id: 32, source_type: "TRANSFER", source_id: "TRF-PAIRED-01", direction: "IN", pool_id: 2 },
-      ]));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     expect(screen.getByRole("tab", { name: "总览" })).toBeInTheDocument();
@@ -609,6 +610,75 @@ describe("FundsPage：押金占用", () => {
 });
 
 describe("FundsPage：资金流水", () => {
+  it("进入总览不请求流水，打开资金明细后才加载", async () => {
+    renderLight(<BusinessPeriodProvider><PeriodReadyProbe /><FundsPage /></BusinessPeriodProvider>, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await screen.findByText("周期已就绪");
+    await act(async () => { await new Promise<void>((resolve) => window.setTimeout(resolve, 0)); });
+    expect(cashflowsApi.list).not.toHaveBeenCalled();
+
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    expect(await screen.findByText("ZC00001")).toBeInTheDocument();
+    expect(cashflowsApi.list).toHaveBeenCalled();
+  });
+
+  it("离开明细时未完成的旧请求不能覆盖重新进入后的流水", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof cashflowsApi.list>>) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof cashflowsApi.list>>>((resolve) => { finishOld = resolve; });
+    vi.mocked(cashflowsApi.list).mockReturnValueOnce(oldRequest).mockResolvedValueOnce(
+      cashflowPage([{ ...cashflows[1], flow_no: "FLOW-LATEST" }]),
+    );
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    try {
+      await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+      await waitFor(() => expect(cashflowsApi.list).toHaveBeenCalledTimes(1));
+      await ui.click(screen.getByRole("tab", { name: "总览" }));
+      await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+      expect(await screen.findByText("FLOW-LATEST")).toBeInTheDocument();
+    } finally {
+      await act(async () => { finishOld(cashflowPage(cashflows)); await oldRequest; });
+    }
+    expect(screen.getByText("FLOW-LATEST")).toBeInTheDocument();
+    expect(screen.queryByText("ZC00001")).not.toBeInTheDocument();
+  });
+
+  it("再次进入明细时保留筛选并刷新流水", async () => {
+    vi.mocked(cashflowsApi.list).mockResolvedValue(cashflowPage([cashflows[1]]));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    await screen.findByText("SR00001");
+    await ui.click(screen.getByRole("combobox", { name: "流水方向" }));
+    await ui.click(await screen.findByText("收入", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ direction: "IN" })));
+    vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([{ ...cashflows[1], flow_no: "SR-LATEST" }]));
+
+    await ui.click(screen.getByRole("tab", { name: "总览" }));
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    expect(await screen.findByText("SR-LATEST")).toBeInTheDocument();
+    expect(cashflowsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ direction: "IN" }));
+  });
+
+  it("写入期间打开明细，完成后仍刷新当前流水", async () => {
+    const period = {
+      period: null, startDay: 16, ready: true, error: null,
+      retry: () => undefined, setPeriod: () => undefined, useCurrentPeriod: () => undefined,
+      usePreviousPeriod: () => undefined, useAllPeriods: () => undefined,
+    };
+    const { result, rerender } = renderHook(
+      ({ visible }) => useFundsResources(true, period, visible),
+      { initialProps: { visible: false } },
+    );
+    const refreshAfterWrite = result.current.load;
+    rerender({ visible: true });
+    await waitFor(() => expect(result.current.cashflowsReady).toBe(true));
+    vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([{ ...cashflows[1], flow_no: "AFTER-WRITE" }]));
+
+    await act(async () => { await refreshAfterWrite(); });
+    expect(result.current.cashflows[0]?.flow_no).toBe("AFTER-WRITE");
+  });
+
   it("资金明细显示每笔流水的资金账户", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -887,7 +957,6 @@ describe("FundsPage：资金写路径", () => {
     { ...balance, pool_id: 2, pool_code: "POOL-B" },
   ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" }));
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
-    vi.mocked(cashflowsApi.list).mockResolvedValueOnce(cashflowPage([]));
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金账户可用余额不足"));
     renderLight(<FundsPage />, { user: "admin" });

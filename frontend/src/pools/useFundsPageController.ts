@@ -4,10 +4,10 @@ import { useFundsFormActions } from "./useFundsFormActions";
 import type { PeriodState } from "../shared/state/businessPeriod";
 
 /** 资金中心逻辑层总入口：组合查询与写入领域。 */
-export function useFundsPageController(active: boolean, periodState: PeriodState) {
+export function useFundsPageController(active: boolean, periodState: PeriodState, cashflowsActive: boolean) {
   // 弹窗不会同时打开，故全部写操作后共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
-  const resources = useFundsResources(active, periodState);
+  const resources = useFundsResources(active, periodState, cashflowsActive);
   const actions = useFundsFormActions({
     load: resources.load,
     reconciliations: resources.reconciliations,

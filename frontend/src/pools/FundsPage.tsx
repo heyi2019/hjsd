@@ -1,6 +1,7 @@
 /** 资金中心：总览 / 资金明细 / 工作室运营 / 对账 / 押金。
  *  逻辑层见 useFundsPageController；视图层拆为 FundsPage.tabs 与 FundsPage.modals。 */
 import { Tabs } from "antd";
+import { useState } from "react";
 import { ErrorBanner } from "../shared/ui";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFundsPageController } from "./useFundsPageController";
@@ -17,13 +18,15 @@ import {
 } from "./FundsPage.modals";
 export function FundsPage({ active = true }: { active?: boolean } = {}) {
   const periodState = useBusinessPeriod();
-  const ctrl = useFundsPageController(active, periodState);
+  const [activeTab, setActiveTab] = useState("overview");
+  const ctrl = useFundsPageController(active, periodState, active && activeTab === "cashflows");
   return (
     <section className="ui-stack">
       <ErrorBanner error={ctrl.fundsError} onRetry={() => void ctrl.reloadFunds()} retrying={ctrl.fundsLoading} />
       <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
       <Tabs
-        defaultActiveKey="overview"
+        activeKey={activeTab}
+        onChange={setActiveTab}
         destroyOnHidden
         items={[
           {

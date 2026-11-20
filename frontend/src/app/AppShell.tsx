@@ -115,13 +115,6 @@ export function AppShell() {
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
   };
-  const navigateToPersonalView = (view: "orders" | "earnings") => {
-    if (view === "orders") {
-      navigate("/business/ledger?mine=true");
-      return;
-    }
-    navigate("/operations?tab=my-earnings");
-  };
   const navigateToDashboardPath = (path: string) => navigate(path);
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
@@ -298,7 +291,7 @@ export function AppShell() {
                       当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
                   <ErrorBoundary name={key}>
                     {key === "dashboard" ? (
-                      <DashboardPage active={isActive} onNavigate={navigateTo} onPersonalNavigate={navigateToPersonalView} onDashboardNavigate={navigateToDashboardPath} />
+                      <DashboardPage active={isActive} onNavigate={navigateTo} onDashboardNavigate={navigateToDashboardPath} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}

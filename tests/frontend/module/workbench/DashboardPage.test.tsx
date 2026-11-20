@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
+import { BusinessAlerts } from "@/app/BusinessOverview";
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/misc.api";
 import { ordersApi } from "@/shared/api/orders.api";
@@ -35,6 +36,12 @@ beforeEach(() => {
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {
+it("提醒动作由类型决定，修改文案不影响点击", () => {
+    const openPending = vi.fn();
+    renderLight(<BusinessAlerts alerts={[{ type: "pending_profit", message: "需要设置分润" }]} loading={false} onPendingProfitNotificationsClick={openPending} />, { user: "admin" });
+    fireEvent.click(screen.getByRole("button", { name: "需要设置分润" }));
+    expect(openPending).toHaveBeenCalledTimes(1);
+  });
 it("切换周期加载期间隐藏旧统计并暂停旧周期跳转", async () => {
     let finish!: (value: Awaited<ReturnType<typeof dashboardApi.summary>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof dashboardApi.summary>>>((resolve) => { finish = resolve; });

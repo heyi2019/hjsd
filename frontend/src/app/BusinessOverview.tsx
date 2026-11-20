@@ -4,23 +4,21 @@ import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from 
 import type { NotificationItem } from "../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../shared/lib/format";
 import { StatRow } from "../shared/ui";
+import type { DashboardAlert } from "./dashboardSummary";
 
 export function BusinessOverview({
-  orderSummary,
+  orderCount,
   inventoryCount,
   inventoryOverdueCount,
   installmentCount,
   overdueInstallmentCount,
-  ordersError = false,
   loading,
   allPeriods = false,
   personalOrders,
   personalCustomers,
-  personalOrdersError = false,
   onPersonalOrdersClick,
   onPersonalCustomersClick,
   personalEarnings,
-  personalEarningsError = false,
   onPersonalEarningsClick,
   onInventoryClick,
   onOrdersClick,
@@ -28,24 +26,18 @@ export function BusinessOverview({
   onOverdueInstallmentsClick,
   onInventoryOverdueClick,
 }: {
-  orderSummary: { total_count: number; completed_count: number } | null;
+  orderCount: number | null;
   inventoryCount: number | null;
-  inventoryAgingCount: number | null;
   inventoryOverdueCount: number | null;
   installmentCount: number | null;
   overdueInstallmentCount: number | null;
-  profitNotificationsEnabled?: boolean;
-  overdueInstallmentsEnabled?: boolean;
-  ordersError?: boolean;
   loading: boolean;
   allPeriods?: boolean;
-  personalOrders?: number | null;
-  personalCustomers?: number | null;
-  personalOrdersError?: boolean;
+  personalOrders: number | null;
+  personalCustomers: number | null;
   onPersonalOrdersClick?: () => void;
   onPersonalCustomersClick?: () => void;
-  personalEarnings?: string | null;
-  personalEarningsError?: boolean;
+  personalEarnings: string | null;
   onPersonalEarningsClick?: () => void;
   onInventoryClick?: () => void;
   onOrdersClick?: () => void;
@@ -57,11 +49,11 @@ export function BusinessOverview({
   return (
     <section aria-label="我的业务总览" className="ui-stack">
       <StatRow className="ui-stat-row--overview" items={[
-        ...(personalOrders !== undefined ? [{ label: allPeriods ? "我的订单" : "我的当期订单", kind: "count" as const, amount: loading || personalOrdersError || personalOrders === null ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrdersError || personalOrders === null ? undefined : onPersonalOrdersClick, testId: "dashboard-personal-orders" }] : []),
-        ...(personalEarnings !== undefined ? [{ label: allPeriods ? "我的收益" : "我的当期收益", amount: loading || personalEarningsError ? null : personalEarnings, hint: allPeriods ? "全部 · 本人分润基数" : "当期 · 本人分润基数", onClick: loading || personalEarningsError || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "dashboard-personal-earnings" }] : []),
+        { label: allPeriods ? "我的订单" : "我的当期订单", kind: "count", amount: loading || personalOrders === null ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrders === null ? undefined : onPersonalOrdersClick, testId: "dashboard-personal-orders" },
+        { label: allPeriods ? "我的收益" : "我的当期收益", amount: loading ? null : personalEarnings, hint: allPeriods ? "全部 · 本人分润基数" : "当期 · 本人分润基数", onClick: loading || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "dashboard-personal-earnings" },
         { label: "在库账号", kind: "count", amount: amount(inventoryCount), onClick: onInventoryClick, testId: "dashboard-inventory" },
-        { label: "订单总量", kind: "count", amount: ordersError || !orderSummary ? null : amount(orderSummary.total_count), onClick: loading || ordersError || !orderSummary ? undefined : onOrdersClick, testId: "dashboard-orders" },
-        ...(personalCustomers !== undefined ? [{ label: allPeriods ? "我的客户数" : "我的当期客户数", kind: "count" as const, amount: loading || ordersError || personalCustomers === null ? null : String(personalCustomers), onClick: loading || ordersError || personalCustomers === null ? undefined : onPersonalCustomersClick, testId: "dashboard-personal-customers" }] : []),
+        { label: "订单总量", kind: "count", amount: amount(orderCount), onClick: loading || orderCount === null ? undefined : onOrdersClick, testId: "dashboard-orders" },
+        { label: allPeriods ? "我的客户数" : "我的当期客户数", kind: "count", amount: loading || personalCustomers === null ? null : String(personalCustomers), onClick: loading || personalCustomers === null ? undefined : onPersonalCustomersClick, testId: "dashboard-personal-customers" },
         { label: "分期合约", kind: "count", amount: amount(installmentCount), onClick: onInstallmentsClick, testId: "dashboard-installments" },
         { label: "逾期合约", kind: "count", amount: amount(overdueInstallmentCount), tone: "warn", onClick: onOverdueInstallmentsClick, testId: "dashboard-overdue-installments" },
         { label: "在库超期账号", kind: "count", amount: amount(inventoryOverdueCount), hint: "未售超过 30 天", tone: "warn", onClick: onInventoryOverdueClick, testId: "dashboard-inventory-overdue" },
@@ -189,7 +181,7 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   );
 }
 
-export function BusinessAlerts({ alerts, loading, error = false, onPendingProfitNotificationsClick, onProfitNotificationsRead }: { alerts: string[]; loading: boolean; error?: boolean; onPendingProfitNotificationsClick?: () => void; onProfitNotificationsRead?: () => void }) {
+export function BusinessAlerts({ alerts, loading, error = false, onPendingProfitNotificationsClick, onProfitNotificationsRead }: { alerts: DashboardAlert[]; loading: boolean; error?: boolean; onPendingProfitNotificationsClick?: () => void; onProfitNotificationsRead?: () => void }) {
   const [profitNotificationsOpen, setProfitNotificationsOpen] = useState(false);
   return (
     <section aria-label="我的消息" className="business-alerts--expanded">
@@ -200,11 +192,11 @@ export function BusinessAlerts({ alerts, loading, error = false, onPendingProfit
             dataSource={alerts}
             renderItem={(item) => (
               <List.Item>
-                {item.startsWith("分润待配置") ? (
-                  <button type="button" className="business-alert__button" onClick={onPendingProfitNotificationsClick}>{item}</button>
-                ) : item.startsWith("获得分润通知") ? (
-                  <button type="button" className="business-alert__button" onClick={() => setProfitNotificationsOpen(true)}>{item}</button>
-                ) : item}
+                {item.type === "pending_profit" ? (
+                  <button type="button" className="business-alert__button" onClick={onPendingProfitNotificationsClick}>{item.message}</button>
+                ) : item.type === "allocated_profit" ? (
+                  <button type="button" className="business-alert__button" onClick={() => setProfitNotificationsOpen(true)}>{item.message}</button>
+                ) : item.message}
               </List.Item>
             )}
           />

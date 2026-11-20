@@ -8,6 +8,11 @@ export interface DashboardAlertInputs {
   overdueInstallmentsEnabled: boolean;
 }
 
+export interface DashboardAlert {
+  type: "inventory_aging" | "pending_profit" | "allocated_profit" | "overdue_installment";
+  message: string;
+}
+
 export function buildDashboardAlertMessages({
   inventoryAgingCount,
   inventoryAgingDays,
@@ -16,19 +21,19 @@ export function buildDashboardAlertMessages({
   profitNotificationsEnabled,
   overdueInstallmentCount,
   overdueInstallmentsEnabled,
-}: DashboardAlertInputs): string[] {
+}: DashboardAlertInputs): DashboardAlert[] {
   return [
     inventoryAgingCount && inventoryAgingCount > 0
-      ? `库存订单入库超过 ${inventoryAgingDays} 天 ${inventoryAgingCount} 个`
+      ? { type: "inventory_aging" as const, message: `库存订单入库超过 ${inventoryAgingDays} 天 ${inventoryAgingCount} 个` }
       : null,
     profitNotificationsEnabled && pendingProfitCount && pendingProfitCount > 0
-      ? `分润待配置 ${pendingProfitCount} 条`
+      ? { type: "pending_profit" as const, message: `分润待配置 ${pendingProfitCount} 条` }
       : null,
     profitNotificationsEnabled && allocatedProfitCount && allocatedProfitCount > 0
-      ? `获得分润通知 ${allocatedProfitCount} 条`
+      ? { type: "allocated_profit" as const, message: `获得分润通知 ${allocatedProfitCount} 条` }
       : null,
     overdueInstallmentsEnabled && overdueInstallmentCount && overdueInstallmentCount > 0
-      ? `逾期合约 ${overdueInstallmentCount} 个`
+      ? { type: "overdue_installment" as const, message: `逾期合约 ${overdueInstallmentCount} 个` }
       : null,
-  ].filter((item): item is string => Boolean(item));
+  ].filter((item): item is DashboardAlert => item !== null);
 }

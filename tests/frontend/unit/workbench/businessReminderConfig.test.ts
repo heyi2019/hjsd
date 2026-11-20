@@ -29,8 +29,8 @@ describe("业务提醒配置", () => {
       overdueInstallmentCount: 3,
       overdueInstallmentsEnabled: false,
     })).toEqual([
-      "库存订单入库超过 14 天 2 个",
-      "获得分润通知 1 条",
+      { type: "inventory_aging", message: "库存订单入库超过 14 天 2 个" },
+      { type: "allocated_profit", message: "获得分润通知 1 条" },
     ]);
   });
 });

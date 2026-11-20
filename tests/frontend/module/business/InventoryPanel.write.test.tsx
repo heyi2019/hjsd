@@ -858,6 +858,34 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
   });
 
+  it("库存编辑加载并保存自定义字段，不把它当作建单账号字段", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+      ...allFormFields().filter((field) => field.order_type_code === scope),
+      ...(scope === "INVEDIT" ? [{ id: 9001, order_type_code: scope, field_key: "check_note", label: "核对凭据", field_type: "TEXT", options: [], required: true, is_active: true, sort_order: 99, locked: false, is_custom: true, section: "EXTRA", note: null }] : []),
+    ] as never);
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+    const account = { ...accounts[0], extra_values: { check_note: "原凭据" } };
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account, orders: [{ order_id: 21, order_no: "HS-2026-0001", order_type: "HS", status: "ACTIVE", events: [] }],
+      detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+    } as never);
+    vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+    const input = await screen.findByLabelText("核对凭据");
+    expect(input).toHaveValue("原凭据");
+    await ui.clear(input);
+    await ui.type(input, "新凭据");
+    await ui.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(21, expect.objectContaining({
+      profile: expect.objectContaining({ form_extra: { check_note: "新凭据" } }),
+    })));
+    const payload = vi.mocked(ordersApi.updateExecution).mock.calls[0][1];
+    const profile = payload.profile as { extra_values?: Record<string, unknown> } | undefined;
+    expect(profile?.extra_values ?? {}).not.toHaveProperty("check_note");
+  });
+
   it("首次编辑库存账号只读取一次来源订单详情", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     await screen.findByText("acc-1");

@@ -55,7 +55,7 @@ def apply_operation_event_creates(
             form_extra["platform_unlisted_at"] = occurred_at.isoformat()
             form_extra_scope = "INVOID"
         else:
-            form_extra_scope = "INVEDIT"
+            form_extra_scope = None
         event, _ = post_event(
             db,
             order_id,

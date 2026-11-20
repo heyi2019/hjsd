@@ -27,12 +27,22 @@ export function CustomFieldSection(props: { testIdSuffix?: string; section?: Ord
   if (defs.length === 0) return null;
   return (
     <section className="ui-stack custom-field-section" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
-      <Typography.Text type="secondary" strong>{sectionLabels[props.section ?? "EXTRA"] ?? CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"]}</Typography.Text>
+      <Typography.Text type="secondary" strong>{sectionLabels[props.section ?? "EXTRA"] ?? CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"] ?? props.section}</Typography.Text>
       {defs.map((def) => (
         <CustomFormField key={def.id} def={def} />
       ))}
     </section>
   );
+}
+
+/** 在没有固定板块布局的表单中展示所有已配置的自定义字段。 */
+export function CustomFieldSections({ testIdSuffix }: { testIdSuffix?: string }): ReactElement {
+  const cfg = useFieldConfig();
+  const sections = [...new Set(Object.values(cfg)
+    .filter((field) => field.is_custom && field.is_active)
+    .map((field) => field.section ?? "EXTRA"))];
+  return <>{sections.map((section) => <CustomFieldSection key={section} section={section}
+    testIdSuffix={testIdSuffix ? `${testIdSuffix}-${section.toLowerCase()}` : undefined} />)}</>;
 }
 
 /** 解析配置选项：后端只返回 {value,label} 对象。 */

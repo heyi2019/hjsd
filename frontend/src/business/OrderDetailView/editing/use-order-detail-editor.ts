@@ -41,6 +41,7 @@ export function useOrderDetailEditor(params: {
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [invEditExtraForm] = Form.useForm();
+  const originalAccountExtras = useRef<Record<string, unknown>>({});
   const saveAction = useAsyncAction();
   const savingAccount = saveAction.pending;
   const openVersion = useLatestRequest();
@@ -98,6 +99,8 @@ export function useOrderDetailEditor(params: {
     setOrderDrafts({});
     setPartyDrafts({});
     invEditExtraForm.resetFields();
+    originalAccountExtras.current = { ...(account.extra_values ?? {}) };
+    invEditExtraForm.setFieldsValue({ form_extra: account.extra_values ?? {} });
     await Promise.all([ensureEmployees(), ensurePools()]);
     if (!openVersion.isCurrent(version)) return false;
     if (isCurrent && !isCurrent()) {
@@ -241,6 +244,9 @@ export function useOrderDetailEditor(params: {
           note,
           extra_values,
         } = editingAccount;
+        const changedAccountExtras = Object.fromEntries(Object.entries(extra_values ?? {}).filter(
+          ([key, value]) => JSON.stringify(value) !== JSON.stringify(originalAccountExtras.current[key]),
+        ));
         const profile = {
           game_account,
           game_type,
@@ -255,8 +261,8 @@ export function useOrderDetailEditor(params: {
           account_description,
           account_images,
           note,
-          extra_values,
-          form_extra: extraValues?.form_extra,
+          ...(Object.keys(changedAccountExtras).length ? { extra_values: changedAccountExtras } : {}),
+          form_extra: extraValues?.form_extra ?? {},
         };
         const detail = getExecutionDetail(id);
         const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];

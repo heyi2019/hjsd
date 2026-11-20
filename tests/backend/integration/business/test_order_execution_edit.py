@@ -31,6 +31,27 @@ def test_execution_edit_enforces_required_account_custom_fields(seeded_client, s
     assert seeded_db.get(Account, account.id).form_extra["rank"] == 12
 
 
+def test_execution_edit_uses_inventory_edit_fields_without_blocking_quick_actions(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="inventory-edit-fields", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    create_order_form_field(seeded_db, order_type_code="INVEDIT", field_key="check_note", label="核对凭据",
+                            required=True, actor="pytest")
+    seeded_db.commit()
+    url = f"/api/v1/orders/{order.id}/execution-edit"
+    quick = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"account_description": "运营描述"},
+        "new_events": [{"operation_type": "DESCRIPTION", "occurred_at": "2026-10-02T11:00:00", "operator_user_ids": [1]}]})
+    assert quick.status_code == 200, quick.text
+    for profile in ({"game_account": "inventory-edit-fields"}, {"game_account": "inventory-edit-fields", "form_extra": {}}):
+        missing = seeded_client.patch(url, headers=headers, json={"events": [], "profile": profile})
+        assert missing.status_code == 422, missing.text
+        assert "核对凭据" in missing.text
+    saved = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {
+        "game_account": "inventory-edit-fields", "form_extra": {"check_note": "凭据A"},
+    }})
+    assert saved.status_code == 200, saved.text
+    assert seeded_db.get(Account, account.id).form_extra["check_note"] == "凭据A"
+
+
 def test_execution_edit_saves_more_than_twenty_operations(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="many-operations", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

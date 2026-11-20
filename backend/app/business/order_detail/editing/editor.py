@@ -39,12 +39,15 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
 
     event_changes, cost_delta = validate_event_edits(db, account, order_id, payload, user)
     if payload.profile is not None:
+        profile = payload.profile.model_dump(exclude_unset=True)
+        if profile.keys() - {"account_description", "account_images"}:
+            profile.setdefault("form_extra", {})
         update_account_profile(
             db,
             account.id,
             actor=user.username,
             user=user,
-            **payload.profile.model_dump(exclude_unset=True),
+            **profile,
         )
     apply_event_edits(db, event_changes, user.username)
     apply_operation_event_creates(db, order_id, payload.new_events, user.username, user)

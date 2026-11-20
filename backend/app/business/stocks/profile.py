@@ -13,6 +13,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus, AuditAction, InstallmentContractType, SequenceKey
 from app.domain.trade import Account
 from app.shared.form_values import _validate_required_extras, set_extra_values
+from app.shared.form_field_rules import validate_form_extra
 from ._common import (
     _UNSET,
     account_is_visible,
@@ -159,6 +160,10 @@ def update_account_profile(
     if extra_values is not _UNSET:
         _validate_required_extras(session, "account", extra_values or {}, partial=True,
                                   scope=_ACCOUNT_FORM_SCOPE.get(account.inventory_type))
+    checked_form_extra = (
+        validate_form_extra(session, order_type_code="INVEDIT", values=form_extra)
+        if form_extra is not _UNSET else None
+    )
     before = {
         "game_account": account.game_account,
         "camp_account": account.camp_account,
@@ -231,9 +236,9 @@ def update_account_profile(
             values=(extra_values or {}).items(),
             scope=_ACCOUNT_FORM_SCOPE.get(account.inventory_type),
         )
-    if form_extra is not _UNSET and form_extra:
+    if checked_form_extra:
         # INVEDIT 作用域自定义字段值合并进账号 form_extra。
-        account.form_extra = {**(account.form_extra or {}), **dict(form_extra)}
+        account.form_extra = {**(account.form_extra or {}), **checked_form_extra}
     record_audit(
         session,
         action=AuditAction.ACCOUNT_UPDATE,

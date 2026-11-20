@@ -13,8 +13,8 @@ import type { Permission } from "../../shared/state/session";
 import { useContractActions } from "./useContractActions";
 import { buildContractColumns } from "./contractColumns";
 
-export function useContractTableController(params: { contractType: string; reloadKey: number; dateRange?: [string, string] | null; status?: string }) {
-  const { contractType, reloadKey, dateRange, status } = params;
+export function useContractTableController(params: { contractType: string; reloadKey: number; active?: boolean; dateRange?: [string, string] | null; status?: string }) {
+  const { contractType, reloadKey, active = true, dateRange, status } = params;
   // 上层每次渲染都会新建 [from, to] 数组，直接当 useCallback 依赖会每次变化 →
   // load 变 → useEffect 触发 → 无限重拉。这里只依赖两个原始字符串。
   const dateFrom = dateRange?.[0] ?? "";
@@ -101,8 +101,10 @@ export function useContractTableController(params: { contractType: string; reloa
   }, [contractType, dateFrom, dateTo, status]);
 
   useEffect(() => {
+    if (!active) return;
     void load();
-  }, [load, reloadKey]);
+    return () => { loadSeqRef.current += 1; };
+  }, [active, load, reloadKey]);
 
   // 写操作已提取到 useContractActions（函数体一字未改）：传入 state/form/setter
   // 与共享的 write/load，保持原闭包语义；返回字段与原 controller 完全一致。

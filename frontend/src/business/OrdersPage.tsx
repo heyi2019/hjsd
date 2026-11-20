@@ -96,7 +96,7 @@ export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilte
           {
             key: "collections",
             label: "分期与回款",
-            children: <InstallmentsPanel refreshKey={installmentRefreshKey} initialStatus={initialInstallmentStatus} />,
+            children: <InstallmentsPanel active={active} refreshKey={installmentRefreshKey} initialStatus={initialInstallmentStatus} />,
           },
         ]}
       />

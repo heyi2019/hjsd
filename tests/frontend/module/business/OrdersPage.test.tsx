@@ -11,7 +11,7 @@ import { stocksApi } from "@/shared/api/stocks.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { inventoryLedgerResponse, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
+import { installmentTotals, inventoryLedgerResponse, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -115,6 +115,24 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it("分期页仅在业务中心激活时加载并在返回时刷新", async () => {
+    vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals());
+    const view = renderLight(<OrdersPage initialTab="collections" active={false} />);
+    await act(async () => {});
+    expect(installmentsApi.list).not.toHaveBeenCalled();
+    expect(installmentsApi.totals).not.toHaveBeenCalled();
+    view.rerender(<OrdersPage initialTab="collections" active />);
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalledTimes(1));
+    expect(installmentsApi.totals).toHaveBeenCalledTimes(1);
+    view.rerender(<OrdersPage initialTab="collections" active={false} initialInstallmentStatus="OVERDUE" />);
+    await act(async () => {});
+    expect(installmentsApi.list).toHaveBeenCalledTimes(1);
+    view.rerender(<OrdersPage initialTab="collections" active initialInstallmentStatus="OVERDUE" />);
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalledTimes(2));
+    expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE" }));
+    expect(installmentsApi.totals).toHaveBeenCalledTimes(2);
+  });
+
   it("订单台账翻页时请求并展示后端第二页", async () => {
     const rows = Array.from({ length: 11 }, (_, index) => ({
       ...orders[0], id: index + 1, order_no: index === 10 ? "HS-PAGE2" : `HS-PAGE1-${index}`,

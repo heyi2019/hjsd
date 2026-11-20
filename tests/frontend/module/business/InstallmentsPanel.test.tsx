@@ -125,6 +125,20 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("分期页隐藏后忽略未完成请求并在返回时刷新", async () => {
+    let finish!: (value: Installment[]) => void;
+    const pending = new Promise<Installment[]>((resolve) => { finish = resolve; });
+    vi.mocked(installmentsApi.list).mockReturnValueOnce(pending);
+    const view = renderLight(<InstallmentsPanel />, { user: "admin" });
+    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalledTimes(1));
+    view.rerender(<InstallmentsPanel active={false} />);
+    await act(async () => finish(withBackendActions(installments)));
+    expect(screen.queryByText("HS0001-INS01")).not.toBeInTheDocument();
+    view.rerender(<InstallmentsPanel active />);
+    expect(await screen.findByText("HS0001-INS01")).toBeVisible();
+    expect(installmentsApi.list).toHaveBeenCalledTimes(2);
+  });
+
   it("合计请求未完成时先展示合约列表", async () => {
     let finish!: (value: ReturnType<typeof installmentTotals>) => void;
     const pending = new Promise<ReturnType<typeof installmentTotals>>((resolve) => { finish = resolve; });

@@ -500,6 +500,115 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(within(second).getByLabelText("分润备注")).toHaveValue(""));
   });
 
+  it("连续打开不同订单的分润配置，较晚返回的换算不能覆盖当前订单", async () => {
+    let finishFirst!: (result: { value: string | null }) => void;
+    const firstConversion = new Promise<{ value: string | null }>((resolve) => { finishFirst = resolve; });
+    vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
+    vi.mocked(profitAllocationApi.allocations).mockImplementation(async (id) => profitAllocationResponse([], {
+      allocatable_profit: id === 1 ? "1000.00" : "2000.00",
+      totals_by_type: { BUY: { allocation_amount: id === 1 ? "100.00" : "200.00", allocation_rate: "" } },
+    }));
+    vi.mocked(profitAllocationApi.convert).mockImplementation((id) => id === 1 ? firstConversion : Promise.resolve({ value: "20.00" }));
+
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    await waitFor(() => expect(profitAllocationApi.convert).toHaveBeenCalledWith(1, "AMOUNT_TO_RATE", "100.00"));
+    await openRowMenu("DG-2026-0002", "分润配置");
+    const modal = await modalOf(/分润 · DG-2026-0002/);
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("200.00");
+    await act(async () => finishFirst({ value: "10.00" }));
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("200.00");
+    expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("20.00");
+    await clickModalOk(modal);
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(2, expect.arrayContaining([
+      expect.objectContaining({ allocation_type: "BUY", allocation_amount: "200.00" }),
+    ]), expect.any(Object)));
+  });
+
+  it("关闭分润弹窗后，旧订单的金额换算不能覆盖新订单", async () => {
+    let finishFirst!: (result: { value: string | null }) => void;
+    const firstConversion = new Promise<{ value: string | null }>((resolve) => { finishFirst = resolve; });
+    vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
+    vi.mocked(profitAllocationApi.allocations).mockImplementation(async (id) => profitAllocationResponse([], {
+      totals_by_type: id === 1 ? {} : { BUY: { allocation_amount: "200.00", allocation_rate: "" } },
+    }));
+    vi.mocked(profitAllocationApi.convert).mockImplementation((id) => id === 1 ? firstConversion : Promise.resolve({ value: "20.00" }));
+
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const first = await modalOf(/分润 · HS-2026-0001/);
+    const amount = within(first).getAllByLabelText("金额")[0];
+    fireEvent.change(amount, { target: { value: "100.00" } });
+    fireEvent.blur(amount);
+    await waitFor(() => expect(profitAllocationApi.convert).toHaveBeenCalledWith(1, "AMOUNT_TO_RATE", "100.00"));
+    fireEvent.click(first.querySelector(".ant-modal-close") as HTMLElement);
+    await waitFor(() => expect(first).not.toBeVisible());
+    await openRowMenu("DG-2026-0002", "分润配置");
+    const second = await modalOf(/分润 · DG-2026-0002/);
+    expect(within(second).getAllByLabelText("比例")[0]).toHaveValue("20.00");
+    await act(async () => finishFirst({ value: "99.00" }));
+    expect(within(second).getAllByLabelText("比例")[0]).toHaveValue("20.00");
+  });
+
+  it.each(["请求失败", "没有结果"])("比例分润%s时提示重试，避免原配置被当成空金额保存", async (failure) => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      totals_by_type: { BUY: { allocation_rate: "30.00", allocation_amount: "" } },
+    }));
+    if (failure === "请求失败") vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
+    else vi.mocked(profitAllocationApi.convert).mockResolvedValueOnce({ value: null });
+    vi.mocked(profitAllocationApi.convert).mockResolvedValueOnce({ value: "300.00" });
+
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith("分润金额换算失败，请重试"));
+    expect(screen.queryByRole("dialog", { name: /分润 · HS-2026-0001/ })).toBeNull();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("300.00");
+    await clickModalOk(modal);
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
+      expect.objectContaining({ allocation_type: "BUY", allocation_amount: "300.00" }),
+    ]), expect.any(Object)));
+  });
+
+  it("上一单保存完成时，不关闭后来打开的分润配置", async () => {
+    let finishSave!: (result: Awaited<ReturnType<typeof profitAllocationApi.set>>) => void;
+    const saving = new Promise<Awaited<ReturnType<typeof profitAllocationApi.set>>>((resolve) => { finishSave = resolve; });
+    vi.mocked(profitAllocationApi.set).mockReturnValueOnce(saving);
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([]));
+    vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const first = await modalOf(/分润 · HS-2026-0001/);
+    await clickModalOk(first);
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledTimes(1));
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(first).not.toBeVisible());
+    await openRowMenu("DG-2026-0002", "分润配置");
+    const second = await modalOf(/分润 · DG-2026-0002/);
+    fireEvent.change(within(second).getAllByLabelText("金额")[0], { target: { value: "200.00" } });
+    await act(async () => finishSave(profitAllocationResponse([])));
+    expect(second).toBeVisible();
+    expect(within(second).getAllByLabelText("金额")[0]).toHaveValue("200.00");
+  });
+
+  it("分润保存中重复提交只写入一次", async () => {
+    let finishSave!: (result: Awaited<ReturnType<typeof profitAllocationApi.set>>) => void;
+    const saving = new Promise<Awaited<ReturnType<typeof profitAllocationApi.set>>>((resolve) => { finishSave = resolve; });
+    vi.mocked(profitAllocationApi.set).mockReturnValue(saving);
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([]));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const form = within(modal).getAllByLabelText("金额")[0].closest("form")!;
+    fireEvent.submit(form);
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledTimes(1));
+    fireEvent.submit(form);
+    await act(async () => { await Promise.resolve(); });
+    expect(profitAllocationApi.set).toHaveBeenCalledTimes(1);
+    await act(async () => finishSave(profitAllocationResponse([])));
+  });
+
   it("分润：只展示可分配动作，公司比例由规则配置补入", async () => {
     // 空分润 → 只展示买号、售出、运营；公司 40% 隐藏并由规则配置自动补入。
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));

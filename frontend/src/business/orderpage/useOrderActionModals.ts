@@ -1,5 +1,5 @@
 import { Form } from "antd";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useSession } from "../../shared/state/session";
 import { currentDevUser, normalizeError } from "../../shared/api/client";
 import type { CashflowTarget } from "../../finance/cashflow";
@@ -40,6 +40,7 @@ export function useOrderActionModals({
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationSubmitting, setAllocationSubmitting] = useState(false);
   const [allocationForm] = Form.useForm();
+  const allocationSession = useRef(0);
   const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
   const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
   const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
@@ -67,22 +68,20 @@ export function useOrderActionModals({
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
   const allocationIsLoss = Number(allocationProfit) < 0;
   const openAllocations = async (sourceOrder?: Order) => {
+    const session = ++allocationSession.current;
     try {
       const order = sourceOrder ? await ordersApi.get(sourceOrder.id) : selectedOrder;
-      if (!order) return;
+      if (!order || allocationSession.current !== session) return;
       const [result, userResult] = await Promise.all([
         profitAllocationApi.allocations(order.id),
         employeesApi.list(),
       ]);
+      if (allocationSession.current !== session) return;
       const currentEmployee = userResult.find((item) => item.is_active && item.username === username)
         ?? (import.meta.env.DEV
           ? userResult.find((item) => item.is_active && item.username === currentDevUser())
           : undefined);
       const candidates = buildActionAllocationCandidates(order, currentEmployee?.id);
-      setActionOrder(order);
-      setUsers(userResult.filter((item) => item.is_active));
-      setAllocationCandidates(candidates);
-      setAllocationProfit(result.allocatable_profit ?? result.order_profit ?? "0");
       const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates, result.totals_by_type);
       const companyRow = rows.find((row) => row.allocation_type === "COMPANY");
       if (companyRow) {
@@ -92,6 +91,7 @@ export function useOrderActionModals({
       // 比例框已改为只读参考，金额是唯一提交口径。金额模式存库后库里 rate 为 0，
       // 回显时用金额经 convert 反算比例供展示；历史比例模式数据（有 rate 无金额）
       // 则反向补金额，避免用户不改直接提交时把配置清成空金额。
+      let requiredConversionFailed = false;
       await Promise.all(rows.map(async (row) => {
         if (row.allocation_type === "COMPANY") return;
         const amount = (row.allocation_amount ?? "").trim();
@@ -102,18 +102,35 @@ export function useOrderActionModals({
         } else if (rate && Number(rate) !== 0) {
           const converted = await profitAllocationApi.convert(order.id, "RATE_TO_AMOUNT", rate).catch(() => null);
           if (converted?.value != null) row.allocation_amount = converted.value;
+          else requiredConversionFailed = true;
         }
       }));
+      if (allocationSession.current !== session) return;
+      if (requiredConversionFailed) {
+        appMessage.error("分润金额换算失败，请重试");
+        return;
+      }
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
       allocationForm.resetFields();
       allocationForm.setFieldsValue({
         allocations: rows,
       });
+      setActionOrder(order);
+      setUsers(userResult.filter((item) => item.is_active));
+      setAllocationCandidates(candidates);
+      setAllocationProfit(result.allocatable_profit ?? result.order_profit ?? "0");
       setAllocationOpen(true);
     } catch (error) {
-      appMessage.error(normalizeError(error).message);
+      if (allocationSession.current === session) appMessage.error(normalizeError(error).message);
     }
   };
+
+  const closeAllocations = () => {
+    allocationSession.current += 1;
+    setAllocationOpen(false);
+    setActionOrder(null);
+  };
+  const getAllocationSession = () => allocationSession.current;
 
   const openRefund = async (sourceOrder?: Order) => {
     try {
@@ -245,14 +262,14 @@ export function useOrderActionModals({
 
   return {
     actionOrder,
-    setActionOrder,
     allocationCandidates,
     allocationForm,
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
     allocationSubmitting,
-    setAllocationOpen,
+    closeAllocations,
+    getAllocationSession,
     setAllocationProfit,
     setAllocationSubmitting,
     cashflowPools,

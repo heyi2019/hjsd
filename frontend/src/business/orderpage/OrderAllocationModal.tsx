@@ -32,8 +32,8 @@ type AllocationController = Pick<OrdersPageController,
   | "employeeOptions"
   | "load"
   | "loadLedgerDetail"
-  | "setActionOrder"
-  | "setAllocationOpen"
+  | "closeAllocations"
+  | "getAllocationSession"
   | "setAllocationSubmitting"
 >;
 
@@ -60,12 +60,14 @@ function AllocationFields({
   allocationCandidates,
   allocationForm,
   employeeOptions,
+  getAllocationSession,
   orderId,
   watchedRows,
 }: {
   allocationCandidates: ActionAllocationCandidates;
   allocationForm: FormInstance;
   employeeOptions: AllocationEmployeeOption[];
+  getAllocationSession: () => number;
   orderId: number;
   watchedRows: AllocationFormRow[];
 }) {
@@ -76,9 +78,10 @@ function AllocationFields({
   const convertValue = (row: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string, target: "allocation_rate" | "allocation_amount") => {
     invalidateConversion(row);
     const version = conversionVersion.current[row];
+    const session = getAllocationSession();
     if (!value.trim()) return;
     void profitAllocationApi.convert(orderId, direction, value).then((result) => {
-      if (conversionVersion.current[row] !== version) return;
+      if (conversionVersion.current[row] !== version || getAllocationSession() !== session) return;
       allocationForm.setFieldValue(["allocations", row, target], result.value ?? "");
     }).catch(() => undefined);
   };
@@ -177,19 +180,22 @@ export function AllocationModal({ controller }: { controller: AllocationControll
     employeeOptions,
     load,
     loadLedgerDetail,
-    setActionOrder,
-    setAllocationOpen,
+    closeAllocations,
+    getAllocationSession,
     setAllocationSubmitting,
   } = controller;
   const watchedRows = Form.useWatch<AllocationFormRow[]>("allocations", allocationForm) ?? [];
+  const submitting = useRef(false);
 
   const submitAllocations = async (values: AllocationFormValues) => {
-    if (!actionOrder) return;
+    if (!actionOrder || submitting.current) return;
     const rows = values.allocations ?? [];
     if (rows.length === 0) {
       appMessage.error("请先在员工花名册里选择分润对象");
       return;
     }
+    const session = getAllocationSession();
+    submitting.current = true;
     setAllocationSubmitting(true);
     try {
       const sourceFormExtra = {
@@ -219,8 +225,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
       await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
       appMessage.success("分润已保存");
       const savedOrder = actionOrder;
-      setAllocationOpen(false);
-      setActionOrder(null);
+      if (getAllocationSession() === session) closeAllocations();
       // 保存成功后先关闭弹窗，台账和详情在后台刷新；刷新失败不应误报保存失败。
       void (async () => {
         await load();
@@ -229,6 +234,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
+      submitting.current = false;
       setAllocationSubmitting(false);
     }
   };
@@ -240,7 +246,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
       open={allocationOpen}
       confirmLoading={allocationSubmitting}
       wrapClassName="allocation-modal"
-      onCancel={() => { setAllocationOpen(false); setActionOrder(null); }}
+      onCancel={closeAllocations}
       onOk={() => void allocationForm.submit()}
     >
       <BusinessRegistrationForm
@@ -270,6 +276,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           allocationCandidates={allocationCandidates}
           allocationForm={allocationForm}
           employeeOptions={employeeOptions}
+          getAllocationSession={getAllocationSession}
           orderId={actionOrder?.id ?? 0}
           watchedRows={watchedRows}
         />

@@ -315,6 +315,96 @@ class TestInstallmentsApi:
         assert event.form_extra[field_key] == "凭据A"
         assert "payment_method" not in event.form_extra
 
+    @pytest.mark.parametrize(("order_type", "installment", "dependency"), [
+        ("HS", False, "amount"), ("TH", False, "pool_id"), ("DG", False, "sale_amount"),
+        ("HS", False, "operator_user_ids"), ("HS", False, "customer_nickname"),
+        ("TH", False, "intermediary_platform"), ("HS", False, "cashflow_note"),
+        ("HS", True, "amount"), ("TH", True, "pool_id"), ("HS", True, "down_payment"),
+        ("HS", True, "periods"), ("TH", True, "per_period"),
+        ("HS", True, "customer_nickname"), ("TH", True, "intermediary_platform"),
+    ])
+    def test_stock_sale_conditions_use_actual_form_values(self, seeded_client, seeded_db, headers, order_type, installment, dependency):
+        from app.business.stocks.profile import create_account
+
+        account = create_account(seeded_db, game_account=f"sale-condition-{order_type}-{installment}-{dependency}",
+            business_mode="SELF" if order_type == "HS" else "DISTRIBUTION",
+            inventory_type={"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type], actor="pytest")
+        order = _order(seeded_db, order_type=order_type, account_id=account.id)
+        if order_type != "DG":
+            _buy(seeded_db, order.id, "100")
+        scope = {"HS": "SALEREC", "TH": "SALETH", "DG": "SALEDG"}[order_type]
+        core = seeded_db.scalar(select(OrderFormField).where(
+            OrderFormField.order_type_code == scope, OrderFormField.field_key == dependency,
+        ))
+        if core is None:
+            core = create_order_form_field(seeded_db, order_type_code=scope, field_key=dependency,
+                                           label="依赖字段", actor="pytest")
+            core.is_custom = False
+            seeded_db.flush()
+        create_order_form_field(seeded_db, order_type_code=scope, field_key="receipt", label="售出凭据",
+                                required_when={"field": dependency, "op": "filled"}, actor="pytest")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        if installment:
+            url = "/api/v1/installments/stock-sale"
+            payload = {"order_id": order.id, "principal": "200", "down_payment": "50", "periods": 2,
+                       "per_period": "75", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+                       "pool_id": pool.id, "operator_user_ids": [1]}
+        else:
+            url = f"/api/v1/orders/{order.id}/stock-sale"
+            payload = {"amount": "200", "sale_amount": "250", "occurred_on": TODAY.isoformat(),
+                       "pool_id": pool.id, "operator_user_ids": [1], "note": "收款备注"}
+        if dependency == "customer_nickname":
+            payload["customer_input"] = {"display_name": "售出客户", "role": "CONSIGNOR" if order_type == "DG" else "BUYER"}
+        if dependency == "intermediary_platform":
+            payload["delivery_form_extra"] = {"intermediary_platform": "测试平台"}
+        seeded_db.commit()
+
+        def transactional_db():
+            try:
+                yield seeded_db
+                seeded_db.commit()
+            except Exception:
+                seeded_db.rollback()
+                raise
+        seeded_client.app.dependency_overrides[get_db] = transactional_db
+        missing = seeded_client.post(url, headers=headers, json=payload)
+        assert missing.status_code == 422 and "售出凭据" in missing.text
+        spoofed = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {dependency: ""}})
+        assert spoofed.status_code == 422 and "售出凭据" in spoofed.text
+        assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL")) is None
+        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+        assert saved.status_code == 201, saved.text
+        event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
+        assert event.form_extra["receipt"] == "凭据A"
+
+    @pytest.mark.parametrize("installment", [False, True])
+    def test_stock_sale_optional_customer_cannot_be_faked_by_extra(self, seeded_client, seeded_db, headers, installment):
+        account = _account(seeded_db, f"sale-optional-customer-{installment}")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        core = seeded_db.scalar(select(OrderFormField).where(
+            OrderFormField.order_type_code == "SALEREC", OrderFormField.field_key == "customer_nickname",
+        ))
+        if core is None:
+            core = create_order_form_field(seeded_db, order_type_code="SALEREC", field_key="customer_nickname",
+                                           label="客户昵称", actor="pytest")
+            core.is_custom = False
+            seeded_db.flush()
+        create_order_form_field(seeded_db, order_type_code="SALEREC", field_key="receipt", label="售出凭据",
+                                required_when={"field": "customer_nickname", "op": "filled"}, actor="pytest")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        if installment:
+            url = "/api/v1/installments/stock-sale"
+            payload = {"order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
+                       "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(), "pool_id": pool.id}
+        else:
+            url = f"/api/v1/orders/{order.id}/stock-sale"
+            payload = {"amount": "200", "occurred_on": TODAY.isoformat(), "pool_id": pool.id}
+        payload["form_extra"] = {"customer_nickname": "伪造客户"}
+        saved = seeded_client.post(url, headers=headers, json=payload)
+        assert saved.status_code == 201, saved.text
+        assert seeded_db.scalar(select(Customer.id).where(Customer.display_name == "伪造客户")) is None
+
     def test_buy_does_not_require_unrelated_cashflow_fields(self, seeded_db):
         account = _account(seeded_db, "buy-with-cashflow-custom-field")
         order = _order(seeded_db, order_type="HS", account_id=account.id)

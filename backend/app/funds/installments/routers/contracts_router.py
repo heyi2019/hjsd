@@ -26,7 +26,7 @@ from app.funds.installments import create as inst_create
 from app.funds.installments import queries as inst_queries
 from app.funds.installments.repayments.pay import pay as inst_pay
 from app.business.events import post_event as orders_post_event
-from app.business.sale import apply_sale_details
+from app.business.sale import apply_sale_details, sale_form_context
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import build_list_csv, detail_json
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
@@ -173,11 +173,17 @@ def create_stock_sale(
         raise PermissionDenied("当前角色无权登记售出及分期收款")
     apply_sale_details(db, payload.order_id, customer_input=payload.customer_input,
                        delivery_form_extra=payload.delivery_form_extra, user=user)
+    field_context = sale_form_context(payload.customer_input, payload.delivery_form_extra)
+    field_context.update({
+        "pool_id": payload.pool_id, "down_payment": payload.down_payment, "service_fee": payload.service_fee,
+        "periods": payload.periods, "per_period_service_fee": payload.per_period_service_fee,
+        "per_period": payload.per_period, "note": payload.note,
+    })
     orders_post_event(
         db, payload.order_id, event_type="SELL", sale_mode="INSTALLMENT",
         amount=payload.principal, occurred_on=payload.paid_on, actor=_actor(user),
         portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
-        form_extra=payload.form_extra, user=user,
+        form_extra=payload.form_extra, form_extra_context=field_context, user=user,
     )
     item = inst_create.create_installment(
         db, order_id=payload.order_id, contract_type="STOCK_SALE", principal=payload.principal,

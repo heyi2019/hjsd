@@ -1,4 +1,6 @@
 """售出时将买家与交付资料写入当前事务。"""
+from collections.abc import Mapping
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import PermissionDenied, Validation
@@ -8,6 +10,27 @@ from .create import add_customer_role
 from .mutations import update_order
 from .participants import resolve_customer_role
 from .schemas import CustomerDraftInput
+
+
+def sale_form_context(
+    customer_input: CustomerDraftInput | None,
+    delivery_form_extra: Mapping[str, object] | None,
+) -> dict[str, object]:
+    """还原售出表单中的客户与交付字段，供条件必填校验使用。"""
+    delivery = delivery_form_extra or {}
+    context = {key: delivery.get(key) for key in (
+        "bound_phone", "bound_phone_owner", "intermediary_platform", "intermediary_type",
+        "compensation_type", "delivery_responsible_ids",
+    )}
+    context.update({
+        "customer_nickname": customer_input.display_name if customer_input else None,
+        "customer_contact_name": customer_input.contact_name if customer_input else None,
+        "customer_phone": customer_input.phone if customer_input else None,
+        "customer_wechat": customer_input.wechat if customer_input else None,
+        "customer_qq": customer_input.qq if customer_input else None,
+        "note": customer_input.note if customer_input else None,
+    })
+    return context
 
 
 def apply_sale_details(

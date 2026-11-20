@@ -58,7 +58,7 @@ export function OrderConsignmentModal(props: {
       listedAt: item.listedAt,
     }));
     setListed(current);
-    if (current.some((item) => item.platform === form.getFieldValue("platform"))) form.setFieldValue("platform", undefined);
+    if (current.some((item) => item.platform === form.getFieldValue("platform_ids"))) form.setFieldValue("platform_ids", undefined);
     setListingReady(Boolean(sourceOrder) && detail.account.status !== "VOID");
   };
 
@@ -95,11 +95,11 @@ export function OrderConsignmentModal(props: {
     return () => { requestGeneration.invalidate(); employeesRequest.invalidate(); };
   }, [employeesRequest, form, open, props.account, props.orderId, requestGeneration]);
 
-  const submit = async (values: { platform?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { platform_ids?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const account = props.account;
     if (!account || !configReady) return;
     const listedAt = values.listed_at ?? dayjs();
-    if (!values.platform) return;
+    if (!values.platform_ids) return;
     if (!sourceOrderId) {
       setError({ message: "当前账号没有可关联的来源订单，无法登记寄售" });
       return;
@@ -114,18 +114,18 @@ export function OrderConsignmentModal(props: {
           operation_type: "CONSIGNMENT",
           occurred_on: listedAt.format("YYYY-MM-DD"),
           operator_user_ids: values.operator_user_ids,
-          note: `寄售上架：${values.platform}`,
+          note: `寄售上架：${values.platform_ids}`,
           form_extra_scope: "CONSIGN",
           form_extra: {
             ...formExtraOrUndefined(values.form_extra),
-            consignment_platforms: [values.platform],
+            consignment_platforms: [values.platform_ids],
             ...(price === undefined ? {} : { consignment_price: price }),
             listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
           },
         });
-        appMessage.success(`${values.platform} 已上架，账号仍保持在库`);
+        appMessage.success(`${values.platform_ids} 已上架，账号仍保持在库`);
         if (session.isCurrent(submittedSession)) {
-          form.setFieldsValue({ platform: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
+          form.setFieldsValue({ platform_ids: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
           setListingReady(false);
           void reloadListed(orderId);
           close();
@@ -175,7 +175,7 @@ export function OrderConsignmentModal(props: {
         >
           <FieldConfigStatus scope="CONSIGN" ready={configReady} error={configError} retry={retryConfig} />
           <CfgItem
-            name="platform"
+            name="platform_ids"
             label="寄售平台"
             rules={[{ required: true, message: "请选择寄售平台" }]}
           >

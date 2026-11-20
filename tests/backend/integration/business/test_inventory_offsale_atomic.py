@@ -32,6 +32,24 @@ def _conditional_receipt(seeded_db, scope, dependency):
     )
 
 
+@pytest.mark.parametrize("dependency", ["platform_ids", "operator_user_ids"])
+def test_consignment_conditions_use_selected_platform_and_operators(seeded_db, seeded_client, headers, dependency):
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": f"consignment-condition-{dependency}"})
+    _conditional_receipt(seeded_db, "CONSIGN", dependency)
+    seeded_db.commit()
+    url = f"/api/v1/orders/{order.id}/events"
+    payload = {"event_type": "OPERATE", "operation_type": "CONSIGNMENT", "occurred_on": "2026-11-02",
+               "operator_user_ids": [1], "form_extra": {"consignment_platforms": ["测试平台"]}}
+    missing = seeded_client.post(url, json=payload, headers=headers)
+    assert missing.status_code == 422 and "条件凭据" in missing.text
+    spoofed = seeded_client.post(url, json={**payload, "form_extra": {**payload["form_extra"], dependency: []}}, headers=headers)
+    assert spoofed.status_code == 422 and "条件凭据" in spoofed.text
+    saved = seeded_client.post(url, json={**payload, "form_extra": {**payload["form_extra"], "receipt": "凭据A"}}, headers=headers)
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["event"]["form_extra"]["receipt"] == "凭据A"
+
+
 @pytest.mark.parametrize(("order_type", "amount", "dependency"), [
     ("HS", "0", "reason"), ("HS", "30", "reason"), ("TH", "0", "reason"),
     ("TH", "30", "reason"), ("DG", None, "reason"),

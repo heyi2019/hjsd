@@ -200,11 +200,21 @@ def post_event(
         historical_sale_refund = latest_sell_id != offset.id
 
     field_context: dict[str, Any] = {}
+    if event_type == EventType.SELL.value:
+        field_context.update({
+            "amount": amount, "pool_id": pool_id, "operator_user_ids": operator_user_ids,
+            "bound_phone": bound_phone, "bound_phone_owner": bound_phone_owner, "cashflow_note": note,
+        })
     if event_type == EventType.CANCEL.value:
         field_context.update({
             "amount": amount, "cancel_amount": amount, "refund_amount": amount,
             "cancelled_on": occurred_on, "offset_event_id": offset_event_id,
             "pool_id": pool_id, "reason": reason, "operator_user_ids": operator_user_ids,
+        })
+    if event_type == EventType.OPERATE.value and operation_type == "CONSIGNMENT":
+        field_context.update({
+            "platform_ids": (form_extra or {}).get("consignment_platforms"),
+            "operator_user_ids": operator_user_ids,
         })
     if event_type == EventType.OPERATE.value and operation_type == "UNLIST":
         extra = form_extra or {}

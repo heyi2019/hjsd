@@ -947,8 +947,10 @@ describe("InventoryPanel：写入与长路径", () => {
     vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({ FINANCE: "上架补充资料" });
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
       ...allFormFields().filter((field) => field.order_type_code === scope),
-      ...(scope === "CONSIGN" ? [{ id: 9001, order_type_code: scope, field_key: "receipt", label: "上架凭据",
-        field_type: "TEXT", required: true, is_active: true, sort_order: 99, locked: false, is_custom: true,
+      ...(scope === "CONSIGN" ? [{ id: 9000, order_type_code: scope, field_key: "platform_ids", label: "寄售平台",
+        field_type: "MULTI_SELECT", required: true, is_active: true, sort_order: 1, locked: false, is_custom: false },
+        { id: 9001, order_type_code: scope, field_key: "receipt", label: "上架凭据",
+        field_type: "TEXT", required: false, required_when: { field: "platform_ids", op: "filled" }, is_active: true, sort_order: 99, locked: false, is_custom: true,
         section: "FINANCE" }, { id: 9002, order_type_code: scope, field_key: "optional_number", label: "上架附加数字",
         field_type: "NUMBER", required: false, is_active: true, sort_order: 100, locked: false, is_custom: true,
         section: "BUSINESS" }] : []),
@@ -963,6 +965,9 @@ describe("InventoryPanel：写入与长路径", () => {
 
     await ui.click(screen.getAllByRole("combobox", { name: "寄售平台" })[0]);
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: "确认上架" }));
+    expect(await screen.findByText("上架凭据必填")).toBeInTheDocument();
+    expect(ordersApi.postEvent).not.toHaveBeenCalled();
     await ui.type(await screen.findByLabelText("上架凭据"), "寄售凭据");
     expect(await screen.findByText("上架补充资料")).toBeInTheDocument();
     await ui.type(screen.getByLabelText("上架附加数字"), "17");

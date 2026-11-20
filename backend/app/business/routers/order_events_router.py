@@ -30,7 +30,7 @@ from app.business.consignment import post_consignment_operation
 from app.business.create import add_customer_role
 from app.business.events import post_event as orders_post_event
 from app.business.cancellation_model import cancel_order as orders_cancel_order
-from app.business.sale import apply_sale_details
+from app.business.sale import apply_sale_details, sale_form_context
 
 from ..router_output import (
     _actor,
@@ -150,12 +150,19 @@ def stock_sale(
 ) -> schemas.EventPostResult:
     apply_sale_details(db, order_id, customer_input=payload.customer_input,
                        delivery_form_extra=payload.delivery_form_extra, user=user)
+    field_context = sale_form_context(payload.customer_input, payload.delivery_form_extra)
+    field_context.update({
+        "sale_amount": payload.sale_amount,
+        "bound_phone": payload.bound_phone if payload.bound_phone is not None else field_context["bound_phone"],
+        "bound_phone_owner": payload.bound_phone_owner if payload.bound_phone_owner is not None else field_context["bound_phone_owner"],
+    })
     event, flow = orders_post_event(
         db, order_id, event_type="SELL", sale_mode="FULL", amount=payload.amount,
         occurred_on=payload.occurred_on, actor=_actor(user), pool_id=payload.pool_id,
         portion="PROFIT", operator_user_ids=payload.operator_user_ids, note=payload.note,
         bound_phone=payload.bound_phone, bound_phone_owner=payload.bound_phone_owner,
         form_extra={**(payload.form_extra or {}), **({"sale_amount": str(payload.sale_amount)} if payload.sale_amount is not None else {})},
+        form_extra_context=field_context,
         user=user,
     )
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all())

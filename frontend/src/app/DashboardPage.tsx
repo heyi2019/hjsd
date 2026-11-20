@@ -153,6 +153,7 @@ export function DashboardPage({ onNavigate, onPersonalNavigate, onDashboardNavig
         <BusinessAlerts
           alerts={businessAlerts}
           loading={summaryLoading}
+          error={Boolean(summaryError)}
           onPendingProfitNotificationsClick={() => void openPendingProfitAllocation()}
           onProfitNotificationsRead={() => void loadSummary()}
         />

@@ -43,8 +43,8 @@ export function BusinessOverview({
   ordersError?: boolean;
   loading: boolean;
   allPeriods?: boolean;
-  personalOrders?: number;
-  personalCustomers?: number;
+  personalOrders?: number | null;
+  personalCustomers?: number | null;
   personalOrdersError?: boolean;
   onPersonalOrdersClick?: () => void;
   onPersonalCustomersClick?: () => void;
@@ -61,11 +61,11 @@ export function BusinessOverview({
   return (
     <section aria-label="我的业务总览" className="ui-stack">
       <StatRow className="ui-stat-row--overview" items={[
-        ...(personalOrders !== undefined ? [{ label: allPeriods ? "我的订单" : "我的当期订单", kind: "count" as const, amount: loading || personalOrdersError ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrdersError ? undefined : onPersonalOrdersClick, testId: "dashboard-personal-orders" }] : []),
+        ...(personalOrders !== undefined ? [{ label: allPeriods ? "我的订单" : "我的当期订单", kind: "count" as const, amount: loading || personalOrdersError || personalOrders === null ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrdersError || personalOrders === null ? undefined : onPersonalOrdersClick, testId: "dashboard-personal-orders" }] : []),
         ...(personalEarnings !== undefined ? [{ label: allPeriods ? "我的收益" : "我的当期收益", amount: loading || personalEarningsError ? null : personalEarnings, hint: allPeriods ? "全部 · 本人分润基数" : "当期 · 本人分润基数", onClick: loading || personalEarningsError || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "dashboard-personal-earnings" }] : []),
         { label: "在库账号", kind: "count", amount: amount(inventoryCount), onClick: onInventoryClick, testId: "dashboard-inventory" },
         { label: "订单总量", kind: "count", amount: ordersError || !orderSummary ? null : amount(orderSummary.total_count), onClick: loading || ordersError || !orderSummary ? undefined : onOrdersClick, testId: "dashboard-orders" },
-        ...(personalCustomers !== undefined ? [{ label: allPeriods ? "我的客户数" : "我的当期客户数", kind: "count" as const, amount: loading || ordersError ? null : String(personalCustomers), onClick: loading || ordersError ? undefined : onPersonalCustomersClick, testId: "dashboard-personal-customers" }] : []),
+        ...(personalCustomers !== undefined ? [{ label: allPeriods ? "我的客户数" : "我的当期客户数", kind: "count" as const, amount: loading || ordersError || personalCustomers === null ? null : String(personalCustomers), onClick: loading || ordersError || personalCustomers === null ? undefined : onPersonalCustomersClick, testId: "dashboard-personal-customers" }] : []),
         { label: "分期合约", kind: "count", amount: amount(installmentCount), onClick: onInstallmentsClick, testId: "dashboard-installments" },
         { label: "逾期合约", kind: "count", amount: amount(overdueInstallmentCount), tone: "warn", onClick: onOverdueInstallmentsClick, testId: "dashboard-overdue-installments" },
         { label: "在库超期账号", kind: "count", amount: amount(inventoryOverdueCount), hint: "未售超过 30 天", tone: "warn", onClick: onInventoryOverdueClick, testId: "dashboard-inventory-overdue" },
@@ -96,6 +96,9 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   const [readFailureCount, setReadFailureCount] = useState(0);
   const [detailPage, setDetailPage] = useState(1);
   const onReadRef = useRef(onRead);
+  const attemptedReads = useRef(new Set<number>());
+  const generation = useRef(0);
+  const loadedGeneration = useRef(0);
 
   useEffect(() => {
     onReadRef.current = onRead;
@@ -103,6 +106,8 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
 
   useEffect(() => {
     if (!open) return undefined;
+    generation.current += 1;
+    attemptedReads.current.clear();
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -121,16 +126,10 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
         });
         if (cancelled) return;
         const available = loaded.flatMap((item) => item.status === "fulfilled" && item.value !== null ? [item.value] : []);
+        loadedGeneration.current = generation.current;
         setDetails(available);
         setUnavailableCount(profitNotifications.length - available.length);
         setLoading(false);
-        if (available.length) {
-          void settleInBatches(available, (item) => notificationsApi.markRead(item.notification.id)).then((results) => {
-            const failed = results.filter((result) => result.status === "rejected").length;
-            if (!cancelled) setReadFailureCount(failed);
-            if (failed < results.length) onReadRef.current?.();
-          });
-        }
       })
       .catch((reason) => {
         if (cancelled) return;
@@ -139,8 +138,24 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
       });
     return () => {
       cancelled = true;
+      generation.current += 1;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || loading || loadedGeneration.current !== generation.current) return;
+    const currentGeneration = generation.current;
+    const visible = details.slice((detailPage - 1) * 10, detailPage * 10)
+      .filter(({ notification }) => !attemptedReads.current.has(notification.id));
+    for (const { notification } of visible) attemptedReads.current.add(notification.id);
+    if (!visible.length) return;
+    void settleInBatches(visible, (item) => notificationsApi.markRead(item.notification.id)).then((results) => {
+      if (currentGeneration !== generation.current) return;
+      const failed = results.filter((result) => result.status === "rejected").length;
+      setReadFailureCount((count) => count + failed);
+      if (failed < results.length) onReadRef.current?.();
+    });
+  }, [open, loading, details, detailPage]);
 
   return (
     <Modal open={open} title="订单分润通知详情" onCancel={onClose} footer={null} width={720} destroyOnHidden>
@@ -177,12 +192,12 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
   );
 }
 
-export function BusinessAlerts({ alerts, loading, onPendingProfitNotificationsClick, onProfitNotificationsRead }: { alerts: string[]; loading: boolean; onPendingProfitNotificationsClick?: () => void; onProfitNotificationsRead?: () => void }) {
+export function BusinessAlerts({ alerts, loading, error = false, onPendingProfitNotificationsClick, onProfitNotificationsRead }: { alerts: string[]; loading: boolean; error?: boolean; onPendingProfitNotificationsClick?: () => void; onProfitNotificationsRead?: () => void }) {
   const [profitNotificationsOpen, setProfitNotificationsOpen] = useState(false);
   return (
     <section aria-label="我的消息" className="business-alerts--expanded">
       <Card className="glass" title="我的消息">
-        {loading ? null : alerts.length > 0 ? (
+        {loading ? null : error ? <Typography.Text type="warning">消息加载失败，请重新加载。</Typography.Text> : alerts.length > 0 ? (
           <List
             size="small"
             dataSource={alerts}

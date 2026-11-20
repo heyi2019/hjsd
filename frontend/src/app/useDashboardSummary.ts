@@ -6,8 +6,8 @@ import { buildDashboardAlertMessages } from "./dashboardSummary";
 
 export function useDashboardSummary(active = true, selectedPeriod?: { from: string; to: string } | null) {
   const [orderSummary, setOrderSummary] = useState<{ total_count: number; completed_count: number } | null>(null);
-  const [personalOrders, setPersonalOrders] = useState(0);
-  const [personalCustomers, setPersonalCustomers] = useState(0);
+  const [personalOrders, setPersonalOrders] = useState<number | null>(null);
+  const [personalCustomers, setPersonalCustomers] = useState<number | null>(null);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [personalOrdersError, setPersonalOrdersError] = useState<{ message: string; code?: string } | null>(null);
@@ -37,9 +37,9 @@ export function useDashboardSummary(active = true, selectedPeriod?: { from: stri
         completed_count: summary.orders.completed_count,
       } : null);
       setSummaryError(null);
-      setPersonalOrders(summary.personal_orders ?? 0);
+      setPersonalOrders(summary.personal_orders);
       setPersonalOrdersError(null);
-      setPersonalCustomers(summary.personal_customers ?? 0);
+      setPersonalCustomers(summary.personal_customers);
       setPersonalEarnings(summary.personal_earnings == null ? null : String(summary.personal_earnings));
       setEarningsError(null);
       setInventoryCount(summary.inventory?.account_count ?? null);
@@ -61,7 +61,8 @@ export function useDashboardSummary(active = true, selectedPeriod?: { from: stri
       setPeriod(null);
       setSummaryError(error);
       setPersonalOrdersError(error);
-      setPersonalCustomers(0);
+      setPersonalOrders(null);
+      setPersonalCustomers(null);
       setPersonalEarnings(null);
       setEarningsError(null);
       setInventoryCount(null);

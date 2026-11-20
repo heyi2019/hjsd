@@ -73,9 +73,9 @@
         },
         "cases": {
           "fast": 165,
-          "quick": 94,
+          "quick": 95,
           "react": 724,
-          "deep": 110
+          "deep": 111
         },
         "byArea": {
           "unit": {

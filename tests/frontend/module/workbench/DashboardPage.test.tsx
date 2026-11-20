@@ -103,6 +103,23 @@ it("获得分润通知可查看第200条以后的消息", async () => {
     expect(await screen.findByText("末尾通知")).toBeInTheDocument();
   });
 
+it("分润通知只将当前查看页标为已读", async () => {
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ notifications: { pending_profit_count: 0, allocated_profit_count: 11 } }));
+    const notifications = Array.from({ length: 11 }, (_, index) => ({ id: index + 1, notification_no: `N${index}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `通知 ${index + 1}`, entity_type: "order", entity_id: `HS${index + 1}`, created_by: "admin", read_at: null }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: notifications, total: 11, unread_total: 11 });
+    vi.mocked(ordersApi.listPage).mockImplementation(async (params) => pageResponse([{ id: Number(params?.keyword?.slice(2)), order_no: params?.keyword, order_type: "HS", trade_date: "2026-11-17", status: "COMPLETED", sale_amount: "10.00", account_id: 7 }] as never));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 7 }, detail_view: { execution_rows: [], lifecycle: {} } } as never);
+    vi.mocked(notificationsApi.markRead).mockResolvedValue(notifications[0] as never);
+    renderLight(<DashboardPage />, { user: "admin" });
+    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 11 条" }));
+    expect(await screen.findByText("通知 1")).toBeInTheDocument();
+    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledTimes(10));
+    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(11);
+    fireEvent.click(screen.getByRole("listitem", { name: "2" }));
+    expect(await screen.findByText("通知 11")).toBeInTheDocument();
+    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(11));
+  });
+
 it("点击获得分润通知展示订单金额、分润配置人和库存回收信息", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       notifications: { pending_profit_count: 0, allocated_profit_count: 3 },

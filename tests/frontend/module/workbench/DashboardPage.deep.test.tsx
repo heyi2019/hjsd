@@ -32,6 +32,21 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     vi.mocked(dashboardApi.summary).mockRejectedValue(new Error("dashboard down"));
     renderLight(<DashboardPage />, { user: "admin" });
     expect((await screen.findAllByText(/dashboard down/)).length).toBeGreaterThan(0);
+    const alerts = screen.getByRole("region", { name: "我的消息" });
+    expect(within(alerts).queryByText("暂无异常事项")).toBeNull();
+    expect(within(alerts).getByText(/消息加载失败/)).toBeInTheDocument();
+  });
+
+  it("没有订单权限时个人订单和客户数显示占位且不可跳转", async () => {
+    const navigate = vi.fn();
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null, notifications: { pending_profit_count: 7, allocated_profit_count: 0 } }));
+    renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
+    await screen.findByText("分润待配置 7 条");
+    for (const id of ["dashboard-personal-orders", "dashboard-personal-customers"]) {
+      const card = screen.getByTestId(id);
+      await waitFor(() => expect(within(card).getByText("-")).toBeInTheDocument());
+      expect(card).not.toHaveAttribute("role", "button");
+    }
   });
 
   it("错误横幅重试：点「重新加载」再次请求订单汇总", async () => {

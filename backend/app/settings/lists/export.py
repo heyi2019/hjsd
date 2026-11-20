@@ -145,7 +145,8 @@ def build_list_csv(
     report: dict[str, Any] = {"items": items}
     if total is not None:
         report["total"] = total
-    value_labels = merge_static_value_labels(list_columns_service.get_value_labels(db, scope_code))
+    dynamic_value_labels = list_columns_service.get_value_labels(db, scope_code)
+    value_labels = merge_static_value_labels(dynamic_value_labels)
     if scope_code == "CASHFLOW":
         for key, labels in CASHFLOW_VALUE_LABELS.items():
             value_labels[key] = {**labels, **value_labels.get(key, {})}
@@ -161,9 +162,7 @@ def build_list_csv(
     )
     return csv_text, {
         "column_count": sum(1 for _key, _label, visible in columns if visible),
-        "translated_columns": sorted(
-            list_columns_service.get_value_labels(db, scope_code)
-        ),
+        "translated_columns": sorted(dynamic_value_labels),
         "row_count": len(items),
         "truncated": False,
     }

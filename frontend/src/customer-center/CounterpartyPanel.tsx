@@ -71,12 +71,21 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     }
   }, [creatorFilter, page, pageSize, statusFilter, createdPeriod?.from, createdPeriod?.to]);
 
-  useEffect(() => { setPage(1); }, [createdPeriod?.from, createdPeriod?.to]);
-  // 页面被 keep-alive 隐藏时不请求；重新激活或状态筛选变化都从后端刷新。
+  const resetKey = JSON.stringify([createdPeriod?.from, createdPeriod?.to]);
+  const previousResetKey = useRef(resetKey);
+  // 周期变化时先回到第一页，避免请求新周期的旧页码。
   useEffect(() => {
-    if (active) void load();
+    if (!active) return;
+    if (previousResetKey.current !== resetKey) {
+      previousResetKey.current = resetKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+    void load();
     return () => { requestRef.current += 1; };
-  }, [active, load]);
+  }, [active, load, page, resetKey]);
 
   useEffect(() => {
     orderFormFieldsApi.list("COUNTERPARTY", true)

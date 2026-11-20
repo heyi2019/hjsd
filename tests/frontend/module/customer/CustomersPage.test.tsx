@@ -213,6 +213,25 @@ describe("CustomersPage：客户档案", () => {
     expect(await screen.findByText("CP-PAGE2")).toBeInTheDocument();
     expect(counterpartiesApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
   });
+
+  it("合作方在后续页切换周期时只请求新周期第一页", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(counterpartiesApi.page).mockImplementation(async (params) => pageResponse(
+      [{ ...counterparties[0], counterparty_no: params?.offset === 10 ? "CP-PAGE2" : "CP-0001" }],
+      { total: 11, limit: params?.limit ?? 10, offset: params?.offset ?? 0 },
+    ));
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await screen.findByText("CP-0001");
+    await user.click(screen.getByTitle("2"));
+    await screen.findByText("CP-PAGE2");
+    vi.mocked(counterpartiesApi.page).mockClear();
+    await user.click(screen.getByRole("button", { name: "上期" }));
+    await screen.findByText("CP-0001");
+    expect(counterpartiesApi.page).toHaveBeenCalledTimes(1);
+    expect(counterpartiesApi.page).toHaveBeenCalledWith(expect.objectContaining({ offset: 0 }));
+  });
   it("切换创建日期时不显示旧周期的客户统计", async () => {
     let finish!: (value: ReturnType<typeof pageResponse>) => void;
     const pending = new Promise<ReturnType<typeof pageResponse>>((resolve) => { finish = resolve; });

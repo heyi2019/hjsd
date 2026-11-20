@@ -68,11 +68,20 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       .finally(() => { if (request === requestRef.current) setSummaryLoading(false); });
     await Promise.all([listRequest, summaryRequest]);
   }, [page, pageSize, createdPeriod?.from, createdPeriod?.to]);
-  useEffect(() => { setPage(1); }, [createdPeriod?.from, createdPeriod?.to]);
+  const resetKey = JSON.stringify([createdPeriod?.from, createdPeriod?.to]);
+  const previousResetKey = useRef(resetKey);
   useEffect(() => {
-    if (active) void load();
+    if (!active) return;
+    if (previousResetKey.current !== resetKey) {
+      previousResetKey.current = resetKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+    void load();
     return () => { requestRef.current += 1; };
-  }, [active, load]);
+  }, [active, load, page, resetKey]);
 
   const openCreate = async () => {
     try {

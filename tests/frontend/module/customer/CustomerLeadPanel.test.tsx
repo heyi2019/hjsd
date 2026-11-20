@@ -141,6 +141,23 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(await screen.findByText("LD-PAGE2")).toBeInTheDocument();
     expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
   });
+  it("需求池在后续页切换周期时只请求新周期第一页", async () => {
+    vi.mocked(leadsApi.page).mockImplementation(async (params) => pageResponse(
+      [{ ...leads[0], lead_no: params?.offset === 10 ? "LD-PAGE2" : "LD-1" }],
+      { total: 11, limit: params?.limit ?? 10, offset: params?.offset ?? 0 },
+    ));
+    const view = renderLight(<CustomerLeadPanel createdPeriod={{ from: "2026-10-01", to: "2026-10-31" }} />, { user: "admin" });
+    await screen.findByText("LD-1");
+    await ui.click(screen.getByTitle("2"));
+    await screen.findByText("LD-PAGE2");
+    vi.mocked(leadsApi.page).mockClear();
+    vi.mocked(leadsApi.summary).mockClear();
+    view.rerender(<CustomerLeadPanel createdPeriod={{ from: "2026-11-01", to: "2026-11-30" }} />);
+    await screen.findByText("LD-1");
+    expect(leadsApi.page).toHaveBeenCalledTimes(1);
+    expect(leadsApi.page).toHaveBeenCalledWith(expect.objectContaining({ offset: 0, created_from: "2026-11-01" }));
+    expect(leadsApi.summary).toHaveBeenCalledTimes(1);
+  });
   it("加载成功后渲染需求列表、客户名与统计", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText("LD-1")).toBeInTheDocument();

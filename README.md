@@ -2,10 +2,9 @@
 
 FastAPI + React 的工作室经营系统。后端入口为 `app/main.py`。
 
-开发、测试和发布按以下三份流程执行：
-[研发流程](docs/研发流程.md)
+开发与本地验收见 [研发流程](docs/研发流程.md)，测试见 [测试流程](docs/测试流程.md)，阿里云上线见 [发布流程](docs/发布流程.md)，版本规则与记录见 [版本管理](docs/版本管理.md)。
 
-> 发布通道：远端只有 `origin/main`，`git push origin main` → `main-ci-cd` 自动升版 → dispatch lint / frontend / backend 三个门禁 → 全绿后 dispatch `deploy-production` → ECS 生产。**推送即上线**，纯文档提交同样会触发。
+> 发布通道：远端只有 `origin/main`，`git push origin main` 后由 `main-ci-cd` 同时启动 lint / frontend / backend 门禁与镜像构建，门禁全绿后才部署到 ECS。**推送即触发生产发布**，纯文档提交同样会触发。
 
 ## 快速启动
 

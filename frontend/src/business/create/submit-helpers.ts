@@ -48,7 +48,8 @@ export function resolveCustomerSource(values: Values, isDg: boolean): string | u
   const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
   const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
   const selected = values[customerSourceField] as string | undefined;
-  return selected === "其他" ? values[customerSourceOtherField] as string : selected;
+  if (selected !== "其他") return selected;
+  return String(values[customerSourceOtherField] ?? "").trim() || selected;
 }
 
 /** 订单备注：HS/DG 汇总客户来源，TH 汇总供货方备注，其余取原备注。 */

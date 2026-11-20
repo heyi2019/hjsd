@@ -1,4 +1,5 @@
 import { Form } from "antd";
+import { useState } from "react";
 import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +25,8 @@ const added: EmployeeOption = { id: 2, username: "new-user", display_name: "新�
 let employees: EmployeeOption[];
 
 function EmployeeSelectors() {
-  const lookups = useCreateBusinessLookups();
+  const [createOpen, setCreateOpen] = useState(false);
+  const lookups = useCreateBusinessLookups(createOpen);
   const editor = useOrderDetailEditor({
     getExecutionDetail: () => undefined,
     onSaved: () => undefined,
@@ -36,8 +38,11 @@ function EmployeeSelectors() {
     <output data-testid="建单账户">{lookups.pools.map((item) => item.name).join("、")}</output>
     <output data-testid="建单游戏">{lookups.gameTypes.map((item) => item.name).join("、")}</output>
     <output data-testid="资料错误">{lookups.loadError?.message ?? ""}</output>
+    <button onClick={() => setCreateOpen(true)}>打开建单</button>
     <Form form={editor.invEditExtraForm} />
     <button onClick={() => void editor.openEditor({ id: 1, extra_values: {} } as Account)}>编辑订单</button>
+    <button onClick={editor.cancelInlineEdit}>关闭编辑</button>
+    <output data-testid="编辑状态">{editor.inlineEditId ?? "未编辑"}</output>
     <EmployeeSelectControl aria-label="详情操作人" employees={editor.employees} />
     <output data-testid="详情在职员工">{editor.employees.filter((item) => item.is_active).map((item) => item.display_name).join("、")}</output>
     <output data-testid="详情账户">{editor.pools.map((item) => item.name).join("、")}</output>
@@ -76,6 +81,22 @@ beforeEach(() => {
 });
 
 describe("基础资料变更后的选项", () => {
+  it("打开建单时更新其他设备修改的资金账户和游戏类型", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "旧账户", code: "OLD", pool_type: "OPERATING", status: "ACTIVE" }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, name: "旧游戏", sort_order: 1, is_active: true, is_default: false }]);
+    renderLight(<EmployeeSelectors />, { user: "admin" });
+    await waitFor(() => expect(screen.getByTestId("建单账户")).toHaveTextContent("旧账户"));
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, name: "新增账户", code: "NEW", pool_type: "OPERATING", status: "ACTIVE" }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 4, name: "新增游戏", sort_order: 1, is_active: true, is_default: false }]);
+
+    await user.click(screen.getByRole("button", { name: "打开建单" }));
+    await waitFor(() => expect(screen.getByTestId("建单账户")).toHaveTextContent("新增账户"));
+    expect(screen.getByTestId("建单游戏")).toHaveTextContent("新增游戏");
+    expect(poolsApi.list).toHaveBeenCalledWith({ fresh: true });
+    expect(gameTypesApi.list).toHaveBeenCalledWith({ include_inactive: false }, { fresh: true });
+  });
+
   it("新增资金账户和游戏类型后已打开的建单资料同步更新", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "旧账户", code: "OLD", pool_type: "OPERATING", status: "ACTIVE" }]);
@@ -112,6 +133,26 @@ describe("基础资料变更后的选项", () => {
     await act(async () => { resolveOld([]); });
     await user.click(screen.getByRole("combobox", { name: "所属团队" }));
     expect(await screen.findByText("新团队", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
+  it("用户管理打开团队和账户选择时读取其他设备的最新资料", async () => {
+    vi.spyOn(usersApi, "list").mockResolvedValue([]);
+    let teams: Awaited<ReturnType<typeof teamsApi.list>> = [];
+    vi.spyOn(teamsApi, "list").mockImplementation(async () => [...teams]);
+    vi.spyOn(optionSetsApi, "list").mockResolvedValue({ items: [] } as never);
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<UsersPanel />, { user: "admin" });
+    await screen.findByText("暂无用户");
+    teams = [{ id: 2, code: "T2", name: "新团队", is_active: true }];
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, name: "新增账户", code: "NEW", pool_type: "OPERATING", status: "ACTIVE" }]);
+
+    await user.click(screen.getByRole("combobox", { name: "所属团队" }));
+    expect(await screen.findByText("新团队", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("combobox", { name: "可见资金账户" }));
+    expect(await screen.findByText("新增账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(teamsApi.list).toHaveBeenCalledWith({ fresh: true });
+    expect(poolsApi.list).toHaveBeenCalledWith({ fresh: true });
   });
 
   it("另一个标签页修改员工后，当前页面自动更新操作人选项", async () => {
@@ -213,6 +254,61 @@ afterEach(() => {
 });
 
 describe("员工变更后的操作人选项", () => {
+  it("其他设备新增员工后，打开操作人下拉即可取得最新名单", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<EmployeeSelectors />, { user: "admin" });
+    await screen.findByText("管理员", { selector: "output" });
+    employees = [original, added];
+
+    await user.click(screen.getByRole("combobox", { name: "建单操作人" }));
+    expect(await screen.findByText("新员工", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(employeesApi.list).toHaveBeenCalledWith({ fresh: true });
+  });
+
+  it("打开下拉后的旧请求晚到时，不能覆盖刚新增的员工", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<EmployeeSelectors />, { user: "admin" });
+    await screen.findByText("管理员", { selector: "output" });
+    let resolveOld!: (items: EmployeeOption[]) => void;
+    vi.mocked(employeesApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }));
+    await user.click(screen.getByRole("combobox", { name: "建单操作人" }));
+    await waitFor(() => expect(employeesApi.list).toHaveBeenCalledWith({ fresh: true }));
+
+    await act(async () => { await usersApi.create({ username: added.username }); });
+    await waitFor(() => expect(screen.getByTestId("建单员工")).toHaveTextContent("新员工"));
+    await act(async () => { resolveOld([original]); });
+    expect(await screen.findByText("新员工", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+  });
+
+  it("重新编辑订单时可取得其他设备新增的员工", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<EmployeeSelectors />, { user: "admin" });
+    await screen.findByText("管理员", { selector: "output" });
+    await user.click(screen.getByRole("button", { name: "编辑订单" }));
+    await waitFor(() => expect(screen.getByTestId("编辑状态")).toHaveTextContent("1"));
+    await user.click(screen.getByRole("button", { name: "关闭编辑" }));
+    employees = [original, added];
+
+    await user.click(screen.getByRole("button", { name: "编辑订单" }));
+    await waitFor(() => expect(screen.getByTestId("详情在职员工")).toHaveTextContent("新员工"));
+    expect(employeesApi.list).toHaveBeenCalledWith({ fresh: true });
+  });
+
+  it("已有员工名单时，刷新未完成也能立即进入订单编辑", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<EmployeeSelectors />, { user: "admin" });
+    await screen.findByText("管理员", { selector: "output" });
+    await user.click(screen.getByRole("button", { name: "编辑订单" }));
+    await waitFor(() => expect(screen.getByTestId("编辑状态")).toHaveTextContent("1"));
+    await user.click(screen.getByRole("button", { name: "关闭编辑" }));
+    let resolveRefresh!: (items: EmployeeOption[]) => void;
+    vi.mocked(employeesApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveRefresh = resolve; }));
+    await user.click(screen.getByRole("button", { name: "编辑订单" }));
+    expect(screen.getByTestId("编辑状态")).toHaveTextContent("1");
+    expect(employeesApi.list).toHaveBeenLastCalledWith({ fresh: true });
+    await act(async () => { resolveRefresh([original]); });
+  });
+
   it("已打开的建单和订单详情同步新增、改名和停用的员工", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<EmployeeSelectors />, { user: "admin" });
@@ -232,7 +328,6 @@ describe("员工变更后的操作人选项", () => {
     }
 
     await act(async () => { await usersApi.update(added.id, { display_name: "更名员工" }); });
-    await waitFor(() => expect(employeesApi.list).toHaveBeenCalledTimes(6));
     await waitFor(() => {
       expect(screen.getByTestId("建单员工")).toHaveTextContent("更名员工");
       expect(screen.getByTestId("详情在职员工")).toHaveTextContent("更名员工");

@@ -57,7 +57,7 @@ export function CreateBusinessModal(props: {
     canRetryLookups,
     lookupLoading,
     retryLookups,
-  } = useCreateBusinessLookups();
+  } = useCreateBusinessLookups(props.open);
   const write = useAsyncAction();
   const submitting = write.pending;
   const session = useRequestSession(props.open ? orderType : null);

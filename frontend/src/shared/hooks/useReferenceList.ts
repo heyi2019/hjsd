@@ -10,11 +10,11 @@ export function useReferenceList<T>(resource: ReferenceData, list: () => Promise
   const mounted = useRef(false);
   const requested = useRef(false);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (load: () => Promise<T[]> = list) => {
     requested.current = true;
     const request = ++sequence.current;
     try {
-      const next = (await list()) ?? [];
+      const next = (await load()) ?? [];
       if (mounted.current && request === sequence.current) {
         setItems(next);
         setError(null);

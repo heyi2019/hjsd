@@ -444,7 +444,7 @@ describe("InstallmentsPanel：动作与减免", () => {
           required: true, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "FINANCE" },
       ] : []);
       installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
-      vi.mocked(employeesApi.list).mockResolvedValueOnce([
+      vi.mocked(employeesApi.list).mockResolvedValue([
         { id: 1, username: "admin", display_name: "管理员", is_active: true },
         { id: 2, username: "helper", display_name: "协作人员", is_active: true },
       ]);

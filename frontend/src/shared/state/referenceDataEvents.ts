@@ -1,7 +1,7 @@
 import { clearApiCache } from "../api/client";
 
 export type ReferenceData = "employees" | "teams" | "pools" | "gameTypes" | "optionSets" | "formFields" | "formSections";
-type ChangeOrigin = "local" | "remote";
+type ChangeOrigin = "local" | "remote" | "refresh";
 
 const listeners = new Map<ReferenceData, Set<(origin: ChangeOrigin) => void>>();
 const eventKey = "hj.reference-data-changed";
@@ -28,6 +28,11 @@ export function notifyReferenceDataChanged(resource: ReferenceData): void {
   } catch {
     // 本页联动已完成；存储不可用时不影响已成功的写入。
   }
+}
+
+/** 读取到最新资料后更新当前页面；读取本身不向其它标签页广播。 */
+export function notifyReferenceDataRefreshed(resource: ReferenceData): void {
+  dispatchReferenceDataChanged(resource, "refresh");
 }
 
 function onStorage(event: StorageEvent): void {

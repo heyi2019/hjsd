@@ -1711,13 +1711,14 @@ it.each([RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal])("已选售�
   await saleUi.click(screen.getByLabelText("交付操作人"));
   const employeeOptions = screen.getAllByText("小红", { selector: ".ant-select-item-option-content" });
   await saleUi.click(employeeOptions[employeeOptions.length - 1]);
+  const listCallsBeforeSubmit = vi.mocked(employeesApi.list).mock.calls.length;
   vi.mocked(employeesApi.list).mockReturnValue(new Promise(() => {}));
   vi.mocked(ordersApi.stockSale).mockReturnValue(new Promise(() => {}));
   const form = screen.getByLabelText(amountLabel).closest("form")!;
   await act(async () => { fireEvent.click(screen.getByRole("button", { name: /确认售出/ })); });
   await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledTimes(1));
   await act(async () => { fireEvent.submit(form); });
-  expect(employeesApi.list).toHaveBeenCalledTimes(1);
+  expect(employeesApi.list).toHaveBeenCalledTimes(listCallsBeforeSubmit);
   expect(screen.getByRole("button", { name: /确认售出/ })).toHaveClass("ant-btn-loading");
   expect(ordersApi.stockSale).toHaveBeenCalledTimes(1);
 });

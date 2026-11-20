@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import { notifyReferenceDataChanged } from "../state/referenceDataEvents";
 import type { AttachmentItem, DocumentSequence, NotificationItem } from "./types/common";
 import type { GameTypeOption } from "./types/org";
@@ -20,8 +20,10 @@ export interface ProfitNotificationDetail {
 }
 
 export const gameTypesApi = {
-  list: (params?: { include_inactive?: boolean }) =>
-    api.get<GameTypeOption[]>("/game-types", { params }).then((r) => r.data),
+  list: (params?: { include_inactive?: boolean }, options?: { fresh?: boolean }) => {
+    const config: CacheAwareRequestConfig = { params, ...(options?.fresh ? { refreshCache: true } : {}) };
+    return api.get<GameTypeOption[]>("/game-types", config).then((r) => r.data);
+  },
   create: (payload: { name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) =>
     api.post<GameTypeOption>("/game-types", payload).then((r) => gameTypesChanged(r.data)),
   update: (id: number, payload: { name?: string; sort_order?: number; channel_regions?: string[] }) =>

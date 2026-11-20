@@ -114,6 +114,53 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     expect((axios as any).__getCallCount()).toBe(1);
   });
 
+  it("要求最新数据时只刷新目标接口，并合并并发刷新请求", async () => {
+    const api = apiInstance();
+    const oldEmployees = await api.request({ method: "get", url: "/users/options" });
+    const orders = await api.request({ method: "get", url: "/orders" });
+    const [first, second] = await Promise.all([
+      api.request({ method: "get", url: "/users/options", refreshCache: true }),
+      api.request({ method: "get", url: "/users/options", refreshCache: true }),
+    ]);
+    expect(first.data).not.toBe(oldEmployees.data);
+    expect(second.data).toBe(first.data);
+    expect((await api.request({ method: "get", url: "/orders" })).data).toBe(orders.data);
+    expect((axios as any).__getCallCount()).toBe(3);
+  });
+
+  it("刷新带筛选参数的选项时，不影响同接口的其他筛选缓存", async () => {
+    const api = apiInstance();
+    const active = { include_inactive: false };
+    const all = { include_inactive: true };
+    const first = await api.request({ method: "get", url: "/game-types", params: active });
+    const other = await api.request({ method: "get", url: "/game-types", params: all });
+    const refreshed = await api.request({ method: "get", url: "/game-types", params: active, refreshCache: true });
+    expect(refreshed.data).not.toBe(first.data);
+    expect((await api.request({ method: "get", url: "/game-types", params: all })).data).toBe(other.data);
+    expect((axios as any).__getCallCount()).toBe(3);
+  });
+
+  it("强制刷新时，较早的进行中请求不能覆盖新缓存", async () => {
+    const api = apiInstance();
+    const transport = (axios as any).__instances[1];
+    let finishOld!: (value: unknown) => void;
+    transport.request.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+    const old = api.request({ method: "get", url: "/users/options" });
+    await Promise.resolve();
+    const fresh = api.request({ method: "get", url: "/users/options", refreshCache: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    try {
+      expect(transport.request).toHaveBeenCalledTimes(2);
+      const newest = await fresh;
+      finishOld({ data: "OLD", status: 200, headers: {}, config: { method: "GET" } });
+      await old;
+      expect((await api.request({ method: "get", url: "/users/options" })).data).toBe(newest.data);
+    } finally {
+      finishOld({ data: "OLD", status: 200, headers: {}, config: { method: "GET" } });
+      await Promise.all([old, fresh]);
+    }
+  });
+
   it("POST 成功后清空 GET 缓存，下次 GET 走网络拿新值（写失效）", async () => {
     const api = apiInstance();
     const g1 = await api.request({ method: "get", url: "/orders" });

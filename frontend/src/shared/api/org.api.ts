@@ -1,9 +1,13 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import type { EmployeeOption, ManagedUser, Team } from "./types/org";
 import { notifyReferenceDataChanged } from "../state/referenceDataEvents";
 
 export const employeesApi = {
-  list: () => api.get<EmployeeOption[]>("/users/options").then((r) => r.data),
+  list: (options?: { fresh?: boolean }) => {
+    const config: CacheAwareRequestConfig = { refreshCache: true };
+    const request = options?.fresh ? api.get<EmployeeOption[]>("/users/options", config) : api.get<EmployeeOption[]>("/users/options");
+    return request.then((r) => r.data);
+  },
 };
 
 export const usersApi = {
@@ -21,7 +25,11 @@ export const usersApi = {
 };
 
 export const teamsApi = {
-  list: () => api.get<Team[]>("/teams").then((r) => r.data),
+  list: (options?: { fresh?: boolean }) => {
+    const config: CacheAwareRequestConfig = { refreshCache: true };
+    const request = options?.fresh ? api.get<Team[]>("/teams", config) : api.get<Team[]>("/teams");
+    return request.then((r) => r.data);
+  },
   create: (payload: Record<string, unknown>) => api.post<Team>("/teams", payload).then((r) => {
     notifyReferenceDataChanged("teams");
     return r.data;

@@ -1,10 +1,13 @@
 import { Form } from "antd";
 import type { SelectProps } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { EmployeeOption } from "../shared/api/types/org";
 import { currentDevUser } from "../shared/api/client";
+import { employeesApi } from "../shared/api/org.api";
+import { notifyReferenceDataRefreshed, subscribeReferenceDataChanged } from "../shared/state/referenceDataEvents";
 import { useSession } from "../shared/state/session";
 import { Select } from "../shared/ui";
+import { appMessage } from "../shared/ui/appFeedback";
 import { CfgItem } from "./ConfigurableField";
 import "./ResponsibleEmployeeSelect.css";
 
@@ -14,14 +17,48 @@ type EmployeeSelectControlProps = Omit<SelectProps, "options"> & {
 };
 
 /** 统一人员选项与下拉控件；建单操作人、交付操作人、分润配置共用此入口。 */
-export function EmployeeSelectControl({ employees, options, ...props }: EmployeeSelectControlProps) {
-  const employeeOptions = options ?? employees?.filter((employee) => employee.is_active).map((employee) => ({
+export function EmployeeSelectControl({ employees, options, onOpenChange, ...props }: EmployeeSelectControlProps) {
+  const signature = employees ? JSON.stringify(employees) : "";
+  const signatureRef = useRef(signature);
+  signatureRef.current = signature;
+  const sequence = useRef(0);
+  const [fresh, setFresh] = useState<{ signature: string; employees: EmployeeOption[] } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  useEffect(() => {
+    const unsubscribe = subscribeReferenceDataChanged("employees", (origin) => {
+      if (origin === "refresh") return;
+      sequence.current += 1;
+      setFresh(null);
+      setRefreshing(false);
+    });
+    return () => { sequence.current += 1; unsubscribe(); };
+  }, []);
+  const currentEmployees = fresh?.signature === signature ? fresh.employees : employees;
+  const employeeOptions = options ?? currentEmployees?.filter((employee) => employee.is_active).map((employee) => ({
     value: employee.id,
     label: employee.display_name,
   })) ?? [];
+  const handleOpen = (open: boolean) => {
+    onOpenChange?.(open);
+    if (!open || !employees || options) return;
+    const request = ++sequence.current;
+    setRefreshing(true);
+    void employeesApi.list({ fresh: true }).then((items) => {
+      if (request !== sequence.current || signature !== signatureRef.current) return;
+      if (!Array.isArray(items)) throw new Error("员工列表数据不可用");
+      setFresh({ signature, employees: items });
+      notifyReferenceDataRefreshed("employees");
+    }).catch(() => {
+      if (request === sequence.current) appMessage.warning("员工列表刷新失败，请稍后重试");
+    }).finally(() => {
+      if (request === sequence.current) setRefreshing(false);
+    });
+  };
   return (
     <Select
       {...props}
+      loading={Boolean(props.loading || refreshing)}
+      onOpenChange={handleOpen}
       showSearch={props.showSearch ?? true}
       optionFilterProp={props.optionFilterProp ?? "label"}
       options={employeeOptions}

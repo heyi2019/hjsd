@@ -16,6 +16,7 @@ export function setDevUser(user: string): void {
 }
 
 export const api = axios.create({ baseURL: API_BASE, timeout: 15_000 });
+export type CacheAwareRequestConfig = AxiosRequestConfig & { refreshCache?: boolean };
 
 api.interceptors.request.use((config) => {
   const token = import.meta.env.DEV ? null : localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -47,6 +48,8 @@ interface CacheEntry {
 
 const responseCache = new Map<string, CacheEntry>();
 const pending = new Map<string, Promise<CacheEntry>>();
+const refreshPending = new Map<string, Promise<CacheEntry>>();
+const keyVersions = new Map<string, number>();
 let cacheGeneration = 0;
 
 // 纯传输层：复用相同 baseURL 与默认 xhr adapter，但不挂载本项目拦截器，
@@ -108,9 +111,10 @@ function dedupAdapter(key: string, config: InternalAxiosRequestConfig): AxiosAda
 
 function startCachedRequest(key: string, config: InternalAxiosRequestConfig): Promise<CacheEntry> {
   const generation = cacheGeneration;
+  const version = keyVersions.get(key) ?? 0;
   const request = realSend(config)
     .then((entry) => {
-      if (generation === cacheGeneration) responseCache.set(key, entry);
+      if (generation === cacheGeneration && version === (keyVersions.get(key) ?? 0)) responseCache.set(key, entry);
       return entry;
     })
     .finally(() => {
@@ -124,6 +128,22 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const method = String(config.method || "get").toUpperCase();
   if (method !== "GET") return config;
   const key = buildCacheKey(config);
+  if ((config as InternalAxiosRequestConfig & CacheAwareRequestConfig).refreshCache) {
+    let request = refreshPending.get(key);
+    if (!request) {
+      responseCache.delete(key);
+      pending.delete(key);
+      keyVersions.set(key, (keyVersions.get(key) ?? 0) + 1);
+      request = startCachedRequest(key, config);
+      refreshPending.set(key, request);
+      const current = request;
+      const clear = () => { if (refreshPending.get(key) === current) refreshPending.delete(key); };
+      void request.then(clear, clear);
+    }
+    const current = request;
+    config.adapter = async () => fakeResponse(await current);
+    return config;
+  }
   const now = Date.now();
   const cached = responseCache.get(key);
   if (cached && cached.expireAt > now) {
@@ -149,6 +169,8 @@ export function clearApiCache(): void {
   cacheGeneration += 1;
   responseCache.clear();
   pending.clear();
+  refreshPending.clear();
+  keyVersions.clear();
 }
 
 export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean };

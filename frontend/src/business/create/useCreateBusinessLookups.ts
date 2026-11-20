@@ -9,7 +9,7 @@ import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { subscribeReferenceDataChanged } from "../../shared/state/referenceDataEvents";
 
 /** 建单资料预先加载，失败时可在表单中重试。 */
-export function useCreateBusinessLookups() {
+export function useCreateBusinessLookups(open: boolean) {
   const [pools, setPools] = useState<Pool[]>([]);
   const [gameTypes, setGameTypes] = useState<GameTypeOption[]>([]);
   const { activeEmployees, error: employeeError, reload: reloadEmployees } = useEmployeeOptions(false);
@@ -21,11 +21,14 @@ export function useCreateBusinessLookups() {
   const poolSequence = useRef(0);
   const gameTypeSequence = useRef(0);
   const changeSequence = useRef(0);
+  const openRef = useRef(open);
+  const refreshedForOpen = useRef(false);
+  openRef.current = open;
 
-  const loadPools = useCallback(async () => {
+  const loadPools = useCallback(async (fresh = false) => {
     const request = ++poolSequence.current;
     try {
-      const poolList = await poolsApi.list();
+      const poolList = await (fresh ? poolsApi.list({ fresh: true }) : poolsApi.list());
       if (request === poolSequence.current) {
         setPools((Array.isArray(poolList) ? poolList : []).filter((pool) => pool.status === "ACTIVE"));
       }
@@ -34,10 +37,11 @@ export function useCreateBusinessLookups() {
     }
   }, []);
 
-  const loadGameTypes = useCallback(async () => {
+  const loadGameTypes = useCallback(async (fresh = false) => {
     const request = ++gameTypeSequence.current;
     try {
-      const gameTypeList = await gameTypesApi.list({ include_inactive: false });
+      const params = { include_inactive: false };
+      const gameTypeList = await (fresh ? gameTypesApi.list(params, { fresh: true }) : gameTypesApi.list(params));
       if (request === gameTypeSequence.current) setGameTypes(Array.isArray(gameTypeList) ? gameTypeList : []);
     } catch (error) {
       if (request === gameTypeSequence.current) throw error;
@@ -48,7 +52,9 @@ export function useCreateBusinessLookups() {
     await lookupWrite.run(async () => {
       const current = changeSequence.current;
       try {
-        await Promise.all([loadPools(), loadGameTypes(), reloadEmployees()]);
+        const fresh = openRef.current;
+        if (fresh) refreshedForOpen.current = true;
+        await Promise.all([loadPools(fresh), loadGameTypes(fresh), reloadEmployees()]);
         if (current === changeSequence.current) setLookupError(null);
         didInitLookup.current = true;
       } catch (error) {
@@ -84,6 +90,18 @@ export function useCreateBusinessLookups() {
   useEffect(() => {
     if (!didInitLookup.current) void retryLookups();
   }, [retryLookups]);
+
+  useEffect(() => {
+    if (!open) {
+      refreshedForOpen.current = false;
+      return;
+    }
+    if (lookupLoading || !didInitLookup.current || refreshedForOpen.current) return;
+    refreshedForOpen.current = true;
+    const onError = (error: unknown) => setLookupError(normalizeError(error));
+    void loadPools(true).catch(onError);
+    void loadGameTypes(true).catch(onError);
+  }, [open, lookupLoading, loadPools, loadGameTypes]);
 
   return {
     pools,

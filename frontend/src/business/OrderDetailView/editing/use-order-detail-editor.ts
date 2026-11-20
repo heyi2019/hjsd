@@ -39,7 +39,7 @@ export function useOrderDetailEditor(params: {
   const [financeDrafts, setFinanceDrafts] = useState<Record<string, FinanceDraft>>({});
   const [orderDrafts, setOrderDrafts] = useState<Record<number, OrderDraft>>({});
   const [partyDrafts, setPartyDrafts] = useState<Record<number, PartyAddition[]>>({});
-  const { employees, reload: reloadEmployees } = useEmployeeOptions(false);
+  const { employees, reload: reloadEmployees, reloadFresh: reloadFreshEmployees } = useEmployeeOptions(false);
   const { items: pools, reload: reloadPools } = useReferenceList("pools", poolsApi.list, false);
   const [invEditExtraForm] = Form.useForm();
   const originalAccountExtras = useRef<Record<string, unknown>>({});
@@ -48,10 +48,13 @@ export function useOrderDetailEditor(params: {
   const openVersion = useLatestRequest();
   const openingEditor = useRef(false);
 
-  async function ensureEmployees(): Promise<EmployeeOption[]> {
-    if (employees.length) return employees;
+  async function ensureEmployees(fresh = false): Promise<EmployeeOption[]> {
+    if (employees.length) {
+      if (fresh) void reloadFreshEmployees().catch(() => undefined);
+      return employees;
+    }
     try {
-      return await reloadEmployees();
+      return await (fresh ? reloadFreshEmployees() : reloadEmployees());
     } catch {
       // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
       return [];
@@ -95,7 +98,7 @@ export function useOrderDetailEditor(params: {
     invEditExtraForm.resetFields();
     originalAccountExtras.current = { ...(account.extra_values ?? {}) };
     invEditExtraForm.setFieldsValue({ form_extra: account.extra_values ?? {} });
-    await Promise.all([ensureEmployees(), ensurePools()]);
+    await Promise.all([ensureEmployees(true), ensurePools()]);
     if (!openVersion.isCurrent(version)) return false;
     if (isCurrent && !isCurrent()) {
       openingEditor.current = false;

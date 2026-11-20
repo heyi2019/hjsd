@@ -72,9 +72,9 @@
           "deep": 12
         },
         "cases": {
-          "fast": 163,
+          "fast": 167,
           "quick": 105,
-          "react": 822,
+          "react": 834,
           "deep": 112
         },
         "byArea": {

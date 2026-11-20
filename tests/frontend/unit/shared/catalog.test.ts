@@ -57,13 +57,15 @@ describe("组织 API：统一通过领域客户端访问", () => {
   });
 
   it("团队列表、创建和更新使用固定路径", async () => {
-    vi.mocked(api.get).mockResolvedValueOnce({ data: [] });
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
     vi.mocked(api.post).mockResolvedValueOnce({ data: { id: 1 } });
     vi.mocked(api.patch).mockResolvedValueOnce({ data: { id: 1 } });
     await teamsApi.list();
+    await teamsApi.list({ fresh: true });
     await teamsApi.create({ code: "T1", name: "一队" });
     await teamsApi.update(1, { is_active: false });
-    expect(api.get).toHaveBeenCalledWith("/teams");
+    expect(api.get).toHaveBeenNthCalledWith(1, "/teams");
+    expect(api.get).toHaveBeenNthCalledWith(2, "/teams", { refreshCache: true });
     expect(api.post).toHaveBeenCalledWith("/teams", { code: "T1", name: "一队" });
     expect(api.patch).toHaveBeenCalledWith("/teams/1", { is_active: false });
   });

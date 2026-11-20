@@ -8,6 +8,7 @@ import type { Pool } from "../shared/api/types/finance";
 import type { ManagedUser, Team } from "../shared/api/types/org";
 import { useSettingsResource } from "../shared/state/useSettingsResource";
 import { useReferenceRefresh } from "../shared/hooks/useReferenceRefresh";
+import { useKeyedLatestRequest } from "../shared/hooks/useLatestRequest";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, Select } from "../shared/ui";
 import { OWNER_SCOPE_LABEL, USER_ROLE_LABEL } from "../shared/lib/labels";
 import { useOptionSet } from "../shared/lib/optionSets";
@@ -59,6 +60,17 @@ export function UsersPanel() {
   useReferenceRefresh("employees", reload, true);
   useReferenceRefresh("teams", reload);
   useReferenceRefresh("pools", reload);
+  const optionsRequest = useKeyedLatestRequest<"teams" | "pools">();
+  const refreshOptions = async (resource: "teams" | "pools") => {
+    const request = optionsRequest.start(resource);
+    try {
+      if (resource === "teams") await teamsApi.list({ fresh: true });
+      else await poolsApi.list({ fresh: true });
+      if (optionsRequest.isCurrent(resource, request)) await reload();
+    } catch {
+      if (optionsRequest.isCurrent(resource, request)) appMessage.warning("选项刷新失败，请稍后重试");
+    }
+  };
   const rows = loaded?.rows ?? [];
   const teams = loaded?.teams ?? [];
   const pools = loaded?.pools ?? [];
@@ -122,8 +134,8 @@ export function UsersPanel() {
       <Form.Item name="password" label="初始密码" rules={[{ required: true, min: 8 }]}><Input.Password placeholder="初始密码（至少 8 位）" /></Form.Item>
       <Form.Item name="role" initialValue="VIEWER"><Select options={roleOptions} aria-label="角色" className="ui-control-width-140" /></Form.Item>
       <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} aria-label="数据范围" className="ui-control-width-100" /></Form.Item>
-      <Form.Item name="team_ids"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
-      <Form.Item name="pool_ids"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} placeholder="可见资金账户" className="ui-control-min-180" /></Form.Item>
+      <Form.Item name="team_ids"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} onOpenChange={(open) => { if (open) void refreshOptions("teams"); }} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
+      <Form.Item name="pool_ids"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} onOpenChange={(open) => { if (open) void refreshOptions("pools"); }} placeholder="可见资金账户" className="ui-control-min-180" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={Boolean(loadError)}>新增用户</PermissionButton>
     </BusinessRegistrationForm>
     <BusinessActionModal title={`编辑用户：${editing?.username ?? ""}`} fieldCount={6} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
@@ -138,8 +150,8 @@ export function UsersPanel() {
         </Form.Item>
         <Form.Item name="role" label="角色" rules={[{ required: true }]}><Select options={roleOptions} aria-label="角色" /></Form.Item>
         <Form.Item name="owner_scope" label="数据范围" rules={[{ required: true }]}><Select options={scopeOptions} aria-label="数据范围" /></Form.Item>
-        <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} /></Form.Item>
-        <Form.Item name="pool_ids" label="可见资金账户"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} /></Form.Item>
+        <Form.Item name="team_ids" label="所属团队"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} onOpenChange={(open) => { if (open) void refreshOptions("teams"); }} /></Form.Item>
+        <Form.Item name="pool_ids" label="可见资金账户"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} onOpenChange={(open) => { if (open) void refreshOptions("pools"); }} /></Form.Item>
       </BusinessRegistrationForm>
     </BusinessActionModal>
     <BusinessActionModal size="compact" title={`重置密码：${resetting?.username ?? ""}`} open={Boolean(resetting)} onCancel={() => setResetting(null)} onOk={() => resetForm.submit()} destroyOnHidden>

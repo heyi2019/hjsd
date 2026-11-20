@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import type { Pool, PoolBalance, PoolBalanceTotals } from "./types/finance";
 import { notifyReferenceDataChanged } from "../state/referenceDataEvents";
 
@@ -10,7 +10,11 @@ function poolChanged<T>(value: T): T {
 export const poolsApi = {
   update: (id: number, data: Partial<Pool>) => api.patch<Pool>(`/pools/${id}`, data).then(r => poolChanged(r.data)),
   setStatus: (id: number, status: string) => api.patch<Pool>(`/pools/${id}/status`, {status}).then(r => poolChanged(r.data)),
-  list: () => api.get<Pool[]>("/pools").then((r) => r.data),
+  list: (options?: { fresh?: boolean }) => {
+    const config: CacheAwareRequestConfig = { refreshCache: true };
+    const request = options?.fresh ? api.get<Pool[]>("/pools", config) : api.get<Pool[]>("/pools");
+    return request.then((r) => r.data);
+  },
   create: (payload: Partial<Pool>) => api.post<Pool>("/pools", payload).then((r) => poolChanged(r.data)),
   remove: (id: number) => api.delete<void>(`/pools/${id}`).then(r => poolChanged(r.data)),
   balance: (poolId: number) =>

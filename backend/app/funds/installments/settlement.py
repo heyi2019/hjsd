@@ -101,6 +101,7 @@ def settle_early(
             pool_id=pool_id,
             note=note or f"提前结清 {installment.inst_no} 第 {row.period_no} 期",
             operator_user_ids=operator_user_ids,
+            validate_form_fields=False,
             user=user,
         )
     session.flush()

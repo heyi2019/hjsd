@@ -79,6 +79,64 @@ def _contract(
 
 
 class TestInstallmentsApi:
+    @pytest.mark.parametrize(("action", "scope", "other_scope"), [
+        ("payments", "INSTPAY", "INSTSETTLE"),
+        ("settle-early", "INSTSETTLE", "INSTPAY"),
+        ("cancel", "INSTCANCEL", "INVCANCEL"),
+        ("order-cancel", "INVCANCEL", "INSTCANCEL"),
+    ])
+    def test_installment_actions_use_their_own_fields(self, seeded_client, seeded_db, headers, action, scope, other_scope):
+        account = _account(seeded_db, f"installment-fields-{action}")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        created = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
+            "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "pool_id": pool.id, "operator_user_ids": [1],
+        })
+        assert created.status_code == 201, created.text
+        installment_id = created.json()["id"]
+        for field_scope, key, label in [
+            (scope, "receipt", "本操作凭据"), (other_scope, "other_receipt", "其他操作凭据"),
+            ("FUNDFLOW", "flow_receipt", "资金明细凭据"),
+            ("FUNDREVERSE", "reverse_receipt", "冲销凭据"),
+        ]:
+            create_order_form_field(seeded_db, order_type_code=field_scope, field_key=key,
+                                    label=label, required=True, actor="pytest")
+        seeded_db.commit()
+        if action == "payments":
+            payload = {"amount": "50", "paid_on": TODAY.isoformat(), "period_no": 1, "pool_id": pool.id}
+        elif action == "settle-early":
+            payload = {"paid_on": TODAY.isoformat(), "pool_id": pool.id}
+        else:
+            payload = {"cancelled_on": TODAY.isoformat(), "reason": "取消"}
+        url = f"/api/v1/installments/{installment_id}/{action}"
+        missing = seeded_client.post(url, headers=headers, json=payload)
+        assert missing.status_code == 422, missing.text
+        assert "本操作凭据" in missing.text
+        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+        assert saved.status_code == 200, saved.text
+        installment = saved.json().get("installment", saved.json())
+        assert installment["form_extra"]["receipt"] == "凭据A"
+
+    def test_stock_sale_automatic_down_payment_ignores_other_forms(self, seeded_client, seeded_db, headers):
+        account = _account(seeded_db, "automatic-down-payment-fields")
+        order = _order(seeded_db, order_type="HS", account_id=account.id)
+        _buy(seeded_db, order.id, "100")
+        for scope, key in [("INSTPAY", "pay_receipt"), ("FUNDFLOW", "flow_receipt")]:
+            create_order_form_field(seeded_db, order_type_code=scope, field_key=key,
+                                    label="其他表单凭据", required=True, actor="pytest")
+        seeded_db.commit()
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        response = seeded_client.post("/api/v1/installments/stock-sale", headers=headers, json={
+            "order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
+            "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "pool_id": pool.id, "operator_user_ids": [1],
+        })
+        assert response.status_code == 201, response.text
+        assert Decimal(response.json()["paid_amount"]) == Decimal("50")
+
     @pytest.mark.parametrize(("order_type", "scope", "installment"), [
         ("HS", "SALEREC", False), ("TH", "SALETH", False), ("DG", "SALEDG", False),
         ("HS", "SALEREC", True), ("TH", "SALETH", True),

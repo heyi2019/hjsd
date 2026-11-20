@@ -28,6 +28,7 @@ def cancel_installment(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
+    form_extra_scope: str = "INSTCANCEL",
     operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
@@ -55,8 +56,7 @@ def cancel_installment(
             code=ErrorCode.ORDER_STATUS_CONFLICT,
             details={"order_no": order.order_no, "status": order.status},
         )
-    if form_extra:
-        _merge_form_extra(session, installment, scope="INSTCANCEL", values=form_extra)
+    _merge_form_extra(session, installment, scope=form_extra_scope, values=form_extra)
 
     event_ids: list[int] = []
     refund_amount = Decimal("0")
@@ -90,6 +90,7 @@ def cancel_installment(
                 actor=actor,
                 reason=text_reason,
                 form_extra=None,
+                form_extra_scope=None,
                 user=user,
             )
             amount = to_money(flow.amount)

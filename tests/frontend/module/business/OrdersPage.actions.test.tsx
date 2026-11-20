@@ -1154,7 +1154,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/取消 · INS-1/);
     await ui.type(screen.getByLabelText("取消原因"), "提前结清");
     fireEvent.click(screen.getByRole("button", { name: /确认取消/ }));
-    await waitFor(() => expect(installmentsApi.cancel).toHaveBeenCalledWith(11, expect.objectContaining({ reason: "提前结清" })));
+    await waitFor(() => expect(installmentsApi.cancel).toHaveBeenCalledWith(11, expect.objectContaining({ reason: "提前结清" }), "ORDER"));
     // money() 走千分位格式化
     expect(message.success).toHaveBeenCalledWith(expect.stringContaining("退款已登记：¥3,000.00"));
   });

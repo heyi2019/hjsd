@@ -33,6 +33,7 @@ def pay(
     note: str | None = None,
     form_extra: Mapping[str, Any] | None = None,
     operator_user_ids: list[int] | None = None,
+    validate_form_fields: bool = True,
     user: CurrentUser | None = None,
 ) -> tuple[Installment, InstallmentSchedule]:
     """收款：直接登记收入资金明细，不创建订单业务事件。"""
@@ -40,7 +41,9 @@ def pay(
     order = session.get(Order, installment.order_id)
     if order is None:
         raise NotFound("分期合约所属订单不存在", details={"order_id": installment.order_id})
-    _merge_form_extra(session, installment, scope="INSTPAY", values=form_extra)
+    # 售出首付和提前结清内部生成的收款不对应单独的收款表单。
+    if validate_form_fields:
+        _merge_form_extra(session, installment, scope="INSTPAY", values=form_extra)
     if installment.status in (
         InstallmentStatus.CANCELLED.value,
         InstallmentStatus.DELIVERED.value,
@@ -98,6 +101,7 @@ def pay(
         operator_user_ids=operator_user_ids,
         order_id=order.id,
         note=note or f"分期收款 {installment.inst_no} 第 {schedule.period_no} 期",
+        form_extra_scope=None,
         user=user,
     )
     schedule.received_amount = to_money(schedule.received_amount) + money

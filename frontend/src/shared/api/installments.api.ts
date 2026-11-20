@@ -47,8 +47,8 @@ export const installmentsApi = {
         payload,
       )
       .then((r) => r.data),
-  cancel: (id: number, payload: { cancelled_on: string; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
-    api.post<InstallmentCancelResult>(`/installments/${id}/cancel`, payload).then((r) => r.data),
+  cancel: (id: number, payload: { cancelled_on: string; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }, origin?: "ORDER") =>
+    api.post<InstallmentCancelResult>(`/installments/${id}/${origin === "ORDER" ? "order-cancel" : "cancel"}`, payload).then((r) => r.data),
   settleEarly: (id: number, payload: { paid_on: string; pool_id?: number; note?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
     api.post<Installment>(`/installments/${id}/settle-early`, payload).then((r) => r.data),
   markDefault: (id: number, payload: { reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>

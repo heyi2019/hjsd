@@ -61,10 +61,9 @@ def _merge_form_extra(
     scope: str,
     values: Mapping[str, Any] | None,
 ) -> None:
-    if not values:
-        return
     checked = validate_form_extra(session, order_type_code=scope, values=values)
-    installment.form_extra = {**(installment.form_extra or {}), **checked}
+    if checked:
+        installment.form_extra = {**(installment.form_extra or {}), **checked}
 
 
 def _add_months(base: date, months: int) -> date:

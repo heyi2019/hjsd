@@ -35,7 +35,7 @@ def reverse_cashflow(
     actor: str,
     reason: str,
     form_extra: Mapping[str, Any] | None = None,
-    form_extra_scope: str = "FUNDREVERSE",
+    form_extra_scope: str | None = "FUNDREVERSE",
     operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Cashflow:
@@ -86,7 +86,8 @@ def reverse_cashflow(
         order_id=flow.order_id,
         reversal_reason=text_reason,
         note=f"冲销 {flow.flow_no}",
-        form_extra=validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra) or None,
+        form_extra=(validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra)
+                    if form_extra_scope else dict(form_extra or {})) or None,
         reviewed_by=actor,
         reviewed_at=now_second(),
         created_by=actor,

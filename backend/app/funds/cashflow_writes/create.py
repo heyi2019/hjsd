@@ -50,7 +50,7 @@ def create_cashflow(
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
-    form_extra_scope: str = "FUNDFLOW",
+    form_extra_scope: str | None = "FUNDFLOW",
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入直接入账，业务派生流水不走此入口。"""
@@ -116,6 +116,11 @@ def create_cashflow(
     else:
         money = _positive(amount, field="amount")
     operator_ids = _validate_operator_user_ids(session, operator_user_ids)
+    scope = "STUDIOEXP" if normalized_ledger_type == CashflowLedgerType.STUDIO.value else form_extra_scope
+    checked_extra = (
+        validate_form_extra(session, order_type_code=scope, values=form_extra)
+        if scope else dict(form_extra or {})
+    )
     flow = Cashflow(
         flow_no=allocate_flow_no(session, direction),
         pool_id=pool.id,
@@ -129,11 +134,7 @@ def create_cashflow(
         source_id=source_id,
         order_id=order_id,
         note=note,
-        form_extra=validate_form_extra(
-            session,
-            order_type_code="STUDIOEXP" if normalized_ledger_type == CashflowLedgerType.STUDIO.value else form_extra_scope,
-            values=form_extra,
-        ) or None,
+        form_extra=checked_extra or None,
         created_by=actor,
         updated_by=actor,
         operator_user_ids=operator_ids,

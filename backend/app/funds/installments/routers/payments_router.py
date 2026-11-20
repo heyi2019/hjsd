@@ -63,15 +63,12 @@ def pay_installment(
         schedule=schemas.ScheduleOut.model_validate(schedule),
     )
 
-@router.post(
-    "/installments/{installment_id}/cancel",
-    response_model=schemas.InstallmentCancelResult,
-)
-def cancel_installment(
+def _cancel_installment(
     installment_id: int,
     payload: schemas.CancelIn,
-    db: Session = Depends(get_db),
-    user: CurrentUser = post_payment,
+    db: Session,
+    user: CurrentUser,
+    form_scope: str,
 ) -> schemas.InstallmentCancelResult:
     result = inst_cancel(
         db,
@@ -80,6 +77,7 @@ def cancel_installment(
         actor=_actor(user),
         reason=payload.reason,
         form_extra=payload.form_extra,
+        form_extra_scope=form_scope,
         operator_user_ids=payload.operator_user_ids,
         user=user,
     )
@@ -91,6 +89,22 @@ def cancel_installment(
         reversed_amount=result["reversed_amount"],
         cancel_event_ids=result["cancel_event_ids"],
     )
+
+
+@router.post("/installments/{installment_id}/cancel", response_model=schemas.InstallmentCancelResult)
+def cancel_installment(
+    installment_id: int, payload: schemas.CancelIn,
+    db: Session = Depends(get_db), user: CurrentUser = post_payment,
+) -> schemas.InstallmentCancelResult:
+    return _cancel_installment(installment_id, payload, db, user, "INSTCANCEL")
+
+
+@router.post("/installments/{installment_id}/order-cancel", response_model=schemas.InstallmentCancelResult)
+def cancel_installment_from_order(
+    installment_id: int, payload: schemas.CancelIn,
+    db: Session = Depends(get_db), user: CurrentUser = post_payment,
+) -> schemas.InstallmentCancelResult:
+    return _cancel_installment(installment_id, payload, db, user, "INVCANCEL")
 
 @router.post(
     "/installments/{installment_id}/settle-early", response_model=schemas.InstallmentOut

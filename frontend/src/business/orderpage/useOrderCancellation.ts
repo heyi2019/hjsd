@@ -133,7 +133,7 @@ export function useOrderCancellation(params: {
     await cancelWrite.run(async () => {
       try {
         if (installment) {
-          const result = await installmentsApi.cancel(installment.id, values);
+          const result = await installmentsApi.cancel(installment.id, values, "ORDER");
           success(cancelRefundSuccess(result.refund_amount, installment.contract_type));
           complete();
         } else {

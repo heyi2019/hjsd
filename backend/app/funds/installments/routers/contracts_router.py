@@ -190,7 +190,8 @@ def create_stock_sale(
     )
     if payload.down_payment > 0:
         inst_pay(db, item.id, amount=payload.down_payment, paid_on=payload.paid_on, period_no=0,
-                 pool_id=payload.pool_id, actor=_actor(user), operator_user_ids=payload.operator_user_ids, user=user)
+                 pool_id=payload.pool_id, actor=_actor(user), operator_user_ids=payload.operator_user_ids,
+                 validate_form_fields=False, user=user)
     return _installment_output(db, item)
 
 

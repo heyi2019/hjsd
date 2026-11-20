@@ -257,6 +257,17 @@ it("必填校验失败时显示表单级提示，避免误认为点击无效", a
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
 
+it("代挂必填客户昵称不能仅由空格组成", async () => {
+  await openTypedModal("DG");
+  await ui.type(screen.getByLabelText("游戏账号"), "account-test");
+  await ui.type(screen.getByLabelText("账号密码"), "secret");
+  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await ui.type(screen.getByLabelText("客户昵称"), "   ");
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  expect(await screen.findByText("客户昵称必填")).toBeInTheDocument();
+  expect(ordersApi.create).not.toHaveBeenCalled();
+});
+
 it("关闭并重新打开建单时不保留上一单的校验错误", async () => {
   const onClose = vi.fn();
   const onCreated = vi.fn();

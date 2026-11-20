@@ -80,10 +80,10 @@ export function buildCustomerInput(args: {
 }) {
   const { values, isRecovery, isDg, resolvedCustomerSource } = args;
   const customerPrefix = isDg ? "dg_" : "";
-  const customerNickname = values[`${customerPrefix}customer_nickname`];
+  const customerNickname = String(values[`${customerPrefix}customer_nickname`] ?? "").trim();
   if (!(isRecovery || isDg) || !customerNickname) return undefined;
   return {
-    display_name: String(customerNickname),
+    display_name: customerNickname,
     role: isRecovery ? "SELLER" : "CONSIGNOR",
     contact_name: values[isDg ? "dg_customer_contact" : "customer_contact_name"] as string | undefined,
     phone: values[`${customerPrefix}customer_phone`] as string | undefined,
@@ -100,9 +100,10 @@ export function buildCounterpartyInput(args: {
   isTh: boolean;
 }) {
   const { values, isTh } = args;
-  if (!isTh || !values.supplier_nickname) return undefined;
+  const nickname = String(values.supplier_nickname ?? "").trim();
+  if (!isTh || !nickname) return undefined;
   return {
-    display_name: String(values.supplier_nickname),
+    display_name: nickname,
     type: "PEER",
     role: "PEER",
     contact_name: values.supplier_contact_name as string,

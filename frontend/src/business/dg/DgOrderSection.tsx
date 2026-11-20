@@ -17,7 +17,7 @@ export function DgOrderSection(props: { gameTypes?: GameTypeOption[]; employees?
       </RecoveryAccountSection>
 
       <BusinessRegistrationSection className="dg-customer-section" title={participantTitle}>
-        <CfgItem name="dg_customer_nickname" label="客户昵称" rules={[{ required: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
+        <CfgItem name="dg_customer_nickname" label="客户昵称" rules={[{ required: true, whitespace: true, message: "客户昵称必填" }]}><Input placeholder="请输入客户昵称" /></CfgItem>
         <CustomerSourceFields name="dg_customer_source" otherName="dg_customer_source_other" />
         <BusinessRegistrationGroup className="customer-contacts" title="联系方式">
           <CfgNestedItem name="dg_customer_contact" label="姓名"><Input placeholder="可选填" /></CfgNestedItem>

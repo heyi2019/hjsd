@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildOrderNote, resolveCustomerSource, splitFormExtra } from "@/business/create/submit-helpers";
+import { buildCounterpartyInput, buildCustomerInput, buildOrderNote, resolveCustomerSource, splitFormExtra } from "@/business/create/submit-helpers";
 import type { FieldConfigMap } from "@/business/ConfigurableField";
 
 const config: FieldConfigMap = {
@@ -24,6 +24,12 @@ describe("splitFormExtra", () => {
     const result = splitFormExtra({ form_extra: { optional_number: null } }, config);
     expect(result.orderFormExtra).toEqual({});
   });
+});
+
+it("只有空白的选填昵称不生成参与方草稿", () => {
+  expect(buildCustomerInput({ values: { customer_nickname: "   " }, isRecovery: true, isDg: false, resolvedCustomerSource: undefined })).toBeUndefined();
+  expect(buildCustomerInput({ values: { dg_customer_nickname: "   " }, isRecovery: false, isDg: true, resolvedCustomerSource: undefined })).toBeUndefined();
+  expect(buildCounterpartyInput({ values: { supplier_nickname: "   " }, isTh: true })).toBeUndefined();
 });
 
 it("代挂没有客户来源时仍保存订单备注", () => {

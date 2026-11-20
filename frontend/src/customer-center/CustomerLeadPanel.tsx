@@ -24,6 +24,9 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [rows, setRows] = useState<Lead[]>([]);
   const [summary, setSummary] = useState<{ total_count: number; open_count: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
+  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const requestRef = useRef(0);
@@ -49,18 +52,21 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const load = useCallback(async () => {
     const request = ++requestRef.current;
     setLoading(true);
-    try {
-      const dates = createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {};
-      const [leadPage, leadSummary] = await Promise.all([
-        leadsApi.page({ ...dates, limit: pageSize, offset: (page - 1) * pageSize }),
-        leadsApi.summary(dates),
-      ]);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    const dates = createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {};
+    const listRequest = leadsApi.page({ ...dates, limit: pageSize, offset: (page - 1) * pageSize }).then((leadPage) => {
       if (request !== requestRef.current) return;
       setRows(leadPage.items);
-      setSummary(leadSummary);
+      setTotal(leadPage.total);
       setError(null);
-    } catch (err) { if (request === requestRef.current) setError(normalizeError(err)); }
-    finally { if (request === requestRef.current) setLoading(false); }
+    }).catch((err) => { if (request === requestRef.current) setError(normalizeError(err)); })
+      .finally(() => { if (request === requestRef.current) setLoading(false); });
+    const summaryRequest = leadsApi.summary(dates).then((leadSummary) => {
+      if (request === requestRef.current) setSummary(leadSummary);
+    }).catch((err) => { if (request === requestRef.current) setSummaryError(normalizeError(err)); })
+      .finally(() => { if (request === requestRef.current) setSummaryLoading(false); });
+    await Promise.all([listRequest, summaryRequest]);
   }, [page, pageSize, createdPeriod?.from, createdPeriod?.to]);
   useEffect(() => { setPage(1); }, [createdPeriod?.from, createdPeriod?.to]);
   useEffect(() => {
@@ -125,15 +131,16 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
-      <StatRow items={[{ label: "需求总数", kind: "count", amount: loading || error ? null : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: loading || error ? null : String(summary?.open_count ?? 0), tone: "warn" }]} />
+      <ErrorBanner error={summaryError} onRetry={() => void load()} />
+      <StatRow items={[{ label: "需求总数", kind: "count", amount: loading || summaryLoading || error ? null : summaryError ? "不可用" : String(summary?.total_count ?? 0) }, { label: "待跟进", kind: "count", amount: loading || summaryLoading || error ? null : summaryError ? "不可用" : String(summary?.open_count ?? 0), tone: "warn" }]} />
       {createdPicker ? <Space wrap className="customer-list-filters--separated">{createdPicker}</Space> : null}
       <DataTable<Lead>
         columns={arrangeColumns(columns)}
         rows={error ? [] : rows}
-        loading={loading || (summary === null && !error)}
+        loading={loading}
         page={page}
         pageSize={pageSize}
-        total={error ? 0 : summary?.total_count ?? 0}
+        total={error ? 0 : total}
         controlledPaging
         emptyText={error ? "客户需求数据不可用，请点击重新加载" : "暂无客户需求"}
         pagination={error ? false : undefined}

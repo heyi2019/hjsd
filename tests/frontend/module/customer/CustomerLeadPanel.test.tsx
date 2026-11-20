@@ -40,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(leadsApi.page).mockResolvedValue(pageResponse(leads));
+  vi.mocked(leadsApi.summary).mockResolvedValue({ total_count: 2, open_count: 1 });
   vi.mocked(customersApi.page).mockResolvedValue(pageResponse(customers, { limit: 500 }));
   vi.mocked(leadsApi.create).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.close).mockResolvedValue(leads[0]);
@@ -52,6 +53,30 @@ beforeEach(() => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("统计未返回时先显示需求列表及分页总数", async () => {
+    let finish!: (value: { total_count: number; open_count: number }) => void;
+    const pending = new Promise<{ total_count: number; open_count: number }>((resolve) => { finish = resolve; });
+    vi.mocked(leadsApi.summary).mockReturnValueOnce(pending);
+    vi.mocked(leadsApi.page).mockResolvedValueOnce(pageResponse(leads, { total: 11, limit: 10 }));
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    expect(await screen.findByText("LD-1")).toBeVisible();
+    expect(screen.getByTitle("2")).toBeVisible();
+    expect(screen.getByText("需求总数").closest(".ui-stat")).toHaveTextContent("-");
+    await act(async () => { finish({ total_count: 11, open_count: 3 }); await pending; });
+    expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("3");
+  });
+
+  it("统计失败时保留需求列表并允许重试", async () => {
+    vi.mocked(leadsApi.summary).mockRejectedValueOnce(new Error("需求统计读取失败"))
+      .mockResolvedValueOnce({ total_count: 2, open_count: 1 });
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    expect(await screen.findByText("LD-1")).toBeVisible();
+    expect(await screen.findByText(/需求统计读取失败/)).toBeVisible();
+    expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("不可用");
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("1"));
+  });
+
   it("需求建档请求进行时快速重复提交只创建一次", async () => {
     let finish!: (value: Lead) => void;
     const pending = new Promise<Lead>((resolve) => { finish = resolve; });

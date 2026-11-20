@@ -81,7 +81,7 @@ def test_totals_match_list_rows(seeded_client, seeded_db, headers):
 
     listed = seeded_client.get("/api/v1/installments", headers=headers)
     assert listed.status_code == 200, listed.text
-    rows = listed.json()
+    rows = listed.json()["items"]
     assert rows
 
     summary = seeded_client.get("/api/v1/installments/totals", headers=headers).json()
@@ -109,7 +109,7 @@ def test_trade_date_range_filters_both_list_and_totals(seeded_client, seeded_db,
         headers=headers,
     )
     assert listed.status_code == 200, listed.text
-    assert [row["id"] for row in listed.json()] == [late.id]
+    assert [row["id"] for row in listed.json()["items"]] == [late.id]
 
     receivable, paid, remaining = _totals(
         seeded_client,
@@ -117,9 +117,9 @@ def test_trade_date_range_filters_both_list_and_totals(seeded_client, seeded_db,
         trade_date_from=D2.isoformat(),
         trade_date_to=D2.isoformat(),
     )
-    assert receivable == Decimal(listed.json()[0]["total_receivable"])
-    assert paid == Decimal(listed.json()[0]["paid_amount"])
-    assert remaining == Decimal(listed.json()[0]["remaining_receivable"])
+    assert receivable == Decimal(listed.json()["items"][0]["total_receivable"])
+    assert paid == Decimal(listed.json()["items"][0]["paid_amount"])
+    assert remaining == Decimal(listed.json()["items"][0]["remaining_receivable"])
 
 
 def test_totals_remaining_never_negative(seeded_client, seeded_db, headers):
@@ -127,7 +127,7 @@ def test_totals_remaining_never_negative(seeded_client, seeded_db, headers):
     contract.waived_amount = Decimal("500.00")
     seeded_db.commit()
 
-    listed = seeded_client.get("/api/v1/installments", headers=headers).json()
+    listed = seeded_client.get("/api/v1/installments", headers=headers).json()["items"]
     row = next(item for item in listed if item["id"] == contract.id)
     assert Decimal(row["remaining_receivable"]) == Decimal("0.00")
 
@@ -156,7 +156,7 @@ def test_contract_type_filters_both_list_and_totals(seeded_client, seeded_db, he
         "/api/v1/installments", params={"contract_type": "STOCK_SALE"}, headers=headers
     )
     assert listed.status_code == 200, listed.text
-    rows = listed.json()
+    rows = listed.json()["items"]
     assert [row["id"] for row in rows] == [stock.id]
     assert pickup.id not in [row["id"] for row in rows]
 
@@ -172,7 +172,7 @@ def test_contract_type_filters_both_list_and_totals(seeded_client, seeded_db, he
     # 按 PICKUP_SALE 过滤时只回另一份合约，合计随之切换，证明不是同一口袋。
     pickup_rows = seeded_client.get(
         "/api/v1/installments", params={"contract_type": "PICKUP_SALE"}, headers=headers
-    ).json()
+    ).json()["items"]
     assert [row["id"] for row in pickup_rows] == [pickup.id]
     pickup_totals = _totals(seeded_client, headers, contract_type="PICKUP_SALE")
     assert pickup_totals == (

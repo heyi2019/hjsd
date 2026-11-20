@@ -11,6 +11,7 @@ import { CashflowModal, type CashflowTarget } from "@/finance/cashflow";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { installmentsApi } from "@/shared/api/installments.api";
+const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
 import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
@@ -240,7 +241,12 @@ beforeEach(() => {
     { id: 22, username: "seller", display_name: "售出员", is_active: true },
     { id: 33, username: "operator", display_name: "运营员", is_active: true },
   ]);
-  vi.mocked(installmentsApi.list).mockResolvedValue([installment]);
+  installmentListFixture.mockResolvedValue([installment]);
+  vi.mocked(installmentsApi.page).mockImplementation(async ({ limit, offset, sort_desc, ...filters }) => {
+    const rows = await installmentListFixture(filters);
+    const sorted = [...rows].sort((a, b) => sort_desc ? b.id - a.id : a.id - b.id);
+    return pageResponse(sorted.slice(offset, offset + limit), { total: sorted.length, limit, offset });
+  });
   vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals());
   vi.mocked(installmentsApi.cancel).mockResolvedValue(installmentCancelResult);
   vi.mocked(client.currentUser).mockResolvedValue({ id: 9, username: "lisi", role: "operator", display_name: "李四" });
@@ -397,25 +403,25 @@ describe("OrdersPage：操作与筛选分支", () => {
   // 逾期标记是全局动作（后端按 as_of 扫描全部合约），入口从分期面板收敛到
   // 订单页「分期与回款」Tab 的右上角，这两个用例随功能入口一起从 InstallmentsPanel.flows 迁入。
   it("切走再切回「分期与回款」会重拉分期列表（切入即刷新）", async () => {
-    vi.mocked(installmentsApi.list).mockResolvedValue([]);
+    installmentListFixture.mockResolvedValue([]);
     await openLedger();
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalled());
+    await waitFor(() => expect(installmentListFixture).toHaveBeenCalled());
     // 首次切入只靠挂载 load，不自增 refreshKey（避免双请求）
-    expect(vi.mocked(installmentsApi.list)).toHaveBeenCalledTimes(1);
-    const callsAfterFirstEntry = vi.mocked(installmentsApi.list).mock.calls.length;
+    expect(installmentListFixture).toHaveBeenCalledTimes(1);
+    const callsAfterFirstEntry = installmentListFixture.mock.calls.length;
 
     fireEvent.click(screen.getByRole("tab", { name: "订单台账" }));
     await waitFor(() => expect(screen.getByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true"));
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
 
     await waitFor(() =>
-      expect(vi.mocked(installmentsApi.list).mock.calls.length).toBeGreaterThan(callsAfterFirstEntry),
+      expect(installmentListFixture.mock.calls.length).toBeGreaterThan(callsAfterFirstEntry),
     );
   });
 
   it("标记逾期失败时提示错误且允许重试", async () => {
-    vi.mocked(installmentsApi.list).mockResolvedValue([]);
+    installmentListFixture.mockResolvedValue([]);
     vi.mocked(installmentsApi.markOverdue).mockRejectedValueOnce(new Error("逾期标记失败"));
     await openLedger();
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
@@ -430,12 +436,12 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   // 原两条（有新增 / 无新增）是同一条「标记逾期」路径的两个分支，合并为一次挂载逐次点击。
   it("标记逾期：有新增提示笔数并刷新列表，无新增提示当前无新增", async () => {
-    vi.mocked(installmentsApi.list).mockResolvedValue([]);
+    installmentListFixture.mockResolvedValue([]);
     vi.mocked(installmentsApi.markOverdue).mockResolvedValue({ marked: 3 });
     await openLedger();
     fireEvent.click(screen.getByRole("tab", { name: "分期与回款" }));
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalled());
-    const callsBefore = vi.mocked(installmentsApi.list).mock.calls.length;
+    await waitFor(() => expect(installmentListFixture).toHaveBeenCalled());
+    const callsBefore = installmentListFixture.mock.calls.length;
 
     await ui.click(screen.getByRole("button", { name: /标记逾期/ }));
 
@@ -443,7 +449,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(message.success).toHaveBeenCalledWith("已标记 3 笔逾期");
     // installmentRefreshKey 自增 → 分期面板重新 load
     await waitFor(() => expect(screen.getByRole("tab", { name: "分期与回款" })).toBeInTheDocument());
-    expect(vi.mocked(installmentsApi.list).mock.calls.length).toBeGreaterThan(callsBefore);
+    expect(installmentListFixture.mock.calls.length).toBeGreaterThan(callsBefore);
 
     // 分支二：本次标记 0 笔
     vi.mocked(installmentsApi.markOverdue).mockResolvedValue({ marked: 0 });
@@ -1212,6 +1218,29 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(message.success).toHaveBeenCalledWith(expect.stringContaining("退款已登记：¥3,000.00"));
   });
 
+  it("取消分期订单时继续查找后续页的有效合约", async () => {
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
+    vi.mocked(ordersApi.get).mockResolvedValue(order3);
+    const history = Array.from({ length: 500 }, (_, id) => ({ ...installment, id: 1000 + id, status: "CANCELLED" }));
+    vi.mocked(installmentsApi.page)
+      .mockResolvedValueOnce(pageResponse(history, { total: 501, limit: 500, offset: 0 }) as never)
+      .mockResolvedValueOnce(pageResponse([installment], { total: 501, limit: 500, offset: 500 }) as never);
+    await openLedger();
+    await openRowMenu("HS-2026-0003", "取消");
+    expect(await modalOf(/取消 · INS-1/)).toBeVisible();
+    expect(installmentsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ order_id: 3, limit: 500, offset: 500 }));
+  });
+
+  it("取消分期订单遇到不完整分页时提示重试", async () => {
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
+    vi.mocked(ordersApi.get).mockResolvedValue(order3);
+    vi.mocked(installmentsApi.page).mockResolvedValueOnce(pageResponse([], { total: 1, limit: 500, offset: 0 }));
+    await openLedger();
+    await openRowMenu("HS-2026-0003", "取消");
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith("分期合约读取不完整，请重试"));
+    expect(screen.queryByRole("dialog", { name: /取消 · INS-1/ })).toBeNull();
+  });
+
   it("订单入口取消分期提交所有板块字段并过滤空值", async () => {
     const fields = [...allFormFields(),
       { id: 901, order_type_code: "INVCANCEL", field_key: "receipt", label: "取消凭据", field_type: "TEXT",
@@ -1238,7 +1267,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   it("取消：分期订单无可用合约时提示", async () => {
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
     vi.mocked(ordersApi.get).mockResolvedValue(order3);
-    vi.mocked(installmentsApi.list).mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
+    installmentListFixture.mockResolvedValue([{ ...installment, status: "CANCELLED" }]);
     await openLedger();
     await openRowMenu("HS-2026-0003", "取消");
     await waitFor(() => expect(message.error).toHaveBeenCalledWith("未找到可取消的分期合约"));

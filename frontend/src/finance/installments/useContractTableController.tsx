@@ -22,6 +22,9 @@ export function useContractTableController(params: { contractType: string; reloa
   const [rows, setRows] = useState<Installment[]>([]);
   const [totals, setTotals] = useState<InstallmentTotals | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pageTotal, setPageTotal] = useState(0);
   const [resaleOrders, setResaleOrders] = useState<Order[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const { can } = useSession();
@@ -72,10 +75,35 @@ export function useContractTableController(params: { contractType: string; reloa
 
   // 筛选条件/reloadKey 变化会重新触发 load；用请求序号丢弃过期响应，避免旧请求
   // 后到覆盖新筛选的列表与合计（与 useLedgerList 同一范式）。
-  const loadSeqRef = useRef(0);
-  const load = useCallback(async () => {
-    const seq = ++loadSeqRef.current;
+  const listSeqRef = useRef(0);
+  const totalsSeqRef = useRef(0);
+  const loadList = useCallback(async () => {
+    const seq = ++listSeqRef.current;
     setLoading(true);
+    const rangeParams = {
+      contract_type: contractType,
+      status: status || undefined,
+      trade_date_from: dateFrom || undefined,
+      trade_date_to: dateTo || undefined,
+    };
+    await installmentsApi.page({ ...rangeParams, limit: pageSize, offset: (page - 1) * pageSize, sort_desc: sortDesc })
+        .then((result) => {
+          if (seq !== listSeqRef.current) return;
+          const lastPage = Math.max(1, Math.ceil(result.total / pageSize));
+          if (page > lastPage) {
+            setPage(lastPage);
+            return;
+          }
+          setRows(result.items);
+          setPageTotal(result.total);
+          setError(null);
+        })
+        .catch((err) => { if (seq === listSeqRef.current) setError(normalizeError(err)); })
+        .finally(() => { if (seq === listSeqRef.current) setLoading(false); });
+  }, [contractType, dateFrom, dateTo, status, page, pageSize, sortDesc]);
+
+  const loadTotals = useCallback(async () => {
+    const seq = ++totalsSeqRef.current;
     setTotalsLoading(true);
     setTotalsError(null);
     const rangeParams = {
@@ -84,27 +112,35 @@ export function useContractTableController(params: { contractType: string; reloa
       trade_date_from: dateFrom || undefined,
       trade_date_to: dateTo || undefined,
     };
-    await Promise.all([
-      installmentsApi.list(rangeParams)
-        .then((list) => {
-          if (seq !== loadSeqRef.current) return;
-          setRows(list);
-          setError(null);
-        })
-        .catch((err) => { if (seq === loadSeqRef.current) setError(normalizeError(err)); })
-        .finally(() => { if (seq === loadSeqRef.current) setLoading(false); }),
-      installmentsApi.totals(rangeParams)
-        .then((summary) => { if (seq === loadSeqRef.current) setTotals(summary); })
-        .catch((err) => { if (seq === loadSeqRef.current) setTotalsError(normalizeError(err)); })
-        .finally(() => { if (seq === loadSeqRef.current) setTotalsLoading(false); }),
-    ]);
+    await installmentsApi.totals(rangeParams)
+      .then((summary) => { if (seq === totalsSeqRef.current) setTotals(summary); })
+      .catch((err) => { if (seq === totalsSeqRef.current) setTotalsError(normalizeError(err)); })
+      .finally(() => { if (seq === totalsSeqRef.current) setTotalsLoading(false); });
   }, [contractType, dateFrom, dateTo, status]);
 
+  const load = useCallback(async () => {
+    await Promise.all([loadList(), loadTotals()]);
+  }, [loadList, loadTotals]);
+
+  const resetKey = JSON.stringify([contractType, dateFrom, dateTo, status, sortDesc]);
+  const previousResetKey = useRef(resetKey);
   useEffect(() => {
     if (!active) return;
-    void load();
-    return () => { loadSeqRef.current += 1; };
-  }, [active, load, reloadKey]);
+    if (previousResetKey.current !== resetKey) {
+      previousResetKey.current = resetKey;
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+    void loadList();
+    return () => { listSeqRef.current += 1; };
+  }, [active, loadList, page, reloadKey, resetKey]);
+  useEffect(() => {
+    if (!active) return;
+    void loadTotals();
+    return () => { totalsSeqRef.current += 1; };
+  }, [active, loadTotals, reloadKey]);
 
   // 写操作已提取到 useContractActions（函数体一字未改）：传入 state/form/setter
   // 与共享的 write/load，保持原闭包语义；返回字段与原 controller 完全一致。
@@ -150,6 +186,11 @@ export function useContractTableController(params: { contractType: string; reloa
     setRows,
     sortDesc,
     setSortDesc,
+    page,
+    setPage,
+    pageSize,
+    setPageSize,
+    pageTotal,
     can,
     settlePermission,
     payTarget,

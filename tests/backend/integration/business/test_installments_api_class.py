@@ -690,7 +690,7 @@ class TestInstallmentsApi:
 
         listing = seeded_client.get("/api/v1/installments", headers=scoped_headers)
         assert listing.status_code == 200
-        assert [row["id"] for row in listing.json()] == [own_contract.id]
+        assert [row["id"] for row in listing.json()["items"]] == [own_contract.id]
 
         schedules = seeded_client.get(
             f"/api/v1/installments/{other_contract.id}/schedules",
@@ -712,8 +712,8 @@ class TestInstallmentsApi:
             "/api/v1/installments", params={"status": "PENDING"}, headers=headers
         )
         assert response.status_code == 200, response.text
-        assert [item["inst_no"] for item in response.json()] == [contract.inst_no]
-        row = response.json()[0]
+        assert [item["inst_no"] for item in response.json()["items"]] == [contract.inst_no]
+        row = response.json()["items"][0]
         assert row["first_due_on"] == PAST.isoformat()
         assert row["note"] == "分期备注"
 
@@ -743,7 +743,7 @@ class TestInstallmentsApi:
         response = seeded_client.get("/api/v1/installments", headers=headers)
 
         assert response.status_code == 200, response.text
-        row = next(item for item in response.json() if item["id"] == contract.id)
+        row = next(item for item in response.json()["items"] if item["id"] == contract.id)
         assert {
             key: row["order"][key]
             for key in ("id", "order_no", "order_type", "trade_date")
@@ -782,7 +782,7 @@ class TestInstallmentsApi:
         response = seeded_client.get("/api/v1/installments", headers=headers)
 
         assert response.status_code == 200, response.text
-        row = next(item for item in response.json() if item["id"] == contract.id)
+        row = next(item for item in response.json()["items"] if item["id"] == contract.id)
         assert row["schedules"][0]["installment_id"] == contract.id
         assert row["dispositions"][0]["action"] == "RECOVER"
 

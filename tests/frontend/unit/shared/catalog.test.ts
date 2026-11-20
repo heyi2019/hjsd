@@ -23,11 +23,13 @@ describe("auditApi：与后端审计查询契约一致", () => {
 });
 
 describe("页面接口契约", () => {
-  it("分期列表直接返回期次和处置明细", async () => {
+  it("分期列表返回分页及期次和处置明细", async () => {
     const rows = [{ id: 7, schedules: [], dispositions: [] }];
-    vi.mocked(api.get).mockResolvedValueOnce({ data: rows });
-    await expect(installmentsApi.list()).resolves.toEqual(rows);
-    expect(api.get).toHaveBeenCalledWith("/installments", { params: undefined });
+    const page = { items: rows, total: 1, limit: 10, offset: 0 };
+    const params = { limit: 10, offset: 0, sort_desc: true };
+    vi.mocked(api.get).mockResolvedValueOnce({ data: page });
+    await expect(installmentsApi.page(params)).resolves.toEqual(page);
+    expect(api.get).toHaveBeenCalledWith("/installments", { params });
   });
 });
 

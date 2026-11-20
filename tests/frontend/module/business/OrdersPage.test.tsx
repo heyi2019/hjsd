@@ -5,6 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
 
 import { installmentsApi } from "@/shared/api/installments.api";
+const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { stocksApi } from "@/shared/api/stocks.api";
@@ -104,7 +105,12 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);
-  vi.mocked(installmentsApi.list).mockResolvedValue([]);
+  installmentListFixture.mockResolvedValue([]);
+  vi.mocked(installmentsApi.page).mockImplementation(async ({ limit, offset, sort_desc, ...filters }) => {
+    const rows = await installmentListFixture(filters);
+    const sorted = [...rows].sort((a, b) => sort_desc ? b.id - a.id : a.id - b.id);
+    return pageResponse(sorted.slice(offset, offset + limit), { total: sorted.length, limit, offset });
+  });
 });
 
 async function openLedger(user?: string) {
@@ -119,17 +125,17 @@ describe("OrdersPage：四类订单台账", () => {
     vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals());
     const view = renderLight(<OrdersPage initialTab="collections" active={false} />);
     await act(async () => {});
-    expect(installmentsApi.list).not.toHaveBeenCalled();
+    expect(installmentListFixture).not.toHaveBeenCalled();
     expect(installmentsApi.totals).not.toHaveBeenCalled();
     view.rerender(<OrdersPage initialTab="collections" active />);
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(installmentListFixture).toHaveBeenCalledTimes(1));
     expect(installmentsApi.totals).toHaveBeenCalledTimes(1);
     view.rerender(<OrdersPage initialTab="collections" active={false} initialInstallmentStatus="OVERDUE" />);
     await act(async () => {});
-    expect(installmentsApi.list).toHaveBeenCalledTimes(1);
+    expect(installmentListFixture).toHaveBeenCalledTimes(1);
     view.rerender(<OrdersPage initialTab="collections" active initialInstallmentStatus="OVERDUE" />);
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalledTimes(2));
-    expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE" }));
+    await waitFor(() => expect(installmentListFixture).toHaveBeenCalledTimes(2));
+    expect(installmentListFixture).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE" }));
     expect(installmentsApi.totals).toHaveBeenCalledTimes(2);
   });
 
@@ -220,7 +226,7 @@ describe("OrdersPage：四类订单台账", () => {
       expect(vi.mocked(ordersApi.listPage)).not.toHaveBeenCalled();
       expect(vi.mocked(ordersApi.ledgerSummary)).not.toHaveBeenCalled();
       expect(vi.mocked(orderTypesApi.list)).not.toHaveBeenCalled();
-      expect(vi.mocked(installmentsApi.list)).not.toHaveBeenCalled();
+      expect(installmentListFixture).not.toHaveBeenCalled();
       expect(vi.mocked(installmentsApi.totals)).not.toHaveBeenCalled();
     });
   });
@@ -364,7 +370,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
 
   it("业务中心仅保留业务作业页，不重复展示业务总览", async () => {
-    vi.mocked(installmentsApi.list).mockResolvedValue([{
+    installmentListFixture.mockResolvedValue([{
       id: 20,
       status: "OVERDUE",
       total_receivable: "1030.00",

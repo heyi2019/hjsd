@@ -31,6 +31,26 @@ TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
 
 
+def test_installments_page_limits_results_and_preserves_total(seeded_client, seeded_db, headers):
+    contracts = [_contract(seeded_db, _order(seeded_db).id) for _ in range(11)]
+    contracts[0].status = "CANCELLED"
+    seeded_db.flush()
+
+    first = seeded_client.get("/api/v1/installments", params={"limit": 2, "offset": 0, "sort_desc": "true"}, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["total"] == 11
+    assert [item["id"] for item in first.json()["items"]] == [contracts[10].id, contracts[9].id]
+    assert first.json()["items"][0]["schedules"]
+    second = seeded_client.get("/api/v1/installments", params={"limit": 2, "offset": 10, "sort_desc": "true"}, headers=headers)
+    assert [item["id"] for item in second.json()["items"]] == [contracts[0].id]
+    ascending = seeded_client.get("/api/v1/installments", params={"limit": 2, "sort_desc": "false", "status": "PENDING"}, headers=headers)
+    assert ascending.json()["total"] == 10
+    assert [item["id"] for item in ascending.json()["items"]] == [contracts[1].id, contracts[2].id]
+    exported = seeded_client.get("/api/v1/installments/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert all(contract.inst_no in exported.text for contract in contracts)
+
+
 def test_installment_order_context_reads_only_display_fields(seeded_db):
     from sqlalchemy import event
     from app.customers.counterparties import create_counterparty
@@ -301,7 +321,7 @@ def test_cancelled_installment_does_not_inflate_receivable_totals(seeded_client,
     inst_cancel(seeded_db, first.id, cancelled_on=TODAY, actor="pytest", reason="取消旧合约")
     second = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="50", periods=1, per_period="150")
     inst_pay(seeded_db, second.id, amount=Decimal("50"), paid_on=TODAY, period_no=0, actor="pytest")
-    rows = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers).json()
+    rows = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers).json()["items"]
     old = next(row for row in rows if row["id"] == first.id)
     assert Decimal(old["total_receivable"]) == 100 and Decimal(old["paid_amount"]) == 50
     assert Decimal(old["remaining_receivable"]) == 0
@@ -327,6 +347,8 @@ def test_installment_scope_follows_order_owner(seeded_db):
 
     visible = inst_queries.list_installments(seeded_db, user=scoped_user)
     assert [item.id for item in visible] == [own_contract.id]
+    assert inst_queries.count_installments(seeded_db, user=scoped_user) == 1
+    assert [item.id for item in inst_queries.list_installments(seeded_db, user=scoped_user, limit=10, sort_desc=True)] == [own_contract.id]
     with pytest.raises(NotFound):
         inst__shared.get_installment(seeded_db, other_contract.id, scoped_user)
 
@@ -428,7 +450,7 @@ def test_list_endpoint_emits_available_actions(seeded_client, seeded_db, headers
     )
     response = seeded_client.get("/api/v1/installments", headers=headers)
     assert response.status_code == 200, response.text
-    row = next(item for item in response.json() if item["id"] == contract.id)
+    row = next(item for item in response.json()["items"] if item["id"] == contract.id)
     # PENDING 合约：可收款/终止/提前结清，不可交付/回收/违约/出售
     assert set(row["available_actions"]) == {"pay", "cancel", "settle_early"}
     assert row["schedules"], "合约应带期次明细"
@@ -464,7 +486,7 @@ def test_list_actions_match_default_and_recovery_status_guards(seeded_client, se
     def actions(status):
         contract.status = status
         seeded_db.flush()
-        rows = seeded_client.get("/api/v1/installments", headers=headers).json()
+        rows = seeded_client.get("/api/v1/installments", headers=headers).json()["items"]
         return next(row["available_actions"] for row in rows if row["id"] == contract.id)
     assert "default" not in actions("ACTIVE")
     assert "recover" not in actions("CLOSED")
@@ -477,7 +499,7 @@ def test_cancelled_installment_schedules_cannot_be_waived_or_extended(seeded_cli
     _buy(seeded_db, order.id, "100")
     contract = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
     inst_cancel(seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消售出")
-    row = next(row for row in seeded_client.get("/api/v1/installments", headers=headers).json() if row["id"] == contract.id)
+    row = next(row for row in seeded_client.get("/api/v1/installments", headers=headers).json()["items"] if row["id"] == contract.id)
     assert all(not schedule["available_actions"] for schedule in row["schedules"])
     base = f"/api/v1/installments/{contract.id}/schedules/1"
     waive = seeded_client.post(f"{base}/waive", headers=headers, json={"amount": "10", "waived_on": "2026-10-13", "reason": "减免"})
@@ -497,7 +519,7 @@ def test_recovered_installment_schedules_cannot_be_waived_or_extended(seeded_cli
     contract.status = "OVERDUE"
     seeded_db.flush()
     recover_account(seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="违约回收")
-    row = next(row for row in seeded_client.get("/api/v1/installments", headers=headers).json() if row["id"] == contract.id)
+    row = next(row for row in seeded_client.get("/api/v1/installments", headers=headers).json()["items"] if row["id"] == contract.id)
     assert all(not schedule["available_actions"] for schedule in row["schedules"])
     base = f"/api/v1/installments/{contract.id}/schedules/1"
     waive = seeded_client.post(f"{base}/waive", headers=headers, json={"amount": "10", "waived_on": "2026-10-13", "reason": "减免"})

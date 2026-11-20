@@ -63,6 +63,9 @@ def list_installments(
     trade_date_from: date | None = None,
     trade_date_to: date | None = None,
     user: CurrentUser | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_desc: bool = False,
 ) -> list[Installment]:
     stmt = _apply_installment_filters(
         select(Installment).join(Order, Order.id == Installment.order_id),
@@ -74,7 +77,21 @@ def list_installments(
         trade_date_to=trade_date_to,
         user=user,
     )
-    return list(session.scalars(stmt.order_by(Installment.id)).all())
+    ordering = Installment.id.desc() if sort_desc else Installment.id.asc()
+    return list(session.scalars(stmt.order_by(ordering).limit(limit).offset(offset)).all())
+
+
+def count_installments(
+    session: Session, *, status: str | None = None, order_id: int | None = None,
+    contract_type: str | None = None, trade_date_from: date | None = None,
+    trade_date_to: date | None = None, user: CurrentUser | None = None,
+) -> int:
+    stmt = _apply_installment_filters(
+        select(func.count(Installment.id)).join(Order, Order.id == Installment.order_id),
+        session=session, status=status, order_id=order_id, contract_type=contract_type,
+        trade_date_from=trade_date_from, trade_date_to=trade_date_to, user=user,
+    )
+    return int(session.scalar(stmt) or 0)
 
 
 def installment_order_context(

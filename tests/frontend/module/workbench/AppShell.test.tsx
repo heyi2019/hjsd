@@ -39,7 +39,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
-import { cashflowPage, customerSummary, dashboardSummary, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
+import { cashflowPage, customerSummary, dashboardSummary, installmentTotals, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
@@ -126,6 +126,8 @@ beforeEach(() => {
   vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(leadsApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(leadsApi.summary).mockResolvedValue({ total_count: 0, open_count: 0 });
+  vi.mocked(installmentsApi.page).mockResolvedValue(pageResponse([]));
+  vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals());
   vi.mocked(optionSetsApi.get).mockImplementation(async (code) => code === "BUSINESS_PERIOD"
     ? { code, options: [{ value: "start_day", label: "16" }] } as never
     : [] as never);

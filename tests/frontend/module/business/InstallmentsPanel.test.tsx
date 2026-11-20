@@ -9,6 +9,7 @@ import { InstallmentsPanel } from "@/finance/installments/InstallmentsPanel";
 import type { Installment } from "@/shared/api/types/installments";
 
 import { installmentsApi } from "@/shared/api/installments.api";
+const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
 import { listColumnsApi, orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
@@ -109,7 +110,12 @@ const installments = [
 beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
-  vi.mocked(installmentsApi.list).mockResolvedValue(withBackendActions(installments));
+  installmentListFixture.mockResolvedValue(withBackendActions(installments));
+  vi.mocked(installmentsApi.page).mockImplementation(async ({ limit, offset, sort_desc, ...filters }) => {
+    const rows = await installmentListFixture(filters);
+    const sorted = [...rows].sort((a, b) => sort_desc ? b.id - a.id : a.id - b.id);
+    return pageResponse(sorted.slice(offset, offset + limit), { total: sorted.length, limit, offset });
+  });
   // 合计由服务端下发（Decimal 聚合）；「300+200」这类算术的契约在
   // backend tests/v1/test_installment_totals.py，前端只验展示。
   vi.mocked(installmentsApi.totals).mockResolvedValue(installmentTotals({
@@ -125,18 +131,40 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("分期合约按页加载并可切换第二页", async () => {
+    const rows = Array.from({ length: 11 }, (_, index) => ({
+      ...installments[0], id: index + 1, inst_no: `INS-${index + 1}`,
+    }));
+    let finishTotals!: (value: ReturnType<typeof installmentTotals>) => void;
+    const pendingTotals = new Promise<ReturnType<typeof installmentTotals>>((resolve) => { finishTotals = resolve; });
+    vi.mocked(installmentsApi.totals).mockReturnValueOnce(pendingTotals);
+    installmentListFixture.mockResolvedValue(withBackendActions(rows));
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    expect(await screen.findByText("INS-11")).toBeVisible();
+    await userEvent.click(screen.getByTitle("2"));
+    expect(await screen.findByText("INS-1")).toBeVisible();
+    expect(screen.queryByText("INS-11")).not.toBeInTheDocument();
+    expect(installmentsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10, sort_desc: true }));
+    expect(installmentsApi.totals).toHaveBeenCalledTimes(1);
+    await act(async () => { finishTotals(installmentTotals({ total_count: 11 })); await pendingTotals; });
+    expect(screen.getByText("合约数").closest(".ui-stat")).toHaveTextContent("11");
+    await userEvent.click(screen.getByRole("radio", { name: "最旧在前" }));
+    await waitFor(() => expect(installmentsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0, sort_desc: false })));
+    expect(await screen.findByText("INS-1")).toBeVisible();
+  });
+
   it("分期页隐藏后忽略未完成请求并在返回时刷新", async () => {
     let finish!: (value: Installment[]) => void;
     const pending = new Promise<Installment[]>((resolve) => { finish = resolve; });
-    vi.mocked(installmentsApi.list).mockReturnValueOnce(pending);
+    installmentListFixture.mockReturnValueOnce(pending);
     const view = renderLight(<InstallmentsPanel />, { user: "admin" });
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(installmentListFixture).toHaveBeenCalledTimes(1));
     view.rerender(<InstallmentsPanel active={false} />);
     await act(async () => finish(withBackendActions(installments)));
     expect(screen.queryByText("HS0001-INS01")).not.toBeInTheDocument();
     view.rerender(<InstallmentsPanel active />);
     expect(await screen.findByText("HS0001-INS01")).toBeVisible();
-    expect(installmentsApi.list).toHaveBeenCalledTimes(2);
+    expect(installmentListFixture).toHaveBeenCalledTimes(2);
   });
 
   it("合计请求未完成时先展示合约列表", async () => {
@@ -167,10 +195,10 @@ describe("InstallmentsPanel：分期合约", () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(installmentsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
     renderLight(<InstallmentsPanel initialStatus="OVERDUE" />, { user: "admin" });
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE" })));
+    await waitFor(() => expect(installmentListFixture).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE" })));
     expect(screen.getByText("合约状态：逾期")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "查看全部合约" }));
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined })));
+    await waitFor(() => expect(installmentListFixture).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined })));
     expect(installmentsApi.totals).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined }));
     expect(screen.queryByText("合约状态：逾期")).toBeNull();
     await user.click(screen.getByRole("button", { name: "导出分期与回款数据" }));
@@ -183,7 +211,7 @@ describe("InstallmentsPanel：分期合约", () => {
     renderLight(<InstallmentsPanel initialStatus="OVERDUE" />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
     await setAntdDateRange(document.body, user, "2026-10-01", "2026-10-31");
-    await waitFor(() => expect(installmentsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" })));
+    await waitFor(() => expect(installmentListFixture).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" })));
     await user.click(screen.getByRole("button", { name: "导出分期与回款数据" }));
     await waitFor(() => expect(installmentsApi.exportCsv).toHaveBeenCalledWith({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" }));
   });
@@ -245,7 +273,7 @@ describe("InstallmentsPanel：分期合约", () => {
     await screen.findByText("HS0001-INS01");
     // 面板专营库存分期出售（STOCK_SALE）：列表与合计必须把同一 contract_type 下发给服务端，
     // 否则合计会把提号/其它类型合约的钱算进来（#4）。
-    expect(vi.mocked(installmentsApi.list)).toHaveBeenCalledWith(
+    expect(installmentListFixture).toHaveBeenCalledWith(
       expect.objectContaining({ contract_type: "STOCK_SALE" }),
     );
     expect(vi.mocked(installmentsApi.totals)).toHaveBeenCalledWith(
@@ -306,7 +334,7 @@ describe("InstallmentsPanel：分期合约", () => {
   });
 
   it("SCHEDULED 合约已结清时「换绑交付」可点", async () => {
-    vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
+    installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
     const deliverButtons = screen.getAllByRole("button", { name: /换绑交付/ });
@@ -314,7 +342,7 @@ describe("InstallmentsPanel：分期合约", () => {
   });
 
   it("FE-074：已结清合约禁止登记收款和终止退款", async () => {
-    vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
+    installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
     renderLight(<InstallmentsPanel />, { user: "admin" });
     await screen.findByText("HS0001-INS01");
     expect(screen.getByRole("button", { name: /登记收款/ })).toBeDisabled();
@@ -378,7 +406,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
     vi.clearAllMocks();
     seedOrderFormFields();
-    vi.mocked(installmentsApi.list).mockResolvedValue(withBackendActions(installments));
+    installmentListFixture.mockResolvedValue(withBackendActions(installments));
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{ id: 10, order_no: "HS-2026-0010", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" }], { limit: 500 }) as never);
   });
 
@@ -415,7 +443,7 @@ describe("InstallmentsPanel：动作与减免", () => {
         { id: 912, order_type_code: scope, field_key: "finance_note", label: "交付财务说明", field_type: "TEXT",
           required: true, is_active: true, sort_order: 2, locked: false, is_custom: true, section: "FINANCE" },
       ] : []);
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
       vi.mocked(employeesApi.list).mockResolvedValueOnce([
         { id: 1, username: "admin", display_name: "管理员", is_active: true },
         { id: 2, username: "helper", display_name: "协作人员", is_active: true },
@@ -440,7 +468,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     });
 
     it("已有回收和转售记录时禁用重复处置", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([
         {
           ...installments[0],
           status: "OVERDUE",
@@ -480,7 +508,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     });
 
     it("换绑交付：SETTLED 合约可打开弹窗，必填缺失时不提交", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...installments[0], status: "SETTLED" }]));
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
       await ui.click(screen.getAllByRole("button", { name: /换绑交付/ })[0] as Element);
@@ -494,7 +522,7 @@ describe("InstallmentsPanel：动作与减免", () => {
 
     it("交付前可以登记退款并终止分期", async () => {
       const successSpy = vi.spyOn(message, "success");
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([
         { ...installments[0], status: "ACTIVE" },
       ]));
       vi.mocked(installmentsApi.cancel).mockResolvedValueOnce({
@@ -527,7 +555,7 @@ describe("InstallmentsPanel：动作与减免", () => {
     });
 
     it("后端不可达 → 错误条落地", async () => {
-      vi.mocked(installmentsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+      installmentListFixture.mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
     });
@@ -598,7 +626,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     errorSpy = vi.spyOn(message, "error").mockImplementation(() => undefined as never);
     vi.clearAllMocks();
     seedOrderFormFields();
-    vi.mocked(installmentsApi.list).mockResolvedValue(withBackendActions([{ ...baseInstallment }]));
+    installmentListFixture.mockResolvedValue(withBackendActions([{ ...baseInstallment }]));
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order], { limit: 500 }) as never);
   });
 
@@ -617,7 +645,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
 
   describe("InstallmentsPanel：剩余动作流加深", () => {
     it("登记回收（OVERDUE 合约）提交调用 recover 并提示", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([
         { ...baseInstallment, status: "OVERDUE" },
       ]));
       renderLight(<InstallmentsPanel />, { user: "admin" });
@@ -651,7 +679,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("登记违约提交调用 markDefault 并提示", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "OVERDUE" }]));
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "OVERDUE" }]));
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
       await ui.click(screen.getByRole("button", { name: /登记违约/ }));
@@ -666,7 +694,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("未逾期合约不允许登记违约", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "ACTIVE" }]));
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "ACTIVE" }]));
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
       expect(screen.getByRole("button", { name: /登记违约/ })).toBeDisabled();
@@ -715,14 +743,14 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     it("首屏加载一次分期列表（刷新入口已收敛到订单页/操作后自动重载）", async () => {
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");
-      expect(vi.mocked(installmentsApi.list)).toHaveBeenCalledTimes(1);
+      expect(installmentListFixture).toHaveBeenCalledTimes(1);
       // 逾期标记是全局动作，入口在订单页「分期与回款」Tab 的右上角，不在本面板内。
       expect(screen.queryByRole("button", { name: /标记逾期/ })).toBeNull();
       expect(screen.queryByRole("button", { name: /^刷新$/ })).toBeNull();
     });
 
     it("CLOSED 且已有回收记录 → 行内提供登记出售入口", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([
         {
           ...baseInstallment,
           status: "CLOSED",
@@ -737,7 +765,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("登记出售可选择第500条以后的订单", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] }]));
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] }]));
       const first = Array.from({ length: 500 }, (_, index) => ({ ...order, id: index + 100, order_no: `HS${index + 100}` }));
       vi.mocked(ordersApi.listPage).mockImplementation(async (params) => params?.offset ? pageResponse([resaleOrder], { total: 501, limit: 500, offset: 500 }) as never : pageResponse(first, { total: 501, limit: 500, offset: 0 }) as never);
       renderLight(<InstallmentsPanel />, { user: "admin" });
@@ -750,7 +778,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("登记出售：选择出售订单并填写后调用 resale 关联", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([
         {
           ...baseInstallment,
           status: "CLOSED",
@@ -793,7 +821,7 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
     });
 
     it("P2-274：上一弹窗操作失败后，打开其它业务弹窗不残留旧错误", async () => {
-      vi.mocked(installmentsApi.list).mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "OVERDUE" }]));
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "OVERDUE" }]));
       vi.mocked(installmentsApi.markDefault).mockRejectedValueOnce(new Error("default boom"));
       renderLight(<InstallmentsPanel />, { user: "admin" });
       await screen.findByText("HS0001-INS01");

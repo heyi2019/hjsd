@@ -64,9 +64,19 @@ export function useOrderCancellation(params: {
       if (!order || !actionRequest.isCurrent(request)) return;
       const hasActiveInstallment = Boolean(order.installment_principal && order.installment_status !== "CANCELLED");
       if (hasActiveInstallment) {
-        const contracts = await installmentsApi.list({ order_id: order.id });
-        if (!actionRequest.isCurrent(request)) return;
-        const target = contracts.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
+        let target: Installment | undefined;
+        let offset = 0;
+        do {
+          const page = await installmentsApi.page({ order_id: order.id, limit: 500, offset, sort_desc: false });
+          if (!actionRequest.isCurrent(request)) return;
+          target = page.items.find((item) => !["CANCELLED", "DELIVERED"].includes(item.status));
+          offset += page.items.length;
+          if (target || offset >= page.total) break;
+          if (page.items.length === 0) {
+            appMessage.error("分期合约读取不完整，请重试");
+            return;
+          }
+        } while (true);
         if (!target) {
           appMessage.error("未找到可取消的分期合约");
           return;

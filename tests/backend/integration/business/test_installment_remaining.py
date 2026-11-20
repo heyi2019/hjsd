@@ -102,7 +102,7 @@ def test_list_endpoint_ships_remaining_receivable(seeded_client, seeded_db, head
     response = seeded_client.get("/api/v1/installments", headers=headers)
     assert response.status_code == 200, response.text
 
-    items = [item for item in response.json() if item["id"] == contract.id]
+    items = [item for item in response.json()["items"] if item["id"] == contract.id]
     assert items, "列表应包含刚创建的合约"
     assert items[0]["remaining_receivable"] == "1000.00"
     # 与总应收同源：总额由后端算，剩余不得比总额大。
@@ -147,7 +147,7 @@ def test_installment_export_uses_same_status_type_and_date_filters_as_list(seede
     listing = seeded_client.get("/api/v1/installments", params=filters, headers=headers)
     exported = seeded_client.get("/api/v1/installments/export.csv", params=filters, headers=headers)
     assert listing.status_code == exported.status_code == 200
-    assert [item["id"] for item in listing.json()] == [matching.id]
+    assert [item["id"] for item in listing.json()["items"]] == [matching.id]
     assert matching.inst_no in exported.text
     assert all(item.inst_no not in exported.text for item in (wrong_date, wrong_type, wrong_status))
 

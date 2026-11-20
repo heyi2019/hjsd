@@ -144,7 +144,6 @@ beforeEach(() => {
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
   seedOptionSets();
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
-  vi.mocked(installmentsApi.list).mockResolvedValue([contract]);
   vi.mocked(installmentsApi.cancel).mockResolvedValue({} as never);
   vi.mocked(ordersApi.postEvent).mockResolvedValue({} as never);
   vi.mocked(ordersApi.inventoryOffsale).mockResolvedValue({ ok: true });

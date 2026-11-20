@@ -48,6 +48,9 @@ function ContractTable({
     totalsLoading,
     totalsError,
     openDeliver,
+    page,
+    pageSize,
+    pageTotal,
     payForm,
     recoverForm,
     resaleForm,
@@ -56,6 +59,8 @@ function ContractTable({
     setCancelTarget,
     setDefaultTarget,
     setPayTarget,
+    setPage,
+    setPageSize,
     setRecoverTarget,
     setResaleTarget,
     setSettleTarget,
@@ -149,14 +154,14 @@ function ContractTable({
       >
         <DataTable<Installment>
           columns={arrangeColumns(columns)}
-          rows={[...rows].sort((a, b) => (sortDesc ? b.id - a.id : a.id - b.id))}
+          rows={rows}
           loading={loading}
-          page={1}
-          pageSize={Math.max(rows.length, 10)}
-          total={rows.length}
-         
+          page={page}
+          pageSize={pageSize}
+          total={pageTotal}
+          controlledPaging
           emptyText="暂无分期合约"
-          onPageChange={() => undefined}
+          onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
           expandable={{
             expandedRowRender: (row) => {
               const operationOperators = row.operation_operators ?? [];

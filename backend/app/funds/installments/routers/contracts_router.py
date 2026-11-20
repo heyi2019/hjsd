@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
 from app.core.database import get_db
+from app.core.schemas import PageOut
 from app.core.errors import PermissionDenied
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
@@ -45,26 +46,24 @@ default_manage = require_permissions(PERM_ORDER_UPDATE)
 
 from ._router_shared import _installment_output, _installment_outputs, INSTALLMENT_DETAIL_EXPORT_COLUMNS
 
-@router.get("/installments", response_model=list[schemas.InstallmentOut])
-def list_installments(
+@router.get("/installments", response_model=PageOut[schemas.InstallmentOut])
+def list_installments_page(
     status: str | None = Query(default=None),
     order_id: int | None = Query(default=None),
     contract_type: str | None = Query(default=None),
     trade_date_from: date | None = Query(default=None),
     trade_date_to: date | None = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    sort_desc: bool = Query(default=True),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
-) -> list[schemas.InstallmentOut]:
-    items = inst_queries.list_installments(
-        db,
-        status=status,
-        order_id=order_id,
-        contract_type=contract_type,
-        trade_date_from=trade_date_from,
-        trade_date_to=trade_date_to,
-        user=_user,
-    )
-    return _installment_outputs(db, items, include_details=True)
+) -> PageOut[schemas.InstallmentOut]:
+    filters = dict(status=status, order_id=order_id, contract_type=contract_type,
+                   trade_date_from=trade_date_from, trade_date_to=trade_date_to, user=_user)
+    items = inst_queries.list_installments(db, **filters, limit=limit, offset=offset, sort_desc=sort_desc)
+    return PageOut(items=_installment_outputs(db, items, include_details=True),
+                   total=inst_queries.count_installments(db, **filters), limit=limit, offset=offset)
 
 @router.get("/installments/totals", response_model=schemas.InstallmentTotalsOut)
 def installment_totals(
@@ -110,17 +109,16 @@ def export_installments_csv(
     _user: CurrentUser = read_access,
 ) -> Response:
     """分期与回款按可见列导出 CSV：同 /installments 口径，天然全量。"""
-    # 直接调路由函数时 Query(default=None) 的默认值不会生效，每个可选筛选都要显式传 None。
-    # 此前漏传 contract_type，Query(None) 对象被透传进 SQL 触发 psycopg 参数适配错误。
-    outputs = list_installments(
+    items = inst_queries.list_installments(
+        db,
         status=status,
         order_id=order_id,
         contract_type=contract_type,
         trade_date_from=trade_date_from,
         trade_date_to=trade_date_to,
-        db=db,
-        _user=_user,
+        user=_user,
     )
+    outputs = _installment_outputs(db, items, include_details=True)
     rows = [output.model_dump(mode="json") for output in outputs]
     value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
     export_details = inst_queries.list_installment_export_details(

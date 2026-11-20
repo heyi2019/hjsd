@@ -2,7 +2,7 @@
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { useState } from "react";
 import { normalizeError } from "../shared/api/client";
-import { findOrderByNumber, findPendingProfitNotification } from "./notificationLookup";
+import { notificationsApi } from "../shared/api/misc.api";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateBusinessModal";
@@ -27,17 +27,16 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
   const openPendingProfitAllocation = async () => {
     if (!onDashboardNavigate) return;
     try {
-      const notification = await findPendingProfitNotification();
-      if (!notification) {
+      const target = await notificationsApi.pendingOrder();
+      if (!target.order_no) {
         appMessage.warning("没有找到待配置分润的订单");
         return;
       }
-      const order = await findOrderByNumber(notification.entity_id);
-      if (!order) {
-        appMessage.warning(`未找到订单 ${notification.entity_id}`);
+      if (target.order_id === null) {
+        appMessage.warning(`未找到订单 ${target.order_no}`);
         return;
       }
-      onDashboardNavigate(`/business/ledger?allocation_order_id=${order.id}`);
+      onDashboardNavigate(`/business/ledger?allocation_order_id=${target.order_id}`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -113,7 +112,7 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
           personalCustomers={summary?.personal_customers ?? null}
           onPersonalOrdersClick={() => openDashboardPath(withPeriod("/business/ledger?mine=true"))}
           onPersonalCustomersClick={() => onDashboardNavigate ? openDashboardPath(withPeriod("/customers?mine_orders=true")) : undefined}
-          personalEarnings={summary?.personal_earnings == null ? null : String(summary.personal_earnings)}
+          personalEarnings={summary?.personal_earnings ?? null}
           onPersonalEarningsClick={() => openDashboardPath(period
               ? `/operations?tab=my-earnings&from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`
               : "/operations?tab=my-earnings&period=all")}

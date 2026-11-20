@@ -77,4 +77,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 154（2026-11-19 FIN-01-05 余额快照：+GET /balance-snapshots 只读端点）。
     # → 155（订单库存下架：POST /orders/{order_id}/inventory-offsale）。
     # → 158（库存售出、库存分期售出、订单入口取消分期各新增一个端点）。
-    assert public_routes == 158
+    # → 160（工作台分润通知批量详情和待配置订单定位）。
+    assert public_routes == 160

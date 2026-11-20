@@ -8,8 +8,9 @@ import { BusinessAlerts } from "@/app/BusinessOverview";
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/misc.api";
 import { ordersApi } from "@/shared/api/orders.api";
+import { appMessage } from "@/shared/ui/appFeedback";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
-import { dashboardSummary, pageResponse } from "@fixtures/api-responses";
+import { dashboardSummary } from "@fixtures/api-responses";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 /** 2026-10-13：工作台数据总览（资金账户/统计/入口卡）已迁至「经营中心 · 数据中心」
  *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
@@ -70,10 +71,14 @@ it("切换周期加载期间隐藏旧统计并暂停旧周期跳转", async () =
 
 it("工作台展示业务总览指标和业务提醒", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      orders: { total_count: 2, completed_count: 1, active_count: 1 },
+      orders: { total_count: 2 },
       inventory: { account_count: 1, aging_count: 1, overdue_count: 1 },
       installments: { total_count: 1, overdue_count: 1 },
-      notifications: { pending_profit_count: 1, allocated_profit_count: 1 },
+      alerts: [
+        { type: "inventory_aging", message: "库存订单入库超过 7 天 1 个" },
+        { type: "pending_profit", message: "分润待配置 1 条" },
+        { type: "allocated_profit", message: "获得分润通知 1 条" },
+      ],
     }));
 
     renderLight(<DashboardPage />, { user: "admin" });
@@ -98,20 +103,19 @@ it("工作台展示业务总览指标和业务提醒", async () => {
   });
 
 it("获得分润通知只请求订单来源的消息", async () => {
-    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ notifications: { pending_profit_count: 0, allocated_profit_count: 201 } }));
-    const first = Array.from({ length: 200 }, (_, index) => ({ id: index + 1, notification_no: `N${index}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: "其他", entity_type: "other", entity_id: "-", created_by: "admin", read_at: null }));
-    const last = { ...first[0], id: 201, entity_type: "order", entity_id: "HS0201", message: "末尾通知" };
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ alerts: [{ type: "allocated_profit", message: "获得分润通知 1 条" }] }));
+    const last = { id: 201, notification_no: "N201", recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", entity_type: "order", entity_id: "HS0201", message: "末尾通知", created_by: "admin", read_at: null };
     vi.mocked(notificationsApi.list).mockResolvedValue({ items: [last], total: 1, unread_total: 201 });
     vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 201, order_no: "HS0201", order_type: "HS", sale_amount: "10.00", stock_no: "KU0007", inventory_entry_at: "2026-11-10T08:00:00", removed_at: null, recovery_operator: null }]);
     vi.mocked(notificationsApi.markRead).mockResolvedValue(last as never);
     renderLight(<DashboardPage />, { user: "admin" });
-    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 201 条" }));
+    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 1 条" }));
     expect(await screen.findByText("末尾通知")).toBeInTheDocument();
     expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 10, unread_only: true, notification_type: "PROFIT_ALLOCATED", entity_type: "order" });
   });
 
 it("分润通知逐页加载，已读前页后仍可查看后页", async () => {
-    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ notifications: { pending_profit_count: 0, allocated_profit_count: 11 } }));
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ alerts: [{ type: "allocated_profit", message: "获得分润通知 11 条" }] }));
     const notifications = Array.from({ length: 11 }, (_, index) => ({ id: 11 - index, notification_no: `N${index}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `通知 ${11 - index}`, entity_type: "order", entity_id: `HS${11 - index}`, created_by: "admin", read_at: null }));
     vi.mocked(notificationsApi.list).mockImplementation(async (params) => params.before_id
       ? { items: notifications.slice(10), total: 1, unread_total: 1 }
@@ -137,7 +141,7 @@ it("分润通知逐页加载，已读前页后仍可查看后页", async () => {
 
 it("点击获得分润通知展示订单金额、分润配置人和库存回收信息", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      notifications: { pending_profit_count: 0, allocated_profit_count: 3 },
+      alerts: [{ type: "allocated_profit", message: "获得分润通知 3 条" }],
     }));
     vi.mocked(notificationsApi.list).mockResolvedValue({
       items: [{
@@ -189,47 +193,40 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
 it("点击分润待配置通知跳转到对应订单的分润配置入口", async () => {
     const onDashboardNavigate = vi.fn();
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      notifications: { pending_profit_count: 1, allocated_profit_count: 0 },
+      alerts: [{ type: "pending_profit", message: "分润待配置 1 条" }],
     }));
-    vi.mocked(notificationsApi.list).mockResolvedValue({
-      items: [{
-        id: 2,
-        notification_no: "NTF0002",
-        recipient_user_id: 2,
-        notification_type: "PROFIT_PENDING",
-        title: "订单分润待配置",
-        message: "订单 TH0002 已售出完成，请前往配置分润。",
-        entity_type: "order",
-        entity_id: "TH0002",
-        created_by: "system",
-        read_at: null,
-      }],
-      total: 1,
-      unread_total: 1,
-    });
-    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([{
-      id: 43,
-      order_no: "TH0002",
-      order_type: "TH",
-      trade_date: "2026-11-17",
-      status: "COMPLETED",
-      account_id: 8,
-    }]));
+    vi.mocked(notificationsApi.pendingOrder).mockResolvedValue({ order_no: "TH0002", order_id: 43 });
 
     renderLight(<DashboardPage onDashboardNavigate={onDashboardNavigate} />, { user: "admin" });
 
     fireEvent.click(await screen.findByRole("button", { name: "分润待配置 1 条" }));
     await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
-    expect(notificationsApi.list).toHaveBeenCalledWith({ limit: 1, unread_only: true, notification_type: "PROFIT_PENDING", entity_type: "order" });
+    expect(notificationsApi.pendingOrder).toHaveBeenCalledTimes(1);
+    expect(ordersApi.listPage).not.toHaveBeenCalled();
     expect(notificationsApi.markRead).not.toHaveBeenCalled();
   });
 
-it("工作台按业务提醒配置计算库存阈值并控制提醒开关", async () => {
+it("待配置通知不存在或订单不可见时提示且不跳转", async () => {
+    const navigate = vi.fn();
+    const warning = vi.spyOn(appMessage, "warning").mockImplementation(() => undefined as never);
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ alerts: [{ type: "pending_profit", message: "分润待配置 1 条" }] }));
+    vi.mocked(notificationsApi.pendingOrder)
+      .mockResolvedValueOnce({ order_no: null, order_id: null })
+      .mockResolvedValueOnce({ order_no: "HS-MISSING", order_id: null });
+    renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
+    const button = await screen.findByRole("button", { name: "分润待配置 1 条" });
+    fireEvent.click(button);
+    await waitFor(() => expect(warning).toHaveBeenCalledWith("没有找到待配置分润的订单"));
+    fireEvent.click(button);
+    await waitFor(() => expect(warning).toHaveBeenCalledWith("未找到订单 HS-MISSING"));
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+it("后端没有返回提醒时显示空状态", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
       inventory: { account_count: 1, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 1, overdue_count: 1 },
-      notifications: { pending_profit_count: 0, allocated_profit_count: 1 },
-      reminders: { inventory_aging_days: 14, profit_notifications_enabled: false, overdue_installments_enabled: false },
+      alerts: [],
     }));
 
     renderLight(<DashboardPage />, { user: "admin" });
@@ -282,14 +279,13 @@ it("订单请求完成时不产生未包裹 act 的异步更新警告", async ()
     view.unmount();
     resolveSummary({
       period: { from: "2026-11-01", to: "2026-11-16" },
-      orders: { total_count: 0, completed_count: 0, active_count: 0 },
+      orders: { total_count: 0 },
       personal_orders: 0,
       personal_customers: 0,
       personal_earnings: "0.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },
-      notifications: { pending_profit_count: 0, allocated_profit_count: 0 },
-      reminders: { inventory_aging_days: 7, profit_notifications_enabled: true, overdue_installments_enabled: true },
+      alerts: [],
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 

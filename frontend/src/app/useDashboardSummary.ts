@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { normalizeError } from "../shared/api/client";
 import { dashboardApi, type DashboardSummary } from "../shared/api/dashboard.api";
-import { buildDashboardAlertMessages } from "./dashboardSummary";
 
-export function useDashboardSummary(active = true, selectedPeriod?: { from: string; to: string } | null) {
+export function useDashboardSummary(active: boolean, selectedPeriod: { from: string; to: string } | null) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,15 +36,5 @@ export function useDashboardSummary(active = true, selectedPeriod?: { from: stri
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, selectedPeriod === null, selectedPeriod?.from, selectedPeriod?.to]);
 
-  const alerts = summary ? buildDashboardAlertMessages({
-    inventoryAgingCount: summary.inventory?.aging_count ?? null,
-    inventoryAgingDays: summary.reminders.inventory_aging_days,
-    pendingProfitCount: summary.notifications.pending_profit_count,
-    allocatedProfitCount: summary.notifications.allocated_profit_count,
-    profitNotificationsEnabled: summary.reminders.profit_notifications_enabled,
-    overdueInstallmentCount: summary.installments?.overdue_count ?? null,
-    overdueInstallmentsEnabled: summary.reminders.overdue_installments_enabled,
-  }) : [];
-
-  return { summary, error, loading, alerts, loadSummary };
+  return { summary, error, loading, alerts: summary?.alerts ?? [], loadSummary };
 }

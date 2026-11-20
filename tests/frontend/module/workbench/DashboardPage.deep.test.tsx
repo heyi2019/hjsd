@@ -39,7 +39,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("没有订单权限时个人订单和客户数显示占位且不可跳转", async () => {
     const navigate = vi.fn();
-    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null, notifications: { pending_profit_count: 7, allocated_profit_count: 0 } }));
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null, alerts: [{ type: "pending_profit", message: "分润待配置 7 条" }] }));
     renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
     await screen.findByText("分润待配置 7 条");
     for (const id of ["dashboard-personal-orders", "dashboard-personal-customers"]) {
@@ -59,7 +59,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("业务总览计数：订单总量与我的当期客户数", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      orders: { total_count: 3, completed_count: 2, active_count: 1 },
+      orders: { total_count: 3 },
       personal_customers: 2,
     }));
     renderLight(<DashboardPage />, { user: "admin" });
@@ -71,7 +71,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({
-      orders: { total_count: 3, completed_count: 1, active_count: 2 },
+      orders: { total_count: 3 },
       personal_orders: 2,
       personal_customers: 2,
       personal_earnings: "123.45",

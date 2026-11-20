@@ -80,13 +80,38 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
         "personal_earnings",
         "inventory",
         "installments",
-        "notifications",
-        "reminders",
+        "alerts",
     }
     assert set(payload["period"]) == {"from", "to"}
-    assert set(payload["notifications"]) == {"pending_profit_count", "allocated_profit_count"}
+    assert isinstance(payload["alerts"], list)
+    assert set(payload["orders"]) == {"total_count"}
     assert seeded_client.get("/api/v1/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
     assert seeded_client.get("/api/v1/notifications/summary", headers=headers).status_code in {404, 405}
+
+
+def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, headers, monkeypatch):
+    from app.dashboard import service as dashboard_service
+
+    settings = {"inventory_aging_days": 14, "profit_notifications_enabled": True, "overdue_installments_enabled": False}
+    monkeypatch.setattr(dashboard_service, "_reminder_config", lambda db: settings)
+    monkeypatch.setattr(dashboard_service, "dashboard_inventory_summary", lambda *args, **kwargs: {"account_count": 2, "aging_count": 2, "overdue_count": 0})
+    monkeypatch.setattr(dashboard_service.installment_queries, "installment_totals", lambda *args, **kwargs: {"total_count": 3, "overdue_count": 3})
+    monkeypatch.setattr(dashboard_service.notification_service, "unread_profit_counts", lambda *args, **kwargs: {"pending_profit_count": 1, "allocated_profit_count": 2})
+
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["alerts"] == [
+        {"type": "inventory_aging", "message": "库存订单入库超过 14 天 2 个"},
+        {"type": "pending_profit", "message": "分润待配置 1 条"},
+        {"type": "allocated_profit", "message": "获得分润通知 2 条"},
+    ]
+    settings["profit_notifications_enabled"] = False
+    settings["overdue_installments_enabled"] = True
+    response = seeded_client.get("/api/v1/dashboard/summary", headers=headers)
+    assert response.json()["alerts"] == [
+        {"type": "inventory_aging", "message": "库存订单入库超过 14 天 2 个"},
+        {"type": "overdue_installment", "message": "逾期合约 3 个"},
+    ]
 
 
 def test_workbench_personal_earnings_uses_commission_profit_base(

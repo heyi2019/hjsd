@@ -41,4 +41,9 @@ class ProfitNotificationDetailOut(BaseModel):
     recovery_operator: str | None
 
 
+class PendingProfitOrderOut(BaseModel):
+    order_no: str | None
+    order_id: int | None
+
+
 __all__ = ["NotificationListOut", "NotificationOut"]

@@ -16,10 +16,30 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.notifications import Notification
+from app.domain.trade import Order
+from app.shared.scope import owner_scope_filter
 from app.dashboard.notifications.profit_details import profit_details_for_notifications
 from app.dashboard.notifications import schemas, service
 
 router = APIRouter(tags=["SYS-01-04 系统通知"])
+
+
+@router.get("/notifications/pending-order", response_model=schemas.PendingProfitOrderOut)
+def pending_profit_order(
+    db: Session = Depends(get_db),
+    user: CurrentUser = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False),
+) -> schemas.PendingProfitOrderOut:
+    items, _ = service.list_notifications(
+        db, recipient_user_id=user.id, unread_only=True,
+        notification_type=service.PROFIT_PENDING, entity_type="order", limit=1,
+    )
+    if not items:
+        return schemas.PendingProfitOrderOut(order_no=None, order_id=None)
+    stmt = select(Order.id).where(Order.order_no == items[0].entity_id)
+    scope = owner_scope_filter(Order.owner_id, user, db)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    return schemas.PendingProfitOrderOut(order_no=items[0].entity_id, order_id=db.scalar(stmt))
 
 
 @router.get("/notifications/profit-details", response_model=list[schemas.ProfitNotificationDetailOut])
@@ -42,7 +62,6 @@ def list_my_notifications(
     entity_type: str | None = Query(default=None),
     before_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> schemas.NotificationListOut:
@@ -54,7 +73,6 @@ def list_my_notifications(
         entity_type=entity_type,
         before_id=before_id,
         limit=limit,
-        offset=offset,
     )
     return schemas.NotificationListOut(
         items=[schemas.NotificationOut.model_validate(item) for item in items],

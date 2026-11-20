@@ -52,6 +52,25 @@ def _reminder_config(session: Session) -> dict[str, Any]:
     }
 
 
+def _alerts(reminders: dict[str, Any], inventory: dict[str, Any] | None,
+            installments: dict[str, Any] | None, notifications: dict[str, int]) -> list[dict[str, str]]:
+    alerts: list[dict[str, str]] = []
+    aging = inventory["aging_count"] if inventory else 0
+    if aging:
+        alerts.append({"type": "inventory_aging", "message": f"库存订单入库超过 {reminders['inventory_aging_days']} 天 {aging} 个"})
+    if reminders["profit_notifications_enabled"]:
+        pending = notifications["pending_profit_count"]
+        allocated = notifications["allocated_profit_count"]
+        if pending:
+            alerts.append({"type": "pending_profit", "message": f"分润待配置 {pending} 条"})
+        if allocated:
+            alerts.append({"type": "allocated_profit", "message": f"获得分润通知 {allocated} 条"})
+    overdue = installments["overdue_count"] if installments else 0
+    if reminders["overdue_installments_enabled"] and overdue:
+        alerts.append({"type": "overdue_installment", "message": f"逾期合约 {overdue} 个"})
+    return alerts
+
+
 def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None, all_time: bool = False) -> dict[str, Any]:
     today = date.today()
     if (all_time and (from_date is not None or to_date is not None)) or (from_date is None) != (to_date is None) or (from_date is not None and to_date is not None and from_date > to_date):
@@ -80,11 +99,7 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
             user=user,
             mine=True,
         )
-        orders = {
-            "total_count": sum(counts.values()),
-            "completed_count": counts.get("COMPLETED", 0),
-            "active_count": counts.get("ACTIVE", 0) + counts.get("INSTALLMENT", 0),
-        }
+        orders = {"total_count": sum(counts.values())}
         personal_orders = sum(personal_counts.values())
         personal_customers = order_customer_count(
             session,
@@ -116,6 +131,7 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
             user=user,
         )
 
+    notifications = notification_service.unread_profit_counts(session, recipient_user_id=user.id)
     return {
         "period": None if all_time else {"from": period_from, "to": period_to},
         "orders": orders,
@@ -124,8 +140,5 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
         "personal_earnings": personal_earnings,
         "inventory": inventory,
         "installments": installments,
-        "notifications": notification_service.unread_profit_counts(
-            session, recipient_user_id=user.id
-        ),
-        "reminders": reminders,
+        "alerts": _alerts(reminders, inventory, installments, notifications),
     }

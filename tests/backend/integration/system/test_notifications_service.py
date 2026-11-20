@@ -77,6 +77,7 @@ def test_list_notifications_unread_only_filters(seeded_db):
 def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seeded_db):
     rows = [_make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=str(i)) for i in range(3)]
     _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="other")
+    assert notification_service.unread_profit_counts(seeded_db, recipient_user_id=2)["allocated_profit_count"] == 3
     first, total = notification_service.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", limit=2,
     )
@@ -88,6 +89,29 @@ def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seed
         seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", before_id=first[-1].id, limit=2,
     )
     assert [item.id for item in second] == [rows[0].id]
+
+
+def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, seeded_db):
+    account = seeded_db.get(User, 2)
+    account.role = "OPERATOR"
+    account.owner_scope = "SELF"
+    visible = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=2)
+    hidden = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
+    pending = _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_PENDING", entity_type="order", entity_id=visible.order_no)
+    _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_PENDING", entity_type="other")
+    user = CurrentUser.build(id=2, username="seeduser2", roles=["OPERATOR"], owner_scope="SELF")
+    auth = {"Authorization": f"Bearer {build_access_token(user)}"}
+    response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
+    assert response.status_code == 200, response.text
+    assert response.json() == {"order_no": visible.order_no, "order_id": visible.id}
+    pending.entity_id = hidden.order_no
+    seeded_db.flush()
+    response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
+    assert response.status_code == 200, response.text
+    assert response.json() == {"order_no": hidden.order_no, "order_id": None}
+    notification_service.mark_read(seeded_db, pending.id, recipient_user_id=2, actor="pytest")
+    response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
+    assert response.json() == {"order_no": None, "order_id": None}
 
 
 def test_mark_read_not_found(seeded_db):

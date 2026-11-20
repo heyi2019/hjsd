@@ -92,7 +92,6 @@ def list_notifications(
     entity_type: str | None = None,
     before_id: int | None = None,
     limit: int = 50,
-    offset: int = 0,
 ) -> tuple[list[Notification], int]:
     stmt = select(Notification).where(Notification.recipient_user_id == recipient_user_id)
     count_stmt = select(func.count(Notification.id)).where(
@@ -112,7 +111,7 @@ def list_notifications(
         count_stmt = count_stmt.where(Notification.read_at.is_(None))
     rows = list(
         session.scalars(
-            stmt.order_by(Notification.id.desc()).limit(limit).offset(offset)
+            stmt.order_by(Notification.id.desc()).limit(limit)
         ).all()
     )
     return rows, int(session.scalar(count_stmt) or 0)
@@ -137,6 +136,7 @@ def unread_profit_counts(session: Session, *, recipient_user_id: int) -> dict[st
         .where(
             Notification.recipient_user_id == recipient_user_id,
             Notification.read_at.is_(None),
+            Notification.entity_type == "order",
             Notification.notification_type.in_((PROFIT_PENDING, PROFIT_ALLOCATED)),
         )
         .group_by(Notification.notification_type)

@@ -4,7 +4,7 @@ import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from 
 import type { NotificationItem } from "../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../shared/lib/format";
 import { StatRow } from "../shared/ui";
-import type { DashboardAlert } from "./dashboardSummary";
+import type { DashboardAlert } from "../shared/api/dashboard.api";
 
 export function BusinessOverview({
   orderCount,

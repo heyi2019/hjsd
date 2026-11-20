@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
@@ -125,6 +125,30 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("合计请求未完成时先展示合约列表", async () => {
+    let finish!: (value: ReturnType<typeof installmentTotals>) => void;
+    const pending = new Promise<ReturnType<typeof installmentTotals>>((resolve) => { finish = resolve; });
+    vi.mocked(installmentsApi.totals).mockReturnValueOnce(pending);
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+
+    expect(await screen.findByText("HS0001-INS01")).toBeVisible();
+    expect(screen.getByText("合约数").closest(".ui-stat")).toHaveTextContent("-");
+    await act(async () => { finish(installmentTotals({ total_count: 2 })); await pending; });
+    expect(screen.getByText("合约数").closest(".ui-stat")).toHaveTextContent("2");
+  });
+
+  it("合计失败时保留列表并允许重试", async () => {
+    vi.mocked(installmentsApi.totals).mockRejectedValueOnce(new Error("服务不可用"));
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+
+    expect(await screen.findByText("HS0001-INS01")).toBeVisible();
+    expect(await screen.findByText(/合计加载失败/)).toBeVisible();
+    expect(screen.getByText("合约数").closest(".ui-stat")).toHaveTextContent("-");
+    await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByText("合约数").closest(".ui-stat")).toHaveTextContent("2"));
+    expect(screen.queryByText(/合计加载失败/)).not.toBeInTheDocument();
+  });
+
   it("显示逾期入口筛选并可切回全部合约", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(installmentsApi.exportCsv).mockResolvedValue(new Blob(["csv"]));

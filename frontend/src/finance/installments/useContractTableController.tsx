@@ -38,6 +38,8 @@ export function useContractTableController(params: { contractType: string; reloa
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [totalsLoading, setTotalsLoading] = useState(true);
+  const [totalsError, setTotalsError] = useState<{ message: string; code?: string } | null>(null);
   const [exporting, setExporting] = useState(false);
   // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
   const write = useAsyncAction();
@@ -74,27 +76,28 @@ export function useContractTableController(params: { contractType: string; reloa
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
     setLoading(true);
-    try {
-      // 日期区间、合约类型与合计都走服务端：列表与合计同条件，前端不再本地筛/本地求和。
-      const rangeParams = {
-        contract_type: contractType,
-        status: status || undefined,
-        trade_date_from: dateFrom || undefined,
-        trade_date_to: dateTo || undefined,
-      };
-      const [list, summary] = await Promise.all([
-        installmentsApi.list(rangeParams),
-        installmentsApi.totals(rangeParams),
-      ]);
-      if (seq !== loadSeqRef.current) return;
-      setRows(list);
-      setTotals(summary);
-      setError(null);
-    } catch (err) {
-      if (seq === loadSeqRef.current) setError(normalizeError(err));
-    } finally {
-      if (seq === loadSeqRef.current) setLoading(false);
-    }
+    setTotalsLoading(true);
+    setTotalsError(null);
+    const rangeParams = {
+      contract_type: contractType,
+      status: status || undefined,
+      trade_date_from: dateFrom || undefined,
+      trade_date_to: dateTo || undefined,
+    };
+    await Promise.all([
+      installmentsApi.list(rangeParams)
+        .then((list) => {
+          if (seq !== loadSeqRef.current) return;
+          setRows(list);
+          setError(null);
+        })
+        .catch((err) => { if (seq === loadSeqRef.current) setError(normalizeError(err)); })
+        .finally(() => { if (seq === loadSeqRef.current) setLoading(false); }),
+      installmentsApi.totals(rangeParams)
+        .then((summary) => { if (seq === loadSeqRef.current) setTotals(summary); })
+        .catch((err) => { if (seq === loadSeqRef.current) setTotalsError(normalizeError(err)); })
+        .finally(() => { if (seq === loadSeqRef.current) setTotalsLoading(false); }),
+    ]);
   }, [contractType, dateFrom, dateTo, status]);
 
   useEffect(() => {
@@ -169,6 +172,8 @@ export function useContractTableController(params: { contractType: string; reloa
     error,
     setError,
     loading,
+    totalsLoading,
+    totalsError,
     setLoading,
     write,
     payForm,

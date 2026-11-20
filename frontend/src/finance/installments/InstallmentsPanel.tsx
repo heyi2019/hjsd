@@ -42,6 +42,8 @@ function ContractTable({
     exporting,
     load,
     loading,
+    totalsLoading,
+    totalsError,
     openDeliver,
     payForm,
     recoverForm,
@@ -85,17 +87,18 @@ function ContractTable({
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={totalsError ? { ...totalsError, message: `合计加载失败：${totalsError.message}` } : null} onRetry={() => void load()} />
 
       <StatRow
         items={[
-          { label: "合约数", kind: "count", amount: String(totalCount) },
-          { label: "总应收", amount: totalReceivable },
-          { label: "已收合计", amount: totalPaid },
+          { label: "合约数", kind: "count", amount: totalsLoading || totalsError ? null : String(totalCount) },
+          { label: "总应收", amount: totalsLoading || totalsError ? null : totalReceivable },
+          { label: "已收合计", amount: totalsLoading || totalsError ? null : totalPaid },
           {
             label: "逾期合约",
             kind: "count",
-            amount: String(overdueCount),
-            tone: overdueCount > 0 ? "warn" : "plain",
+            amount: totalsLoading || totalsError ? null : String(overdueCount),
+            tone: !totalsLoading && !totalsError && overdueCount > 0 ? "warn" : "plain",
           },
         ]}
       />

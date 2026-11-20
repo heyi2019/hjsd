@@ -208,20 +208,31 @@ def export_cashflows_csv(
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> Response:
-    # 直接调用路由函数时 `Query(default=None)` 不会被解析成 None，
-    # 漏传 keyword 会把 Query 对象一路带进 SQL 条件（曾让导出直接 500）。
+    can_read = (
+        user.can_see_pool(pool_id) if pool_id is not None
+        else user.is_admin or user.owner_scope == "ALL" or bool(user.pool_ids)
+    )
+    filters = {
+        "pool_id": pool_id,
+        "order_id": order_id,
+        "direction": direction,
+        "occurred_from": occurred_from,
+        "occurred_to": occurred_to,
+        "ledger_type": ledger_type.strip().upper() if ledger_type else None,
+        "accounting_attribute": accounting_attribute.strip().upper() if accounting_attribute else None,
+        "category": category.strip().upper() if category else None,
+        "created_by": created_by,
+        "keyword": keyword,
+        "user": user,
+    }
     output = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
     offset = 0
     try:
         while True:
-            result = list_cashflows(
-                pool_id=pool_id, order_id=order_id, direction=direction,
-                occurred_from=occurred_from, occurred_to=occurred_to,
-                ledger_type=ledger_type, accounting_attribute=accounting_attribute,
-                category=category, created_by=created_by, keyword=keyword,
-                limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, db=db, user=user,
-            )
-            rows = [item.model_dump() for item in result.items]
+            items, total = finance_list_cashflows(
+                db, limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, **filters,
+            ) if can_read else ([], 0)
+            rows = [item.model_dump() for item in _cashflow_outputs(db, items)]
             pool_ids = {row["pool_id"] for row in rows}
             pool_names = (
                 dict(db.execute(select(Pool.id, Pool.name).where(Pool.id.in_(pool_ids))).all())
@@ -234,7 +245,7 @@ def export_cashflows_csv(
             )
             output.write(csv_text.encode("utf-8"))
             offset += len(rows)
-            if not rows or offset >= result.total:
+            if not rows or offset >= total:
                 break
         record_audit(
             db, action=AuditAction.LIST_EXPORT, entity_type="list_export", entity_id="CASHFLOW",

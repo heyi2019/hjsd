@@ -15,7 +15,7 @@ import io
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.domain.foundation import Pool
 
@@ -147,6 +147,21 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
     assert miss.status_code == 200, miss.text
     assert created["flow_no"] not in miss.text
 
+    # 导出与列表使用相同的账户权限，不能通过指定账户绕过范围。
+    from app.core.security import CurrentUser
+    from app.funds.routers.cashflows_router import read_access
+
+    scoped = CurrentUser(id=1, username="admin", roles=(), permissions=frozenset(),
+                         pool_ids=frozenset({2}), owner_scope="SELF")
+    seeded_client.app.dependency_overrides[read_access.dependency] = lambda: scoped
+    try:
+        hidden = seeded_client.get("/api/cashflows/export.csv", headers=headers,
+                                   params={"pool_id": 1, "keyword": created["flow_no"]})
+        assert hidden.status_code == 200, hidden.text
+        assert created["flow_no"] not in hidden.text
+    finally:
+        seeded_client.app.dependency_overrides.pop(read_access.dependency, None)
+
 
 def test_cashflow_export_includes_fund_account_name(seeded_client, seeded_db, headers):
     created = _create(seeded_client, headers, direction="OUT", amount="20", note="资金账户导出")
@@ -185,15 +200,27 @@ def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, header
     assert rows[0]["核算属性"] == "回收成本"
 
 
-def test_export_has_no_row_cap_and_respects_date_range(seeded_client, headers, monkeypatch):
+def test_export_has_no_row_cap_and_respects_date_range(seeded_client, seeded_db, headers, monkeypatch):
     from app.funds.routers import cashflows_router
 
     monkeypatch.setattr(cashflows_router, "CASHFLOW_EXPORT_BATCH_SIZE", 3)
     for index in range(3):
         _create(seeded_client, headers, direction="IN", amount="10", note=f"导出测试{index}\n第二行")
     _create(seeded_client, headers, direction="IN", amount="10", note="范围外流水", occurred_on=date(2026, 10, 5))
-    response = seeded_client.get("/api/cashflows/export.csv", headers=headers)
+    totals_queries = []
+
+    def record_totals(_conn, _cursor, statement, _params, _context, _many):
+        if "sum(cashflow.amount)" in statement.lower():
+            totals_queries.append(statement)
+
+    engine = seeded_db.get_bind()
+    event.listen(engine, "before_cursor_execute", record_totals)
+    try:
+        response = seeded_client.get("/api/cashflows/export.csv", headers=headers)
+    finally:
+        event.remove(engine, "before_cursor_execute", record_totals)
     assert response.status_code == 200, response.text
+    assert totals_queries == []
     assert all(f"导出测试{index}" in response.text for index in range(3))
     assert "范围外流水" in response.text
     csv_rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))

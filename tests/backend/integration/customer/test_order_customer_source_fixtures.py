@@ -15,9 +15,10 @@ from datetime import date
 
 from sqlalchemy import select
 
-from app.domain.parties import Customer
+from app.domain.parties import Counterparty, Customer
 from app.domain.trade import Account, Order
 from app.customers.customers import create_customer
+from app.customers.counterparties import create_counterparty
 
 D = date(2026, 10, 4)
 
@@ -134,14 +135,15 @@ def test_four_order_types_all_persist_distinct_rows(seeded_client, seeded_db, he
     assert len(db_rows) == 3
 
 
-def test_order_inline_customer_creates_a_profile_when_phone_differs(
+def test_order_inline_customer_updates_unique_matching_name(
     seeded_client, seeded_db, headers
 ):
-    """建单内联客户以昵称和明确联系方式复用；手机号不同则建新档案。"""
+    """唯一同名客户更新新手机号，未填写的联系方式保留。"""
     create_customer(
         seeded_db,
         display_name="同名客户",
         phone="13800000000",
+        wechat="原微信",
         actor="pytest",
     )
     payload = _base_payload("HS")
@@ -157,7 +159,60 @@ def test_order_inline_customer_creates_a_profile_when_phone_differs(
     customers = seeded_db.scalars(
         select(Customer).where(Customer.display_name == "同名客户").order_by(Customer.id)
     ).all()
-    assert [customer.phone for customer in customers] == ["13800000000", "13900000000"]
+    assert len(customers) == 1
+    assert customers[0].phone == "13900000000"
+    assert customers[0].wechat == "原微信"
+
+
+def test_order_inline_supplier_updates_existing_contact(seeded_client, seeded_db, headers):
+    supplier = create_counterparty(seeded_db, display_name="同行甲", type="PEER", phone="旧电话", wechat="原微信", actor="pytest")
+    payload = _base_payload("TH")
+    payload["counterparty_input"] = {"display_name": "同行甲", "type": "PEER", "role": "PEER", "phone": "新电话"}
+    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    assert response.status_code == 201, response.text
+    seeded_db.refresh(supplier)
+    assert (supplier.phone, supplier.wechat) == ("新电话", "原微信")
+    assert len(seeded_db.scalars(select(Counterparty).where(Counterparty.display_name == "同行甲")).all()) == 1
+
+
+def test_order_rejects_ambiguous_same_name_customer(seeded_client, seeded_db, headers):
+    for phone in ("111", "222"):
+        create_customer(seeded_db, display_name="重名客户", phone=phone, actor="pytest")
+    payload = _base_payload("HS")
+    payload["customer_input"] = {"display_name": "重名客户", "role": "SELLER", "phone": "333"}
+    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    assert response.status_code == 422
+    assert sorted(c.phone for c in seeded_db.scalars(select(Customer).where(Customer.display_name == "重名客户")).all()) == ["111", "222"]
+
+
+def test_order_failure_rolls_back_contact_update(seeded_client, seeded_db, headers, app):
+    from app.core.database import get_db
+
+    def request_transaction():
+        with seeded_db.begin_nested():
+            yield seeded_db
+
+    app.dependency_overrides[get_db] = request_transaction
+    customer = create_customer(seeded_db, display_name="回滚客户", phone="旧电话", actor="pytest")
+    payload = _base_payload("HS")
+    payload["customer_input"] = {"display_name": "回滚客户", "role": "SELLER", "phone": "新电话"}
+    payload["order_type"] = "UNKNOWN"
+    payload.pop("initial_buy")
+    payload.pop("initial_costs")
+    response = seeded_client.post("/api/v1/orders", json=payload, headers=headers)
+    assert response.status_code == 422
+    seeded_db.refresh(customer)
+    assert customer.phone == "旧电话"
+
+
+def test_supplier_update_requires_manage_permission(seeded_client, seeded_db):
+    supplier = create_counterparty(seeded_db, display_name="受保护同行", type="PEER", phone="旧电话", actor="pytest")
+    payload = _base_payload("TH")
+    payload["counterparty_input"] = {"display_name": "受保护同行", "type": "PEER", "role": "PEER", "phone": "新电话"}
+    response = seeded_client.post("/api/v1/orders", json=payload, headers={"X-Dev-User": "operator"})
+    assert response.status_code == 403
+    seeded_db.refresh(supplier)
+    assert supplier.phone == "旧电话"
 
 
 def test_order_rejects_snapshot_and_existing_account_together(seeded_client, headers):

@@ -165,7 +165,7 @@ def create_order(
     counterparty_roles = [
         (role.counterparty_id, role.role) for role in payload.counterparty_roles
     ]
-    customer_role = resolve_customer_role(db, payload.customer_input, user)
+    customer_role = resolve_customer_role(db, payload.customer_input, user, update_existing=True)
     counterparty_role = resolve_counterparty_role(db, payload.counterparty_input, user)
     if customer_role is not None:
         customer_roles.append(customer_role)

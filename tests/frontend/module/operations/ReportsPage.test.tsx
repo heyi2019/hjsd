@@ -187,6 +187,10 @@ describe("ReportsPage：经营中心报表", () => {
   });
 
   it("FE-260：分润对账可以按人员筛选并传递 user_id", async () => {
+    resolveMock(vi.mocked(reportsApi.commission), {
+      ...commissionResponse([], { order_count: 0, profit_base: "0" }),
+      people: [{ user_id: 9, user_name: "离职同事", is_active: false }],
+    });
     renderLight(<ReportsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: "分润对账" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true, ...currentReportPeriod() })));
@@ -197,6 +201,16 @@ describe("ReportsPage：经营中心报表", () => {
     expect(await screen.findByText("全部", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
     await ui.click(await screen.findByText("业务同事", { selector: ".ant-select-item-option-content" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true, user_id: 7, ...currentReportPeriod() })));
+    await ui.click(personFilter);
+    await ui.click(await screen.findByText("离职同事（已停用）", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true, user_id: 9, ...currentReportPeriod() })));
+    resolveMock(vi.mocked(reportsApi.commission), {
+      ...commissionResponse([], { order_count: 0, profit_base: "0" }), people: [],
+    });
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    await setAntdDateRange(pane, ui, "2026-01-01", "2026-01-31");
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ user_id: 9, from: "2026-01-01", to: "2026-01-31" })));
+    expect(await within(pane).findByTitle("离职同事（已停用）")).toBeInTheDocument();
   });
 
   it("指定员工导出带 user_id，与列表同口径", async () => {

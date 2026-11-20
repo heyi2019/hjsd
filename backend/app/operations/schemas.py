@@ -36,6 +36,7 @@ class MonthlyPnlOut(ReportModel):
 
 class CommissionOrderOut(ReportModel):
     user_id: int | None = None
+    user_name: str | None = None
     order_no: str
     order_id: int
     inventory_date: date | None = None
@@ -59,8 +60,15 @@ class CommissionTotalOut(ReportModel):
     profit_base: Decimal
 
 
+class CommissionPersonOut(ReportModel):
+    user_id: int
+    user_name: str
+    is_active: bool
+
+
 class CommissionOut(ReportModel):
     order_groups: list[CommissionOrderGroupOut]
+    people: list[CommissionPersonOut]
     total: CommissionTotalOut
 
 

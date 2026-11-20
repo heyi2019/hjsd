@@ -63,19 +63,21 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
   it("分润对账：按订单汇总并展开查看每个人的分润明细", async () => {
     vi.mocked(employeesApi.list).mockResolvedValueOnce([
       { id: 1, username: "zhang", display_name: "张三", is_active: true },
-      { id: 2, username: "li", display_name: "李四", is_active: true },
     ]);
-    resolveMockOnce(vi.mocked(reportsApi.commission), commissionResponse([{
+    resolveMockOnce(vi.mocked(reportsApi.commission), { ...commissionResponse([{
         order_id: 10,
         order_no: "HS-2026-0010",
         inventory_date: "2026-10-02",
         outbound_date: "2026-10-04",
         profit_base: "200.00",
         orders: [
-          { user_id: 1, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
-          { user_id: 2, order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
+          { user_id: 1, user_name: "张三", order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
+          { user_id: 2, user_name: "李四", order_id: 10, order_no: "HS-2026-0010", profit_base: "100.00", rate: "0.10" },
         ],
-      }], { order_count: 1, profit_base: "200.00" }));
+      }], { order_count: 1, profit_base: "200.00" }), people: [
+        { user_id: 1, user_name: "张三", is_active: true },
+        { user_id: 2, user_name: "李四", is_active: false },
+      ] });
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("分润对账");
     await screen.findAllByText("HS-2026-0010");

@@ -16,6 +16,7 @@ from app.domain.trade import (
     OrderEvent,
     OrderProfitAllocation,
 )
+from app.domain.users import User
 
 from app.core.money import to_money_or_zero
 from ._shared import (
@@ -144,6 +145,15 @@ def r3_commission_reconciliation(
             outbound_dates.setdefault(order_id, occurred_on)
     if mine and user is not None:
         rows = [row for row in rows if row[0].user_id == user.id]
+
+    # 报表中的历史分润仍属于原人员，即使其账号已停用也须能显示和筛选。
+    # 人员选项在 user_id 筛选前收集，使切换人员后仍可选择同一范围内的其他人。
+    person_ids = {allocation.user_id for allocation, _ in rows if allocation.user_id is not None}
+    people = [
+        {"user_id": person.id, "user_name": person.display_name or person.username, "is_active": person.is_active}
+        for person in session.scalars(select(User).where(User.id.in_(person_ids)).order_by(User.id)).all()
+    ] if person_ids else []
+    person_names = {person["user_id"]: person["user_name"] for person in people}
     if user_id is not None:
         rows = [row for row in rows if row[0].user_id == user_id]
 
@@ -157,6 +167,7 @@ def r3_commission_reconciliation(
         base = base_by_allocation[allocation.id]
         detail = {
             "user_id": allocation.user_id,
+            "user_name": "公司" if allocation.user_id is None else person_names.get(allocation.user_id),
             "order_no": order.order_no,
             "order_id": order.id,
             "inventory_date": account.inventory_entry_at.date() if account else None,
@@ -189,6 +200,7 @@ def r3_commission_reconciliation(
     )
     return {
         "order_groups": order_groups,
+        "people": people,
         "total": {
             "order_count": len(order_groups),
             "profit_base": total_profit_base,

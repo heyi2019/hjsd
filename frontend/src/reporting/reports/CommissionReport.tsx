@@ -43,8 +43,11 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
     [params.from, params.to, mine, selectedUserId],
   );
   const orderRows = data?.order_groups ?? [];
-  const employeeNames = new Map(employees.map((employee) => [employee.id, employee.display_name]));
-  const personName = (row: CommissionRow) => row.user_id == null ? "公司" : employeeNames.get(row.user_id) ?? `人员${row.user_id}`;
+  const employeeOptions = new Map(employees.map((employee) => [employee.id, { name: employee.display_name, isActive: employee.is_active }]));
+  for (const person of data?.people ?? []) {
+    employeeOptions.set(person.user_id, { name: person.user_name, isActive: person.is_active });
+  }
+  const personName = (row: CommissionRow) => row.user_id == null ? "公司" : row.user_name || employeeOptions.get(row.user_id)?.name || `人员${row.user_id}`;
   const peopleText = (row: CommissionOrderGroup) => Array.from(new Set(row.orders.map(personName))).join("、");
   const dateText = (value?: string | null) => value || "—";
   const { arrange: arrangeCommission } = useListViewColumns("RPT_COMMISSION");
@@ -65,7 +68,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
             onChange={(value) => setSelectedUserId((value as number) || 0)}
             options={[
               { value: 0, label: "全部" },
-              ...employees.map((employee) => ({ value: employee.id, label: employee.display_name })),
+              ...Array.from(employeeOptions, ([id, employee]) => ({ value: id, label: `${employee.name}${employee.isActive ? "" : "（已停用）"}` })),
             ]}
             className="ui-control-width-import"
           />

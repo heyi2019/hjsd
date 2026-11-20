@@ -20,6 +20,7 @@ export interface MonthlyPnlReport {
 
 export interface CommissionRow {
   user_id: number | null;
+  user_name: string | null;
   order_id: number;
   order_no: string;
   inventory_date?: string | null;
@@ -40,6 +41,7 @@ export interface CommissionOrderGroup {
 export interface CommissionReport {
   total: { order_count: number; profit_base: string };
   order_groups: CommissionOrderGroup[];
+  people: { user_id: number; user_name: string; is_active: boolean }[];
 }
 
 export interface BusinessPnlRow {

@@ -240,6 +240,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
             ListColumn("inventory_date", "入库日期"),
             ListColumn("outbound_date", "出库日期"),
             ListColumn("user_id", "人员 ID"),
+            ListColumn("user_name", "分润人员"),
             ListColumn("profit_base", "分润基数"),
             ListColumn("rate", "费率"),
         ),

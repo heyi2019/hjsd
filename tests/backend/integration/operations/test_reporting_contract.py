@@ -17,6 +17,7 @@ from app.domain.enums import (
 )
 from app.domain.foundation import Pool
 from app.domain.trade import Account, RebateRecord
+from app.domain.users import User
 from app.funds.cashflows import create_cashflow
 from app.business.create import create_order
 from app.business.events import post_event
@@ -306,7 +307,7 @@ class TestR3Commission:
         from app.dashboard.service import dashboard_summary
         assert dashboard_summary(seeded_db, user=user)["personal_earnings"] == Decimal("150.00")
 
-    def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db):
+    def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db, seeded_client, headers):
         order = _order(seeded_db)
         post_event(
             seeded_db, order.id, event_type="BUY", amount="1000.00",
@@ -325,6 +326,11 @@ class TestR3Commission:
             ],
             actor="pytest",
         )
+        former_employee = seeded_db.get(User, 7)
+        assert former_employee is not None
+        former_employee.display_name = "离职同事"
+        former_employee.is_active = False
+        seeded_db.flush()
         scoped_user = CurrentUser.build(
             id=7, username="seeduser7", roles=["VIEWER"], owner_scope="SELF"
         )
@@ -333,11 +339,26 @@ class TestR3Commission:
             seeded_db, user=scoped_user, all_people=True
         )
         assert {item["user_id"] for item in _commission_details(all_people)} == {7, 8}
+        assert next(item for item in _commission_details(all_people) if item["user_id"] == 7)["user_name"] == "离职同事"
+        assert next(person for person in all_people["people"] if person["user_id"] == 7) == {
+            "user_id": 7, "user_name": "离职同事", "is_active": False,
+        }
 
         one_person = r3_commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True, user_id=8
         )
         assert {item["user_id"] for item in _commission_details(one_person)} == {8}
+        assert {person["user_id"] for person in one_person["people"]} == {7, 8}
+
+        personal = r3_commission_reconciliation(seeded_db, user=scoped_user, mine=True)
+        assert {person["user_id"] for person in personal["people"]} == {7}
+        response = seeded_client.get("/api/v1/reports/commission", params={"all_people": "true", "user_id": 7}, headers=headers)
+        assert response.status_code == 200, response.text
+        assert _commission_details(response.json())[0]["user_name"] == "离职同事"
+        assert {person["user_id"] for person in response.json()["people"]} == {7, 8}
+        options = seeded_client.get("/api/v1/users/options", headers=headers)
+        assert options.status_code == 200
+        assert 7 not in {person["id"] for person in options.json()}
 
     def test_allocations_drill_down_and_date_filters(self, seeded_db):
         order = _order(seeded_db)
@@ -360,6 +381,7 @@ class TestR3Commission:
         assert len(data["order_groups"]) == 1
         assert data["order_groups"][0]["order_no"] == order.order_no
         assert len(data["order_groups"][0]["orders"]) == 4
+        assert all(item["user_name"] == "公司" for item in _commission_details(data) if item["user_id"] is None)
         account = seeded_db.get(Account, order.account_id)
         assert account is not None
         account.inventory_entry_at = datetime(2026, 10, 2, 9, 30)
@@ -452,6 +474,19 @@ class TestR3Commission:
         mine_headers = {"Authorization": f"Bearer {build_access_token(mine_user)}"}
         # 我的收益：修复前 mine 被导出接口忽略，仍导出两人。
         assert exported_user_ids({"mine": "true"}, mine_headers) == {7}
+
+        former_employee = seeded_db.get(User, 7)
+        assert former_employee is not None
+        former_employee.display_name = "离职同事"
+        former_employee.is_active = False
+        seeded_db.flush()
+        response = seeded_client.get(
+            "/api/v1/reports/commission/export.csv", params={"all_people": "true", "user_id": 7}, headers=headers,
+        )
+        assert response.status_code == 200, response.text
+        rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
+        name_index = rows[0].index("分润人员")
+        assert [row[name_index] for row in rows[1:] if row[0] == "明细"] == ["离职同事"]
 
 
 # --------------------------------------------------------------------- R5 业务

@@ -130,6 +130,7 @@ def installment_order_context(
     for order in orders:
         account = accounts.get(order.account_id)
         snapshot = order.account_snapshot or {}
+        delivery = order.form_extra or {}
         result[order.id] = {
             "id": order.id,
             "order_no": order.order_no,
@@ -139,8 +140,11 @@ def installment_order_context(
             "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),
             "account_business_mode": account.business_mode if account else None,
             "party_name": parties.get(order.id),
-            "bound_phone": (account.bound_phone if account else None) or snapshot.get("bound_phone"),
-            "bound_phone_owner": snapshot.get("bound_phone_owner"),
+            # 已保存的卖号交付资料是当前值；显式清空时也不能回退到旧账号快照。
+            "bound_phone": delivery.get(
+                "sell_bound_phone", (account.bound_phone if account else None) or snapshot.get("bound_phone")
+            ),
+            "bound_phone_owner": delivery.get("sell_bound_phone_owner", snapshot.get("bound_phone_owner")),
         }
     return result
 

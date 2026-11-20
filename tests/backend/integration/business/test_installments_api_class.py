@@ -588,6 +588,7 @@ class TestInstallmentsApi:
         edited = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
             "events": [], "orders": [{"order_id": order.id, "form_extra": {
                 "sell_intermediary_platform_other": "新平台", "bound_phone_owner": "新买号绑定人",
+                "sell_bound_phone": "13900000004", "sell_bound_phone_owner": "新卖号绑定人",
             }}],
         })
         assert edited.status_code == 200, edited.text
@@ -595,9 +596,15 @@ class TestInstallmentsApi:
         assert detail.status_code == 200, detail.text
         assert detail.json()["orders"][0]["extra_values"]["sell_intermediary_platform_other"] == "新平台"
         assert detail.json()["orders"][0]["extra_values"]["bound_phone_owner"] == "新买号绑定人"
+        installment_list = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers)
+        assert installment_list.status_code == 200, installment_list.text
+        installment_order = installment_list.json()["items"][0]["order"]
+        assert installment_order["bound_phone"] == "13900000004"
+        assert installment_order["bound_phone_owner"] == "新卖号绑定人"
         cleared = seeded_client.patch(f"/api/v1/orders/{order.id}/execution-edit", headers=headers, json={
             "events": [], "orders": [{"order_id": order.id, "form_extra": {
                 "sell_intermediary_platform": "盼之", "sell_intermediary_platform_other": None,
+                "sell_bound_phone": None, "sell_bound_phone_owner": None,
             }}],
         })
         assert cleared.status_code == 200, cleared.text
@@ -606,6 +613,11 @@ class TestInstallmentsApi:
         assert detail.json()["orders"][0]["extra_values"]["sell_intermediary_platform_other"] is None
         assert detail.json()["orders"][0]["extra_values"]["intermediary_platform"] == "买号平台"
         assert detail.json()["orders"][0]["extra_values"]["bound_phone_owner"] == "新买号绑定人"
+        installment_list = seeded_client.get("/api/v1/installments", params={"order_id": order.id}, headers=headers)
+        assert installment_list.status_code == 200, installment_list.text
+        installment_order = installment_list.json()["items"][0]["order"]
+        assert installment_order["bound_phone"] is None
+        assert installment_order["bound_phone_owner"] is None
 
         settled = seeded_client.post(f"/api/v1/installments/{contract.id}/settle-early", headers=headers, json={"paid_on": TODAY.isoformat()})
         assert settled.status_code == 200, settled.text

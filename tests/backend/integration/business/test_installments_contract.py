@@ -64,9 +64,13 @@ def test_installment_order_context_reads_only_display_fields(seeded_db):
     counterparty = create_counterparty(seeded_db, display_name="分期同行", type="PEER", phone="13700000000", actor="pytest")
     order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", account_id=account.id,
                          customer_roles=[(customer.id, "BUYER")], counterparty_roles=[(counterparty.id, "PEER")])
+    order.form_extra = {"sell_bound_phone": "13900000001", "sell_bound_phone_owner": "卖号绑定人"}
     peer_order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest",
                               counterparty_roles=[(counterparty.id, "PEER")])
     peer_order.account_snapshot = {"game_account": "历史快照账号", "game_type": "游戏类型", "bound_phone": "13600000000", "bound_phone_owner": "客户"}
+    cleared_order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
+    cleared_order.account_snapshot = {"bound_phone": "13500000000", "bound_phone_owner": "原绑定人"}
+    cleared_order.form_extra = {"sell_bound_phone": "", "sell_bound_phone_owner": None}
     seeded_db.flush()
     statements = []
 
@@ -76,7 +80,7 @@ def test_installment_order_context_reads_only_display_fields(seeded_db):
     connection = seeded_db.connection()
     event.listen(connection, "after_cursor_execute", record_sql)
     try:
-        contexts = inst_queries.installment_order_context(seeded_db, [order, peer_order])
+        contexts = inst_queries.installment_order_context(seeded_db, [order, peer_order, cleared_order])
     finally:
         event.remove(connection, "after_cursor_execute", record_sql)
     context = contexts[order.id]
@@ -85,7 +89,10 @@ def test_installment_order_context_reads_only_display_fields(seeded_db):
     assert contexts[peer_order.id]["bound_phone"] == "13600000000"
     assert contexts[peer_order.id]["bound_phone_owner"] == "客户"
     assert context["account_game_account"] == "installment-context-account"
-    assert context["bound_phone"] == "13800000000"
+    assert context["bound_phone"] == "13900000001"
+    assert context["bound_phone_owner"] == "卖号绑定人"
+    assert contexts[cleared_order.id]["bound_phone"] == ""
+    assert contexts[cleared_order.id]["bound_phone_owner"] is None
     assert context["party_name"] == "分期客户"
     assert len(statements) == 3
     assert all("stocks.game_password" not in sql and "stocks.account_images" not in sql for sql in statements)

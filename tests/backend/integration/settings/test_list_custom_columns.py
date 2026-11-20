@@ -10,10 +10,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
+from app.domain.parties import Customer
 from app.domain.trade import Order, OrderFormField
 from app.settings.lists import service
 
@@ -83,33 +84,84 @@ def test_candidate_fields_only_active_custom(seeded_client, headers, seeded_db):
 
 def test_data_only_keys_become_candidates_and_addable(seeded_client, headers, seeded_db):
     """数据里实际有值但无字段定义的键（如 qa500_note）也应能选为列。"""
-    seeded_db.add(
+    seeded_db.add_all([
         Order(
             order_no="HS9901",
             order_type="HS",
             trade_date=date(2026, 1, 1),
-            form_extra={"qa500_note": "补齐轮回填"},
+            form_extra={"qa500_note": "补齐轮回填", "invalid-key": "忽略"},
             created_by="tester",
             updated_by="tester",
-        )
-    )
+        ),
+        Order(
+            order_no="HS9903",
+            order_type="HS",
+            trade_date=date(2026, 1, 1),
+            form_extra={"qa500_note": None},
+            created_by="tester",
+            updated_by="tester",
+        ),
+        Order(
+            order_no="HS9904",
+            order_type="HS",
+            trade_date=date(2026, 1, 1),
+            form_extra=["array_only"],
+            created_by="tester",
+            updated_by="tester",
+        ),
+        Customer(
+            customer_no="CUS_TEST_EXTRA",
+            display_name="候选字段客户",
+            form_extra={"qa500_note": "客户值", "customer_only": None},
+            created_by="tester",
+            updated_by="tester",
+        ),
+    ])
     seeded_db.flush()
 
-    response = seeded_client.get("/api/list-columns/custom-fields", headers=headers)
+    statements = []
+
+    def capture_query(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(" ".join(statement.lower().split()))
+
+    bind = seeded_db.get_bind()
+    event.listen(bind, "before_cursor_execute", capture_query)
+    try:
+        response = seeded_client.get("/api/list-columns/custom-fields", headers=headers)
+        added = seeded_client.post(
+            "/api/list-columns/LEDGER/custom",
+            json={"field_key": "qa500_note", "label": "补齐备注"},
+            headers=headers,
+        )
+        customer_null = seeded_client.post(
+            "/api/list-columns/CUSTOMER/custom",
+            json={"field_key": "customer_only"},
+            headers=headers,
+        )
+        array_only = seeded_client.post(
+            "/api/list-columns/LEDGER/custom",
+            json={"field_key": "array_only"},
+            headers=headers,
+        )
+    finally:
+        event.remove(bind, "before_cursor_execute", capture_query)
+
     assert response.status_code == 200, response.text
     data_rows = [row for row in response.json() if row.get("data_only")]
     qa = next(row for row in data_rows if row["field_key"] == "qa500_note")
     assert qa["scope"] == "DATA"
     assert qa["label"] == "qa500_note"
     assert qa["field_type"] == "TEXT"
-    assert qa["row_count"] >= 1
-    assert "订单" in qa["source_label"]
+    assert qa["row_count"] == 3
+    assert qa["source_label"] == "订单 / 客户"
+    assert not {"array_only", "invalid-key"} & {row["field_key"] for row in data_rows}
+    assert customer_null.status_code == 200, customer_null.text
+    assert array_only.status_code == 422, array_only.text
+    assert not any(
+        statement.startswith(("select orders.form_extra", "select customers.form_extra"))
+        for statement in statements
+    ), "候选汇总和字段存在性检查不应将全部扩展数据读入应用"
 
-    added = seeded_client.post(
-        "/api/list-columns/LEDGER/custom",
-        json={"field_key": "qa500_note", "label": "补齐备注"},
-        headers=headers,
-    )
     assert added.status_code == 200, added.text
     custom = next(c for c in added.json()["columns"] if c["key"] == "extra:qa500_note")
     assert custom["label"] == "补齐备注"

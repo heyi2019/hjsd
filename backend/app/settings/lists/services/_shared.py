@@ -5,7 +5,8 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import case, cast, func, literal, select, true
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from app.domain.lists import ListColumnConfig, ListCustomColumn
@@ -127,21 +128,44 @@ def _config_snapshot(rows: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
 
 
 def _data_extra_keys(session: Session) -> dict[str, dict[str, Any]]:
-    """扫描订单/客户行数据 form_extra 中实际出现过的键：{key: {sources, row_count}}。
+    """汇总订单/客户 form_extra 中实际出现过的键：{key: {sources, row_count}}。
 
     这些键大多没有字段定义记录（历史流程直接写入），但值真实存在 ——
     作为「数据中已有值」候选，让管理员不展开详情也能把关心的字段提到列表里。
     """
     result: dict[str, dict[str, Any]] = {}
     for model, source_label in _DATA_EXTRA_SOURCES:
-        for (payload,) in session.execute(select(model.form_extra)).all():
-            if not isinstance(payload, dict):
+        payload = cast(model.form_extra, JSONB)
+        object_payload = case(
+            (func.jsonb_typeof(payload) == "object", payload),
+            else_=cast(literal("{}"), JSONB),
+        )
+        entries = func.jsonb_each(object_payload).table_valued("key", "value").lateral()
+        query = (
+            select(entries.c.key, func.count())
+            .select_from(model)
+            .join(entries, true())
+            .group_by(entries.c.key)
+        )
+        for key, count in session.execute(query):
+            if not _DATA_KEY_RE.match(key):
                 continue
-            for key in payload:
-                if not isinstance(key, str) or not _DATA_KEY_RE.match(key):
-                    continue
-                entry = result.setdefault(key, {"sources": [], "row_count": 0})
-                if source_label not in entry["sources"]:
-                    entry["sources"].append(source_label)
-                entry["row_count"] += 1
+            entry = result.setdefault(key, {"sources": [], "row_count": 0})
+            entry["sources"].append(source_label)
+            entry["row_count"] += count
     return result
+
+
+def _has_data_extra_key(session: Session, key: str) -> bool:
+    """只判断指定键是否存在，避免新增单列时重新汇总全部候选。"""
+    for model, _ in _DATA_EXTRA_SOURCES:
+        payload = cast(model.form_extra, JSONB)
+        query = (
+            select(literal(1))
+            .select_from(model)
+            .where(func.jsonb_typeof(payload) == "object", payload.has_key(key))
+            .limit(1)
+        )
+        if session.scalar(query) is not None:
+            return True
+    return False

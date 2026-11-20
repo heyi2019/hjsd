@@ -17,6 +17,7 @@ from app.settings.lists.services._shared import (
     _SCOPE_LABELS,
     _AUDIT_ENTITY_TYPE,
     _data_extra_keys,
+    _has_data_extra_key,
     _option_items,
     _value_labels,
     CUSTOM_KEY_PREFIX,
@@ -108,7 +109,7 @@ def add_custom_column(
     if definition is not None:
         field_type = definition.field_type
         value_labels = _value_labels(definition.options)
-    elif not _DATA_KEY_RE.match(key) or key not in _data_extra_keys(session):
+    elif not _DATA_KEY_RE.match(key) or not _has_data_extra_key(session, key):
         raise Validation(
             "字段不是已启用的自定义字段，数据中也没有该字段的值",
             details={"field_key": key},

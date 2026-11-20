@@ -123,3 +123,16 @@ def test_data_center_separates_costs_and_combines_profit(seeded_client, seeded_d
         "studio_other_income": "20.00",
         "profit": "80.00",
     }
+
+    installment_order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
+    installment_order.status = "INSTALLMENT"
+    create_order(seeded_db, order_type="TH", trade_date=date(2000, 1, 1), actor="pytest")
+    seeded_db.flush()
+    period = {"trade_date_from": TODAY.isoformat(), "trade_date_to": TODAY.isoformat()}
+    filtered = seeded_client.get("/api/v1/orders", params={**period, "status": "IN_PROGRESS"}, headers=headers)
+    assert filtered.status_code == 200, filtered.text
+    assert filtered.json()["total"] == 2
+    assert {item["id"] for item in filtered.json()["items"]} == {inventory_order.id, installment_order.id}
+    summary = seeded_client.get("/api/v1/reports/data-center", params={"from": TODAY.isoformat(), "to": TODAY.isoformat()}, headers=headers)
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["active_order_count"] == filtered.json()["total"]

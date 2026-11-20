@@ -21,6 +21,8 @@ export interface OrderListParams {
   offset?: number;
 }
 
+type OrderExportParams = Omit<OrderListParams, "limit" | "offset" | "sort_desc">;
+
 /** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
 export interface OrderPatchPayload {
   trade_date?: string;
@@ -86,15 +88,15 @@ export const ordersApi = {
   }>("/orders/ledger-summary", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   listPage: (params?: OrderListParams) =>
     api.get<PageResponse<Order>>("/orders", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
-  /** 导出必须与当前视图同口径：「我的订单」视图传 mine=true，由后端按 operator_user_ids 过滤。 */
-  exportCsv: (params?: { mine?: boolean }) =>
+  /** 导出按当前筛选取全部匹配订单，不受页面大小影响。 */
+  exportCsv: (params?: OrderExportParams) =>
     api
-      .get<Blob>("/orders/export.csv", { params: { ...params, _t: Date.now() }, responseType: "blob" })
+      .get<Blob>("/orders/export.csv", { params: { ...params, _t: Date.now() }, paramsSerializer: { indexes: null }, responseType: "blob" })
       .then((r) => r.data),
   /** 订单台账 Excel：两个 sheet —— 主订单信息（列表可见列）+ 详情信息（订单详情全字段）。 */
-  exportXlsx: (params?: { mine?: boolean }) =>
+  exportXlsx: (params?: OrderExportParams) =>
     api
-      .get<Blob>("/orders/export.xlsx", { params: { ...params, _t: Date.now() }, responseType: "blob" })
+      .get<Blob>("/orders/export.xlsx", { params: { ...params, _t: Date.now() }, paramsSerializer: { indexes: null }, responseType: "blob" })
       .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),

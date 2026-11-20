@@ -95,7 +95,7 @@ def order_profit(
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
 ) -> OrderProfitOut:
-    """订单利润明细：合计与业务级损益对应维度一致。"""
+    """订单利润明细：按订单日期筛选，金额汇总该订单全部收支。"""
     return order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
 
 

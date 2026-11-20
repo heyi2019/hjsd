@@ -103,11 +103,18 @@ describe("DataCenterPanel：经营指标", () => {
 describe("DataCenterPanel：订单入口", () => {
   it("展示订单总数和进行中数量并支持跳转", async () => {
     const onNavigate = vi.fn();
-    renderLight(<DataCenterPanel onNavigate={onNavigate} />, { user: "admin" });
+    const range = { params: { from: "2026-11-01", to: "2026-11-15" }, picker: null };
+    const view = renderLight(<DataCenterPanel onNavigate={onNavigate} range={range} />, { user: "admin" });
     const total = await screen.findByRole("button", { name: /订单总数/ });
     expect(total).toHaveTextContent("2");
     expect(screen.getByRole("button", { name: /进行中/ })).toHaveTextContent("1");
     await userEvent.setup({ pointerEventsCheck: 0 }).click(total);
-    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
+    expect(onNavigate).toHaveBeenLastCalledWith("business/ledger?trade_date_from=2026-11-01&trade_date_to=2026-11-15");
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: /进行中/ }));
+    expect(onNavigate).toHaveBeenLastCalledWith("business/ledger?trade_date_from=2026-11-01&trade_date_to=2026-11-15&status=IN_PROGRESS");
+    view.rerender(<DataCenterPanel onNavigate={onNavigate} range={{ params: {}, picker: null }} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: /进行中/ })).toHaveTextContent("1"));
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: /进行中/ }));
+    expect(onNavigate).toHaveBeenLastCalledWith("business/ledger?status=IN_PROGRESS");
   });
 });

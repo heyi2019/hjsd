@@ -7,7 +7,7 @@ import type { OrderProfitReport, OrderProfitRow } from "../../shared/api/types/r
 import { ORDER_TYPE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow, StatusTag } from "../../shared/ui";
-import { type ReportRange, useReport } from "./shared";
+import { Note, type ReportRange, useReport } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 
 export function OrderProfit({ range }: { range: ReportRange }) {
@@ -36,6 +36,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
     <Card className="glass" title="订单利润明细">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space className="ui-filter-bar ui-filter-bar--spaced">{picker}</Space>
+      <Note>按订单日期筛选，金额包含该订单全部收支。</Note>
       <StatRow
         items={[
           { label: "收入合计", amount: data?.total.income ?? "-" },

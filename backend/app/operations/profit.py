@@ -37,9 +37,10 @@ def order_profit_detail(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """订单利润明细：合计与业务级损益对应维度一致，可导出但不改原始数据。
+    """订单利润明细：按订单日期筛选，金额包含该订单所有日期的收支。
 
-    订单范围先按权限过滤，再一次性按订单汇总资金流水，避免逐单查询。
+    经营损益按收支发生日期统计，跨期数据不必相等。订单范围先按权限过滤，
+    再一次性按订单汇总资金流水，避免逐单查询。
     """
     _validate_date_range(from_date, to_date)
     orders_stmt = _apply_order_scope(

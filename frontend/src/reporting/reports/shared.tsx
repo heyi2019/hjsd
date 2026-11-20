@@ -23,6 +23,7 @@ export function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
     const request = ++requestRef.current;
     setLoading(true);
     setError(null);
+    setData(null);
     load()
       .then((value) => { if (request === requestRef.current) setData(value); })
       .catch((err) => { if (request === requestRef.current) setError(normalizeError(err)); })

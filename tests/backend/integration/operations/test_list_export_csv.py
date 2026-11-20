@@ -90,8 +90,11 @@ def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seed
 
     headers = X-Dev-User: admin → id=1；入库操作人是本人，另一单的入库操作人是他人。
     """
-    _seed_order(seeded_db, order_no="HSMINE01", form_extra={"business_responsible_ids": [1]})
+    mine = _seed_order(seeded_db, order_no="HSMINE01", form_extra={"business_responsible_ids": [1]})
+    mine.account_snapshot = {"game_type": "王者荣耀"}
     _seed_order(seeded_db, order_no="HSFOREIGN01", form_extra={"business_responsible_ids": [2]})
+    other_game = _seed_order(seeded_db, order_no="HSMINE02", form_extra={"business_responsible_ids": [1]})
+    other_game.account_snapshot = {"game_type": "原神"}
     seeded_db.flush()
 
     full = seeded_client.get("/api/v1/orders/export.csv", headers=headers).text
@@ -117,6 +120,23 @@ def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seed
         if cell.value is not None
     ]
     assert "HSMINE01" in cells
+    assert "HSFOREIGN01" not in cells
+
+    filters = {
+        "mine": True, "status": "IN_PROGRESS", "trade_date_from": "2026-01-01",
+        "trade_date_to": "2026-01-01", "game_type": "王者荣耀", "inventory_operator_ids": [1],
+    }
+    filtered_csv = seeded_client.get("/api/v1/orders/export.csv", headers=headers, params=filters)
+    assert filtered_csv.status_code == 200, filtered_csv.text
+    assert "HSMINE01" in filtered_csv.text
+    assert "HSMINE02" not in filtered_csv.text
+    assert "HSFOREIGN01" not in filtered_csv.text
+    filtered_xlsx = seeded_client.get("/api/v1/orders/export.xlsx", headers=headers, params=filters)
+    assert filtered_xlsx.status_code == 200
+    workbook = openpyxl.load_workbook(io.BytesIO(filtered_xlsx.content))
+    cells = [str(cell.value) for row in workbook.worksheets[0].iter_rows() for cell in row if cell.value is not None]
+    assert "HSMINE01" in cells
+    assert "HSMINE02" not in cells
     assert "HSFOREIGN01" not in cells
 
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import date
 from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
+from app.domain.enums import OrderStatus
 from app.shared.scope import owner_scope_filter
 from sqlalchemy import (
     case,
@@ -258,7 +259,9 @@ def _order_list_stmt(
     stmt = select(Order).outerjoin(Account, Account.id == Order.account_id)
     if order_type:
         stmt = stmt.where(Order.order_type == order_type)
-    if status:
+    if status == "IN_PROGRESS":
+        stmt = stmt.where(Order.status.in_((OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value)))
+    elif status:
         stmt = stmt.where(Order.status == status)
     if trade_date_from is not None:
         stmt = stmt.where(Order.trade_date >= trade_date_from)

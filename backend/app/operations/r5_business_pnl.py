@@ -35,7 +35,7 @@ def r5_business_pnl(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
-    """业务级损益：先按权限取订单，再一次性按订单汇总资金明细收支差。"""
+    """业务级损益：按收支发生日期汇总可见订单的资金明细。"""
     _validate_date_range(from_date, to_date)
     orders_stmt = _apply_order_scope(
         select(Order.id, Order.order_type), user, session
@@ -50,9 +50,10 @@ def r5_business_pnl(
 
     revenue: dict[str, Decimal] = defaultdict(lambda: ZERO)
     cost: dict[str, Decimal] = defaultdict(lambda: ZERO)
-    no_totals = (ZERO, ZERO, ZERO)
     for order_id, order_type in order_rows:
-        income, expense, _buy = cashflow_by_order.get(order_id, no_totals)
+        if order_id not in cashflow_by_order:
+            continue
+        income, expense, _buy = cashflow_by_order[order_id]
         revenue[order_type] += income
         cost[order_type] += expense
 

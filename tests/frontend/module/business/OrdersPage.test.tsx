@@ -255,7 +255,7 @@ describe("OrdersPage：四类订单台账", () => {
     vi.mocked(ordersApi.exportCsv).mockResolvedValue(new Blob(["csv"]));
     vi.mocked(ordersApi.exportXlsx).mockResolvedValue(new Blob(["xlsx"]));
 
-    renderLight(<OrdersPage initialTab="ledger" initialMine />);
+    renderLight(<OrdersPage initialTab="ledger" initialMine initialLedgerFilters={{ status: "IN_PROGRESS", tradeDateFrom: "2026-11-01", tradeDateTo: "2026-11-16" }} />);
     await screen.findAllByText("HS-2026-0001");
 
     await ui.click(screen.getByRole("button", { name: /导出/ }));
@@ -263,14 +263,14 @@ describe("OrdersPage：四类订单台账", () => {
     const csvItem = await screen.findAllByText(/导出表格/);
     fireEvent.click(csvItem[csvItem.length - 1]);
     await waitFor(() => expect(vi.mocked(ordersApi.exportCsv)).toHaveBeenCalledWith(
-      expect.objectContaining({ mine: true }),
+      expect.objectContaining({ mine: true, status: "IN_PROGRESS", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16" }),
     ));
 
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     const xlsxItem = await screen.findAllByText(/导出工作簿/);
     fireEvent.click(xlsxItem[xlsxItem.length - 1]);
     await waitFor(() => expect(vi.mocked(ordersApi.exportXlsx)).toHaveBeenCalledWith(
-      expect.objectContaining({ mine: true }),
+      expect.objectContaining({ mine: true, status: "IN_PROGRESS", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16" }),
     ));
   });
 
@@ -459,6 +459,11 @@ describe("OrdersPage：四类订单台账", () => {
 
     await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenCalledWith(
       expect.objectContaining({ status: "COMPLETED", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16" }),
+    ));
+    expect(screen.getByText("订单状态：已完成")).toBeInTheDocument();
+    await ui.click(screen.getByLabelText("清除订单状态筛选"));
+    await waitFor(() => expect(vi.mocked(ordersApi.listPage)).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ status: "COMPLETED" }),
     ));
   });
 

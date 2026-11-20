@@ -28,6 +28,14 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   const summary = summaryReport.data;
 
   const orderCardsUnavailable = summary === null;
+  const openOrders = (inProgress = false) => {
+    const params = new URLSearchParams();
+    if (from) params.set("trade_date_from", from);
+    if (to) params.set("trade_date_to", to);
+    if (inProgress) params.set("status", "IN_PROGRESS");
+    const query = params.toString();
+    onNavigate?.(`business/ledger${query ? `?${query}` : ""}`);
+  };
 
   return (
     <section className="ui-stack">
@@ -41,14 +49,14 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
           value={summary === null ? "不可用" : String(summary.order_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
-          onClick={() => onNavigate?.("business", "ledger")}
+          onClick={() => openOrders()}
         />
         <EntryCard
           title="进行中"
           value={summary === null ? "不可用" : String(summary.active_order_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
-          onClick={() => onNavigate?.("business", "ledger")}
+          onClick={() => openOrders(true)}
         />
       </EntryRow>
 

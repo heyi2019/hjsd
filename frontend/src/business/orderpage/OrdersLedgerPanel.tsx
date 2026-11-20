@@ -1,4 +1,4 @@
-import { Button, Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Typography } from "antd";
+import { Button, Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Tag, Typography } from "antd";
 import { ArrowDownOutlined, ArrowUpOutlined } from "@ant-design/icons";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, PermissionButton, Select, StatRow } from "../../shared/ui";
@@ -7,6 +7,7 @@ import type { OrderPartyLink } from "../OrderDetailView/OrderDetail.shared";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
+import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
 import "./OrdersLedgerPanel.css";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
@@ -47,6 +48,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     onExportLedgerXlsx,
     orderBusinessModeOptions,
     orderBusinessOptions,
+    orderStatusFilter,
     orderTypeFilter,
     page,
     pageTotal,
@@ -60,6 +62,7 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
     setKeyword,
     setLedgerSortDesc,
     setOrderTypeFilter,
+    setOrderStatusFilter,
     setPage,
     setPageSize,
     editingAccount,
@@ -119,6 +122,15 @@ export function OrdersLedgerPanel({ controller, onNavigate }: {
             value={dateRange}
             onChange={(value) => { setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null); setPage(1); }}
           />
+          {orderStatusFilter !== "all" ? (
+            <Tag
+              closable
+              closeIcon={<span aria-label="清除订单状态筛选">×</span>}
+              onClose={() => { setOrderStatusFilter("all"); setPage(1); }}
+            >
+              订单状态：{orderStatusFilter === "IN_PROGRESS" ? "进行中" : ORDER_STATUS_LABEL[orderStatusFilter] ?? orderStatusFilter}
+            </Tag>
+          ) : null}
           <Select aria-label="游戏类型筛选" className="ui-filter-select" value={gameTypeFilter} options={gameTypeOptions} onChange={(value) => { setGameTypeFilter(value); setPage(1); }} />
           <Select aria-label="库存状态筛选" className="ui-filter-select" value={inventoryStatusFilter} options={inventoryStatusOptions} onChange={(value) => { setInventoryStatusFilter(value); setPage(1); }} />
           <Select

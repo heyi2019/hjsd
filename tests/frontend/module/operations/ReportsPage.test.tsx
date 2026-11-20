@@ -81,7 +81,7 @@ describe("ReportsPage：经营中心报表", () => {
     const oldRequest = new Promise<string>((resolve) => { finishOld = resolve; });
     const newRequest = new Promise<string>((resolve) => { finishNew = resolve; });
     const { result, rerender } = renderHook(({ period }) => useReport(
-      () => period === "old" ? oldRequest : newRequest,
+      () => period === "old" ? oldRequest : period === "new" ? newRequest : Promise.reject(new Error("报表加载失败")),
       [period],
     ), { initialProps: { period: "old" } });
     rerender({ period: "new" });
@@ -90,6 +90,9 @@ describe("ReportsPage：经营中心报表", () => {
     await act(async () => { finishOld("旧周期数据"); await oldRequest; });
     expect(result.current.data).toBe("新周期数据");
     expect(result.current.loading).toBe(false);
+    rerender({ period: "failed" });
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.data).toBeNull();
   });
 
   it("跳转传入本期日期后跨月仍自动滚期", async () => {
@@ -238,7 +241,8 @@ describe("ReportsPage：经营中心报表", () => {
     expect(await screen.findByText("利润")).toBeInTheDocument();
     expect(document.querySelectorAll(".ant-tabs-tabpane-active .ant-picker-input")).toHaveLength(2);
     await ui.click(screen.getByRole("button", { name: /订单总数/ }));
-    expect(onNavigate).toHaveBeenCalledWith("business", "ledger");
+    const period = currentReportPeriod();
+    expect(onNavigate).toHaveBeenCalledWith(`business/ledger?trade_date_from=${period.from}&trade_date_to=${period.to}`);
   });
 
   it("订单利润页内导出按钮按统计周期导出", async () => {
@@ -287,6 +291,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("经营损益");
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
+    expect(screen.getByText("按收支发生日期统计。")).toBeInTheDocument();
     expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
@@ -299,6 +304,7 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     renderLight(<ReportsPage />, { user: "admin" });
     await gotoTab("订单利润");
     expect(await screen.findByText("HS-2026-0010")).toBeInTheDocument();
+    expect(screen.getByText("按订单日期筛选，金额包含该订单全部收支。")).toBeInTheDocument();
     expect(screen.getAllByText("160.00").length).toBeGreaterThanOrEqual(1);
   });
 

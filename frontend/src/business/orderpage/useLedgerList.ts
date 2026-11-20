@@ -54,8 +54,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      // 导出必须与当前视图同口径：「我的订单」视图只导出我负责的单，不借导出绕过筛选拿全量。
-      downloadBlob(await ordersApi.exportCsv({ mine: mineOrders }), `订单台账-${today()}.csv`);
+      downloadBlob(await ordersApi.exportCsv(queryFilters), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -66,7 +65,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const exportLedgerXlsx = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportXlsx({ mine: mineOrders }), `订单台账-${today()}.xlsx`);
+      downloadBlob(await ordersApi.exportXlsx(queryFilters), `订单台账-${today()}.xlsx`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -272,6 +271,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     exportLedgerXlsx,
     orderTypeFilter,
     setOrderTypeFilter,
+    orderStatusFilter,
+    setOrderStatusFilter,
     businessModeFilter,
     setBusinessModeFilter,
     gameTypeFilter,

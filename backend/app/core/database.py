@@ -16,6 +16,7 @@ SQLite 通道已下线（2026-11-02）：生产与测试统一 PostgreSQL。原�
 from __future__ import annotations
 
 from collections.abc import Iterator
+from threading import RLock
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
@@ -37,6 +38,7 @@ def build_engine(url: str | None = None, *, echo: bool = False) -> Engine:
 
 _engine: Engine | None = None
 _session_factory: sessionmaker[Session] | None = None
+_engine_lock = RLock()
 
 
 def get_engine(url: str | None = None) -> Engine:
@@ -44,30 +46,33 @@ def get_engine(url: str | None = None) -> Engine:
     global _engine
     if url is not None:
         return build_engine(url)
-    if _engine is None:
-        _engine = build_engine()
-    return _engine
+    with _engine_lock:
+        if _engine is None:
+            _engine = build_engine()
+        return _engine
 
 
 def reset_engine(url: str | None = None) -> Engine:
     """重建 engine 并丢弃旧连接池（测试/迁移后使用）。"""
     global _engine, _session_factory
-    if _engine is not None:
-        _engine.dispose()
-    _engine = build_engine(url)
-    _session_factory = None
-    return _engine
+    with _engine_lock:
+        if _engine is not None:
+            _engine.dispose()
+        _engine = build_engine(url)
+        _session_factory = None
+        return _engine
 
 
 def get_session_factory(url: str | None = None) -> sessionmaker[Session]:
     global _session_factory
     if url is not None:
         return sessionmaker(bind=build_engine(url), autoflush=False, autocommit=False)
-    if _session_factory is None:
-        _session_factory = sessionmaker(
-            bind=get_engine(), autoflush=False, autocommit=False, future=True
-        )
-    return _session_factory
+    with _engine_lock:
+        if _session_factory is None:
+            _session_factory = sessionmaker(
+                bind=get_engine(), autoflush=False, autocommit=False, future=True
+            )
+        return _session_factory
 
 
 def get_db() -> Iterator[Session]:
@@ -91,10 +96,11 @@ def get_db() -> Iterator[Session]:
 
 def dispose_engine() -> None:
     global _engine, _session_factory
-    if _engine is not None:
-        _engine.dispose()
-    _engine = None
-    _session_factory = None
+    with _engine_lock:
+        if _engine is not None:
+            _engine.dispose()
+        _engine = None
+        _session_factory = None
 
 
 def describe_engine() -> dict[str, str]:

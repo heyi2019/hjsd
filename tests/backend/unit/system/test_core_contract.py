@@ -430,15 +430,44 @@ class TestDatabaseLifecycle:
             for engine in created_engines:
                 engine.dispose()
 
-    def test_session_factory_defaults_to_engine_singleton(self, tmp_path, monkeypatch):
-        engine = create_engine("postgresql+psycopg://u:p@h/db")
+    def test_session_factory_defaults_to_engine_singleton(self, monkeypatch):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier, Lock
+        from time import sleep
+
+        created_engines = []
+        created_lock = Lock()
+
+        def slow_build_engine(url=None):
+            engine = create_engine("postgresql+psycopg://u:p@h/db")
+            with created_lock:
+                created_engines.append(engine)
+            sleep(0.05)
+            return engine
+
+        monkeypatch.setattr(database, "build_engine", slow_build_engine)
+        monkeypatch.setattr(database, "_engine", None)
+        monkeypatch.setattr(database, "_session_factory", None)
         try:
-            monkeypatch.setattr(database, "get_engine", lambda url=None: engine)
-            database._session_factory = None
-            factory = database.get_session_factory()
-            assert factory.kw["bind"] is engine
+            for get_instance in (database.get_engine, database.get_session_factory):
+                database._engine = None
+                database._session_factory = None
+                previous_count = len(created_engines)
+                start = Barrier(12)
+
+                def get_concurrently(_):
+                    start.wait()
+                    return get_instance()
+
+                with ThreadPoolExecutor(max_workers=12) as pool:
+                    instances = list(pool.map(get_concurrently, range(12)))
+                assert len(created_engines) - previous_count == 1
+                assert len({id(instance) for instance in instances}) == 1
+                if get_instance == database.get_session_factory:
+                    assert instances[0].kw["bind"] is created_engines[-1]
         finally:
-            engine.dispose()
+            for engine in created_engines:
+                engine.dispose()
 
     def test_get_db_commits_and_rolls_back(self, v1_engine, monkeypatch):
         factory = sessionmaker(

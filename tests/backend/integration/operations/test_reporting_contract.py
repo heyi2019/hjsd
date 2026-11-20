@@ -196,6 +196,39 @@ def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db
 
 # --------------------------------------------------------------------- R3 提成
 class TestR3Commission:
+    def test_commission_limits_profit_calculation_to_order_date_range(self, seeded_db, monkeypatch):
+        import app.operations.r3_commission as commission_service
+
+        orders = []
+        for trade_day in (EARLY, D, date(2026, 11, 4)):
+            order = _order(seeded_db, trade_date=trade_day)
+            post_event(seeded_db, order.id, event_type="BUY", amount="1000.00", occurred_on=trade_day, actor="pytest")
+            post_event(seeded_db, order.id, event_type="SELL", amount="1300.00", occurred_on=trade_day, actor="pytest")
+            policy_allocations.set_allocations(seeded_db, order.id, items=[
+                {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+                {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+            ], actor="pytest")
+            orders.append(order)
+
+        user = CurrentUser.build(id=7, username="seeduser7", roles=["OPERATOR"], owner_scope="SELF")
+        calculate = commission_service.cashflow_totals_by_order
+        calculated_ids = []
+
+        def track_calculation(session, *, order_ids):
+            calculated_ids.append(set(order_ids))
+            return calculate(session, order_ids=order_ids)
+
+        monkeypatch.setattr(commission_service, "cashflow_totals_by_order", track_calculation)
+        result = r3_commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
+        assert calculated_ids == [{orders[1].id}]
+        assert result["total"] == {"order_count": 1, "profit_base": Decimal("150.00")}
+        assert {item["user_id"] for item in _commission_details(result)} == {7}
+
+        calculated_ids.clear()
+        all_time = r3_commission_reconciliation(seeded_db, user=user, mine=True)
+        assert calculated_ids == [{order.id for order in orders}]
+        assert all_time["total"] == {"order_count": 3, "profit_base": Decimal("450.00")}
+
     def test_my_commission_only_returns_the_logged_in_users_allocations(self, seeded_db):
         order = create_order(
             seeded_db,

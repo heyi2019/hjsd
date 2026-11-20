@@ -69,6 +69,10 @@ def r3_commission_reconciliation(
             OrderStatus.ACTIVE.value,
         ]))
     )
+    if from_date is not None:
+        stmt = stmt.where(Order.trade_date >= from_date)
+    if to_date is not None:
+        stmt = stmt.where(Order.trade_date <= to_date)
     if personal_scope:
         # 只允许查看本人有分润的订单；先取整单分配行统一处理尾差，输出时仍仅保留本人。
         stmt = stmt.where(Order.id.in_(
@@ -127,10 +131,6 @@ def r3_commission_reconciliation(
 
     order_grouped: dict[int, dict[str, Any]] = {}
     for allocation, order in rows:
-        if from_date and order.trade_date < from_date:
-            continue
-        if to_date and order.trade_date > to_date:
-            continue
         account = accounts.get(order.account_id)
         # 分润支持「按比例」与「按金额」两种录入口径：填了金额就直接作为应付基数，
         # 否则按 利润 × 比例 计算。二者由录入校验保证不会同时出现。

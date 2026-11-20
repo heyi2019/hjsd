@@ -158,17 +158,30 @@ fi
 # 但发布通道不能改写用户、配置和历史业务记录。
 # 用户与库名与 compose 的 db 服务同源；宿主未 export 时按 compose 默认值回落。
 db_snapshot() {
-  docker compose exec -T db psql \
+  local policy_table policies state tables dbversion options sale fields users alembic
+  policy_table="$(docker compose exec -T db psql \
+    -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
+    "select coalesce(to_regclass('public.policy_definitions')::text, 'NONE')" </dev/null)" || return 1
+  if [ "$policy_table" = "NONE" ]; then
+    policies="NONE"
+  else
+    policies="$(docker compose exec -T db psql \
+      -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
+      "select count(*) from policy_definitions" </dev/null)" || return 1
+  fi
+  state="$(docker compose exec -T db psql \
     -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" -tAc \
     "select
        (select count(*) from information_schema.tables where table_schema=current_schema()),
        coalesce((select to_regclass('public.db_version')::text), 'NONE'),
-       (select count(*) from policy_definitions),
        (select count(*) from option_sets),
        (select count(*) from order_form_fields where order_type_code='SALE'),
        (select count(*) from order_form_fields),
        (select count(*) from users),
-       (select version_num from alembic_version)"
+       (select version_num from alembic_version)" </dev/null)" || return 1
+  IFS='|' read -r tables dbversion options sale fields users alembic <<< "$state"
+  printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
+    "$tables" "$dbversion" "$policies" "$options" "$sale" "$fields" "$users" "$alembic"
 }
 
 # psql 返回异常（连接失败 / 列数不符 / 空值）时立即中止，不能让下面的算术比较
@@ -176,7 +189,7 @@ db_snapshot() {
 validate_state() {
   local label="$1" state="$2" tables _dbver policies options sale fields users _alembic
   IFS='|' read -r tables _dbver policies options sale fields users _alembic <<< "$state"
-  if ! [[ "$tables" =~ ^[0-9]+$ && "$policies" =~ ^[0-9]+$ && "$options" =~ ^[0-9]+$ \
+  if ! [[ "$tables" =~ ^[0-9]+$ && ( "$policies" =~ ^[0-9]+$ || "$policies" = "NONE" ) && "$options" =~ ^[0-9]+$ \
           && "$sale" =~ ^[0-9]+$ && "$fields" =~ ^[0-9]+$ && "$users" =~ ^[0-9]+$ ]]; then
     printf '✗ %s库状态采集格式异常，已中止发布：%q\n' "$label" "$state" >&2
     exit 1
@@ -204,14 +217,18 @@ if ! docker compose up -d; then
   docker compose up -d
 fi
 
-if [ -n "${ADMIN_PASSWORD:-}" ]; then
-  echo "==> 初始化管理员账号"
-  docker compose exec -T -e ADMIN_PASSWORD="$ADMIN_PASSWORD" backend \
-    python scripts/create_admin.py
+if [ "$pre_users" = "0" ]; then
+  if [ -n "${ADMIN_PASSWORD:-}" ]; then
+    echo "==> 初始化管理员账号"
+    docker compose exec -T -e ADMIN_PASSWORD backend \
+      python scripts/create_admin.py </dev/null
+  else
+    echo "⚠ 未设置 ADMIN_PASSWORD，服务已启动但尚未初始化管理员账号"
+    echo "  首次部署前请执行：export ADMIN_PASSWORD='至少 8 位强密码'"
+    echo "  然后重新运行 ./scripts/deploy.sh"
+  fi
 else
-  echo "⚠ 未设置 ADMIN_PASSWORD，服务已启动但尚未初始化管理员账号"
-  echo "  首次部署前请执行：export ADMIN_PASSWORD='至少 8 位强密码'"
-  echo "  然后重新运行 ./scripts/deploy.sh"
+  echo "==> 已有用户，保留现有管理员密码"
 fi
 
 echo "==> 服务状态"
@@ -259,7 +276,16 @@ assert_unchanged "db_version 表" "$pre_dbversion" "$post_dbversion"
 assert_unchanged "policy_definitions 行数" "$pre_policies" "$post_policies"
 assert_unchanged "option_sets 行数" "$pre_optionsets" "$post_optionsets"
 assert_unchanged "历史 SALE 行数" "$pre_sale_rows" "$post_sale_rows"
-assert_unchanged "用户行数" "$pre_users" "$post_users"
+if [ "$pre_users" = "0" ] && [ -n "${ADMIN_PASSWORD:-}" ]; then
+  if [ "$post_users" = "1" ]; then
+    echo "  ✓ 空库已创建首个管理员：0 → 1"
+  else
+    echo "  ✗ 空库初始化管理员后用户数异常：${post_users}（预期 1）" >&2
+    invariant_fail=1
+  fi
+else
+  assert_unchanged "用户行数" "$pre_users" "$post_users"
+fi
 
 if [ "$post_fields" -lt "$pre_fields" ]; then
   echo "  ✗ 字段总数倒退：${pre_fields} → ${post_fields}" >&2
@@ -273,7 +299,7 @@ if [ "$invariant_fail" -ne 0 ]; then
   exit 1
 fi
 
-# 部署前备份与正式库同处 erp_db 卷，卷丢失会一起没；异地留存必须在另一台机器上做。
+# 备份存于 ECS 宿主目录，与数据库卷分离；异地留存仍须在另一台机器上完成。
 echo "==> 备份提醒（本次已做部署前快照，日常快照需另挂 cron）"
 echo "  ECS: crontab -e → 20 3 * * * /bin/bash $(pwd)/scripts/backup_daily.sh"
 echo "  本机: bash deploy/scripts/pull_backup.sh --host root@<ECS_IP>"

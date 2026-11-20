@@ -45,6 +45,7 @@ jobs:
       ECS_SSH_PRIVATE_KEY: ${{ secrets.ECS_SSH_PRIVATE_KEY }}
       ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
       RESET_DATABASE: ${{ inputs.reset_database || 'false' }}
+      WAIT_FOR_GATES: ${{ inputs.wait_for_gates || 'false' }}
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
 
@@ -82,6 +83,12 @@ jobs:
           echo "gha cache env: cache_url=${ACTIONS_CACHE_URL:+set} results_url=${ACTIONS_RESULTS_URL:+set} runtime_token=${ACTIONS_RUNTIME_TOKEN:+set}"
           VERSION="$(tr -d '\r\n' < VERSION)"
           [[ -n "$VERSION" ]] || { echo 'Unable to read project VERSION' >&2; exit 1; }
+          if [[ "$RESET_DATABASE" == "true" ]]; then
+            [[ "$VERSION" == "1.0.0" && "$WAIT_FOR_GATES" == "true" ]] || {
+              echo '数据库重建仅允许 V1.0.0 且必须等待发布门禁' >&2
+              exit 1
+            }
+          fi
           echo "APP_VERSION=$VERSION" >> "$GITHUB_ENV"
 
           # 前后端镜像互不依赖，并行构建；后续打包、上传与 ECS 校验口径不变。
@@ -266,10 +273,9 @@ jobs:
           cd /opt/heijin/deploy
 
           if [ "$RESET_DATABASE" = "true" ]; then
-            echo "==> 重建 PostgreSQL 数据卷（仅限本次手动确认的全量置换）"
-            docker compose down -v
-            docker compose up -d db
-            docker compose run --rm backend alembic upgrade head
+            echo "==> 本次经确认重建 PostgreSQL 数据库（保留其他数据卷）"
+            RESET_DATABASE=true APP_VERSION="$APP_VERSION" bash scripts/reset_database.sh </dev/null
+            docker compose run --rm -T backend alembic upgrade head </dev/null
           fi
 
           # 持久化发布版本：deploy.sh 只在本次进程内覆盖 APP_VERSION，.env 若仍写旧 tag，
@@ -284,7 +290,7 @@ jobs:
           # deploy.sh 内含发布前后的只读库状态不变量校验，任一校验失败即非零退出，
           # CI 判红，不会静默上线。B4（售出表单三作用域补齐）不在 deploy.sh 内自动执行：
           # 已有库升级须在 ECS 现场按当期执行单手动跑 backend/scripts/split_sale_form_scopes.py。
-          ERP_SKIP_BUILD=1 APP_VERSION="$APP_VERSION" bash scripts/deploy.sh
+          ERP_SKIP_BUILD=1 APP_VERSION="$APP_VERSION" bash scripts/deploy.sh </dev/null
           curl -fsS http://127.0.0.1/api/health
           REMOTE
 

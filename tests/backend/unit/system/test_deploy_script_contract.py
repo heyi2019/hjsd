@@ -7,6 +7,7 @@ import stat
 import subprocess
 from pathlib import Path
 import _repo  # 仓库根解析：向上找 pytest.ini，避免写死 parents[N]
+import pytest
 
 
 PROJECT_ROOT = _repo.REPO_ROOT
@@ -21,6 +22,7 @@ def _release_tree(
     dump_exit: int = 0,
     admin_password: str | None = None,
     partial_schema: bool = False,
+    empty_users: bool = False,
 ) -> tuple[Path, Path]:
     """创建隔离发布目录；仅替换 Docker 与 curl 这两个外部边界。"""
     deploy_dir = tmp_path / "deploy"
@@ -44,13 +46,24 @@ def _release_tree(
     docker.write_text(
         "#!/usr/bin/env bash\n"
         "set -uo pipefail\n"
+        'if [ -n "${FAKE_DOCKER_ARGUMENTS:-}" ]; then printf "%s\\n" "$@" >> "$FAKE_DOCKER_ARGUMENTS"; fi\n'
         'args="$*"\n'
         'case "$args" in\n'
         '  *"ps --status running --services"*) printf "db\\nbackend\\n"; exit 0 ;;\n'
         '  *"ps -q"*) printf "fakecid0123456789\\n"; exit 0 ;;\n'
-        # schema_probe 需要 4 列；db_snapshot 需要 8 列状态。
-        '  *"from policy_definitions"*) printf "41|NONE|0|63|13|220|1|0001\\n"; exit 0 ;;\n'
         f'  *"public.users"*) printf "{schema_probe}\\n"; exit 0 ;;\n'
+        '  *"to_regclass"*"public.policy_definitions"*) printf "NONE\\n"; exit 0 ;;\n'
+        # schema_probe 需要 4 列；db_snapshot 单独查询旧策略表后读取 7 列状态。
+        + (
+            '  *"from option_sets"*) if [ -f "$FAKE_ADMIN_FILE" ]; then '
+            'printf "41|NONE|63|13|220|1|0001\\n"; else '
+            'printf "41|NONE|63|13|220|0|0001\\n"; fi; exit 0 ;;\n'
+            '  *"create_admin.py"*) touch "$FAKE_ADMIN_FILE"; exit 0 ;;\n'
+            if empty_users else
+            '  *"from option_sets"*) printf "41|NONE|63|13|220|1|0001\\n"; exit 0 ;;\n'
+        )
+        +
+        '  *"create_admin.py"*) if [ -n "${FAKE_ADMIN_FILE:-}" ]; then touch "$FAKE_ADMIN_FILE"; fi; exit 0 ;;\n'
         "  *SALEREC*) printf '28|28|21\\n'; exit 0 ;;\n"
         "  *psql*)\n"
         "    printf '1\\n'\n"
@@ -130,14 +143,263 @@ def test_deploy_exits_nonzero_when_post_start_health_check_fails(tmp_path):
     assert result.returncode != 0
 
 
-def test_deploy_uses_admin_password_from_deploy_env_file(tmp_path):
-    """管理员密码写入部署环境文件后，首次发布必须实际执行初始化。"""
-    script, fake_bin = _release_tree(tmp_path, admin_password="admin123456")
+def test_empty_database_deployment_can_create_first_administrator(tmp_path):
+    """空库创建第一个管理员后，发布不能错误地判定用户数不变量失败。"""
+    script, fake_bin = _release_tree(tmp_path, admin_password="admin123456", empty_users=True)
+    marker = tmp_path / "admin-created"
+
+    result = _run(script, fake_bin, extra_env={"FAKE_ADMIN_FILE": str(marker)})
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert marker.is_file()
+
+
+def test_admin_password_is_not_exposed_in_docker_command_arguments(tmp_path):
+    """创建管理员时密码随环境传入，不暴露在 Docker 命令参数中。"""
+    password = "test-initial-password"
+    script, fake_bin = _release_tree(tmp_path, admin_password=password, empty_users=True)
+    marker = tmp_path / "admin-created"
+    arguments = tmp_path / "docker-arguments"
+
+    result = _run(script, fake_bin, extra_env={"FAKE_ADMIN_FILE": str(marker), "FAKE_DOCKER_ARGUMENTS": str(arguments)})
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert marker.is_file()
+    assert password not in arguments.read_text(encoding="utf-8")
+
+
+def test_existing_users_do_not_have_their_admin_password_reset_on_deploy(tmp_path):
+    """发布不应把已有管理员密码重置为服务器上的初始密码。"""
+    script, fake_bin = _release_tree(tmp_path, admin_password="test-initial-password")
+    marker = tmp_path / "admin-reset"
+
+    result = _run(script, fake_bin, extra_env={"FAKE_ADMIN_FILE": str(marker)})
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not marker.exists()
+
+
+def test_deploy_accepts_current_schema_without_legacy_policy_table(tmp_path):
+    """当前 0001 不含旧策略表，部署不应查询不存在的表而失败。"""
+    script, fake_bin = _release_tree(tmp_path)
+    docker = fake_bin / "docker"
+    contents = docker.read_text(encoding="utf-8")
+    contents = contents.replace(
+        'case "$args" in\n',
+        'case "$args" in\n  *"from policy_definitions"*) echo "relation does not exist" >&2; exit 1 ;;\n',
+        1,
+    )
+    docker.write_text(contents, encoding="utf-8")
 
     result = _run(script, fake_bin)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "未设置 ADMIN_PASSWORD" not in result.stdout
+
+
+def _reset_tree(tmp_path, *, dump_exit=0, admin_password="test-admin-secret"):
+    """模拟云端 Docker 边界，真实执行备份及数据库重建脚本。"""
+    deploy_script, fake_bin = _release_tree(tmp_path, dump_exit=dump_exit, admin_password=admin_password)
+    docker = fake_bin / "docker"
+    contents = docker.read_text(encoding="utf-8")
+    contents = contents.replace(
+        'case "$args" in\n',
+        'case "$args" in\n'
+        '  *"down -v"*) rm -f "$FAKE_ATTACHMENT"; exit 0 ;;\n'
+        '  *"dropdb"*) '
+        'find "$FAKE_BACKUP_ROOT" -name "*.dump" | grep -q . || exit 41; '
+        'rm -f "$FAKE_BUSINESS_DATA"; exit 0 ;;\n',
+        1,
+    )
+    docker.write_text(contents, encoding="utf-8")
+    business_data = tmp_path / "business-data"
+    attachment = tmp_path / "attachment"
+    business_data.write_text("old order", encoding="utf-8")
+    attachment.write_text("keep attachment", encoding="utf-8")
+    env = {
+        **os.environ,
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "APP_VERSION": "1.0.0",
+        "RESET_DATABASE": "true",
+        "FAKE_BACKUP_ROOT": str(tmp_path / "backups"),
+        "FAKE_BUSINESS_DATA": str(business_data),
+        "FAKE_ATTACHMENT": str(attachment),
+    }
+    env.pop("ADMIN_PASSWORD", None)
+    return deploy_script.parent / "reset_database.sh", env, business_data, attachment
+
+
+def test_database_reset_backs_up_before_clearing_and_keeps_other_volumes(tmp_path):
+    """重建前先生成备份，只替换数据库；重复执行不能再清库。"""
+    script, env, business_data, attachment = _reset_tree(tmp_path)
+    run = lambda: subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True)
+
+    result = run()
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not business_data.exists()
+    assert attachment.read_text(encoding="utf-8") == "keep attachment"
+    assert len(list((tmp_path / "backups").rglob("*.dump"))) == 1
+    business_data.write_text("new order", encoding="utf-8")
+    second = run()
+    assert second.returncode != 0
+    assert business_data.read_text(encoding="utf-8") == "new order"
+
+
+def test_database_reset_does_not_clear_when_backup_fails(tmp_path):
+    script, env, business_data, attachment = _reset_tree(tmp_path, dump_exit=1)
+
+    result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True)
+
+    assert result.returncode != 0
+    assert "备份失败" in result.stdout + result.stderr
+    assert business_data.read_text(encoding="utf-8") == "old order"
+    assert attachment.read_text(encoding="utf-8") == "keep attachment"
+
+
+def test_database_reset_requires_admin_before_clearing(tmp_path):
+    script, env, business_data, attachment = _reset_tree(tmp_path, admin_password=None)
+
+    result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True)
+
+    assert result.returncode != 0
+    assert "ADMIN_PASSWORD" in result.stdout + result.stderr
+    assert business_data.read_text(encoding="utf-8") == "old order"
+    assert attachment.read_text(encoding="utf-8") == "keep attachment"
+    assert not list((tmp_path / "backups").rglob("*.dump"))
+
+
+def test_database_reset_is_not_available_to_other_versions(tmp_path):
+    script, env, business_data, attachment = _reset_tree(tmp_path)
+    env["APP_VERSION"] = "1.0.1"
+
+    result = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True)
+
+    assert result.returncode != 0
+    assert business_data.read_text(encoding="utf-8") == "old order"
+    assert attachment.read_text(encoding="utf-8") == "keep attachment"
+    assert not list((tmp_path / "backups").rglob("*.dump"))
+
+
+def test_only_explicit_v1_release_request_enables_database_reset(tmp_path):
+    """普通发布不清库；只有指定版本和明确的重建标记才选择重建。"""
+    import sys
+
+    scripts = tmp_path / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    helper = scripts / "release_reset_requested.py"
+    source = PROJECT_ROOT / "scripts" / "ops" / helper.name
+    if source.exists():
+        shutil.copy2(source, helper)
+
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("commit", "--allow-empty", "-qm", "test: baseline")
+    base = git("rev-parse", "HEAD")
+    git("commit", "--allow-empty", "-qm", "release: v1.0.0", "-m", "Reset-Production-Database: empty")
+    run = lambda base_sha, version: subprocess.run(
+        [sys.executable, str(helper), base_sha, "HEAD", version], cwd=tmp_path, capture_output=True, text=True,
+    )
+
+    selected = run(base, "1.0.0")
+    assert selected.returncode == 0, selected.stderr
+    assert selected.stdout.strip() == "true"
+    wrong_version = run(base, "1.0.1")
+    assert wrong_version.returncode != 0
+    assert not wrong_version.stdout.strip()
+    current = git("rev-parse", "HEAD")
+    git("commit", "--allow-empty", "-qm", "fix: ordinary release")
+    ordinary = run(current, "1.0.1")
+    assert ordinary.returncode == 0, ordinary.stderr
+    assert ordinary.stdout.strip() == "false"
+    missing_v1_marker = run(current, "1.0.0")
+    assert missing_v1_marker.returncode != 0
+    assert not missing_v1_marker.stdout.strip()
+    current = git("rev-parse", "HEAD")
+    git("commit", "--allow-empty", "-qm", "release: invalid", "-m", "Reset-Production-Database: unexpected")
+    invalid = run(current, "1.0.0")
+    assert invalid.returncode != 0
+    assert not invalid.stdout.strip()
+
+
+@pytest.mark.parametrize(
+    ("version", "reset_marker", "expected"),
+    [("1.0.0", "\nReset-Production-Database: empty", "true"), ("1.0.1", "", "false")],
+)
+def test_release_workflow_dispatches_the_requested_database_mode(tmp_path, version, reset_marker, expected):
+    """隔离 Git 仓库中，V1 重建走全量门禁，普通发布不重建。"""
+    import json
+    import textwrap
+
+    repo = tmp_path / "repo"
+    remote = tmp_path / "remote.git"
+    fake_bin = tmp_path / "bin"
+    repo.mkdir()
+    fake_bin.mkdir()
+    scripts = repo / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    for name in ("auto_release.sh", "bump_version.sh", "release_reset_requested.py"):
+        source = PROJECT_ROOT / "scripts" / "ops" / name
+        if source.exists():
+            shutil.copy2(source, scripts / name)
+    (repo / "VERSION").write_text(f"{version}\n", encoding="utf-8")
+    notes = repo / "docs" / "版本管理.md"
+    notes.parent.mkdir()
+    notes.write_text(
+        f"# 版本管理\n\n## 版本发布记录\n\n### V{version}\n"
+        "**发布日期：** 待发布\n**发布时间：** 待发布\n**发布状态：** 待发布\n"
+        "#### 本次更新内容\n- 初始版本\n", encoding="utf-8",
+    )
+
+    def git(*args, cwd=repo):
+        return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.name", "Version Test")
+    git("config", "user.email", "version-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    git("config", "core.hooksPath", "/dev/null")
+    git("add", ".")
+    git("commit", "-qm", "test: baseline")
+    base = git("rev-parse", "HEAD")
+    git("init", "--bare", "-q", str(remote), cwd=tmp_path)
+    git("remote", "add", "origin", str(remote))
+    git("push", "-q", "origin", "HEAD:main")
+    git("commit", "--allow-empty", "-qm", f"release: v{version}", "-m",
+        f"Release-Version: {version}{reset_marker}")
+    head = git("rev-parse", "HEAD")
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        '#!/usr/bin/env bash\nif [[ "$*" == *"--input -"* ]]; then '
+        'jq -c . >> "$FAKE_GH_REQUESTS"; fi\n', encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "main-ci-cd.yml").read_text(encoding="utf-8")
+    step = workflow.split("      - name: Bump version and summarize changes\n", 1)[1]
+    commands = textwrap.dedent(step.split("        run: |\n", 1)[1].split("\n  wait-and-deploy:", 1)[0])
+    requests = tmp_path / "requests.jsonl"
+    env = {
+        **os.environ, "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "BASE_SHA": base, "HEAD_SHA": head, "RUNNER_TEMP": str(tmp_path),
+        "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"), "GITHUB_OUTPUT": str(tmp_path / "output"),
+        "REPO": "local/test", "FAKE_GH_REQUESTS": str(requests),
+    }
+
+    result = subprocess.run(["bash", "-c", commands], cwd=repo, env=env, capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payloads = [json.loads(line) for line in requests.read_text(encoding="utf-8").splitlines()]
+    deploy = next(payload for payload in payloads if "release_sha" in payload["inputs"])
+    assert deploy["inputs"]["wait_for_gates"] == "true"
+    assert deploy["inputs"]["reset_database"] == expected
+    gates = [payload for payload in payloads if "changed_paths" in payload["inputs"]]
+    assert len(gates) == 2
+    assert all(payload["inputs"]["full_suite"] == expected for payload in gates)
 
 
 def test_explicit_app_version_overrides_deploy_env_file(tmp_path):

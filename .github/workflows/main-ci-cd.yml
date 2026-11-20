@@ -46,6 +46,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           current_subject="$(git log -1 --format=%s)"
+          reset_database="false"
           if [[ "$current_subject" == chore\(release\):* ]]; then
             version="$(tr -d '\r\n' < VERSION)"
             echo "本提交已完成自动发版，跳过重复升号：V${version}"
@@ -56,8 +57,9 @@ jobs:
               echo "## Automatic release"
               cat "$summary_file"
             } >> "$GITHUB_STEP_SUMMARY"
-            git add VERSION docs/版本管理.md
             version="$(tr -d '\r\n' < VERSION)"
+            reset_database="$(python3 scripts/ops/release_reset_requested.py "$BASE_SHA" "$HEAD_SHA" "$version")"
+            git add VERSION docs/版本管理.md
             git commit -m "chore(release): v${version}"
             git push origin HEAD:main
           fi
@@ -83,9 +85,10 @@ jobs:
 
           gh api --method POST "repos/$REPO/actions/workflows/lint-gate.yml/dispatches" -f ref=main
           # 前端 / 后端按变更选测：路径集是「原始 push 范围」，天然不含自动发版改的版本文件。
+          # V1.0.0 重建生产库时必须跑前后端全量门禁，普通发布仍按范围选测。
           for wf in frontend-gate.yml backend-gate.yml; do
-            jq -n --arg ref main --arg paths "$changed_paths" \
-              '{ref:$ref, inputs:{changed_paths:$paths}}' \
+            jq -n --arg ref main --arg paths "$changed_paths" --arg full "$reset_database" \
+              '{ref:$ref, inputs:{changed_paths:$paths, full_suite:$full}}' \
               | gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" --input -
           done
 
@@ -93,8 +96,8 @@ jobs:
           # 提前跑完即可从发布关键路径上摘掉。deploy-production 内部仍要在「上传 ECS 之前」
           # 等三道 gate 全绿；门禁不过的包只留在 runner，不落 ECS。手动补发/回滚不传
           # wait_for_gates，行为完全不变。
-          jq -n --arg ref main --arg sha "$release_sha" \
-            '{ref:$ref, inputs:{release_sha:$sha, wait_for_gates:"true"}}' \
+          jq -n --arg ref main --arg sha "$release_sha" --arg reset "$reset_database" \
+            '{ref:$ref, inputs:{release_sha:$sha, wait_for_gates:"true", reset_database:$reset}}' \
             | gh api --method POST "repos/$REPO/actions/workflows/deploy-production.yml/dispatches" --input -
           echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] deploy-production dispatched alongside gates at sha $release_sha"
 

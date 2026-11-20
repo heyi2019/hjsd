@@ -79,16 +79,24 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     }
   }, [filters, page, pageSize, loadSequence]);
 
+  const wasActiveRef = useRef(false);
+  const previousInitialAgeRef = useRef(initialAgeGtDays);
   useEffect(() => {
-    if (active) void load();
+    if (!active) {
+      wasActiveRef.current = false;
+      return loadSequence.invalidate;
+    }
+    const reset = !wasActiveRef.current || previousInitialAgeRef.current !== initialAgeGtDays;
+    wasActiveRef.current = true;
+    previousInitialAgeRef.current = initialAgeGtDays;
+    if (reset && (page !== 1 || ageGtDays !== initialAgeGtDays)) {
+      setAgeGtDays(initialAgeGtDays);
+      setPage(1);
+      return loadSequence.invalidate;
+    }
+    void load();
     return loadSequence.invalidate;
-  }, [active, load, loadSequence, refreshKey]);
-
-  useEffect(() => {
-    if (!active) return;
-    setAgeGtDays(initialAgeGtDays);
-    setPage(1);
-  }, [active, initialAgeGtDays]);
+  }, [active, ageGtDays, initialAgeGtDays, load, loadSequence, page, refreshKey]);
 
   const countInventoryRows = useCallback((type?: string) => {
     if (type) return typeCounts[type] ?? 0;

@@ -382,6 +382,23 @@ describe("InventoryPanel：写入与长路径", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     expect(Object.keys(submit.mock.calls[0][0])).not.toContain("__field_config_ready_INVVOID");
   });
+  it("重新进入库存时先恢复第一页和默认库龄，再发一次请求", async () => {
+    function ListProbe({ active }: { active: boolean }) {
+      const list = useInventoryList({ active, initialAgeGtDays: 30 });
+      return <><button onClick={() => list.setAgeGtDays(7)}>选择库龄</button>
+        <button onClick={() => list.setPage(2)}>第二页</button></>;
+    }
+    const view = renderLight(<ListProbe active />, { user: "admin" });
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledWith(expect.objectContaining({ age_gt_days: 30, offset: 0 })));
+    await ui.click(screen.getByRole("button", { name: "选择库龄" }));
+    await ui.click(screen.getByRole("button", { name: "第二页" }));
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenLastCalledWith(expect.objectContaining({ age_gt_days: 7, offset: 10 })));
+    view.rerender(<ListProbe active={false} />);
+    vi.mocked(stocksApi.inventoryLedger).mockClear();
+    view.rerender(<ListProbe active />);
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledWith(expect.objectContaining({ age_gt_days: 30, offset: 0 })));
+    expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(1);
+  });
   it.each(["success", "failure"])("库存筛选切换后忽略较旧请求的%s结果", async (oldResult) => {
     let resolveOld!: (value: Awaited<ReturnType<typeof stocksApi.inventoryLedger>>) => void;
     let rejectOld!: (error: Error) => void;

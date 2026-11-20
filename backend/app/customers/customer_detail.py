@@ -37,27 +37,25 @@ def get_customer_activity_summary(
     }
     if not ids:
         return summary
-    active_order_ids_by_customer: dict[int, set[int]] = {
-        customer_id: set() for customer_id in ids
-    }
-    stmt = select(OrderCustomerRole, Order).join(
+    stmt = select(
+        OrderCustomerRole.customer_id,
+        func.array_agg(OrderCustomerRole.role.distinct()),
+        func.count(Order.id.distinct()).filter(
+            Order.status.in_((OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value))
+        ),
+        func.max(Order.created_at),
+    ).join(
         Order, Order.id == OrderCustomerRole.order_id
-    ).where(OrderCustomerRole.customer_id.in_(ids))
+    ).where(OrderCustomerRole.customer_id.in_(ids)).group_by(OrderCustomerRole.customer_id)
     scope = owner_scope_filter(Order.owner_id, user, session) if user is not None else None
     if scope is not None:
         stmt = stmt.where(scope)
-    rows = session.execute(stmt).all()
-    for role_row, order in rows:
-        item = summary[role_row.customer_id]
-        if role_row.role not in item["order_roles"]:
-            item["order_roles"].append(role_row.role)
-        if order.status in {OrderStatus.ACTIVE.value, OrderStatus.INSTALLMENT.value}:
-            active_order_ids_by_customer[role_row.customer_id].add(order.id)
-        if order.created_at and (
-            item["last_interaction_at"] is None
-            or order.created_at > item["last_interaction_at"]
-        ):
-            item["last_interaction_at"] = order.created_at
+    for customer_id, roles, active_count, created_at in session.execute(stmt).all():
+        summary[customer_id] = {
+            "order_roles": sorted(roles),
+            "active_order_count": int(active_count),
+            "last_interaction_at": created_at,
+        }
 
     event_stmt = select(OrderCustomerRole.customer_id, func.max(OrderEvent.created_at)).join(
         OrderEvent, OrderEvent.order_id == OrderCustomerRole.order_id
@@ -76,10 +74,6 @@ def get_customer_activity_summary(
             or created_at > summary[customer_id]["last_interaction_at"]
         ):
             summary[customer_id]["last_interaction_at"] = created_at
-    for item in summary.values():
-        item["order_roles"].sort()
-    for customer_id, order_ids in active_order_ids_by_customer.items():
-        summary[customer_id]["active_order_count"] = len(order_ids)
     return summary
 
 

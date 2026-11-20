@@ -130,9 +130,16 @@ class TestPartiesActivitySummary:
         customer = _customer(seeded_db)
         order = _order(seeded_db)
         order.created_at = datetime(2026, 1, 1)
+        another, completed = _order(seeded_db), _order(seeded_db)
+        another.created_at = completed.created_at = datetime(2026, 1, 1)
+        completed.status = "COMPLETED"
         seeded_db.add_all([
             OrderCustomerRole(order_id=order.id, customer_id=customer.id, role=role)
             for role in ("BUYER", "SELLER")
+        ])
+        seeded_db.add_all([
+            OrderCustomerRole(order_id=item.id, customer_id=customer.id, role="BUYER")
+            for item in (another, completed)
         ])
         for day in (2, 3, 4):
             seeded_db.add(OrderEvent(
@@ -142,10 +149,13 @@ class TestPartiesActivitySummary:
             ))
         seeded_db.flush()
         returned_rows = []
+        order_rows = []
 
         def record_rows(_conn, cursor, statement, _params, _context, _many):
             if "order_events" in statement.lower():
                 returned_rows.append(cursor.rowcount)
+            elif "order_customer_roles" in statement.lower():
+                order_rows.append(cursor.rowcount)
 
         connection = seeded_db.connection()
         event.listen(connection, "after_cursor_execute", record_rows)
@@ -156,8 +166,9 @@ class TestPartiesActivitySummary:
 
         assert result[customer.id]["last_interaction_at"] == datetime(2026, 1, 4)
         assert result[customer.id]["order_roles"] == ["BUYER", "SELLER"]
-        assert result[customer.id]["active_order_count"] == 1
+        assert result[customer.id]["active_order_count"] == 2
         assert returned_rows == [1]
+        assert order_rows == [1]
 
     def test_latest_event_respects_order_owner_scope(self, seeded_db):
         customer = _customer(seeded_db)

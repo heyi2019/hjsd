@@ -76,6 +76,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
   vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customersApi.options).mockResolvedValue(customers);
   vi.mocked(customersApi.page).mockImplementation(async (params) => {
     const items = await vi.mocked(customersApi.list)(params);
     return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
@@ -686,6 +687,7 @@ describe("CustomersPage：行内动作", () => {
     vi.clearAllMocks();
     seedOptionSets();
     vi.mocked(customersApi.list).mockResolvedValue(customers as unknown as never);
+    vi.mocked(customersApi.options).mockResolvedValue(customers.filter((item) => item.status === "ACTIVE"));
     vi.mocked(customersApi.page).mockImplementation(async (params) => {
       const items = await vi.mocked(customersApi.list)(params);
       return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
@@ -699,16 +701,12 @@ describe("CustomersPage：行内动作", () => {
 
   describe("CustomersPage：客户与合作方操作流", () => {
     it("合并弹窗重开后忽略上一次迟到的客户名单", async () => {
-      let finishFirst!: (value: Awaited<ReturnType<typeof customersApi.page>>) => void;
-      const first = new Promise<Awaited<ReturnType<typeof customersApi.page>>>((resolve) => { finishFirst = resolve; });
+      let finishFirst!: (value: Awaited<ReturnType<typeof customersApi.options>>) => void;
+      const first = new Promise<Awaited<ReturnType<typeof customersApi.options>>>((resolve) => { finishFirst = resolve; });
       let candidateRequests = 0;
-      vi.mocked(customersApi.page).mockImplementation(async (params) => {
-        if (params?.status === "ACTIVE" && params.limit === 500) {
-          candidateRequests += 1;
-          if (candidateRequests === 1) return first;
-          return pageResponse([{ ...customers[1], status: "ACTIVE" }]);
-        }
-        return pageResponse(customers);
+      vi.mocked(customersApi.options).mockImplementation(async () => {
+        candidateRequests += 1;
+        return candidateRequests === 1 ? first : [customers[1]];
       });
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
@@ -717,27 +715,19 @@ describe("CustomersPage：行内动作", () => {
       await ui.click(dialog.querySelector(".ant-modal-close") as Element);
       await ui.click(screen.getAllByRole("button", { name: /合并/ })[0]);
       await waitFor(() => expect(candidateRequests).toBe(2));
-      await act(async () => { finishFirst(pageResponse([{ ...customers[0], id: 3, customer_no: "CUS-0003", display_name: "旧名单" }])); await first; });
+      await act(async () => { finishFirst([{ ...customers[0], id: 3, customer_no: "CUS-0003", display_name: "旧名单" }]); await first; });
       const reopened = await screen.findByRole("dialog");
       await ui.click(reopened.querySelector(".ant-select-selector") as Element);
       expect(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
       expect(screen.queryByText("CUS-0003 旧名单", { selector: ".ant-select-item-option-content" })).not.toBeInTheDocument();
     });
-    it("合并客户可选择后续页的有效客户", async () => {
-      vi.mocked(customersApi.page).mockImplementation(async (params) => {
-        if (params?.status === "ACTIVE" && params?.limit === 500) {
-          return params.offset === 0
-            ? pageResponse([customers[0]], { total: 2, limit: 500, offset: 0 })
-            : pageResponse([customers[1]], { total: 2, limit: 500, offset: 1 });
-        }
-        return pageResponse(customers);
-      });
+    it("合并客户可按名称搜索候选", async () => {
+      vi.mocked(customersApi.options).mockImplementation(async (keyword) => keyword === "李四" ? [customers[1]] : []);
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
       await ui.click(screen.getAllByRole("button", { name: /合并/ })[0]);
       const modal = await screen.findByRole("dialog");
-      await waitFor(() => expect(customersApi.page).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 1 }));
-      await ui.click(modal.querySelector(".ant-select-selector") as HTMLElement);
+      await ui.type(within(modal).getByLabelText("目标客户（需为有效客户）"), "李四");
       expect(await screen.findByText("CUS-0002 李四", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
     });
     it("客户建档请求未完成时不能重复提交", async () => {
@@ -842,7 +832,7 @@ describe("CustomersPage：行内动作", () => {
       renderLight(<CustomersPage />, { user: "admin" });
       await screen.findByText("CUS-0001");
       await ui.click(screen.getAllByRole("button", { name: /合\s*并/ })[0]);
-      await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 }));
+      await waitFor(() => expect(vi.mocked(customersApi.options)).toHaveBeenCalledWith(""));
       const modal = await screen.findByRole("dialog");
       const selector = modal.querySelector(".ant-select-selector") as Element;
       await ui.click(selector);
@@ -947,6 +937,7 @@ describe("CustomersPage：权限门控与写操作", () => {
     vi.clearAllMocks();
     seedOptionSets();
     vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customersApi.options).mockResolvedValue(customers);
     vi.mocked(customersApi.page).mockImplementation(async (params) => {
       const items = await vi.mocked(customersApi.list)(params);
       return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });

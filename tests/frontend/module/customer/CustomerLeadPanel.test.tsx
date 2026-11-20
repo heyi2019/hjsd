@@ -42,7 +42,7 @@ beforeEach(() => {
   seedOrderFormFields();
   vi.mocked(leadsApi.page).mockResolvedValue(pageResponse(leads));
   vi.mocked(leadsApi.summary).mockResolvedValue({ total_count: 2, open_count: 1 });
-  vi.mocked(customersApi.page).mockResolvedValue(pageResponse(customers, { limit: 500 }));
+  vi.mocked(customersApi.options).mockResolvedValue(customers);
   vi.mocked(leadsApi.create).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.close).mockResolvedValue(leads[0]);
   vi.mocked(leadsApi.convert).mockResolvedValue(leads[0]);
@@ -76,23 +76,34 @@ describe("客户中心工具栏搜索", () => {
 });
 
 describe("CustomerLeadPanel：客户需求池", () => {
+  it("新增需求可通过后端搜索选择客户", async () => {
+    vi.mocked(customersApi.options).mockImplementation(async (keyword) => keyword === "后续客户"
+      ? [{ id: 2, customer_no: "C-LATER", display_name: "后续客户" }]
+      : []);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("客户"), "后续客户");
+    await ui.click(await screen.findByText("C-LATER · 后续客户", { selector: ".ant-select-item-option-content" }));
+    expect(within(modal).getByText("C-LATER · 后续客户", { selector: ".ant-select-selection-item" })).toBeInTheDocument();
+  });
   it("新增需求时立即打开表单并等待客户名单", async () => {
-    let finish!: (value: ReturnType<typeof pageResponse<Customer>>) => void;
-    const pending = new Promise<ReturnType<typeof pageResponse<Customer>>>((resolve) => { finish = resolve; });
-    vi.mocked(customersApi.page).mockReturnValueOnce(pending);
+    let finish!: (value: Customer[]) => void;
+    const pending = new Promise<Customer[]>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.options).mockReturnValueOnce(pending);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: "新增需求" }));
     const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
     expect(within(modal).getByRole("button", { name: "创建需求" })).toBeDisabled();
     await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("LEAD", true));
-    await act(async () => finish(pageResponse(customers, { limit: 500 })));
+    await act(async () => finish(customers));
     await waitFor(() => expect(within(modal).getByRole("button", { name: "创建需求" })).toBeEnabled());
   });
 
   it("关闭后重新打开需求表单时忽略旧名单请求", async () => {
     let fail!: (error: Error) => void;
-    const pending = new Promise<ReturnType<typeof pageResponse<Customer>>>((_resolve, reject) => { fail = reject; });
-    vi.mocked(customersApi.page).mockReturnValueOnce(pending);
+    const pending = new Promise<Customer[]>((_resolve, reject) => { fail = reject; });
+    vi.mocked(customersApi.options).mockReturnValueOnce(pending);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: "新增需求" }));
     const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
@@ -151,26 +162,11 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(leadsApi.create).toHaveBeenCalledTimes(1);
     await act(async () => { finish(leads[0]); await pending; });
   });
-  it("新增需求可选择后续页的有效客户", async () => {
-    vi.mocked(customersApi.page)
-      .mockResolvedValueOnce(pageResponse(customers, { total: 2, limit: 500, offset: 0 }))
-      .mockResolvedValueOnce(pageResponse([{ id: 2, customer_no: "C-LATER", display_name: "后续客户", status: "ACTIVE" }], { total: 2, limit: 500, offset: 1 }));
-    renderLight(<CustomerLeadPanel />, { user: "admin" });
-    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
-    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
-    await ui.click(within(modal).getByLabelText("客户").closest(".ant-form-item")!.querySelector(".ant-select-selector") as HTMLElement);
-    expect(await screen.findByText("C-LATER · 后续客户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
-    expect(customersApi.page).toHaveBeenLastCalledWith({ status: "ACTIVE", limit: 500, offset: 1 });
-  });
-
-  it("客户名单后续页加载失败时提示重试，不显示不完整名单", async () => {
-    vi.mocked(customersApi.page)
-      .mockResolvedValueOnce(pageResponse(customers, { total: 2, limit: 500, offset: 0 }))
-      .mockRejectedValueOnce(new Error("客户名单读取失败"));
+  it("客户搜索失败时提示错误", async () => {
+    vi.mocked(customersApi.options).mockRejectedValueOnce(new Error("客户名单读取失败"));
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await ui.click(await screen.findByRole("button", { name: "新增需求" }));
     expect(await screen.findByText(/客户名单读取失败/)).toBeVisible();
-    expect(screen.queryByRole("dialog", { name: "新增客户需求" })).toBeNull();
   });
   it("需求日期筛选失败隐藏旧数据，重试后恢复", async () => {
     const view = renderLight(<CustomerLeadPanel createdPeriod={{ from: "2026-10-01", to: "2026-10-31" }} />, { user: "admin" });
@@ -243,29 +239,30 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(await screen.findByText(/lead down/)).toBeInTheDocument();
   });
 
-  it("客户列表为空时允许打开新增但禁止提交", async () => {
-    vi.mocked(customersApi.page).mockResolvedValue(pageResponse([], { limit: 500 }));
+  it("客户列表为空时允许打开新增但要求选择客户", async () => {
+    vi.mocked(customersApi.options).mockResolvedValue([]);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     expect(await screen.findByText("需求总数")).toBeInTheDocument();
     const createButton = screen.getByRole("button", { name: /新增需求/ });
     expect(createButton).toBeEnabled();
     await ui.click(createButton);
     const modal = await screen.findByText("新增客户需求");
-    expect(within(modal.closest(".ant-modal-content") as HTMLElement).getByRole("button", { name: /创建需求/ })).toBeDisabled();
+    await ui.click(within(modal.closest(".ant-modal-content") as HTMLElement).getByRole("button", { name: /创建需求/ }));
+    expect(leadsApi.create).not.toHaveBeenCalled();
   });
 
   it("首屏不加载客户全集，点击新增时才加载客户选项", async () => {
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await screen.findByText("LD-1");
-    expect(customersApi.page).not.toHaveBeenCalled();
+    expect(customersApi.options).not.toHaveBeenCalled();
 
     await ui.click(screen.getByRole("button", { name: /新增需求/ }));
     await screen.findByText("新增客户需求");
-    expect(customersApi.page).toHaveBeenCalledWith({ status: "ACTIVE", limit: 500, offset: 0 });
+    expect(customersApi.options).toHaveBeenCalledWith("");
   });
 
   it("需求列表直接展示后端返回的客户名称", async () => {
-    vi.mocked(customersApi.page).mockResolvedValue(pageResponse([], { limit: 500 }));
+    vi.mocked(customersApi.options).mockResolvedValue([]);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     const row = (await screen.findByText("LD-1")).closest("tr")!;
     expect(within(row).getByText("张三")).toBeInTheDocument();

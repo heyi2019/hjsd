@@ -1,10 +1,11 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import type { PageResponse } from "./types/common";
 import type { Counterparty, Customer, CustomerDetail, CustomerSummary, DuplicateCandidate, Lead, LeadSummary } from "./types/customers";
 
 type CreatedDateFilter = { created_from?: string; created_to?: string };
 type CustomerFilterParams = CreatedDateFilter & { keyword?: string; status?: string; created_by?: string[]; mine_orders?: boolean; trade_date_from?: string; trade_date_to?: string };
 type CustomerListParams = CustomerFilterParams & { limit?: number; offset?: number; sort_desc?: boolean };
+export type CustomerOption = Pick<Customer, "id" | "customer_no" | "display_name">;
 
 const customerPage = (params?: CustomerListParams) =>
   api.get<PageResponse<Customer>>("/customers", {
@@ -13,6 +14,10 @@ const customerPage = (params?: CustomerListParams) =>
   }).then((r) => r.data);
 
 export const customersApi = {
+  options: (keyword = "", exact = false) => {
+    const config: CacheAwareRequestConfig = { params: { keyword, ...(exact ? { exact: true } : {}) }, ...(exact ? { refreshCache: true } : {}) };
+    return api.get<CustomerOption[]>("/customers/options", config).then((r) => r.data);
+  },
   summary: (params: CustomerFilterParams & { today_date: string }) =>
     api.get<CustomerSummary>("/customers/summary", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   /** 返回一个后端分页窗口，默认只请求当前列表页。 */

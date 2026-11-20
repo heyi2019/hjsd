@@ -56,6 +56,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     pageSize,
     renderContact,
     requestEdit,
+    scheduleMergeSearch,
     rows,
     summary,
     summaryLoading,
@@ -139,7 +140,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
           }}
         />
         <TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} />
-        <ExportButton permission="customer.read" aria-label="导出客户数据" loading={exporting} disabled={Boolean(error) || rows === null} onClick={() => void exportCustomers()} />
+        <ExportButton permission="customer.export" aria-label="导出客户数据" loading={exporting} disabled={Boolean(error) || rows === null} onClick={() => void exportCustomers()} />
       </Space>
       <StatRow
         items={[
@@ -196,6 +197,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       <CustomerMergeModal
         mergeTarget={mergeTarget}
         candidates={mergeCandidates}
+        onSearch={scheduleMergeSearch}
         mergeForm={mergeForm}
         error={actionError}
         pending={actionPending}

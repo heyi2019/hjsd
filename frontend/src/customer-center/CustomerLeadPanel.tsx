@@ -6,8 +6,9 @@ import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { leadsApi } from "../shared/api/customers.api";
-import type { Customer, Lead } from "../shared/api/types/customers";
+import { customersApi, leadsApi } from "../shared/api/customers.api";
+import type { CustomerOption } from "../shared/api/customers.api";
+import type { Lead } from "../shared/api/types/customers";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
@@ -15,7 +16,6 @@ import { CfgItem, CustomFieldSection, FieldConfigContext, FieldConfigScope, Fiel
 import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
 import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
-import { loadActiveCustomers } from "./loadActiveCustomers";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
@@ -36,7 +36,8 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [pageSize, setPageSize] = useState(10);
   const requestRef = useRef(0);
   const summaryRequestRef = useRef(0);
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { activeEmployees: employees } = useEmployeeOptions();
   const [createOpen, setCreateOpen] = useState(false);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
@@ -46,6 +47,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const write = useAsyncAction();
   const [customersLoading, setCustomersLoading] = useState(false);
   const customersRequest = useLatestRequest();
+  useEffect(() => () => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); }, []);
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [convertForm] = Form.useForm();
@@ -95,15 +97,11 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     return () => { summaryRequestRef.current += 1; };
   }, [active, loadSummary]);
 
-  const openCreate = async () => {
+  const searchCustomers = async (keyword: string) => {
     const request = customersRequest.start();
-    setError(null);
-    write.clearError();
-    setCustomers([]);
     setCustomersLoading(true);
-    setCreateOpen(true);
     try {
-      const items = await loadActiveCustomers();
+      const items = await customersApi.options(keyword);
       if (customersRequest.isCurrent(request)) setCustomers(items);
     } catch (err) {
       if (customersRequest.isCurrent(request)) {
@@ -115,8 +113,16 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     }
   };
 
+  const openCreate = () => {
+    setError(null);
+    write.clearError();
+    setCustomers([]);
+    setCreateOpen(true);
+    void searchCustomers("");
+  };
+
   const createLead = async (values: Record<string, unknown>) => {
-    if (!configReady || customersLoading || customers.length === 0) return;
+    if (!configReady || customersLoading) return;
     await write.run(async () => {
       await leadsApi.create({ customer_id: Number(values.customer_id), request_type: values.request_type as string, budget: values.budget as string, target: values.target as string, note: values.note as string, extra_values: values.form_extra, operator_user_ids: values.operator_user_ids as number[] | undefined });
       appMessage.success("客户需求已创建"); setCreateOpen(false); createForm.resetFields(); await load();
@@ -188,21 +194,21 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       title="新增客户需求"
       fieldCount={5}
       open={createOpen}
-      onCancel={() => { customersRequest.invalidate(); setCustomersLoading(false); write.clearError(); setCreateOpen(false); }}
+      onCancel={() => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); customersRequest.invalidate(); setCustomersLoading(false); write.clearError(); setCreateOpen(false); }}
       footer={null}
     >
       <InlineError error={write.error} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm scope="LEAD" form={createForm} onFinish={createLead}>
           <FieldConfigStatus scope="LEAD" ready={configReady} error={configError} retry={retryConfig} />
-          <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select loading={customersLoading} disabled={customersLoading} options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
+          <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select showSearch placeholder="输入客户编号、姓名或联系方式搜索" filterOption={false} loading={customersLoading} onSearch={(value) => { customersRequest.invalidate(); if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); customerSearchTimer.current = setTimeout(() => void searchCustomers(value), 300); }} options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
           <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select /></CfgItem>
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
           <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-create" />
-          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending} disabled={customersLoading || customers.length === 0 || !configReady}>创建需求</PermissionButton>
+          <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending} disabled={customersLoading || !configReady}>创建需求</PermissionButton>
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal> : null}

@@ -61,6 +61,14 @@ class DuplicateCandidate(BaseModel):
     matched_on: list[str]
 
 
+class CustomerOptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    customer_no: str
+    display_name: str
+
+
 class CustomerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

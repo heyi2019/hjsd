@@ -3,6 +3,7 @@ import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../business/ConfigurableField";
 import { customersApi } from "../shared/api/customers.api";
+import type { CustomerOption } from "../shared/api/customers.api";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import type { Customer, CustomerDetail } from "../shared/api/types/customers";
 import { normalizeError } from "../shared/api/client";
@@ -15,7 +16,6 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { collectExtras } from "./CustomersPage.fragments";
-import { loadActiveCustomers } from "./loadActiveCustomers";
 
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 export function useCustomerController({ active = true, focusId, orderFilter, createdPeriod }: { active?: boolean; focusId?: number; orderFilter?: { from?: string; to?: string }; createdPeriod?: { from: string; to: string } | null }) {
@@ -30,7 +30,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
-  const [mergeCandidates, setMergeCandidates] = useState<Customer[] | null>(null);
+  const [mergeCandidates, setMergeCandidates] = useState<CustomerOption[] | null>(null);
+  const mergeSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [detailData, setDetailData] = useState<CustomerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
@@ -50,6 +51,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const summaryRequestRef = useRef(0);
   const detailRequest = useLatestRequest();
   const candidatesRequest = useLatestRequest();
+  useEffect(() => () => { if (mergeSearchTimer.current) clearTimeout(mergeSearchTimer.current); }, []);
   const customerStatusOptions = useOptionSet("CUSTOMER_STATUS");
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -333,15 +335,11 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const requestEdit = (target: Customer) => { detailRequest.invalidate(); clearActionError(); setEditTarget(target); setDetailTarget(null); setDetailLoading(false); };
   // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
   // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
-  const cancelMerge = () => { candidatesRequest.invalidate(); clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
-  const requestMerge = async (target: Customer) => {
+  const cancelMerge = () => { if (mergeSearchTimer.current) clearTimeout(mergeSearchTimer.current); candidatesRequest.invalidate(); clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
+  const searchMergeCandidates = async (keyword: string) => {
     const request = candidatesRequest.start();
-    clearActionError();
-    mergeForm.resetFields();
-    setMergeTarget(target);
-    setMergeCandidates(null);
     try {
-      const candidates = await loadActiveCustomers();
+      const candidates = await customersApi.options(keyword);
       if (candidatesRequest.isCurrent(request)) setMergeCandidates(candidates);
     } catch (err) {
       if (candidatesRequest.isCurrent(request)) {
@@ -349,6 +347,18 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
         setMergeCandidates([]);
       }
     }
+  };
+  const requestMerge = (target: Customer) => {
+    clearActionError();
+    mergeForm.resetFields();
+    setMergeTarget(target);
+    setMergeCandidates(null);
+    void searchMergeCandidates("");
+  };
+  const scheduleMergeSearch = (keyword: string) => {
+    candidatesRequest.invalidate();
+    if (mergeSearchTimer.current) clearTimeout(mergeSearchTimer.current);
+    mergeSearchTimer.current = setTimeout(() => void searchMergeCandidates(keyword), 300);
   };
 
   return {
@@ -389,6 +399,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     renderContact,
     requestEdit,
     requestMerge,
+    scheduleMergeSearch,
     rows,
     summary,
     summaryLoading,

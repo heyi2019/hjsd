@@ -49,6 +49,7 @@ def _customer_list_stmt(
 
 def list_customers(
     session: Session, *, keyword: str | None = None, status: str | None = None,
+    exact_name: str | None = None,
     created_by: Sequence[str] | None = None, user: CurrentUser | None = None,
     limit: int | None = None, offset: int = 0, mine_orders: bool = False, sort_desc: bool = False,
     trade_date_from: date | None = None, trade_date_to: date | None = None,
@@ -59,6 +60,8 @@ def list_customers(
         mine_orders=mine_orders, trade_date_from=trade_date_from, trade_date_to=trade_date_to,
         created_from=created_from, created_to=created_to,
     )
+    if exact_name is not None:
+        stmt = stmt.where(Customer.display_name == exact_name)
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(Customer.created_at.desc() if sort_desc else Customer.created_at.asc(), Customer.id.desc() if sort_desc else Customer.id.asc())).all())

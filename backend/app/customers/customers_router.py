@@ -12,10 +12,12 @@ from sqlalchemy.orm import Session
 from app.core.actor import actor_name as _actor
 from app.shared.audit import record_audit
 from app.core.database import get_db
-from app.core.errors import Validation
+from app.core.errors import RateLimited, Validation
+from app.core.ratelimit import RateLimiter
 from app.core.schemas import PageOut
 from app.core.security import (
     PERM_CUSTOMER_CREATE,
+    PERM_CUSTOMER_EXPORT,
     PERM_CUSTOMER_MERGE,
     PERM_CUSTOMER_READ,
     PERM_CUSTOMER_UPDATE,
@@ -51,6 +53,13 @@ read_customers = require_permissions(PERM_CUSTOMER_READ)
 create_customers = require_permissions(PERM_CUSTOMER_CREATE)
 update_customers = require_permissions(PERM_CUSTOMER_UPDATE)
 merge_customers = require_permissions(PERM_CUSTOMER_MERGE)
+export_customers = require_permissions(PERM_CUSTOMER_READ, PERM_CUSTOMER_EXPORT)
+customer_access_limiter = RateLimiter()
+
+
+def _limit_customer_access(user: CurrentUser, action: str, limit: int) -> None:
+    if not customer_access_limiter.is_allowed(f"{action}:{user.id}", limit, 60):
+        raise RateLimited("请求过于频繁，请稍后重试")
 
 
 def mine_order_filter(
@@ -76,6 +85,7 @@ def list_customers(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> PageOut[schemas.CustomerOut]:
+    _limit_customer_access(user, "read", 300)
     customers = parties_list_customers(
         db, keyword=keyword, status=status, created_by=created_by, user=user, limit=limit, offset=offset, sort_desc=sort_desc, **order_filter, **created_filter
     )
@@ -116,6 +126,19 @@ def customer_summary(
     ))
 
 
+@router.get("/customers/options", response_model=list[schemas.CustomerOptionOut])
+def customer_options(
+    keyword: str = Query(default="", max_length=128),
+    exact: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_customers,
+) -> list[schemas.CustomerOptionOut]:
+    _limit_customer_access(user, "options", 120)
+    name = keyword.strip()
+    items = parties_list_customers(db, keyword=None if exact else name or None, exact_name=name if exact else None, status="ACTIVE", user=user, limit=20, sort_desc=True)
+    return [schemas.CustomerOptionOut.model_validate(item) for item in items]
+
+
 @router.get("/customers/export.csv")
 def export_customers_csv(
     keyword: str | None = Query(default=None),
@@ -124,9 +147,10 @@ def export_customers_csv(
     order_filter: dict = Depends(mine_order_filter),
     created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
-    user: CurrentUser = read_customers,
+    user: CurrentUser = export_customers,
 ) -> Response:
     """客户按可见列导出 CSV：同 /customers 筛选口径。"""
+    _limit_customer_access(user, "export", 30)
     customers = parties_list_customers(
         db, keyword=keyword, status=status, created_by=created_by, user=user, limit=None, offset=0, **order_filter, **created_filter
     )
@@ -207,6 +231,7 @@ def get_customer(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.CustomerOut:
+    _limit_customer_access(user, "read", 300)
     customer = parties_get_customer(db, customer_id, user)
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return to_customer_out(customer, extra_values=extras)
@@ -218,6 +243,7 @@ def get_customer_detail(
     db: Session = Depends(get_db),
     user: CurrentUser = read_customers,
 ) -> schemas.CustomerDetailOut:
+    _limit_customer_access(user, "read", 300)
     customer = parties_get_customer(db, customer_id, user)
     extras = get_extra_values(db, entity_type="customer", entity_id=customer.id)
     return schemas.CustomerDetailOut(

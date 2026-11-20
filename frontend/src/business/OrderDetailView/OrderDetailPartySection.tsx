@@ -1,11 +1,11 @@
 import { Descriptions, Input, Space } from "antd";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OrderDraft } from "./editing/use-order-detail-editor";
 import type { PartyAddition } from "./editing/use-order-detail-editor";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
-import type { Counterparty, Customer } from "../../shared/api/types/customers";
+import type { Counterparty } from "../../shared/api/types/customers";
+import type { CustomerOption } from "../../shared/api/customers.api";
 import { customersApi, counterpartiesApi } from "../../shared/api/customers.api";
-import { loadCustomers } from "../../shared/api/loadCustomers";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
@@ -40,7 +40,9 @@ export function OrderDetailPartySection({
       : [{ role: "SELLER", label: "卖家" }, { role: "BUYER", label: "买家" },
         ...(order?.customers?.some((item) => item.role === "INSTALLMENT_CUSTOMER") ? [{ role: "INSTALLMENT_CUSTOMER", label: "分期客户" }] : [])];
   const counterpartyRole = order?.order_type === "DG" ? "PLATFORM" : order?.order_type === "TH" ? "PEER" : null;
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const customerSearchToken = useRef(0);
+  const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
   const [customersReady, setCustomersReady] = useState(false);
   const [counterpartiesReady, setCounterpartiesReady] = useState(false);
@@ -73,11 +75,25 @@ export function OrderDetailPartySection({
     let cancelled = false;
     setCustomersReady(false);
     setCustomersError(null);
-    void loadCustomers("ACTIVE").then((rows) => {
-      if (!cancelled) { setCustomers(rows); setCustomersReady(true); }
+    const request = ++customerSearchToken.current;
+    void customersApi.options().then((rows) => {
+      if (!cancelled && request === customerSearchToken.current) { setCustomers(rows); setCustomersReady(true); }
     }).catch((error) => { if (!cancelled) setCustomersError(normalizeError(error)); });
-    return () => { cancelled = true; };
+    return () => { cancelled = true; customerSearchToken.current += 1; if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); };
   }, [editing, customerRetry]);
+
+  const searchCustomers = (keyword: string) => {
+    const request = ++customerSearchToken.current;
+    if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current);
+    customerSearchTimer.current = setTimeout(() => {
+      void customersApi.options(keyword).then((rows) => {
+        if (request !== customerSearchToken.current) return;
+        const selected = new Set(Object.values(selectedCustomers).flat());
+        setCustomers((current) => [...current.filter((item) => selected.has(item.id) && !rows.some((row) => row.id === item.id)), ...rows]);
+        setCustomersError(null);
+      }).catch((error) => { if (request === customerSearchToken.current) setCustomersError(normalizeError(error)); });
+    }, 300);
+  };
 
   useEffect(() => {
     if (!editing || !counterpartyRole) return;
@@ -97,7 +113,8 @@ export function OrderDetailPartySection({
     const submittedSession = session.current();
     await customerCreate.run(async () => {
       try {
-        const existing = customers.find((item) => item.display_name === name);
+        const existing = (await customersApi.options(name, true))[0];
+        if (!session.isCurrent(submittedSession)) return;
         const customer = existing
           ?? (await customersApi.create({ display_name: name })).customer;
         if (!session.isCurrent(submittedSession)) {
@@ -182,15 +199,18 @@ export function OrderDetailPartySection({
                   virtual={customers.length > 100}
                   popupMatchSelectWidth={customers.length > 100}
                   showSearch
-                  optionFilterProp="label"
+                  filterOption={false}
                   aria-label={`选择${label}`}
                   disabled={!customersReady}
                   value={selected}
                   placeholder={`输入或选择${label}，可多选`}
                   searchValue={newCustomerNames[role] ?? ""}
-                  onSearch={(value) => setNewCustomerNames((current) => ({ ...current, [role]: value }))}
+                  onSearch={(value) => { setNewCustomerNames((current) => ({ ...current, [role]: value })); searchCustomers(value); }}
                   popupRender={(menu) => <>{menu}{newCustomerNames[role]?.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="customer.create" disabled={!customersReady} loading={customerCreate.pending} type="link" onClick={() => void addCustomer(role)}>{`新建${label}：${newCustomerNames[role].trim()}`}</PermissionButton></div> : null}</>}
-                  options={customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` }))}
+                  options={[
+                    ...(order?.customers ?? []).filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index && !customers.some((customer) => customer.id === item.id)).map((item) => ({ value: item.id, label: item.display_name })),
+                    ...customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` })),
+                  ]}
                   onChange={(ids: number[]) => {
                     setSelectedCustomers((current) => ({ ...current, [role]: ids }));
                     setNewCustomerNames((current) => ({ ...current, [role]: "" }));

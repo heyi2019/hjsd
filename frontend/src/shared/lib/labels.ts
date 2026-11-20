@@ -68,6 +68,7 @@ export const PERMISSION_LABEL: Record<string, string> = {
   "customer.update": "编辑客户",
   "customer.contact.write": "维护客户联系人",
   "customer.merge": "合并客户",
+  "customer.export": "导出客户",
   "counterparty.read": "查看合作方",
   "counterparty.manage": "管理合作方",
   "order.create": "新建订单",

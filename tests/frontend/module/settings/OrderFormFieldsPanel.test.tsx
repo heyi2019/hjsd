@@ -123,7 +123,7 @@ describe("OrderFormFieldsPanel", () => {
 
   it("板块管理可以编辑板块键", async () => {
     let attempts = 0;
-    vi.mocked(orderFormFieldsApi).listSectionLabels.mockImplementation(async (scope) => {
+    vi.mocked(orderFormFieldsApi).listSectionLabels.mockImplementation(async (scope): Promise<Record<string, string>> => {
       if (scope === "HS" && attempts++ === 0) throw new Error("板块标题读取失败");
       return scope === "TH" ? { TH_SECTION: "提号板块" } : {};
     });

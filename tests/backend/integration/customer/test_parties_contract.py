@@ -8,6 +8,7 @@
 表单扩展字段覆写，以及 7 个未测路由端点。
 """
 from __future__ import annotations
+from unittest import mock
 import pytest
 from sqlalchemy import select
 from app.core.errors import Validation
@@ -112,3 +113,39 @@ def test_validate_owner_id_rejects_non_positive_and_inactive(seeded_db):
     seeded_db.flush()
     with pytest.raises(Validation, match="启用"):
         _validate_owner_id(seeded_db, inactive.id)
+
+
+def test_customer_options_only_return_matching_active_customer_identifiers(seeded_client, seeded_db, headers):
+    customer = create_customer(seeded_db, display_name="搜索目标", phone="13800001234", actor="pytest")
+    create_customer(seeded_db, display_name="其他客户", actor="pytest")
+    disabled = create_customer(seeded_db, display_name="搜索目标停用", actor="pytest")
+    disabled.status = "DISABLED"
+    seeded_db.flush()
+    response = seeded_client.get("/api/customers/options", params={"keyword": "搜索目标"}, headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json() == [{"id": customer.id, "customer_no": customer.customer_no, "display_name": "搜索目标"}]
+
+
+def test_customer_export_requires_export_permission(seeded_client):
+    response = seeded_client.get("/api/customers/export.csv", headers={"X-Dev-User": "employee"})
+    assert response.status_code == 403
+
+
+def test_customer_options_can_find_exact_name(seeded_client, seeded_db, headers):
+    customer = create_customer(seeded_db, display_name="精确名", actor="pytest")
+    create_customer(seeded_db, display_name="精确名字", actor="pytest")
+    response = seeded_client.get("/api/customers/options", params={"keyword": "精确名", "exact": "true"}, headers=headers)
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()] == [customer.id]
+
+
+def test_customer_export_applies_rate_limit(seeded_client, headers):
+    with mock.patch("app.customers.customers_router.customer_access_limiter.is_allowed", return_value=False):
+        response = seeded_client.get("/api/customers/export.csv", headers=headers)
+    assert response.status_code == 429
+
+
+def test_customer_list_applies_rate_limit(seeded_client, headers):
+    with mock.patch("app.customers.customers_router.customer_access_limiter.is_allowed", return_value=False):
+        response = seeded_client.get("/api/customers", headers=headers)
+    assert response.status_code == 429

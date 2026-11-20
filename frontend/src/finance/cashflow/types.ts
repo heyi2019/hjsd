@@ -32,7 +32,6 @@ export type CashflowModalProps = {
   target: CashflowTarget | null;
   pools: Pool[];
   users?: EmployeeOption[];
-  scope?: string;
   showOperator?: boolean;
   showDetails?: boolean;
   currentOperator?: string;

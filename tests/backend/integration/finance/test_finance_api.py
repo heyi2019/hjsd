@@ -10,6 +10,7 @@ import pytest
 from sqlalchemy import select
 
 from app.business.stocks.profile import create_account
+from app.business.form_fields import create_order_form_field
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool
@@ -202,6 +203,42 @@ class TestFinanceApi:
         assert seeded_db.scalar(
             select(Cashflow).where(Cashflow.id == flow["id"])
         ).source_type == CashflowSourceType.MANUAL.value
+
+    def test_order_cashflow_uses_order_cashflow_field_rules(self, seeded_client, seeded_db, headers):
+        order_id = _active_order(seeded_db)
+        for scope, key, label in [
+            ("REFUND", "receipt", "收支凭据"),
+            ("FUNDFLOW", "business_note", "资金明细凭据"),
+        ]:
+            create_order_form_field(
+                seeded_db, order_type_code=scope, field_key=key, label=label,
+                required=True, actor="pytest",
+            )
+        seeded_db.commit()
+        payload = {
+            "pool_id": _pool(seeded_db, "HJ_INVEST").id,
+            "occurred_on": TODAY.isoformat(), "direction": "OUT",
+            "category": "OTHER", "amount": "25.00",
+        }
+
+        for url, order_link in [
+            (f"/api/v1/orders/{order_id}/cashflows", {}),
+            ("/api/v1/cashflows", {"order_id": order_id}),
+        ]:
+            bypass = seeded_client.post(url, headers=headers, json={
+                **payload, **order_link, "form_extra_scope": "FUNDFLOW",
+                "form_extra": {"business_note": "凭据"},
+            })
+            assert bypass.status_code == 422, bypass.text
+            assert "收支凭据" in bypass.text
+
+            for direction, attribute in [("OUT", "OTHER_EXPENSE"), ("IN", "OTHER_INCOME")]:
+                created = seeded_client.post(url, headers=headers, json={
+                    **payload, **order_link, "direction": direction, "form_extra": {"receipt": "凭据1"},
+                })
+                assert created.status_code == 201, created.text
+                assert created.json()["form_extra"] == {"receipt": "凭据1"}
+                assert created.json()["accounting_attribute"] == attribute
 
     def test_pool_scoped_finance_user_cannot_transfer_or_read_other_pool(
         self, seeded_client, seeded_db

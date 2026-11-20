@@ -16,13 +16,13 @@ export function CashflowModal({
   target,
   pools,
   users = [],
-  scope = "FUNDFLOW",
   showOperator = false,
   showDetails = false,
   currentOperator,
   onClose,
   onCreated,
 }: CashflowModalProps) {
+  const scope = "REFUND";
   const [form] = Form.useForm<CashflowFormValues>();
   const write = useAsyncAction();
   const submitting = write.pending;

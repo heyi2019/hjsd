@@ -19,7 +19,6 @@ export function OrderModals({ controller }: { controller: OrdersPageController }
         target={controller.cashflowTarget}
         pools={controller.cashflowPools}
         users={controller.cashflowUsers}
-        scope="REFUND"
         showOperator
         showDetails
         currentOperator={controller.currentOperator}

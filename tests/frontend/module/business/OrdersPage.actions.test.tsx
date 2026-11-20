@@ -855,6 +855,14 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("资金收支：退款已并入普通支出，登记为 OTHER 支出明细", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
+      ...allFormFields(),
+      {
+        id: 9001, order_type_code: "REFUND", field_key: "receipt", label: "收支凭据",
+        field_type: "TEXT", options: [], required: true, is_active: true, sort_order: 99,
+        locked: false, is_custom: true, section: "EXTRA", note: null,
+      },
+    ] as never);
     await openLedger();
     await openRowMenu("HS-2026-0001", "资金收支");
     const modal = await modalOf(/资金收支 · HS-2026-0001/);
@@ -862,15 +870,17 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(within(modal).getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("李四"));
     await ui.type(within(modal).getByLabelText("金额"), "500");
     await ui.type(within(modal).getByLabelText("收支备注"), "客户取消");
+    await ui.type(await within(modal).findByLabelText("收支凭据"), "凭据1");
     expect(within(modal).getByText("支出")).toBeInTheDocument();
     await clickModalOk(modal);
     await waitFor(() =>
       expect(orderCashflowsApi.create).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", occurred_on: today(), pool_id: expect.any(Number) }),
+        expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", occurred_on: today(), pool_id: expect.any(Number), form_extra: { receipt: "凭据1" } }),
       )
     );
     expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).toMatchObject({ operator_user_ids: [9] });
+    expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).not.toHaveProperty("accounting_attribute");
     expect(message.success).toHaveBeenCalledWith("资金收支已登记");
   });
 
@@ -900,6 +910,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       1,
       expect.objectContaining({ direction: "IN", amount: "100", category: "OTHER" }),
     ));
+    expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).not.toHaveProperty("accounting_attribute");
   });
 
   it("订单台账不提供交付操作入口", async () => {

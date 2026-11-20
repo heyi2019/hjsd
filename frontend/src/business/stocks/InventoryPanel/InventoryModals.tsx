@@ -100,7 +100,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         target={cashflowTarget}
         pools={cashflowPools}
         users={cashflowUsers}
-        scope="REFUND"
         showOperator
         showDetails
         currentOperator={currentDevUser()}

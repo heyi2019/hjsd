@@ -144,6 +144,35 @@ describe("BusinessReminderSettingsPanel", () => {
 });
 
 describe("OptionDictionarySection", () => {
+  it("字典写入和刷新期间禁止再次提交及其他修改", async () => {
+    let finishUpdate!: () => void;
+    let finishReload!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    const original = [{ value: "旧选项", label: "旧选项" }];
+    vi.mocked(optionSetsApi.get).mockResolvedValueOnce({ options: original } as never)
+      .mockReturnValueOnce(new Promise((resolve) => { finishReload = resolve; }));
+    vi.mocked(optionSetsApi.update).mockReturnValue(new Promise((resolve) => { finishUpdate = () => resolve(undefined as never); }));
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+    renderLight(<OptionDictionarySection code="TEST_DICT" title="测试字典" description="字典" />, { user: "admin" });
+    const input = await screen.findByPlaceholderText("请输入测试字典");
+    await screen.findByText("旧选项");
+    fireEvent.change(input, { target: { value: "新选项" } });
+    const form = input.closest("form")!;
+    await act(async () => { fireEvent.submit(form); fireEvent.submit(form); });
+    await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "新增测试字典" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "上移" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "删除" })).toBeDisabled();
+    await act(async () => { fireEvent.submit(form); });
+    expect(optionSetsApi.update).toHaveBeenCalledTimes(1);
+    await act(async () => finishUpdate());
+    await waitFor(() => expect(optionSetsApi.get).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "新增测试字典" })).toBeDisabled();
+    await act(async () => finishReload({ options: [...original, { value: "新选项", label: "新选项" }] } as never));
+    expect(await screen.findByText("新选项")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "新增测试字典" })).toBeEnabled());
+  });
+
   it("读取失败时禁止覆盖字典，重试成功后保留已有选项", async () => {
     let rejectLoad!: (error: Error) => void;
     vi.mocked(optionSetsApi.get).mockReturnValueOnce(new Promise((_resolve, reject) => { rejectLoad = reject; }));

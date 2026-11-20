@@ -2,7 +2,7 @@ import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
 import type { OptionItem } from "../../shared/api/types/common";
 import { clearOptionSetsCache } from "../../shared/lib/optionSets";
@@ -13,6 +13,8 @@ import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, Permis
 export function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
   const [editingValue, setEditingValue] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [form] = Form.useForm<{ option: string }>();
   const load = useCallback(async () => {
     const set = await optionSetsApi.get(code);
@@ -21,19 +23,48 @@ export function OptionDictionarySection({ code, title, description }: { code: st
   const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
-  const canEdit = !loading && !error && loadedRows !== null;
+  const canEdit = !loading && !saving && !error && loadedRows !== null;
   const reloadSection = useCallback(async () => {
     setMutationError(null);
     await reload();
   }, [reload]);
+  const updateOptions = async (options: OptionItem[], onSuccess?: () => void) => {
+    if (!canEdit || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
+    try {
+      await optionSetsApi.update(code, { options });
+      clearOptionSetsCache();
+      onSuccess?.();
+      setMutationError(null);
+      await reload();
+    } catch (err) {
+      setMutationError(normalizeError(err));
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  };
   const save = async ({ option }: { option: string }) => {
     if (!canEdit) return;
     const value = option.trim(); if (!value) return;
     const next = editingValue ? rows.map((item) => item.value === editingValue ? { value, label: value } : item) : [...rows, { value, label: value }];
     if (next.some((item, index) => next.findIndex((candidate) => candidate.value === item.value) !== index)) { form.setFields([{ name: "option", errors: [`${title}不能重复`] }]); return; }
-    try { await optionSetsApi.update(code, { options: next }); clearOptionSetsCache(); appMessage.success(editingValue ? `${title}已更新` : `${title}已新增`); setEditingValue(null); form.resetFields(); setMutationError(null); await reload(); } catch (err) { setMutationError(normalizeError(err)); }
+    await updateOptions(next, () => {
+      appMessage.success(editingValue ? `${title}已更新` : `${title}已新增`);
+      setEditingValue(null);
+      form.resetFields();
+    });
   };
-  const move = async (value: string, offset: -1 | 1) => { if (!canEdit) return; const index = rows.findIndex((item) => item.value === value); const nextIndex = index + offset; if (index < 0 || nextIndex < 0 || nextIndex >= rows.length) return; const next = [...rows]; [next[index], next[nextIndex]] = [next[nextIndex], next[index]]; try { await optionSetsApi.update(code, { options: next }); clearOptionSetsCache(); setMutationError(null); await reload(); } catch (err) { setMutationError(normalizeError(err)); } };
+  const move = async (value: string, offset: -1 | 1) => {
+    if (!canEdit) return;
+    const index = rows.findIndex((item) => item.value === value);
+    const nextIndex = index + offset;
+    if (index < 0 || nextIndex < 0 || nextIndex >= rows.length) return;
+    const next = [...rows];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    await updateOptions(next);
+  };
   const columns: ColumnsType<OptionItem> = [
     { title, dataIndex: "label" },
     { title: "排序", render: (_value, _row, index) => index + 1, width: 80 },
@@ -50,16 +81,7 @@ export function OptionDictionarySection({ code, title, description }: { code: st
         description="删除后不可恢复。"
         okText="删除"
         onConfirm={async () => {
-          if (!canEdit) return;
-          try {
-            await optionSetsApi.update(code, { options: rows.filter((item) => item.value !== row.value) });
-            clearOptionSetsCache();
-            appMessage.success(`${title}已删除`);
-            setMutationError(null);
-            await reload();
-          } catch (err) {
-            setMutationError(normalizeError(err));
-          }
+          await updateOptions(rows.filter((item) => item.value !== row.value), () => appMessage.success(`${title}已删除`));
         }}
       >
         删除

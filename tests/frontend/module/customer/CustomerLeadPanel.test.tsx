@@ -62,6 +62,9 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(await screen.findByText("LD-1")).toBeVisible();
     expect(screen.getByTitle("2")).toBeVisible();
     expect(screen.getByText("需求总数").closest(".ui-stat")).toHaveTextContent("-");
+    await ui.click(screen.getByTitle("2"));
+    await waitFor(() => expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 10 })));
+    expect(leadsApi.summary).toHaveBeenCalledTimes(1);
     await act(async () => { finish({ total_count: 11, open_count: 3 }); await pending; });
     expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("3");
   });
@@ -129,7 +132,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await ui.click(screen.getByRole("button", { name: "重新加载" }));
     expect(await screen.findByText("LD-1")).toBeInTheDocument();
   });
-  it("需求列表翻页时加载后台下一页", async () => {
+  it("需求列表翻页时保留统计且不重复请求汇总", async () => {
     vi.mocked(leadsApi.summary).mockResolvedValueOnce({ total_count: 11, open_count: 11 }).mockResolvedValueOnce({ total_count: 11, open_count: 11 });
     vi.mocked(leadsApi.page).mockImplementation(async (params) => pageResponse(
       [{ ...leads[0], lead_no: params?.offset === 10 ? "LD-PAGE2" : "LD-1" }],
@@ -137,7 +140,14 @@ describe("CustomerLeadPanel：客户需求池", () => {
     ));
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     await screen.findByText("LD-1");
+    await waitFor(() => expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("11"));
+    let finish!: (value: ReturnType<typeof pageResponse<Lead>>) => void;
+    const pending = new Promise<ReturnType<typeof pageResponse<Lead>>>((resolve) => { finish = resolve; });
+    vi.mocked(leadsApi.page).mockReturnValueOnce(pending);
     await ui.click(screen.getByTitle("2"));
+    expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("11");
+    expect(leadsApi.summary).toHaveBeenCalledTimes(1);
+    await act(async () => { finish(pageResponse([{ ...leads[0], lead_no: "LD-PAGE2" }], { total: 11, limit: 10, offset: 10 })); await pending; });
     expect(await screen.findByText("LD-PAGE2")).toBeInTheDocument();
     expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 10, offset: 10 }));
   });
@@ -241,6 +251,7 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(leadsApi.create).toHaveBeenCalledWith(
       expect.objectContaining({ customer_id: 1, request_type: "FIND_ACCOUNT", budget: "100", target: "找一个号" }),
     );
+    await waitFor(() => expect(leadsApi.summary).toHaveBeenCalledTimes(2));
   });
 
   it("新增需求接口失败时展示错误", async () => {

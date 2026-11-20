@@ -58,6 +58,37 @@ def _active_order(seeded_db) -> int:
 
 
 class TestFinanceApi:
+    @pytest.mark.parametrize(("action", "scope"), [
+        ("return", "FUNDRELEASE"), ("cancel", "FUNDCANCEL"), ("resolve", "FUNDCLEAR"),
+    ])
+    def test_finance_action_requires_its_custom_fields(self, seeded_client, seeded_db, headers, action, scope):
+        pool = _pool(seeded_db, "HJ_INVEST")
+        if action == "resolve":
+            created = seeded_client.post("/api/v1/reconciliations", headers=headers, json={
+                "pool_id": pool.id, "reconciled_on": TODAY.isoformat(), "statement_balance": "0", "account_label": "账户",
+            })
+            assert created.status_code == 201, created.text
+            url = f"/api/v1/reconciliations/{created.json()['id']}/resolve"
+            payload = {"reason": "核对完成"}
+        else:
+            deposit = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("100"),
+                                     paid_on=TODAY, actor="pytest")
+            if action == "return":
+                url = f"/api/v1/deposits/{deposit.id}/returns"
+                payload = {"amount": "30", "released_on": TODAY.isoformat()}
+            else:
+                url = f"/api/v1/deposits/{deposit.id}/cancel"
+                payload = {"reason": "登记错误", "cancelled_on": TODAY.isoformat()}
+        create_order_form_field(seeded_db, order_type_code=scope, field_key="receipt",
+                                label="操作凭据", required=True, actor="pytest")
+        seeded_db.commit()
+        missing = seeded_client.post(url, headers=headers, json=payload)
+        assert missing.status_code == 422, missing.text
+        assert "操作凭据" in missing.text
+        saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
+        assert saved.status_code == 200, saved.text
+        assert saved.json()["form_extra"]["receipt"] == "凭据A"
+
     def test_reconciliation_endpoints_snapshot_and_resolve(
         self, seeded_client, seeded_db, headers
     ):

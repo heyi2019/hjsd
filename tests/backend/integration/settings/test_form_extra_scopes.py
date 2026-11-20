@@ -56,6 +56,26 @@ def test_scopes_endpoint_lists_all_scopes(seeded_client, headers):
         assert by_code[code]["group"] == "SYSTEM"
 
 
+def test_all_registered_long_scopes_can_configure_fields_and_labels(seeded_client, headers):
+    from app.domain.form_scopes import GROUP_SYSTEM
+
+    scopes = [scope for scope in FORM_SCOPES if len(scope.code) > 10]
+    assert scopes
+    for scope in scopes:
+        if scope.group != GROUP_SYSTEM:
+            created = seeded_client.post("/api/v1/order-form-fields", headers=headers, json={
+                "order_type_code": scope.code, "field_key": "receipt", "label": "凭据", "field_type": "TEXT",
+            })
+            assert created.status_code == 201, f"{scope.code}: {created.text}"
+        saved = seeded_client.put("/api/v1/order-form-fields/section-labels", headers=headers,
+                                 json={"order_type_code": scope.code, "labels": {"EXTRA": "扩展信息"}})
+        assert saved.status_code == 200, f"{scope.code}: {saved.text}"
+        loaded = seeded_client.get("/api/v1/order-form-fields/section-labels", headers=headers,
+                                   params={"order_type_code": scope.code})
+        assert loaded.status_code == 200, f"{scope.code}: {loaded.text}"
+        assert loaded.json()["EXTRA"] == "扩展信息"
+
+
 def test_operation_scope_seeds_match_registry(seeded_db):
     """当前基线为所有操作作用域落入可读取的字段种子。"""
     from app.domain import form_scopes

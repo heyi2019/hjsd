@@ -253,12 +253,13 @@ def resolve_reconciliation(
     item = _get_reconciliation(session, reconciliation_id, user)
     if item.status != ReconciliationStatus.OPEN.value:
         raise Validation("该对账记录已核销", details={"reconciliation_id": item.id})
+    checked_extra = validate_form_extra(session, order_type_code="FUNDCLEAR", values=form_extra)
     item.status = ReconciliationStatus.RESOLVED.value
     item.resolved_by = actor
     item.resolved_at = now_second()
     item.reason = f"{item.reason}; {text_reason}" if item.reason else text_reason
-    if form_extra:
-        item.form_extra = {**(item.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDCLEAR", values=form_extra)}
+    if checked_extra:
+        item.form_extra = {**(item.form_extra or {}), **checked_extra}
     item.updated_by = actor
     session.flush()
     record_audit(

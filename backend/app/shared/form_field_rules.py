@@ -34,7 +34,7 @@ REQUIRED_WHEN_OPS = ("eq", "ne", "filled")
 FIELD_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
-ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
+ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,16}$")
 
 BUSINESS_RESPONSIBLE_FIELD_KEY = "business_responsible_ids"
 BUSINESS_RESPONSIBLE_ORDER_TYPES = {"HS", "TH", "DG"}

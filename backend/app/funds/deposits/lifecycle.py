@@ -59,12 +59,13 @@ def return_deposit(
             details={"deposit_id": deposit.id, "outstanding": str(outstanding)},
         )
 
+    checked_extra = validate_form_extra(session, order_type_code="FUNDRELEASE", values=form_extra)
     deposit.returned_amount = to_money(deposit.returned_amount) + money
     deposit.released_on = released_on
     deposit.status = _status_after_return(deposit)
     deposit.updated_by = actor
-    if form_extra:
-        deposit.form_extra = {**(deposit.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDRELEASE", values=form_extra)}
+    if checked_extra:
+        deposit.form_extra = {**(deposit.form_extra or {}), **checked_extra}
     session.add(
         Cashflow(
             flow_no=allocate_flow_no(session, Direction.IN.value),
@@ -139,6 +140,7 @@ def cancel_deposit(
             },
         )
     text = _text(reason, field="reason", message="取消押金必须填写理由")
+    checked_extra = validate_form_extra(session, order_type_code="FUNDCANCEL", values=form_extra)
     money = to_money(deposit.paid_amount)
     deposit.status = DepositStatus.CANCELLED.value
     # 反向流水 DEPOSIT_CANCEL（IN）已把资金余额冲平；台账侧同步回填已退金额，
@@ -147,8 +149,8 @@ def cancel_deposit(
     deposit.returned_amount = money
     deposit.released_on = cancelled_on
     deposit.updated_by = actor
-    if form_extra:
-        deposit.form_extra = {**(deposit.form_extra or {}), **validate_form_extra(session, order_type_code="FUNDCANCEL", values=form_extra)}
+    if checked_extra:
+        deposit.form_extra = {**(deposit.form_extra or {}), **checked_extra}
     session.add(
         Cashflow(
             flow_no=allocate_flow_no(session, Direction.IN.value),

@@ -26,7 +26,7 @@ def get_section_labels(session: Session, *, order_type_code: str) -> dict[str, s
     code = (order_type_code or "").strip().upper()
     if not ORDER_TYPE_CODE_PATTERN.match(code):
         raise Validation(
-            "业务类型 code 必须为 2-10 位大写字母或数字",
+            "表单作用域 code 必须为 2-16 位大写字母或数字",
             details={"field": "order_type_code", "value": order_type_code},
         )
     rows = session.scalars(
@@ -50,7 +50,7 @@ def save_section_labels(
     code = (order_type_code or "").strip().upper()
     if not ORDER_TYPE_CODE_PATTERN.match(code):
         raise Validation(
-            "业务类型 code 必须为 2-10 位大写字母或数字",
+            "表单作用域 code 必须为 2-16 位大写字母或数字",
             details={"field": "order_type_code", "value": order_type_code},
         )
     if code not in SCOPE_CODES:

@@ -38,7 +38,7 @@ def create_order_form_field(
         raise Validation("系统表单仅支持配置现有字段，不能新增自定义字段")
     if not ORDER_TYPE_CODE_PATTERN.match(code):
         raise Validation(
-            "业务类型 code 必须为 2-10 位大写字母或数字",
+            "表单作用域 code 必须为 2-16 位大写字母或数字",
             details={"field": "order_type_code", "value": order_type_code},
         )
     if not isinstance(field_type, str) or field_type not in FIELD_TYPES:

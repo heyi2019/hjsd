@@ -10,18 +10,19 @@ import { AUDIT_ACTION_LABEL, ENTITY_TYPE_LABEL } from "../shared/lib/labels";
 import { formatDateTimeMinute } from "../shared/lib/format";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { useListViewColumns } from "../shared/lib/listColumns";
-import { CONFIG_ENTITY_TYPE_LABEL, ENTITY_TYPE_TO_ITEM, SETTINGS_ITEMS } from "../settings/configCatalog";
+import { CONFIG_ENTITY_TYPE_LABEL, configItemLabel, SETTINGS_ITEMS } from "../settings/configCatalog";
 
 function entityTypeLabel(value: string): string {
   return CONFIG_ENTITY_TYPE_LABEL[value] ?? ENTITY_TYPE_LABEL[value] ?? ENTITY_TYPE_LABEL[value.toLowerCase()] ?? value;
 }
 
-const CONFIG_ITEM_OPTIONS = SETTINGS_ITEMS
-  .flatMap((item) => item.entityTypes.map((type) => ({
+const CONFIG_ITEM_OPTIONS = [
+  ...SETTINGS_ITEMS.flatMap((item) => item.entityTypes.map((type) => ({
     value: type,
     label: `${item.label} · ${entityTypeLabel(type)}`,
-  })))
-  .sort((a, b) => a.label.localeCompare(b.label, "zh-Hans-CN"));
+  }))),
+  { value: "option_set", label: CONFIG_ENTITY_TYPE_LABEL.option_set },
+].sort((a, b) => a.label.localeCompare(b.label, "zh-Hans-CN"));
 
 /** 词典未加载时的回落值，与改造前硬编码一致。 */
 const ENTITY_TYPE_FALLBACK = Object.entries(ENTITY_TYPE_LABEL).map(([value, label]) => ({ value, label }));
@@ -81,7 +82,7 @@ export function AuditPanel() {
   const columns: ColumnsType<AuditLogRow> = [
     { title: "时间", dataIndex: "occurred_at", render: (v: string | null | undefined) => formatDateTimeMinute(v) },
     { title: "操作人", dataIndex: "actor" },
-    { title: "配置项", key: "config_item", render: (_v, row) => ENTITY_TYPE_TO_ITEM[row.entity_type ?? ""] ?? "—" },
+    { title: "配置项", key: "config_item", render: (_v, row) => configItemLabel(row.entity_type, row.entity_id) },
     { title: "动作", dataIndex: "action", render: (v: string) => configurableLabel("AUDIT_ACTION", v, AUDIT_ACTION_LABEL) },
     { title: "对象类型", dataIndex: "entity_type", render: (v: string) => {
       // 词典优先 → 配置类型翻译（Pool/GameTypeOption 等类名写点）→ 原值兜底

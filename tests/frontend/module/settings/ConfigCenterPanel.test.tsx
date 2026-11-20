@@ -67,6 +67,8 @@ describe("ConfigCenterPanel", () => {
     expect(screen.getByTestId("center-nav-form-fields")).toBeInTheDocument();
     expect(screen.getByTestId("center-nav-order-types")).toBeInTheDocument();
     expect(screen.getByTestId("center-nav-business-reminders")).toBeInTheDocument();
+    expect(screen.getByTestId("center-nav-intermediary-platforms")).toBeInTheDocument();
+    expect(screen.getByTestId("center-nav-party-sources")).toBeInTheDocument();
     expect(screen.getByTestId("center-nav-sequences")).toBeInTheDocument();
   });
 
@@ -109,6 +111,12 @@ describe("ConfigCenterPanel", () => {
     // 选中态高亮切到列表字段
     expect(screen.getByTestId("center-nav-list-columns").className).toContain("config-center__item--active");
     expect(screen.getByTestId("center-nav-order-types").className).not.toContain("config-center__item--active");
+
+    for (const [key, title] of [["intermediary-platforms", "中介业务配置"], ["party-sources", "参与方来源"]]) {
+      await ui.click(screen.getByTestId(`center-nav-${key}`));
+      expect(screen.getByTestId(`center-nav-${key}`)).toHaveClass("config-center__item--active");
+      expect(within(screen.getByTestId("center-content")).getAllByText(title).length).toBeGreaterThan(0);
+    }
   });
 
   it("viewer 隐藏有权限的字段配置项（表单字段），保留无权限项", async () => {

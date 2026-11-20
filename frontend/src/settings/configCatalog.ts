@@ -33,6 +33,8 @@ interface SettingsItemMeta {
   readOnly?: boolean;
   /** 审计 entity_type（可多个，统计时取并集）。 */
   entityTypes: string[];
+  /** 共用 option_set 对象类型时，用词典编号区分具体配置。 */
+  optionSetCodes?: string[];
 }
 
 /** 设置页独立页签顺序，配置中心内部顺序也从本文件维护。 */
@@ -89,11 +91,28 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     entityTypes: ["GameTypeOption"],
   },
   {
+    key: "intermediary-platforms",
+    label: "中介业务配置",
+    summary: "维护经手平台、中介类型和包赔类型",
+    group: "MASTER",
+    entityTypes: [],
+    optionSetCodes: ["INTERMEDIARY_PLATFORM", "INTERMEDIARY_TYPE", "COMPENSATION_TYPE"],
+  },
+  {
+    key: "party-sources",
+    label: "参与方来源",
+    summary: "维护客户来源选项",
+    group: "MASTER",
+    entityTypes: [],
+    optionSetCodes: ["CUSTOMER_SOURCE"],
+  },
+  {
     key: "business-reminders",
     label: "业务提醒",
     summary: "工作台库存、分润与逾期合约提醒规则",
     group: "BUSINESS",
-    entityTypes: ["option_set"],
+    entityTypes: [],
+    optionSetCodes: ["BUSINESS_OVERVIEW_REMINDERS"],
   },
   {
     key: "business-period",
@@ -102,6 +121,7 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "BUSINESS",
     permission: "option-set.manage",
     entityTypes: [],
+    optionSetCodes: ["BUSINESS_PERIOD"],
   },
   {
     key: "organization",
@@ -157,9 +177,16 @@ export const CONFIG_ENTITY_TYPE_LABEL: Record<string, string> = {
   user: "用户",
 };
 
-/** 全部涉及的 entity_type 扁平集合，供「最近配置改动」流水过滤。 */
-
 /** entity_type → 配置项标签，流水中把「order_form_field」翻成人话。 */
-export const ENTITY_TYPE_TO_ITEM: Record<string, string> = Object.fromEntries(
+const ENTITY_TYPE_TO_ITEM: Record<string, string> = Object.fromEntries(
   SETTINGS_ITEMS.flatMap((item) => item.entityTypes.map((type) => [type, item.label])),
 );
+
+const OPTION_SET_TO_ITEM: Record<string, string> = Object.fromEntries(
+  SETTINGS_ITEMS.flatMap((item) => (item.optionSetCodes ?? []).map((code) => [code, item.label])),
+);
+
+export function configItemLabel(entityType?: string | null, entityId?: string | null): string {
+  if (entityType === "option_set") return OPTION_SET_TO_ITEM[entityId ?? ""] ?? CONFIG_ENTITY_TYPE_LABEL.option_set;
+  return ENTITY_TYPE_TO_ITEM[entityType ?? ""] ?? "—";
+}

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -59,11 +59,27 @@ describe("AuditPanel：审计记录", () => {
   });
 
   it("加载并展示审计行", async () => {
+    vi.mocked(auditApi.list).mockResolvedValue(listResponse([
+      rows[0],
+      ...["BUSINESS_PERIOD", "BUSINESS_OVERVIEW_REMINDERS", "CUSTOMER_SOURCE", "UNKNOWN_DICTIONARY"].map((entity_id, index) => ({
+        ...rows[0], id: index + 2, entity_type: "option_set", entity_id,
+      })),
+    ]));
     renderLight(<AuditPanel />, { user: "admin" });
-    expect(await screen.findByText("admin")).toBeInTheDocument();
+    expect((await screen.findAllByText("admin")).length).toBeGreaterThan(0);
     // 动作与对象类型均按中文标签渲染（AUDIT_ACTION_LABEL / ENTITY_TYPE_LABEL）
-    expect(screen.getByText("新建订单")).toBeInTheDocument();
+    expect(screen.getAllByText("新建订单").length).toBeGreaterThan(0);
     expect(screen.getByText("订单")).toBeInTheDocument();
+    for (const [code, label] of [
+      ["BUSINESS_PERIOD", "当期设置"],
+      ["BUSINESS_OVERVIEW_REMINDERS", "业务提醒"],
+      ["CUSTOMER_SOURCE", "参与方来源"],
+      ["UNKNOWN_DICTIONARY", "选项词典"],
+    ]) {
+      const row = screen.getByText(code).closest("tr");
+      expect(row).not.toBeNull();
+      expect(within(row as HTMLElement).getAllByText(label).length).toBeGreaterThan(0);
+    }
   });
 
   it("展示配置项列并支持按配置项筛选", async () => {
@@ -89,6 +105,10 @@ describe("AuditPanel：审计记录", () => {
 
     expect(screen.queryByText("资金账户 · 资金路由", { selector: ".ant-select-item-option-content" })).toBeNull();
     expect(screen.queryByText("资金账户 · OrderTypePool", { selector: ".ant-select-item-option-content" })).toBeNull();
+    expect(screen.getByText("选项词典", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.queryByText("业务提醒 · 选项词典", { selector: ".ant-select-item-option-content" })).toBeNull();
+    await ui.click(screen.getByText("选项词典", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "option_set" })));
   });
 
   it("加载失败展示错误横幅", async () => {

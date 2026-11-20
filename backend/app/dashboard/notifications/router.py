@@ -81,19 +81,19 @@ def list_my_notifications(
     )
 
 
-@router.post("/notifications/{notification_id}/read", response_model=schemas.NotificationOut)
-def mark_notification_read(
-    notification_id: int,
+@router.post("/notifications/read", response_model=schemas.NotificationReadOut)
+def mark_notifications_read(
+    payload: schemas.NotificationReadRequest,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
-) -> schemas.NotificationOut:
-    notification = service.mark_read(
+) -> schemas.NotificationReadOut:
+    ids = service.mark_read_batch(
         db,
-        notification_id,
+        payload.ids,
         recipient_user_id=user.id,
         actor=user.username,
     )
-    return schemas.NotificationOut.model_validate(notification)
+    return schemas.NotificationReadOut(read_ids=ids)
 
 
 __all__ = ["router"]

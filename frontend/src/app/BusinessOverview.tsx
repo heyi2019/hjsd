@@ -62,14 +62,6 @@ export function BusinessOverview({
   );
 }
 
-async function settleInBatches<T, R>(items: T[], action: (item: T) => Promise<R>): Promise<PromiseSettledResult<R>[]> {
-  const results: PromiseSettledResult<R>[] = [];
-  for (let index = 0; index < items.length; index += 10) {
-    results.push(...await Promise.allSettled(items.slice(index, index + 10).map(action)));
-  }
-  return results;
-}
-
 type ProfitNotificationDetail = {
   notification: NotificationItem;
   detail: ProfitDetail;
@@ -130,10 +122,15 @@ function ProfitNotificationModal({ open, onClose, onRead }: { open: boolean; onC
         const visible = available.filter(({ notification }) => !attemptedReads.current.has(notification.id));
         for (const { notification } of visible) attemptedReads.current.add(notification.id);
         if (visible.length) {
-          const results = await settleInBatches(visible, (item) => notificationsApi.markRead(item.notification.id));
-          const failed = results.filter((result) => result.status === "rejected").length;
-          if (!cancelled) setReadFailureCount((count) => count + failed);
-          if (failed < results.length) onReadRef.current?.();
+          try {
+            const result = await notificationsApi.markReadBatch(visible.map(({ notification }) => notification.id));
+            const readIds = new Set(result.read_ids);
+            const failed = visible.filter(({ notification }) => !readIds.has(notification.id)).length;
+            if (!cancelled) setReadFailureCount((count) => count + failed);
+            if (failed < visible.length) onReadRef.current?.();
+          } catch {
+            if (!cancelled) setReadFailureCount((count) => count + visible.length);
+          }
         }
       })()
       .catch((reason) => {

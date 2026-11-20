@@ -1,10 +1,10 @@
 """系统通知服务：只负责提醒的生成、查询和已读状态。"""
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFound, Validation
+from app.core.errors import Validation
 from app.shared.numbering import allocate_number
 from app.core.time import now_second
 from app.domain.enums import SequenceKey
@@ -148,27 +148,23 @@ def unread_profit_counts(session: Session, *, recipient_user_id: int) -> dict[st
     }
 
 
-def mark_read(
+def mark_read_batch(
     session: Session,
-    notification_id: int,
+    notification_ids: list[int],
     *,
     recipient_user_id: int,
     actor: str,
-) -> Notification:
-    notification = session.scalar(
-        select(Notification).where(
-            Notification.id == notification_id,
-            Notification.recipient_user_id == recipient_user_id,
-        )
-    )
-    if notification is None:
-        raise NotFound("通知不存在")
-    if notification.read_at is None:
-        # 与全库其余写入路径统一：本地无时区时间，精确到秒。
-        notification.read_at = now_second()
-        notification.updated_by = actor
+) -> list[int]:
+    ids = list(session.scalars(select(Notification.id).where(
+        Notification.id.in_(notification_ids), Notification.recipient_user_id == recipient_user_id,
+    )).all())
+    if ids:
+        session.execute(update(Notification).where(
+            Notification.id.in_(ids), Notification.recipient_user_id == recipient_user_id,
+            Notification.read_at.is_(None),
+        ).values(read_at=now_second(), updated_by=actor))
         session.flush()
-    return notification
+    return ids
 
 
 __all__ = [
@@ -177,7 +173,7 @@ __all__ = [
     "create_notification",
     "ensure_notification",
     "list_notifications",
-    "mark_read",
+    "mark_read_batch",
     "unread_profit_counts",
     "unread_count",
 ]

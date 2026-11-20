@@ -42,5 +42,5 @@ export const notificationsApi = {
   list: (params: { limit: number; before_id?: number; entity_type?: string; unread_only?: boolean; notification_type?: string }) => api.get<{ items: NotificationItem[]; total: number; unread_total: number }>("/notifications", { params }).then(r => r.data),
   pendingOrder: () => api.get<{ order_no: string | null; order_id: number | null }>("/notifications/pending-order").then(r => r.data),
   profitDetails: (ids: number[]) => api.get<ProfitNotificationDetail[]>("/notifications/profit-details", { params: { ids }, paramsSerializer: { indexes: null } }).then(r => r.data),
-  markRead: (id: number) => api.post<NotificationItem>(`/notifications/${id}/read`).then(r => r.data),
+  markReadBatch: (ids: number[]) => api.post<{ read_ids: number[] }>("/notifications/read", { ids }).then(r => r.data),
 };

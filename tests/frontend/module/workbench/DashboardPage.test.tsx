@@ -107,7 +107,7 @@ it("获得分润通知只请求订单来源的消息", async () => {
     const last = { id: 201, notification_no: "N201", recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", entity_type: "order", entity_id: "HS0201", message: "末尾通知", created_by: "admin", read_at: null };
     vi.mocked(notificationsApi.list).mockResolvedValue({ items: [last], total: 1, unread_total: 201 });
     vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 201, order_no: "HS0201", order_type: "HS", sale_amount: "10.00", stock_no: "KU0007", inventory_entry_at: "2026-11-10T08:00:00", removed_at: null, recovery_operator: null }]);
-    vi.mocked(notificationsApi.markRead).mockResolvedValue(last as never);
+    vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [201] });
     renderLight(<DashboardPage />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 1 条" }));
     expect(await screen.findByText("末尾通知")).toBeInTheDocument();
@@ -121,17 +121,17 @@ it("分润通知逐页加载，已读前页后仍可查看后页", async () => {
       ? { items: notifications.slice(10), total: 1, unread_total: 1 }
       : { items: notifications.slice(0, 10), total: 11, unread_total: 11 });
     vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, order_type: "HS", sale_amount: "10.00", stock_no: null, inventory_entry_at: "2026-11-10T08:00:00", removed_at: null, recovery_operator: null })));
-    vi.mocked(notificationsApi.markRead).mockResolvedValue(notifications[0] as never);
+    vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids }));
     renderLight(<DashboardPage />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 11 条" }));
     expect(await screen.findByText("通知 11")).toBeInTheDocument();
-    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledTimes(10));
+    await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([11, 10, 9, 8, 7, 6, 5, 4, 3, 2]));
     expect(notificationsApi.list).toHaveBeenCalledTimes(1);
     expect(notificationsApi.profitDetails).toHaveBeenCalledTimes(1);
-    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(1);
+    expect(notificationsApi.markReadBatch).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole("listitem", { name: "2" }));
     expect(await screen.findByText("通知 1")).toBeInTheDocument();
-    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1]));
     expect(notificationsApi.list).toHaveBeenLastCalledWith(expect.objectContaining({ before_id: 2 }));
     fireEvent.click(screen.getByRole("listitem", { name: "1" }));
     expect(await screen.findByText("通知 11")).toBeInTheDocument();
@@ -167,7 +167,7 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
       total: 3,
       unread_total: 3,
     });
-    vi.mocked(notificationsApi.markRead).mockRejectedValueOnce(new Error("网络不可用"));
+    vi.mocked(notificationsApi.markReadBatch).mockRejectedValueOnce(new Error("网络不可用"));
     vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 1, order_no: "TH0001", order_type: "TH", sale_amount: "300.00", stock_no: "KU0007", inventory_entry_at: "2026-11-10T08:00:00", removed_at: "2026-11-17T12:30:00", recovery_operator: "回收人员" }]);
     renderLight(<DashboardPage />, { user: "admin" });
 
@@ -184,10 +184,21 @@ it("点击获得分润通知展示订单金额、分润配置人和库存回收�
     expect(screen.queryByText("售出人员")).not.toBeInTheDocument();
     expect(screen.getByText("2026-11-17 12:30")).toBeInTheDocument();
     expect(screen.getByText(/2 条通知暂时无法查看/)).toBeInTheDocument();
-    await waitFor(() => expect(notificationsApi.markRead).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1]));
     expect(await screen.findByText(/1 条通知未能标为已读/)).toBeInTheDocument();
-    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(2);
-    expect(notificationsApi.markRead).not.toHaveBeenCalledWith(3);
+    expect(notificationsApi.markReadBatch).toHaveBeenCalledTimes(1);
+  });
+
+it("批量标记部分失败时保留未读并提示数量", async () => {
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ alerts: [{ type: "allocated_profit", message: "获得分润通知 2 条" }] }));
+    const items = [1, 2].map((id) => ({ id, notification_no: `N${id}`, recipient_user_id: 2, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `通知 ${id}`, entity_type: "order", entity_id: `HS${id}`, created_by: "admin", read_at: null }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items, total: 2, unread_total: 2 });
+    vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, order_type: "HS", sale_amount: "10.00", stock_no: null, inventory_entry_at: "2026-11-10T08:00:00", removed_at: null, recovery_operator: null })));
+    vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [1] });
+    renderLight(<DashboardPage />, { user: "admin" });
+    fireEvent.click(await screen.findByRole("button", { name: "获得分润通知 2 条" }));
+    expect(await screen.findByText(/1 条通知未能标为已读/)).toBeInTheDocument();
+    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1, 2]);
   });
 
 it("点击分润待配置通知跳转到对应订单的分润配置入口", async () => {
@@ -203,7 +214,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
     await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
     expect(notificationsApi.pendingOrder).toHaveBeenCalledTimes(1);
     expect(ordersApi.listPage).not.toHaveBeenCalled();
-    expect(notificationsApi.markRead).not.toHaveBeenCalled();
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
   });
 
 it("待配置通知不存在或订单不可见时提示且不跳转", async () => {

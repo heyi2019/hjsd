@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.core.errors import NotFound, Validation
+from app.core.errors import Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order, OrderEvent
@@ -61,7 +61,7 @@ def test_create_notification_rejects_blank_entity(seeded_db):
 def test_list_notifications_unread_only_filters(seeded_db):
     a = _make_unread(seeded_db, entity_id="A")
     b = _make_unread(seeded_db, entity_id="B")
-    notification_service.mark_read(seeded_db, a.id, recipient_user_id=2, actor="pytest")
+    notification_service.mark_read_batch(seeded_db, [a.id], recipient_user_id=2, actor="pytest")
     unread, unread_total = notification_service.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=True
     )
@@ -83,8 +83,7 @@ def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seed
     )
     assert total == 3
     assert [item.id for item in first] == [rows[2].id, rows[1].id]
-    for item in first:
-        notification_service.mark_read(seeded_db, item.id, recipient_user_id=2, actor="pytest")
+    notification_service.mark_read_batch(seeded_db, [item.id for item in first], recipient_user_id=2, actor="pytest")
     second, _ = notification_service.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", before_id=first[-1].id, limit=2,
     )
@@ -109,30 +108,45 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
     assert response.status_code == 200, response.text
     assert response.json() == {"order_no": hidden.order_no, "order_id": None}
-    notification_service.mark_read(seeded_db, pending.id, recipient_user_id=2, actor="pytest")
+    notification_service.mark_read_batch(seeded_db, [pending.id], recipient_user_id=2, actor="pytest")
     response = seeded_client.get("/api/v1/notifications/pending-order", headers=auth)
     assert response.json() == {"order_no": None, "order_id": None}
 
 
 def test_mark_read_not_found(seeded_db):
-    with pytest.raises(NotFound, match="通知不存在"):
-        notification_service.mark_read(
-            seeded_db, 999999, recipient_user_id=2, actor="pytest"
-        )
+    assert notification_service.mark_read_batch(seeded_db, [999999], recipient_user_id=2, actor="pytest") == []
 
 
 def test_mark_read_sets_read_at_and_idempotent(seeded_db):
     n = _make_unread(seeded_db)
     assert n.read_at is None
-    updated = notification_service.mark_read(
-        seeded_db, n.id, recipient_user_id=2, actor="pytest"
-    )
-    assert updated.read_at is not None
-    # 幂等：再次 mark_read 不重设 read_at（L134 的 is None 守卫）
-    again = notification_service.mark_read(
-        seeded_db, n.id, recipient_user_id=2, actor="pytest"
-    )
-    assert again.read_at == updated.read_at
+    assert notification_service.mark_read_batch(seeded_db, [n.id], recipient_user_id=2, actor="pytest") == [n.id]
+    seeded_db.refresh(n)
+    read_at = n.read_at
+    assert read_at is not None
+    assert notification_service.mark_read_batch(seeded_db, [n.id], recipient_user_id=2, actor="pytest") == [n.id]
+    seeded_db.refresh(n)
+    assert n.read_at == read_at
+
+
+def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_client, seeded_db):
+    first = _make_unread(seeded_db, recipient_user_id=1, entity_id="first")
+    second = _make_unread(seeded_db, recipient_user_id=1, entity_id="second")
+    other = _make_unread(seeded_db, recipient_user_id=2, entity_id="other")
+    payload = {"ids": [first.id, second.id, other.id, 999999]}
+    response = seeded_client.post("/api/v1/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
+    assert response.status_code == 200, response.text
+    assert set(response.json()["read_ids"]) == {first.id, second.id}
+    seeded_db.refresh(first)
+    seeded_db.refresh(second)
+    seeded_db.refresh(other)
+    assert first.read_at is not None and second.read_at is not None
+    assert other.read_at is None
+    initial_read_at = first.read_at
+    repeat = seeded_client.post("/api/v1/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
+    assert set(repeat.json()["read_ids"]) == {first.id, second.id}
+    seeded_db.refresh(first)
+    assert first.read_at == initial_read_at
 
 
 # 售出与分润通知业务闭环
@@ -241,7 +255,7 @@ def test_sell_pending_notification_is_idempotent(seeded_db):
     triggers.notify_seller_to_allocate(seeded_db, order, sell_event, actor="pytest")
     assert len(_notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)) == 1
     notification = _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)[0]
-    notification_service.mark_read(seeded_db, notification.id, recipient_user_id=seller_id, actor="pytest")
+    notification_service.mark_read_batch(seeded_db, [notification.id], recipient_user_id=seller_id, actor="pytest")
     triggers.notify_seller_to_allocate(seeded_db, order, sell_event, actor="pytest")
     assert notification.read_at is not None
 
@@ -295,7 +309,7 @@ def test_set_allocations_repeat_is_idempotent(seeded_db):
     _set_person_allocations(seeded_db, order, items)
     assert len(_notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 1
     notification = _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)[0]
-    notification_service.mark_read(seeded_db, notification.id, recipient_user_id=recipient_id, actor="pytest")
+    notification_service.mark_read_batch(seeded_db, [notification.id], recipient_user_id=recipient_id, actor="pytest")
     changed = [{"user_id": recipient_id, "role": "OWNER", "allocation_rate": "60"},
                {"user_id": None, "role": "OWNER", "allocation_rate": "40"}]
     _set_person_allocations(seeded_db, order, changed)

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NotificationOut(BaseModel):
@@ -44,6 +44,14 @@ class ProfitNotificationDetailOut(BaseModel):
 class PendingProfitOrderOut(BaseModel):
     order_no: str | None
     order_id: int | None
+
+
+class NotificationReadRequest(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=10)
+
+
+class NotificationReadOut(BaseModel):
+    read_ids: list[int]
 
 
 __all__ = ["NotificationListOut", "NotificationOut"]

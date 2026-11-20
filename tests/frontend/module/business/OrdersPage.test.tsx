@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -115,6 +115,27 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it("进入订单台账立即加载统计，输入关键词时合并请求", async () => {
+    vi.useFakeTimers();
+    try {
+      await act(async () => { renderLight(<OrdersPage initialTab="ledger" />); });
+      expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
+      fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "H" } });
+      fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "HS" } });
+      expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(249); });
+      expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(2);
+      expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS" }));
+      fireEvent.click(screen.getByRole("radio", { name: "回收 1" }));
+      expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(3);
+      expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS", order_type: "HS" }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   // 默认夹具、只读静态 DOM，合并外壳和已下线能力边界断言，避免重复挂载。
   it("业务中心外壳：默认进库存中心、页签只留三视图", async () => {
     renderLight(<OrdersPage />);
@@ -259,8 +280,8 @@ describe("OrdersPage：四类订单台账", () => {
     }
   });
 
-  it("FE-253：订单台账加载未完成时统计卡不显示可信的零", async () => {
-    vi.mocked(ordersApi.listPage).mockImplementation(() => new Promise(() => undefined));
+  it("FE-253：订单统计加载未完成时统计卡不显示可信的零", async () => {
+    vi.mocked(ordersApi.ledgerSummary).mockImplementation(() => new Promise(() => undefined));
     renderLight(<OrdersPage initialTab="ledger" />);
     const ledger = await screen.findByRole("tabpanel", { name: "订单台账" });
     const card = within(ledger).getByText("订单总量").closest(".ui-stat") as HTMLElement;

@@ -17,6 +17,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from app.domain.trade import Account
+from app.business.create import create_order
 from app.business.stocks.inventory import dashboard_inventory_summary
 from app.business.stocks.profile import create_account
 from app.business.stocks.schemas import AccountOut
@@ -106,9 +107,11 @@ def _account(seeded_db, game_account: str, *, days_ago: int):
 def test_dashboard_summary_aggregates_inventory_age_without_loading_rows(seeded_db):
     """工作台只取数据库聚合结果，不把所有入库时间加载到 Python。"""
     today = date.today()
-    _account(seeded_db, "dashboard-fresh", days_ago=7)
-    _account(seeded_db, "dashboard-aging", days_ago=8)
-    _account(seeded_db, "dashboard-overdue", days_ago=31)
+    for name, days in (("dashboard-fresh", 7), ("dashboard-aging", 8), ("dashboard-overdue", 31)):
+        account = _account(seeded_db, name, days_ago=days)
+        create_order(seeded_db, order_type="HS", trade_date=today, actor="pytest", account_id=account.id)
+        account.inventory_entry_at = datetime.combine(today - timedelta(days=days), time.min)
+    _account(seeded_db, "dashboard-unlinked", days_ago=31)
 
     class AggregateOnlySession:
         def __init__(self, session):

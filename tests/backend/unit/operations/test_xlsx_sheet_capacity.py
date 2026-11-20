@@ -1,3 +1,4 @@
+"""EXPORT-02 工作簿超过单表容量时续表并重复表头。"""
 from app.settings.lists import xlsx
 
 

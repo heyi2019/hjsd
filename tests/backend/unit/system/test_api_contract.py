@@ -76,4 +76,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 153（2026-11-19 f6e8b690 五档字段与子系统清理收口，-25：下线能力整域移除）。
     # → 154（2026-11-19 FIN-01-05 余额快照：+GET /balance-snapshots 只读端点）。
     # → 155（订单库存下架：POST /orders/{order_id}/inventory-offsale）。
-    assert public_routes == 155
+    # → 158（库存售出、库存分期售出、订单入口取消分期各新增一个端点）。
+    assert public_routes == 158

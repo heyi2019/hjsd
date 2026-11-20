@@ -58,6 +58,28 @@ def _buy(seeded_db, account, amount="500"):
     return order
 
 class TestCreateAccountGuards:
+    def test_inventory_order_summary_reuses_loaded_accounts(self, seeded_db):
+        from sqlalchemy import event
+        from app.business.router_outputs.list_payload import _order_list_payload
+
+        account = _account(seeded_db, "inventory-summary-reuse")
+        order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id)
+        expected = _order_list_payload(seeded_db, [order])
+        statements = []
+
+        def record_sql(_conn, _cursor, statement, _params, _context, _many):
+            statements.append(" ".join(statement.lower().split()))
+
+        connection = seeded_db.connection()
+        event.listen(connection, "before_cursor_execute", record_sql)
+        try:
+            actual = _order_list_payload(seeded_db, [order], accounts=[account])
+        finally:
+            event.remove(connection, "before_cursor_execute", record_sql)
+
+        assert actual == expected
+        assert not any(" from stocks " in sql for sql in statements)
+
     def test_account_records_inventory_entry_time_to_second(self, seeded_db):
         account = _account(seeded_db, "inventory-entry-time")
 

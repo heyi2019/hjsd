@@ -54,6 +54,8 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     requestEdit,
     rows,
     summary,
+    summaryLoading,
+    summaryError,
     searchInput,
     setCreateOpen,
     setCreatorFilter,
@@ -91,14 +93,15 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={summaryError} onRetry={() => void load()} />
       <Typography.Paragraph type="secondary">
         联系方式直接展示已建档原值；拉黑或已合并客户不可作为新订单参与方。
       </Typography.Paragraph>
       <StatRow
         items={[
           { label: "客户总数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(total) },
-          { label: "本月新增客户数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
-          { label: "今日新增客户数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(newTodayCount ?? 0) },
+          { label: "本月新增客户数", kind: "count", amount: loading || summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
+          { label: "今日新增客户数", kind: "count", amount: loading || summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
       />
       <Space wrap className="customer-list-filters customer-list-filters--separated">

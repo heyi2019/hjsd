@@ -138,7 +138,7 @@ def inventory_ledger(
     accounts = [account for account, _order in pairs]
     orders = [order for _account, order in pairs]
     account_outputs = _account_outputs(db, accounts, user)
-    order_outputs = build_order_list_payload(db, orders)
+    order_outputs = build_order_list_payload(db, orders, accounts=accounts)
     return InventoryLedgerOut(
         items=[{"account": account, "order": order}
                for account, order in zip(account_outputs, order_outputs, strict=True)],

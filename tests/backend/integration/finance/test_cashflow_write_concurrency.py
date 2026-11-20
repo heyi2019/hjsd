@@ -1,4 +1,4 @@
-"""同一笔流水的冲销、编辑和删除必须串行检查。"""
+"""REVERSAL-02 同一笔流水的冲销、编辑和删除必须串行检查。"""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from threading import Event

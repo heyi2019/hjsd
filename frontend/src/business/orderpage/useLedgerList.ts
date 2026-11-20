@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import { orderTypesApi, ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
@@ -38,6 +38,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const [gameTypes, setGameTypes] = useState<string[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
+  const previousSummaryQuery = useRef<{ keyword: string | undefined; filters: string } | null>(null);
   const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -142,8 +143,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
       setOrderStatusFilter(initialStatus ?? "all");
       setDateRange(initialTradeDateFrom && initialTradeDateTo ? [dayjs(initialTradeDateFrom), dayjs(initialTradeDateTo)] : null);
       const mineOperatorIds = initialMine && myOperatorId !== undefined ? [myOperatorId] : [];
-      setInventoryOperatorIds(mineOperatorIds);
-      setSaleOperatorIds(mineOperatorIds);
+      setInventoryOperatorIds((previous) => previous.length === mineOperatorIds.length && previous.every((id, index) => id === mineOperatorIds[index]) ? previous : mineOperatorIds);
+      setSaleOperatorIds((previous) => previous.length === mineOperatorIds.length && previous.every((id, index) => id === mineOperatorIds[index]) ? previous : mineOperatorIds);
       setPage(1);
     }
   }, [active, initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId]);
@@ -187,11 +188,19 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   }, [active, load, requestSequence]);
 
   useEffect(() => {
-    if (!active) return;
+    if (!active) {
+      previousSummaryQuery.current = null;
+      return;
+    }
     let cancelled = false;
     setSummaryLoading(true);
     setLedgerSummary(null);
-    const timer = window.setTimeout(() => {
+    const { keyword: searchKeyword, ...otherFilters } = queryFilters;
+    const filters = JSON.stringify(otherFilters);
+    const previous = previousSummaryQuery.current;
+    const debounceSearch = previous !== null && previous.filters === filters && previous.keyword !== searchKeyword;
+    previousSummaryQuery.current = { keyword: searchKeyword, filters };
+    const fetchSummary = () => {
       void ordersApi.ledgerSummary(queryFilters).then((result) => {
         if (cancelled) return;
         setLedgerSummary(result);
@@ -203,10 +212,12 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
       }).finally(() => {
         if (!cancelled) setSummaryLoading(false);
       });
-    }, 250);
+    };
+    const timer = debounceSearch ? window.setTimeout(fetchSummary, 250) : undefined;
+    if (!debounceSearch) fetchSummary();
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
     };
   }, [active, queryFilters]);
 

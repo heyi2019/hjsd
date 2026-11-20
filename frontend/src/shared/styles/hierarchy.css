@@ -82,6 +82,8 @@
 .page-enter {
   animation: ui-page-rise var(--dur-spring) var(--ease-spring) both;
 }
+/* 高频列表入口优先展示内容，避免页面与表格动画叠加造成等待感。 */
+.page-enter.page-slot--quick-entry { animation-duration: 80ms; }
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; }
 }

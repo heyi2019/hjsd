@@ -525,6 +525,10 @@
   .ant-table-tbody > tr.ant-table-row:nth-child(10) { animation-delay: 216ms; }
   .ant-table-tbody > tr.ant-table-row:nth-child(11) { animation-delay: 240ms; }
   .ant-table-tbody > tr.ant-table-row:nth-child(12) { animation-delay: 264ms; }
+  .page-slot--quick-entry .ant-table-tbody > tr.ant-table-row {
+    animation-duration: 80ms;
+    animation-delay: 0ms;
+  }
 }
 
 /* ── 建单弹窗 / 二次确认框：入场动画压至 50ms（用户 2026-10-28 裁决）──

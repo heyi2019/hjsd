@@ -120,6 +120,27 @@ beforeEach(() => {
   }));
 });
 describe("CustomersPage：客户档案", () => {
+  it("统计尚未返回时先展示已返回的客户列表", async () => {
+    let finish!: (value: ReturnType<typeof customerSummary>) => void;
+    const pending = new Promise<ReturnType<typeof customerSummary>>((resolve) => { finish = resolve; });
+    vi.mocked(customersApi.summary).mockReturnValueOnce(pending);
+    renderLight(<CustomersPage />, { user: "admin" });
+    expect(await screen.findByText("CUS-0001")).toBeVisible();
+    expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("-");
+    await act(async () => { finish(customerSummary({ month_count: 3, today_count: 1 })); await pending; });
+    expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("3");
+  });
+
+  it("统计请求失败时保留客户列表并提示重试", async () => {
+    vi.mocked(customersApi.summary).mockRejectedValueOnce(new Error("客户统计读取失败"));
+    renderLight(<CustomersPage />, { user: "admin" });
+    expect(await screen.findByText("CUS-0001")).toBeVisible();
+    expect(await screen.findByText(/客户统计读取失败/)).toBeVisible();
+    expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("不可用");
+    await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.getByText("本月新增客户数").closest(".ui-stat")).toHaveTextContent("1"));
+  });
+
   it("客户筛选失败隐藏旧数据，重试后显示当前结果", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<CustomersPage />, { user: "admin" });

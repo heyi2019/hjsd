@@ -23,6 +23,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [rows, setRows] = useState<Customer[] | null>(null);
   const [total, setTotal] = useState(0);
   const [summary, setSummary] = useState<{ month_count: number; today_count: number } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const [fieldDefs, setFieldDefs] = useState<OrderFormField[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
@@ -76,38 +78,43 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const load = useCallback(async () => {
     const request = ++requestRef.current;
     setLoading(true);
-    try {
-      const params = {
-        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-        ...(statusFilter ? { status: statusFilter } : {}),
-        ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-        ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
-        ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-      };
-      const summaryParams = {
-        today_date: today(),
-        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-        ...(statusFilter ? { status: statusFilter } : {}),
-        ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-        ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
-        ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
-      };
-      const [customerPage, customerSummary] = await Promise.all([
-        customersApi.page(params),
-        customersApi.summary(summaryParams),
-      ]);
+    setSummaryLoading(true);
+    setSummaryError(null);
+    const params = {
+      ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+      ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
+      ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    };
+    const summaryParams = {
+      today_date: today(),
+      ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
+      ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
+      ...(orderFilter ? { mine_orders: true, trade_date_from: orderFilter.from, trade_date_to: orderFilter.to } : {}),
+      ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
+    };
+    const listRequest = customersApi.page(params).then((customerPage) => {
       if (request !== requestRef.current) return;
       setRows(customerPage.items);
       setTotal(customerPage.total);
-      setSummary(customerSummary);
       setError(null);
-    } catch (err) {
+    }).catch((err) => {
       if (request === requestRef.current) setError(normalizeError(err));
-    } finally {
+    }).finally(() => {
       if (request === requestRef.current) setLoading(false);
-    }
+    });
+    const summaryRequest = customersApi.summary(summaryParams).then((customerSummary) => {
+      if (request === requestRef.current) setSummary(customerSummary);
+    }).catch((err) => {
+      if (request === requestRef.current) setSummaryError(normalizeError(err));
+    }).finally(() => {
+      if (request === requestRef.current) setSummaryLoading(false);
+    });
+    await Promise.all([listRequest, summaryRequest]);
   }, [creatorFilter, keyword, page, pageSize, statusFilter, Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
 
   useEffect(() => { setPage(1); }, [Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
@@ -377,6 +384,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     requestMerge,
     rows,
     summary,
+    summaryLoading,
+    summaryError,
     searchInput,
     setCreateOpen,
     setCreatorFilter,

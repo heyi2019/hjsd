@@ -290,7 +290,7 @@ export function AppShell() {
                 <div
                   key={key}
                   ref={isActive ? pageRef : undefined}
-                  className={`page-slot${isActive ? " page-enter" : " page-slot--hidden"}`}
+                  className={`page-slot${key === "business" || key === "customers" ? " page-slot--quick-entry" : ""}${isActive ? " page-enter" : " page-slot--hidden"}`}
                   aria-hidden={!isActive}
                 >
                   {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，

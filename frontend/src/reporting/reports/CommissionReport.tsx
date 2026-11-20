@@ -2,8 +2,8 @@
 
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useEffect, useState } from "react";
-import { employeesApi } from "../../shared/api/org.api";
+import { useState } from "react";
+import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { reportsApi } from "../../shared/api/reports.api";
 import type { CommissionOrderGroup, CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
 import { normalizeError } from "../../shared/api/client";
@@ -15,22 +15,9 @@ import "./CommissionReport.css";
 
 export function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
   const { params, picker } = range;
-  const [employees, setEmployees] = useState<{ id: number; username: string; display_name: string; is_active: boolean }[]>([]);
-  const [employeeError, setEmployeeError] = useState<{ message: string; code?: string } | null>(null);
+  const { employees, error: employeeCause } = useEmployeeOptions();
+  const employeeError = employeeCause ? normalizeError(employeeCause) : null;
   const [selectedUserId, setSelectedUserId] = useState<number>(0);
-  useEffect(() => {
-    let mounted = true;
-    employeesApi.list()
-      .then((items) => {
-        if (!mounted) return;
-        setEmployees(items);
-        setEmployeeError(null);
-      })
-      .catch((error) => {
-        if (mounted) setEmployeeError(normalizeError(error));
-      });
-    return () => { mounted = false; };
-  }, [mine]);
   const commissionParams = {
     ...(params.from ? { from: params.from } : {}),
     ...(params.to ? { to: params.to } : {}),

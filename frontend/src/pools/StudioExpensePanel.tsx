@@ -16,10 +16,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
 import { studioExpensesApi } from "../shared/api/studioExpenses.api";
 import { optionSetsApi } from "../shared/api/options.api";
-import { employeesApi } from "../shared/api/org.api";
 import type { OptionItem } from "../shared/api/types/common";
 import type { Cashflow, Pool } from "../shared/api/types/finance";
-import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
@@ -37,6 +35,7 @@ import { ConfirmButton,
   StatRow,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
 import type { FundsPageController } from "./useFundsPageController";
 import { useBusinessPeriod, type PeriodState } from "../shared/state/businessPeriod";
@@ -103,7 +102,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     count: number;
   } | null>(null);
   const [expenseItems, setExpenseItems] = useState<OptionItem[]>([]);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const { activeEmployees: employees } = useEmployeeOptions();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
 
@@ -126,16 +125,6 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   useEffect(() => {
     setPaging((current) => current.filterKey === filterKey ? current : { ...current, filterKey, page: 1 });
   }, [filterKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.resolve(employeesApi.list())
-      .then((items) => {
-        if (!cancelled) setEmployees((items ?? []).filter((item) => item.is_active));
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
 
   // 筛选条件变化会重新触发 load；用请求序号丢弃过期响应，避免切类目/改日期后
   // 旧请求后到覆盖新结果（与 useLedgerList 同一范式）。

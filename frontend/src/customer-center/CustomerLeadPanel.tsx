@@ -6,8 +6,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { leadsApi } from "../shared/api/customers.api";
 import type { Customer, Lead } from "../shared/api/types/customers";
-import { employeesApi } from "../shared/api/org.api";
-import type { EmployeeOption } from "../shared/api/types/org";
 import { normalizeError } from "../shared/api/client";
 import { BusinessActionModal, BusinessRegistrationForm, CompactActions, DataTable, ErrorBanner, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { moneyRules } from "../shared/lib/validators";
@@ -18,6 +16,7 @@ import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect
 import { loadActiveCustomers } from "./loadActiveCustomers";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useLatestRequest } from "../shared/hooks/useLatestRequest";
+import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
@@ -33,7 +32,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const requestRef = useRef(0);
   const summaryRequestRef = useRef(0);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const { activeEmployees: employees } = useEmployeeOptions();
   const [createOpen, setCreateOpen] = useState(false);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
@@ -45,12 +44,6 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [convertForm] = Form.useForm();
-
-  useEffect(() => {
-    void Promise.resolve(employeesApi.list())
-      .then((items) => setEmployees((items ?? []).filter((item) => item.is_active)))
-      .catch(() => undefined);
-  }, []);
 
   const loadList = useCallback(async () => {
     const request = ++requestRef.current;

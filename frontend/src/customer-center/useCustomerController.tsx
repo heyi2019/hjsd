@@ -3,7 +3,7 @@ import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFormExtraDisplay, formatExtraDisplayValue } from "../business/ConfigurableField";
 import { customersApi } from "../shared/api/customers.api";
-import { employeesApi } from "../shared/api/org.api";
+import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Customer, CustomerDetail } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
@@ -44,7 +44,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | undefined>();
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
-  const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
+  const { activeEmployees, settled: employeesSettled } = useEmployeeOptions();
+  const creatorOptions = employeesSettled ? activeEmployees.map((item) => ({ label: item.display_name || item.username, value: item.username })) : null;
   const requestRef = useRef(0);
   const summaryRequestRef = useRef(0);
   const detailRequest = useLatestRequest();
@@ -153,15 +154,6 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       .list("CUSTOMER", true)
       .then((rows) => setFieldDefs((rows ?? []).filter((row) => row.is_custom)))
       .catch(() => setFieldDefs([]));
-  }, []);
-
-  useEffect(() => {
-    Promise.resolve(employeesApi.list())
-      .then((items) => setCreatorOptions((items ?? []).filter((item) => item.is_active).map((item) => ({
-        label: item.display_name || item.username,
-        value: item.username,
-      }))))
-      .catch(() => setCreatorOptions([]));
   }, []);
 
   const openDetail = async (row: Customer) => {

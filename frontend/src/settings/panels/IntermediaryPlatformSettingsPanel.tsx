@@ -5,7 +5,6 @@ import type { ColumnsType } from "antd/es/table";
 import { useCallback, useRef, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
 import type { OptionItem } from "../../shared/api/types/common";
-import { clearOptionSetsCache } from "../../shared/lib/optionSets";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
@@ -34,7 +33,6 @@ export function OptionDictionarySection({ code, title, description }: { code: st
     setSaving(true);
     try {
       await optionSetsApi.update(code, { options });
-      clearOptionSetsCache();
       onSuccess?.();
       setMutationError(null);
       await reload();

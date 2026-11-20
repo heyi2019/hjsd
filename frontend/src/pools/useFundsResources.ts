@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef } from "react";
 import { useReloadOnActive } from "../shared/state/reloadOnActive";
 import { useCashflowResources } from "./useCashflowResources";
 import { useDepositResources } from "./useDepositResources";
 import { usePoolResources } from "./usePoolResources";
 import { useReconciliationResources } from "./useReconciliationResources";
-import { employeesApi } from "../shared/api/org.api";
-import type { EmployeeOption } from "../shared/api/types/org";
+import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import type { PeriodState } from "../shared/state/businessPeriod";
 
 /** 资金中心数据/查询层：资金账户、余额、押金、流水、对账的加载与筛选，以及派生统计。
@@ -14,21 +13,11 @@ export function useFundsResources(active: boolean, periodState: PeriodState, cas
   const poolResources = usePoolResources();
   const depositResources = useDepositResources();
   const reconciliationResources = useReconciliationResources();
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const { activeEmployees: employees } = useEmployeeOptions();
   const cashflowEnabled = cashflowsActive && periodState.ready;
   const cashflowEnabledRef = useRef(cashflowEnabled);
   cashflowEnabledRef.current = cashflowEnabled;
   const cashflow = useCashflowResources(cashflowEnabled, periodState);
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.resolve(employeesApi.list())
-      .then((items) => {
-        if (!cancelled) setEmployees((items ?? []).filter((item) => item.is_active));
-      })
-      .catch(() => undefined);
-    return () => { cancelled = true; };
-  }, []);
 
   const load = useCallback(async (includeCashflow = true) => {
     await Promise.all([

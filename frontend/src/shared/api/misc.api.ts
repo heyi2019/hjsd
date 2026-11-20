@@ -1,6 +1,12 @@
 import { api } from "./client";
+import { notifyReferenceDataChanged } from "../state/referenceDataEvents";
 import type { AttachmentItem, DocumentSequence, NotificationItem } from "./types/common";
 import type { GameTypeOption } from "./types/org";
+
+function gameTypesChanged<T>(value: T): T {
+  notifyReferenceDataChanged("gameTypes");
+  return value;
+}
 
 export interface ProfitNotificationDetail {
   notification_id: number;
@@ -17,14 +23,14 @@ export const gameTypesApi = {
   list: (params?: { include_inactive?: boolean }) =>
     api.get<GameTypeOption[]>("/game-types", { params }).then((r) => r.data),
   create: (payload: { name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) =>
-    api.post<GameTypeOption>("/game-types", payload).then((r) => r.data),
+    api.post<GameTypeOption>("/game-types", payload).then((r) => gameTypesChanged(r.data)),
   update: (id: number, payload: { name?: string; sort_order?: number; channel_regions?: string[] }) =>
-    api.patch<GameTypeOption>(`/game-types/${id}`, payload).then((r) => r.data),
+    api.patch<GameTypeOption>(`/game-types/${id}`, payload).then((r) => gameTypesChanged(r.data)),
   setActive: (id: number, active: boolean) =>
-    api.patch<GameTypeOption>(`/game-types/${id}/active?active=${active}`).then((r) => r.data),
+    api.patch<GameTypeOption>(`/game-types/${id}/active?active=${active}`).then((r) => gameTypesChanged(r.data)),
   setDefault: (id: number, isDefault: boolean) =>
-    api.patch<GameTypeOption>(`/game-types/${id}/default?is_default=${isDefault}`).then((r) => r.data),
-  remove: (id: number) => api.delete(`/game-types/${id}`),
+    api.patch<GameTypeOption>(`/game-types/${id}/default?is_default=${isDefault}`).then((r) => gameTypesChanged(r.data)),
+  remove: (id: number) => api.delete(`/game-types/${id}`).then(gameTypesChanged),
 };
 
 export const sequencesApi = {

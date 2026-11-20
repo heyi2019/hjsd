@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue } from "../business/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
-import { employeesApi } from "../shared/api/org.api";
 import { orderFormFieldsApi } from "../shared/api/orders.api";
 import type { Counterparty } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
@@ -16,6 +15,7 @@ import { useListViewColumns } from "../shared/lib/listColumns";
 import { DataTable, BusinessActionModal, BusinessRegistrationForm, ErrorBanner, InlineError, ConfirmButton, PermissionButton, Select, StatRow, StatusTag } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import { collectExtras } from "./CustomersPage.fragments";
 
 export function CounterpartyPanel({ active = true, focusId, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
@@ -23,7 +23,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
   const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
-  const [creatorOptions, setCreatorOptions] = useState<{ label: string; value: string }[] | null>(null);
+  const { activeEmployees, settled: employeesSettled } = useEmployeeOptions();
+  const creatorOptions = employeesSettled ? activeEmployees.map((item) => ({ label: item.display_name || item.username, value: item.username })) : null;
   const requestRef = useRef(0);
   const [rows, setRows] = useState<Counterparty[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -91,15 +92,6 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     orderFormFieldsApi.list("COUNTERPARTY", true)
       .then((items) => setFieldDefs((items ?? []).filter((item) => item.is_custom)))
       .catch(() => setFieldDefs([]));
-  }, []);
-
-  useEffect(() => {
-    Promise.resolve(employeesApi.list())
-      .then((items) => setCreatorOptions((items ?? []).filter((item) => item.is_active).map((item) => ({
-        label: item.display_name || item.username,
-        value: item.username,
-      }))))
-      .catch(() => setCreatorOptions([]));
   }, []);
 
   const openDetail = async (row: Counterparty, loadedDetail?: Counterparty) => {

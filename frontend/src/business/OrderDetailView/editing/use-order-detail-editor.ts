@@ -1,6 +1,5 @@
 import { Form } from "antd";
 import { useRef, useState } from "react";
-import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { useSession } from "../../../shared/state/session";
 import type { AccountExecutionDetail, AccountExecutionEvent } from "../../../shared/api/types/account-execution";
@@ -12,6 +11,7 @@ import { normalizeError } from "../../../shared/api/client";
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useEmployeeOptions } from "../../../shared/hooks/useEmployeeOptions";
 import { buildEventEdits, buildOperationEventCreates, buildOrderEdits } from "./execution-edit-payload";
 import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
 import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
@@ -38,7 +38,7 @@ export function useOrderDetailEditor(params: {
   const [financeDrafts, setFinanceDrafts] = useState<Record<string, FinanceDraft>>({});
   const [orderDrafts, setOrderDrafts] = useState<Record<number, OrderDraft>>({});
   const [partyDrafts, setPartyDrafts] = useState<Record<number, PartyAddition[]>>({});
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const { employees, reload: reloadEmployees } = useEmployeeOptions(false);
   const [pools, setPools] = useState<Pool[]>([]);
   const [invEditExtraForm] = Form.useForm();
   const originalAccountExtras = useRef<Record<string, unknown>>({});
@@ -50,11 +50,8 @@ export function useOrderDetailEditor(params: {
   async function ensureEmployees(): Promise<EmployeeOption[]> {
     if (employees.length) return employees;
     try {
-      const list = await employeesApi.list();
-      setEmployees(list);
-      return list;
+      return await reloadEmployees();
     } catch {
-      setEmployees([]);
       // 员工列表加载失败不阻断编辑：事件操作人下拉可在保存前重试或留空由后端校验。
       return [];
     }

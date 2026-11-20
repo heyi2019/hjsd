@@ -1,12 +1,11 @@
 import { Form } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../../shared/api/installments.api";
-import { employeesApi } from "../../shared/api/org.api";
 import type { Installment, InstallmentTotals, Schedule } from "../../shared/api/types/installments";
 import type { Order } from "../../shared/api/types/orders";
-import type { EmployeeOption } from "../../shared/api/types/org";
 import { normalizeError } from "../../shared/api/client";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { useSession } from "../../shared/state/session";
 import type { Permission } from "../../shared/state/session";
@@ -26,7 +25,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const [pageSize, setPageSize] = useState(10);
   const [pageTotal, setPageTotal] = useState(0);
   const [resaleOrders, setResaleOrders] = useState<Order[]>([]);
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const { activeEmployees: employees, error: employeeError } = useEmployeeOptions();
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
@@ -157,16 +156,8 @@ export function useContractTableController(params: { contractType: string; reloa
   });
 
   useEffect(() => {
-    let cancelled = false;
-    void Promise.resolve(employeesApi.list())
-      .then((items) => {
-        if (!cancelled) setEmployees((items ?? []).filter((item) => item.is_active));
-      })
-      .catch((err) => {
-        if (!cancelled) setError(normalizeError(err));
-      });
-    return () => { cancelled = true; };
-  }, []);
+    if (employeeError) setError(normalizeError(employeeError));
+  }, [employeeError]);
 
   // 总应收 / 剩余应收都只采用后端下发值（含「不小于 0」的 clamp），前端不再自行推导。
   const totalReceivable = totals?.total_receivable ?? "0.00";

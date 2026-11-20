@@ -6,6 +6,7 @@ import { orderFormFieldsApi } from "../../shared/api/orders.api";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { ErrorBanner } from "../../shared/ui/ErrorBanner";
 import type { OrderFormField } from "../../shared/api/types/forms";
+import { subscribeReferenceDataChanged } from "../../shared/state/referenceDataEvents";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
 
@@ -24,6 +25,7 @@ export function useOrderFormConfig(orderType: string | undefined): {
   const [failure, setFailure] = useState<{ scope: string; error: NormalizedError } | null>(null);
   const [loading, setLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  useEffect(() => subscribeReferenceDataChanged("formFields", () => setRetryCount((value) => value + 1)), []);
   useEffect(() => {
     if (!orderType) return undefined;
     let cancelled = false;
@@ -79,6 +81,8 @@ export function useOrderFormSectionLabels(orderType: string | undefined): {
 } {
   const [labels, setLabels] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => subscribeReferenceDataChanged("formSections", () => setRevision((value) => value + 1)), []);
   useEffect(() => {
     if (!orderType) {
       setLabels({});
@@ -100,7 +104,7 @@ export function useOrderFormSectionLabels(orderType: string | undefined): {
     return () => {
       cancelled = true;
     };
-  }, [orderType]);
+  }, [orderType, revision]);
   return { labels, loading };
 }
 

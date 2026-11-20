@@ -6,52 +6,71 @@
 import { useEffect, useState } from "react";
 import { optionSetsApi } from "../api/options.api";
 import type { OptionItem } from "../api/types/common";
+import { subscribeReferenceDataChanged } from "../state/referenceDataEvents";
 
 type OptionSetMap = Record<string, OptionItem[]>;
 
 let cache: OptionSetMap | null = null;
 let inflight: Promise<OptionSetMap> | null = null;
+let generation = 0;
+const listeners = new Set<() => void>();
 
 /** 加载全部选项词典并缓存；并发请求复用同一 Promise。 */
 export function loadOptionSets(): Promise<OptionSetMap> {
   if (cache) return Promise.resolve(cache);
   if (inflight) return inflight;
-  inflight = Promise.resolve(optionSetsApi.list())
+  const requestGeneration = generation;
+  const request = Promise.resolve(optionSetsApi.list())
     .then((res) => {
+      if (requestGeneration !== generation) return loadOptionSets();
       const map: OptionSetMap = {};
       // 防御：接口返回空/未打桩（如单测未 mock）时按空词典处理，避免整页白屏。
       for (const set of (res as { items?: Array<{ code: string; options?: OptionItem[] }> } | undefined)?.items ?? []) {
         map[set.code] = set.options ?? [];
       }
       cache = map;
-      inflight = null;
       return map;
     })
     .catch((err) => {
-      inflight = null;
+      if (requestGeneration !== generation) return loadOptionSets();
       throw err;
+    })
+    .finally(() => {
+      if (inflight === request) inflight = null;
     });
-  return inflight;
+  inflight = request;
+  return request;
 }
 
-/** 写入后清缓存，下次读取重新拉取。 */
+/** 写入后清缓存，并更新已挂载页面的字典。 */
 export function clearOptionSetsCache(): void {
+  generation += 1;
   cache = null;
   inflight = null;
+  for (const listener of listeners) listener();
 }
+
+subscribeReferenceDataChanged("optionSets", clearOptionSetsCache);
 
 /** 组件用：返回全量 code→options 映射（加载中为 null）。 */
 function useOptionSets(): OptionSetMap | null {
   const [map, setMap] = useState<OptionSetMap | null>(cache);
   useEffect(() => {
     let active = true;
-    loadOptionSets()
-      .then((m) => {
-        if (active) setMap(m);
-      })
-      .catch(() => undefined);
+    let sequence = 0;
+    const reload = () => {
+      const current = ++sequence;
+      void loadOptionSets()
+        .then((m) => {
+          if (active && current === sequence) setMap(m);
+        })
+        .catch(() => undefined);
+    };
+    listeners.add(reload);
+    reload();
     return () => {
       active = false;
+      listeners.delete(reload);
     };
   }, []);
   return map;

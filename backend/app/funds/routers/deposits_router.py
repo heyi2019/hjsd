@@ -26,6 +26,7 @@ from app.funds.deposits.writes import (
     delete_deposit as finance_delete_deposit,
     update_deposit as finance_update_deposit,
 )
+from app.shared.operation_operators import list_operation_operators_bulk
 
 from ..router_output import _actor, _cashflow_out, _deposit_out
 
@@ -49,7 +50,10 @@ def list_deposits(
         else sorted(user.pool_ids),
         user=user,
     )
-    return [_deposit_out(item, db) for item in items]
+    operators = list_operation_operators_bulk(
+        db, entity_type="deposit", entity_ids=[item.id for item in items],
+    )
+    return [_deposit_out(item, db, operation_operators=operators.get(str(item.id), [])) for item in items]
 
 
 @router.post("/deposits", response_model=schemas.DepositOut, status_code=201)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.operation_operators import list_operation_operators
 from app.domain.trade import Cashflow, Deposit, Order, RebateRecord
+from app.domain.foundation import BusinessOperationOperator
 from app.domain.users import User
 from app.domain.enums import CashflowSourceType
 from app.funds import schemas
@@ -91,10 +92,14 @@ def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None, ope
     )
 
 
-def _deposit_out(item: Deposit, db: Session | None = None) -> schemas.DepositOut:
-    operation_operators = list_operation_operators(
-        db, entity_type="deposit", entity_id=item.id
-    ) if db is not None else []
+def _deposit_out(
+    item: Deposit, db: Session, *,
+    operation_operators: list[BusinessOperationOperator] | None = None,
+) -> schemas.DepositOut:
+    if operation_operators is None:
+        operation_operators = list_operation_operators(
+            db, entity_type="deposit", entity_id=item.id
+        )
     return schemas.DepositOut.model_validate(
         {
             **vars(item),
@@ -115,15 +120,20 @@ def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
     return schemas.RebateOut.model_validate(payload)
 
 
-def _reconciliation_out(item, db: Session | None = None) -> schemas.ReconciliationOut:
+def _reconciliation_out(
+    item, db: Session, *,
+    operation_operators: list[BusinessOperationOperator] | None = None,
+) -> schemas.ReconciliationOut:
+    if operation_operators is None:
+        operation_operators = list_operation_operators(
+            db, entity_type="reconciliation", entity_id=item.id
+        )
     return schemas.ReconciliationOut.model_validate(
         {
             **vars(item),
             "created_at": item.created_at,
             "operator": item.created_by,
-            "operation_operators": list_operation_operators(
-                db, entity_type="reconciliation", entity_id=item.id
-            ) if db is not None else [],
+            "operation_operators": operation_operators,
         }
     )
 

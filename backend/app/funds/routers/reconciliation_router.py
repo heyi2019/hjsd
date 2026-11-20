@@ -25,6 +25,7 @@ from app.funds.transfers import (
     create_transfer as finance_create_transfer,
     repair_transfer as finance_repair_transfer,
 )
+from app.shared.operation_operators import list_operation_operators_bulk
 
 from ..router_output import _actor, _reconciliation_out, _transfer_out
 
@@ -49,7 +50,10 @@ def list_reconciliations(
         else sorted(user.pool_ids),
         user=user,
     )
-    return [_reconciliation_out(item, db) for item in items]
+    operators = list_operation_operators_bulk(
+        db, entity_type="reconciliation", entity_ids=[item.id for item in items],
+    )
+    return [_reconciliation_out(item, db, operation_operators=operators.get(str(item.id), [])) for item in items]
 
 
 @router.get("/balance-snapshots", response_model=list[schemas.BalanceSnapshotOut])

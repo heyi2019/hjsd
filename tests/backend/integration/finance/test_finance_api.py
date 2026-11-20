@@ -7,7 +7,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.business.stocks.profile import create_account
 from app.business.form_fields import create_order_form_field
@@ -22,11 +22,50 @@ from app.funds.deposits.writes import create_deposit
 from app.funds.deposits.reads import list_deposits
 from app.funds.rebates import create_rebate
 from app.funds.transfers import create_transfer, repair_transfer
+from app.funds.reconciliation import create_reconciliation, resolve_reconciliation
 from app.business.create import create_order
 from app.business.events import post_event
 from app.funds.balances import pool_balance
 
 TODAY = date(2026, 10, 4)
+
+
+@pytest.mark.parametrize("kind", ["deposit", "reconciliation"])
+def test_finance_lists_batch_operation_operators(seeded_client, seeded_db, headers, kind):
+    pool = _pool(seeded_db, "HJ_INVEST")
+    records = []
+    for i in range(3):
+        if kind == "deposit":
+            item = create_deposit(seeded_db, pool_id=pool.id, amount=Decimal("10"),
+                                  paid_on=TODAY, actor="pytest", operator_user_ids=[1, 2])
+        else:
+            item = create_reconciliation(seeded_db, pool_id=pool.id, reconciled_on=TODAY,
+                                         account_label=f"账户{i}", statement_balance=Decimal("0"),
+                                         actor="pytest", operator_user_ids=[1, 2])
+        records.append(item)
+    if kind == "reconciliation":
+        resolve_reconciliation(seeded_db, records[0].id, actor="pytest", reason="已核对", operator_user_ids=[2])
+    seeded_db.flush()
+    operator_queries = []
+
+    def count_queries(_conn, _cursor, statement, _params, _context, _many):
+        if "from business_operation_operators" in statement.lower():
+            operator_queries.append(statement)
+
+    engine = seeded_db.get_bind()
+    event.listen(engine, "before_cursor_execute", count_queries)
+    try:
+        response = seeded_client.get(f"/api/{'deposits' if kind == 'deposit' else 'reconciliations'}", headers=headers)
+    finally:
+        event.remove(engine, "before_cursor_execute", count_queries)
+    assert response.status_code == 200, response.text
+    outputs = {row["id"]: row["operation_operators"] for row in response.json()}
+    assert set(outputs) == {item.id for item in records}
+    for item in records:
+        assert any(op["operation_key"] == "CREATE" and op["operator_user_ids"] == [1, 2] for op in outputs[item.id])
+    if kind == "reconciliation":
+        assert any(op["operation_key"] == "RESOLVE" and op["operator_user_ids"] == [2] for op in outputs[records[0].id])
+    assert len(operator_queries) == 1
 
 
 def _pool(seeded_db, code: str) -> Pool:

@@ -110,6 +110,18 @@ export function CreateBusinessModal(props: {
 
   const submit = async (values: Record<string, unknown>) => {
     if (!configReady) return;
+    const prefix = isTh ? "supplier_" : isDg ? "dg_customer_" : "customer_";
+    const nicknameField = `${prefix}nickname`;
+    const contactFields = isDg
+      ? ["dg_customer_contact", "dg_customer_phone", "dg_customer_wechat", "dg_customer_qq"]
+      : [`${prefix}contact_name`, `${prefix}phone`, `${prefix}wechat`, `${prefix}qq`];
+    if (!String(values[nicknameField] ?? "").trim() && contactFields.some((key) => String(values[key] ?? "").trim())) {
+      const message = `已填写联系方式，请补充${isTh ? "供货方" : "客户"}昵称`;
+      submitErrorVisible.current = true;
+      form.setFields([{ name: nicknameField, errors: [message] }]);
+      setLoadError({ code: "FORM_VALIDATION", message });
+      return;
+    }
     const submittedSession = session.current();
     await write.run(async () => {
       try {

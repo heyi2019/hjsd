@@ -67,7 +67,7 @@ export function buildOrderNote(
       values.supplier_note as string,
     ].filter(Boolean).join("｜") || undefined;
   }
-  return values.note as string;
+  return values[kind.isDg ? "dg_note" : "note"] as string;
 }
 
 /** 建单客户草稿：由订单接口在同一事务内复用已有客户或新建档案。 */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { splitFormExtra } from "@/business/create/submit-helpers";
+import { buildOrderNote, splitFormExtra } from "@/business/create/submit-helpers";
 import type { FieldConfigMap } from "@/business/ConfigurableField";
 
 const config: FieldConfigMap = {
@@ -24,4 +24,8 @@ describe("splitFormExtra", () => {
     const result = splitFormExtra({ form_extra: { optional_number: null } }, config);
     expect(result.orderFormExtra).toEqual({});
   });
+});
+
+it("代挂没有客户来源时仍保存订单备注", () => {
+  expect(buildOrderNote({ dg_note: "委托备注" }, { isRecovery: false, isTh: false, isDg: true }, undefined)).toBe("委托备注");
 });

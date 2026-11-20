@@ -257,6 +257,36 @@ it("必填校验失败时显示表单级提示，避免误认为点击无效", a
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });
 
+it.each([
+  ["HS", "customer_phone", "客户昵称"],
+  ["TH", "supplier_phone", "供货方昵称"],
+])("%s 填了联系方式但未填昵称时阻止提交并提示", async (orderType, phoneId, nickname) => {
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
+    ...allFormFields().filter((field) => field.order_type_code === scope),
+    { id: 9999, order_type_code: scope, field_key: "customer_nickname", label: "客户昵称", field_type: "TEXT",
+      options: null, required: false, is_active: true, sort_order: 1, locked: false, is_custom: false, note: null },
+  ]);
+  await openTypedModal(orderType);
+  await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+  await ui.type(screen.getByLabelText("游戏账号"), "account-test");
+  await ui.type(screen.getByLabelText("账号密码"), "secret");
+  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
+  await pickMainPool();
+  fireEvent.change(document.getElementById(phoneId)!, { target: { value: "13800008888" } });
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(nickname);
+  expect(ordersApi.create).not.toHaveBeenCalled();
+  resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "TEST-31", status: "ACTIVE" });
+  await ui.type(screen.getByLabelText(nickname), "测试昵称");
+  await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+  await waitFor(() => expect(ordersApi.create).toHaveBeenCalledWith(expect.objectContaining({
+    [orderType === "TH" ? "counterparty_input" : "customer_input"]: expect.objectContaining({
+      display_name: "测试昵称", phone: "13800008888",
+    }),
+  })));
+});
+
 it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
     vi.mocked(ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,

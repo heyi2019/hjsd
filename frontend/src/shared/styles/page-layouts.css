@@ -195,7 +195,7 @@
 .administration-page .permission-tree,.administration-page .scope-directory { margin:0; background:color-mix(in srgb,var(--glass) 70%,transparent); }
 .administration-page .ui-table-wrap,.administration-page .ant-table-wrapper { overflow:hidden; border-radius:var(--radius-md); }
 .administration-page .advanced-roles { margin:0; padding:var(--space-3) var(--space-4); border:var(--border-w) solid var(--glass-border); border-radius:var(--radius-md); background:color-mix(in srgb,var(--soft) 42%,transparent); }
-@media (--bp-md) { .administration-container > .ui-card { padding:var(--space-4); }.administration-page .finance-form { padding:var(--space-3); } }
+@media (max-width: 960px) { .administration-container > .ui-card { padding:var(--space-4); }.administration-page .finance-form { padding:var(--space-3); } }
 .assembly-form .permission-tree,
 .assembly-form > button {
   grid-column: 1 / -1;

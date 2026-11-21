@@ -67,7 +67,7 @@
 /* 表头不折行（2026-09-20 用户裁决 A）。
    背景：antd 表头默认可折行（实测 computed 为 normal，且全仓无任何规则声明 th 的
    white-space），窄列（如「状态」「操作」）会被压成两行；而项目既有的
-   `.ui-table-wrap th` 与下方 @media (--bp-sm) 的窄屏规则都是 nowrap ——
+   `.ui-table-wrap th` 与下方 @media (max-width: 640px) 的窄屏规则都是 nowrap ——
    桌面端允许折行本属不一致。
    作用域限定为本项目 DataTable（`.ui-datatable`），不波及 DatePicker 日历、
    Select 下拉等 antd 内部表格的 th。
@@ -225,6 +225,14 @@
   min-height: var(--ui-control-height-compact) !important;
   height: var(--ui-control-height-compact) !important;
 }
+/* 手机分页保留当前页、翻页和每页条数，避免整行溢出。 */
+@media (max-width: 640px) {
+  :where(.ui-datatable .ant-pagination .ant-pagination-item:not(.ant-pagination-item-active),
+         .ui-datatable .ant-pagination .ant-pagination-jump-prev,
+         .ui-datatable .ant-pagination .ant-pagination-jump-next) { display: none !important; }
+  :where(.ui-datatable .ant-pagination .ant-pagination-options) { display: block !important; }
+}
+
 /* 窄屏表格保持完整列宽，通过容器横向滑动查看，避免复选框与内容重叠。 */
 :where(.ant-table-wrapper) {
   max-width: 100%;
@@ -232,7 +240,7 @@
   -webkit-overflow-scrolling: touch;
 }
 
-@media (--bp-sm) {
+@media (max-width: 640px) {
   :where(.ant-table-wrapper .ant-table) {
     min-width: var(--sz-680);
   }

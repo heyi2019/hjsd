@@ -106,7 +106,7 @@
   padding-inline: var(--space-3);
 }
 
-@media (--bp-md) {
+@media (max-width: 960px) {
   .settings-tabs > .ant-tabs-content-holder { max-height: none; overflow: visible; }
 }
 .ui-filter-bar {
@@ -123,7 +123,7 @@
   flex: 0 0 auto;
   max-width: 100%;
 }
-@media (--bp-sm) {
+@media (max-width: 640px) {
   .studio-expense-filters {
     align-items: stretch;
   }
@@ -164,7 +164,7 @@
   width: 100%;
 }
 
-@media (--bp-md) {
+@media (max-width: 960px) {
   .funds-cashflow-filters > * {
     flex: 1 1 100%;
     max-width: none;
@@ -174,7 +174,7 @@
     max-width: none;
   }
 }
-@media (--bp-sm) {
+@media (max-width: 640px) {
   .funds-cashflow-filters > * { flex-basis: 100%; }
 }
 .funds-cashflow-filters > .ui-export-button {

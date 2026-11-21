@@ -191,12 +191,19 @@ if (!existsSync(uiComponentsCss)) {
 const cssFiles = ALL_FILES.filter((f) => f.endsWith(".css"));
 /**
  * 剥注释必须能跨行：块注释 /* ... *\/ 常整段跨多行（如 tokens.css 里
- * 「响应式断点媒体查询」那段就整块提到 @media (--bp-md) 的用法），
+ * 示例说明可能包含不会实际使用的 CSS 令牌），
  * 只做单行 replace 的话，注释第二行起的 `var(--bp-*)` 会被当成真代码 →
  * 规则 9 首次运行就误报（实测 var(--bp-) 这种根本不可能的变量名 = 典型症状）。
  * 故先整块去注释，再按行处理。
  */
 const stripComments = (text) => text.replace(/\/\*[\s\S]*?\*\//g, "");
+// 当前构建未配置自定义媒体查询转换，禁止会被浏览器静默忽略的断点写法。
+for (const file of cssFiles) {
+  const code = stripComments(readFileSync(file, "utf8"));
+  if (/@media\s*\(\s*--[\w-]+\s*\)/.test(code)) {
+    fail("css-media", `${relative(process.cwd(), file)} → 自定义媒体查询未配置转换，请使用标准媒体查询`);
+  }
+}
 const definedVars = new Set();
 for (const file of cssFiles) {
   for (const m of readFileSync(file, "utf8").matchAll(/(--[\w-]+)\s*:/g)) definedVars.add(m[1]);

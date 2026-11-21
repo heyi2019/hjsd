@@ -87,11 +87,11 @@
 @media (prefers-reduced-motion: reduce) {
   .page-enter { animation: none; }
 }
-@media (--bp-sm) {
+@media (max-width: 640px) {
   .page-content { padding: var(--space-3); }
 }
 
-@media (--bp-801) {
+@media (min-width: 801px) {
   .sidebar.glass {
     position: sticky;
     top: var(--space-4);

@@ -147,7 +147,7 @@
   font: var(--font-nav-secondary);
 }
 
-@media (--bp-md) {
+@media (max-width: 960px) {
   .sidebar .nav-item {
     font: var(--font-nav-secondary);
   }

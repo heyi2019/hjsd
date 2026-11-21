@@ -246,24 +246,10 @@
   --content-max-sm: 420px;
   --app-max-width: 1680px;
 
-  /* 响应式断点（2026-09-11 收口，原值精确入表，零行为变更；维度值双主题同值，不加 dark 覆盖）
-     语义尺度 sm/md/lg = 640/960/1280 由第二 :root 块（设计系统 Phase 3.3）统一定义，本块只放散值；
-     原 800/900 查询已统一翻到 --bp-md/--bp-lg（语义尺度），不再需要 --bp-800/--bp-900 值命名；
-     --bp-sm=640 / --bp-xl=1100 与既定义不冲突，保留语义名；散值 --bp-600/650/700/720/760/801 保留原值命名 */
-  --bp-600: 600px;
-  --bp-sm: 640px;
-  --bp-650: 650px;
-  --bp-700: 700px;
-  --bp-720: 720px;
-  --bp-760: 760px;
-  --bp-800: 800px;
-  --bp-560: 560px;
   --sz-20: 20px;
   --sz-260: 260px;
   --sz-280: 280px;
   --sz-300: 300px;
-  --bp-xl: 1100px;
-  --bp-801: 801px; /* min-width 断点 */
 
   /* 动效 */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -458,12 +444,6 @@
   /* SchemaForm 单列组限宽：双主题同值，不加 dark 覆盖。 */
   --form-max-width: 720px;
 
-  /* 响应式断点（设计系统 Phase 3.3 统一尺度 sm/md/lg = 640/960/1280；
-     2026-09-11 曾因与业务块重名被删，现按用户「执行 A」统一 800/900 查询到该尺度而恢复） */
-  --bp-sm: 640px;
-  --bp-md: 960px;
-  --bp-lg: 1280px;
-
   /* ── 看板组件库专用令牌（2026-09-23 Apple 化收口，零视觉变化；尺寸双主题同值） ── */
   /* 强调色（编辑器/选择面板 chrome，非语义主色，需独立品牌橙/蓝） */
   --accent-amber: #e98a00;
@@ -632,35 +612,6 @@
   --accent-blue: #64a8ff;
   --border-amber: rgba(255, 178, 64, 0.35);
 }
-
-/* 响应式断点媒体查询（2026-09-11 修复：CSS `var()` 不能在 @media 条件值内解析，
-   原 `var(--bp-*)` 媒体查询全部静默失效。改为 `@custom-media` 声明 + 构建期文本
-   替换：vite.config.ts 的 resolveCustomMedia 插件读取本块，把源码 `@media (--bp-md)`
-   直接替换为 `@media (max-width: 960px)`（不依赖 postcss-custom-media 插件，规避
-   Vite 模块隔离与插件版本 churn 导致的整条丢弃）。用法：`@media (--bp-md)`。
-   定义须顶层（不在 :root 内）；值与原 --bp-* 运行时属性严格一致。 */
-@custom-media --bp-600 (max-width: 600px);
-@custom-media --bp-650 (max-width: 650px);
-@custom-media --bp-700 (max-width: 700px);
-@custom-media --bp-720 (max-width: 720px);
-@custom-media --bp-760 (max-width: 760px);
-@custom-media --bp-800 (max-width: 800px);
-@custom-media --bp-sm (max-width: 640px);
-@custom-media --bp-md (max-width: 960px);
-@custom-media --bp-lg (max-width: 1280px);
-@custom-media --bp-xl (max-width: 1100px);
-@custom-media --bp-801 (min-width: 801px);
-@custom-media --bp-560 (max-width: 560px);
-@custom-media --bp-620 (max-width: 620px);
-@custom-media --bp-900 (max-width: 900px);
-@custom-media --bp-980 (max-width: 980px);
-@custom-media --bp-1200 (max-width: 1200px);
-@custom-media --bp-1120 (min-width: 1120px);
-@custom-media --bp-1420 (min-width: 1420px);
-@custom-media --bp-1740 (min-width: 1740px);
-@custom-media --bp-1740-dn (max-width: 1740px);
-@custom-media --bp-1420-dn (max-width: 1420px);
-@custom-media --bp-1120-dn (max-width: 1120px);
 
 /* 无障碍：降低透明度（对应 macOS「降低透明度」，此前全站零适配）。
    毛玻璃材质整体降级为不透明实底、模糊关闭，边框换用常规边框色保证边界可辨。

@@ -283,8 +283,8 @@
 .order-finance-time-input .ant-picker-input > input { min-width: 0; white-space: nowrap; text-overflow: clip; }
 .order-finance-amount-input .ant-input { padding-inline: var(--space-1); }
 .order-finance-pool-select .ant-select-selector { padding-inline: var(--space-1) !important; }
-@media (--bp-sm) { .order-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (--bp-sm) {
+@media (max-width: 640px) { .order-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) {
   .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
   .order-detail {
     width: calc(100% - var(--space-3) * 2);
@@ -380,7 +380,7 @@
 .order-detail__image-upload:hover { color: var(--color-primary); border-color: var(--color-primary); }
 .order-detail__image-upload > .anticon { font-size: 1.5rem; }
 .order-detail__image-empty { align-self: center; color: var(--color-text-secondary); }
-@media (--bp-sm) {
+@media (max-width: 640px) {
   .order-detail__image-card,
   .order-detail__image-upload { width: 8.5rem; height: 8.5rem; }
   .order-detail__image-card > .ant-image { width: 7rem; height: 7rem; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,5 +20,18 @@ describe("开发服务器 API 转发", () => {
     expect(config).toContain("env.VITE_BACKEND_PORT");
     expect(config).toContain('target: `http://127.0.0.1:${backendPort}`');
     expect(config).toContain("changeOrigin: true");
+  });
+});
+
+
+describe("响应式断点", () => {
+  it("样式不使用未配置转换的自定义媒体查询", () => {
+    const root = path.join(REPO, "frontend/src");
+    const cssFiles = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const name = path.join(dir, entry.name);
+      return entry.isDirectory() ? cssFiles(name) : name.endsWith(".css") ? [name] : [];
+    });
+    const invalid = cssFiles(root).filter((file) => /@media\s*\(\s*--[\w-]+\s*\)/.test(readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "")));
+    expect(invalid.map((file) => path.relative(root, file))).toEqual([]);
   });
 });

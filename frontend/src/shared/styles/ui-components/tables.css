@@ -83,7 +83,7 @@
 }
 .form-drawer .ant-form-item:last-child { margin-block-end: var(--space-2); }
 
-@media (--bp-sm) {
+@media (max-width: 640px) {
   .form-drawer .ant-drawer-footer .ant-space { width: 100%; }
   .form-drawer .ant-drawer-footer .ant-btn { flex: 1; }
 }

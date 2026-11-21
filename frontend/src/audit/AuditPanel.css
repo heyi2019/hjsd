@@ -30,7 +30,7 @@
   max-width: var(--control-date-width);
 }
 
-@media (--bp-sm) {
+@media (max-width: 640px) {
   .audit-filter-bar > .audit-filter-select,
   .audit-filter-bar > .audit-filter-field,
   .audit-filter-bar > .audit-filter-date {

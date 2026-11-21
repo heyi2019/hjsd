@@ -50,7 +50,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       if (cursor.current.generation === generation) { state.loading = false; setNotificationLoading(false); }
     }
   };
-  useEffect(() => { setSelected(null); }, [category, username]);
+  useEffect(() => { setSelected(null); }, [active, category, username]);
   useEffect(() => {
     if (!active) return;
     cursor.current = { done: false, generation: cursor.current.generation + 1, loading: true };

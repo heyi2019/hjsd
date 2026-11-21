@@ -1,8 +1,6 @@
 """SYS-01-04 系统通知接口。"""
 from __future__ import annotations
 
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -50,10 +48,13 @@ def pending_profit_order(
         ))
         items = [item] if item else []
     else:
-        items, _ = query.list_notifications(
-            db, recipient_user_id=user.id, unread_only=True,
-            notification_type=service.PROFIT_PENDING, entity_type="order", limit=1,
-        )
+        item = db.scalar(select(Notification).where(
+            Notification.recipient_user_id == user.id,
+            Notification.read_at.is_(None),
+            Notification.notification_type == service.PROFIT_PENDING,
+            Notification.entity_type == "order",
+        ).order_by(Notification.id.desc()).limit(1))
+        items = [item] if item else []
     if not items:
         return schemas.PendingProfitOrderOut(order_no=None, order_id=None)
     stmt = select(Order.id).where(Order.order_no == items[0].entity_id)
@@ -86,41 +87,6 @@ def notification_inbox(
 ) -> schemas.NotificationInboxOut:
     items, next_cursor = query.inbox_page(db, recipient_user_id=user.id, category=category, cursor=cursor, limit=limit, user=user)
     return schemas.NotificationInboxOut(items=[schemas.NotificationOut.model_validate(item) for item in items], next_cursor=next_cursor)
-
-
-@router.get("/notifications", response_model=schemas.NotificationListOut)
-def list_my_notifications(
-    unread_only: bool = Query(default=False),
-    read_only: bool = Query(default=False),
-    category: str | None = Query(default=None, pattern="^(sale|inventory)$"),
-    notification_type: str | None = Query(default=None),
-    entity_type: str | None = Query(default=None),
-    before_id: int | None = Query(default=None, ge=1),
-    before_created_at: datetime | None = Query(default=None),
-    sort_by_time: bool = Query(default=False),
-    limit: int = Query(default=50, ge=1, le=200),
-    db: Session = Depends(get_db),
-    user: CurrentUser = Depends(get_current_user),
-) -> schemas.NotificationListOut:
-    items, total = query.list_notifications(
-        db,
-        recipient_user_id=user.id,
-        unread_only=unread_only,
-        read_only=read_only,
-        category=category,
-        notification_type=notification_type,
-        entity_type=entity_type,
-        before_id=before_id,
-        before_created_at=before_created_at,
-        sort_by_time=sort_by_time,
-        limit=limit,
-        user=user,
-    )
-    return schemas.NotificationListOut(
-        items=[schemas.NotificationOut.model_validate(item) for item in items],
-        total=total,
-        unread_total=service.unread_count(db, recipient_user_id=user.id, visibility=query.visibility_filter(db, user)),
-    )
 
 
 @router.post("/notifications/read", response_model=schemas.NotificationReadOut)

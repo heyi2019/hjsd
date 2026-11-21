@@ -39,16 +39,16 @@ export function BusinessAlerts(props: Parameters<typeof useWorkbenchMessages>[0]
         ) : (
           notificationError || notificationLoading || hasMore ? null : <Typography.Text type="secondary">暂无消息</Typography.Text>
         )}
-        {notificationLoading ? <Spin size="small" /> : hasMore && !notificationError ? <button type="button" className="business-alert__button" onClick={() => void loadMore()}>加载更多</button> : null}
+        {notificationLoading ? <Spin size="small" /> : null}
         </div>
       </Card>
-      {dataOwner === username && selected?.notification_type === "PROFIT_ALLOCATED" && <ProfitNotificationModal
+      {props.active !== false && dataOwner === username && selected?.notification_type === "PROFIT_ALLOCATED" && <ProfitNotificationModal
         selected={selected}
         summary={notificationDetails[selected.id]}
         onClose={() => setSelected(null)}
         onPartyNavigate={props.onPartyNavigate ? (path) => { setSelected(null); props.onPartyNavigate?.(path); } : undefined}
       />}
-      {dataOwner === username && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}</Modal>}
+      {props.active !== false && dataOwner === username && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}</Modal>}
     </section>
   );
 }

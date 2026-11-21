@@ -23,7 +23,8 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     from app.business.stocks.inventory import _inventory_ledger_scope
     from app.dashboard.service import _reminder_config
 
-    db.scalar(select(User.id).where(User.id == user.id).with_for_update())
+    # 与同用户同步/已读操作串行，同时允许通知插入时的外键 KEY SHARE，避免与编号锁死锁。
+    db.scalar(select(User.id).where(User.id == user.id).with_for_update(key_share=True))
     days = _reminder_config(db)["inventory_aging_days"]
     cutoff = datetime.combine(date.today() - timedelta(days=days), time.min)
     already_notified = exists(select(Notification.id).where(

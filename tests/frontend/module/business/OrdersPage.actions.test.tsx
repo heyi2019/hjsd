@@ -517,7 +517,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(modal).toBeVisible();
     if (action === "分润配置") {
       await ui.click(within(modal).getByRole("button", { name: "查看订单详情" }));
-      await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true }));
+      await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { fresh: true, imagePreviews: true }));
       expect(await screen.findByText("订单详情")).toBeInTheDocument();
     }
   });

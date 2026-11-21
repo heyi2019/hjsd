@@ -29,7 +29,7 @@ export function ProfitNotificationModal({ selected, summary, onClose, onPartyNav
           <Descriptions bordered size="small" column={2}>
             <Descriptions.Item label="订单号">{detail.order_no}</Descriptions.Item>
             <Descriptions.Item label="可分配利润">{money(summary?.allocatable_profit)}</Descriptions.Item>
-            <Descriptions.Item label="已配置分润合计">{money(detail.profit_base)}</Descriptions.Item>
+            <Descriptions.Item label="可见人员分润合计">{money(detail.personnel_profit_base)}</Descriptions.Item>
             <Descriptions.Item label="入库日期">{detail.inventory_date || "-"}</Descriptions.Item>
             <Descriptions.Item label="出库日期">{detail.outbound_date || "-"}</Descriptions.Item>
             {summary && <Descriptions.Item label="售出金额">{money(summary.sale_amount)}</Descriptions.Item>}

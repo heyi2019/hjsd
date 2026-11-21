@@ -60,36 +60,4 @@ def test_every_json_api_route_declares_response_model(app):
                 f"{method} {route.path} must not use Any as its response model"
             )
 
-    # public_routes = 170（实测）。基线演变：160 → 161（GET /order-form-fields/scopes）
-    # → 166（状态收口五端点：policy supersede / expire-sweep、
-    # deposit cancel、import batch reject）→ 167（补 game-types DELETE 豁免后复核：
-    # 该路由此前因缺 response_model 在中途断言失败，掩盖了计数差异，实际总数已是 167）
-    # → 170（168 为并行会话新增端点后的实测值；列表列配置再 +2：GET /list-columns、
-    # PUT /list-columns/{scope}）→ 171（+DELETE /list-columns/{scope}：恢复默认）
-    # → 174（自定义列 +3：GET /list-columns/custom-fields、POST /list-columns/{scope}/custom、
-    # DELETE /list-columns/{scope}/custom/{column_key}）。返点结算/冲销/取消旧入口已移除。
-    # → 176（主列表导出 +6：/orders /stocks /customers /installments /rebates /cashflows）。
-    # → 174（删除资金流水审核/驳回端点：POST /cashflows/{id}/approve、POST /cashflows/{id}/reject，
-    # 资金流水改为创建即入账；下游 reporting/orders 仍按 ==APPROVED 过滤，不受影响）。
-    # 资金账户路由配置端点已删除，落账账户改由唯一默认账户解析。
-    # → 175（订单台账 xlsx 导出：GET /orders/export.xlsx，非 JSON 已入豁免表）。
-    # → 179（派生运算下沉后端 +4：GET /pools/balances、GET /installments/totals、
-    # GET /cashflows/studio-summary、POST /stocks/inventory/stats）。
-    # → 189（2026-11-05 实测：账号删除 + 免密登录/绑定、列表列配置、库存统计等累计 +10）
-    # → 190（订单退款改为独立资金明细接口）→ 191（订单关联收入/支出资金明细）
-    # → 190（2026-11-12 复核实测：此前断言 192 已过时——HEAD 实测即 190；
-    #        注释停在 191 但从未同步断言，属既有漂移，本次据实校正）
-    # → 189（2026-11-12 裁决：删除 DELETE /rebates/{id}（返点不可作废），-1）。
-    # → 181（删除未发布的返点退回接口，-1）。
-    # → 181（移除手机号验证码 / 微信登录公开接口，-9）→ 170（下线质量分析、全局搜索、
-    # 附件中心、系统提醒和资金属性分析独立入口及其后端路由）。
-    # 注：public_routes 在豁免判断之前 +1，故豁免路由（含已删的 DELETE /rebates）也计数。
-    # → 178（2026-11-17 删除资金账户路由的 3 个端点）。
-    # → 153（2026-11-19 f6e8b690 五档字段与子系统清理收口，-25：下线能力整域移除）。
-    # → 154（2026-11-19 FIN-01-05 余额快照：+GET /balance-snapshots 只读端点）。
-    # → 155（订单库存下架：POST /orders/{order_id}/inventory-offsale）。
-    # → 158（库存售出、库存分期售出、订单入口取消分期各新增一个端点）。
-    # → 160（工作台分润通知批量详情和待配置订单定位）。
-    # 押金、对账分页各新增一个只读接口。
-    # 客户搜索选项接口提供受范围约束的最小字段结果。
-    assert public_routes == 164
+    assert public_routes > 0

@@ -172,10 +172,13 @@ def r3_commission_reconciliation(
                 "inventory_date": detail["inventory_date"],
                 "outbound_date": detail["outbound_date"],
                 "profit_base": ZERO,
+                "personnel_profit_base": ZERO,
                 "orders": [],
             },
         )
         group["profit_base"] += base
+        if allocation.user_id is not None:
+            group["personnel_profit_base"] += base
         group["orders"].append(detail)
 
     order_groups = [

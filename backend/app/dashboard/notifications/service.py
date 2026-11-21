@@ -85,19 +85,6 @@ def ensure_notification(
     )
 
 
-def unread_count(session: Session, *, recipient_user_id: int, visibility=None) -> int:
-    stmt = select(func.count(Notification.id)).where(
-        Notification.recipient_user_id == recipient_user_id,
-        Notification.read_at.is_(None),
-    )
-    if visibility is not None:
-        stmt = stmt.where(visibility)
-    return int(
-        session.scalar(stmt)
-        or 0
-    )
-
-
 def unread_profit_counts(session: Session, *, recipient_user_id: int) -> dict[str, int]:
     """按分润阶段统计用户未读通知，不加载通知明细。"""
     rows = session.execute(
@@ -144,5 +131,4 @@ __all__ = [
     "ensure_notification",
     "mark_read_batch",
     "unread_profit_counts",
-    "unread_count",
 ]

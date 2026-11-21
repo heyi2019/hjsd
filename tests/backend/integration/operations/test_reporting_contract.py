@@ -224,7 +224,7 @@ class TestR3Commission:
             summary = dashboard_summary(seeded_db, user=user, from_date=MID_GATE, to_date=D)
         finally:
             event.remove(connection, "before_cursor_execute", record)
-        assert summary["personal_earnings"] == report["total"]["profit_base"] == Decimal("-4.99")
+        assert summary["personal_earnings"] == report["total"]["profit_base"] == Decimal("-2.49")
         assert not any("from accounts where accounts.id in" in sql for sql in statements)
         assert not any("select order_events.order_id, order_events.occurred_on" in sql for sql in statements)
 
@@ -253,13 +253,13 @@ class TestR3Commission:
         monkeypatch.setattr(commission_service, "cashflow_totals_by_order", track_calculation)
         result = r3_commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
         assert calculated_ids == [{orders[1].id}]
-        assert result["total"] == {"order_count": 1, "profit_base": Decimal("150.00")}
+        assert result["total"] == {"order_count": 1, "profit_base": Decimal("90.00")}
         assert {item["user_id"] for item in _commission_details(result)} == {7}
 
         calculated_ids.clear()
         all_time = r3_commission_reconciliation(seeded_db, user=user, mine=True)
         assert calculated_ids == [{order.id for order in orders}]
-        assert all_time["total"] == {"order_count": 3, "profit_base": Decimal("450.00")}
+        assert all_time["total"] == {"order_count": 3, "profit_base": Decimal("270.00")}
 
     def test_my_commission_only_returns_the_logged_in_users_allocations(self, seeded_db):
         order = create_order(
@@ -301,11 +301,11 @@ class TestR3Commission:
 
         assert {item["user_id"] for item in _commission_details(data)} == {7}
         assert data["total"]["order_count"] == 1
-        assert data["total"]["profit_base"] == Decimal("150.00")
+        assert data["total"]["profit_base"] == Decimal("90.00")
         assert r3_commission_reconciliation(seeded_db, user=user)["total"]["order_count"] == 0
         assert r3_commission_reconciliation(seeded_db, user=user, mine=True, user_id=8)["total"]["order_count"] == 0
         from app.dashboard.service import dashboard_summary
-        assert dashboard_summary(seeded_db, user=user)["personal_earnings"] == Decimal("150.00")
+        assert dashboard_summary(seeded_db, user=user)["personal_earnings"] == Decimal("90.00")
 
     def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db, seeded_client, headers):
         order = _order(seeded_db)
@@ -338,7 +338,7 @@ class TestR3Commission:
         all_people = r3_commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True
         )
-        assert {item["user_id"] for item in _commission_details(all_people)} == {7, 8}
+        assert {item["user_id"] for item in _commission_details(all_people)} == {7, 8, None}
         assert next(item for item in _commission_details(all_people) if item["user_id"] == 7)["user_name"] == "离职同事"
         assert next(person for person in all_people["people"] if person["user_id"] == 7) == {
             "user_id": 7, "user_name": "离职同事", "is_active": False,
@@ -390,8 +390,8 @@ class TestR3Commission:
         assert data["order_groups"][0]["inventory_date"] == date(2026, 10, 2)
         assert data["order_groups"][0]["outbound_date"] == D
         person = next(item for item in _commission_details(data) if item["user_id"] == 7)
-        assert person["profit_base"] == 300
-        assert person["rate"] == 100
+        assert person["profit_base"] == 180
+        assert person["rate"] == 60
 
         # 已完成订单与进行中订单都属于有效提成对账范围。
         completed = _order(seeded_db)
@@ -462,7 +462,7 @@ class TestR3Commission:
             assert response.status_code == 200, response.text
             rows = list(csv.reader(io.StringIO(response.content.decode("utf-8-sig"))))
             person_index = rows[0].index("人员 ID")
-            return {int(row[person_index]) for row in rows[1:] if row[0] == "明细"}
+            return {int(row[person_index]) for row in rows[1:] if row[0] == "明细" and row[person_index]}
 
         assert exported_user_ids({"all_people": "true"}, headers) == {7, 8}
         # 指定员工：修复前 user_id 被导出接口忽略，仍导出两人。

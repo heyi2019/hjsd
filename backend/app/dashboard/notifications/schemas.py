@@ -25,12 +25,6 @@ class NotificationOut(BaseModel):
     updated_at: datetime
 
 
-class NotificationListOut(BaseModel):
-    items: list[NotificationOut]
-    total: int
-    unread_total: int
-
-
 class NotificationInboxOut(BaseModel):
     items: list[NotificationOut]
     next_cursor: str | None
@@ -51,7 +45,7 @@ class PendingProfitOrderOut(BaseModel):
 
 class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=10)
-    category: Literal["latest", "sale", "inventory"] | None = None
+    category: Literal["latest", "sale", "inventory"]
 
 
 class NotificationReadOut(BaseModel):
@@ -60,4 +54,4 @@ class NotificationReadOut(BaseModel):
     next_read_id: int | None = None
 
 
-__all__ = ["NotificationListOut", "NotificationOut"]
+__all__ = ["NotificationOut"]

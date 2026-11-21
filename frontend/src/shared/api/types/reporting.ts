@@ -35,6 +35,7 @@ export interface CommissionOrderGroup {
   inventory_date?: string | null;
   outbound_date?: string | null;
   profit_base: string;
+  personnel_profit_base: string;
   orders: CommissionRow[];
 }
 

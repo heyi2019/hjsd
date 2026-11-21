@@ -73,6 +73,7 @@ vi.mock("axios", () => {
 import axios from "axios";
 import { clearApiCache, setDevUser } from "@/shared/api/client";
 import { reportsApi } from "@/shared/api/reports.api";
+import { notificationsApi } from "@/shared/api/notifications.api";
 import "@/shared/state/referenceDataEvents";
 
 function apiInstance() {
@@ -99,7 +100,7 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     expect((axios as any).__getCallCount()).toBe(4);
   });
 
-  it("重新读取经营报表时等待最新结果", async () => {
+  it("重新读取经营报表和通知摘要时等待最新结果", async () => {
     const params = { from: "2026-10-01", to: "2026-10-31" };
     const reports = [
       () => reportsApi.monthlyPnl(params),
@@ -112,7 +113,9 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
       const first = await read();
       expect(await read()).not.toBe(first);
     }
-    expect((axios as any).__getCallCount()).toBe(10);
+    const summary = await notificationsApi.profitDetails([1]);
+    expect(await notificationsApi.profitDetails([1])).not.toBe(summary);
+    expect((axios as any).__getCallCount()).toBe(12);
   });
 
   it("切换操作用户后不会复用上一用户的缓存", async () => {

@@ -42,6 +42,15 @@ beforeEach(() => {
 });
 
 describe("工作台消息", () => {
+it("离开工作台时关闭已打开的消息弹窗", async () => {
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "提醒详情", message: "消息内容", entity_type: "other", entity_id: "1", read_at: "2026-11-21" }], next_cursor: null });
+    const view = renderLight(<BusinessAlerts active />, { user: "admin" });
+    fireEvent.click(await screen.findByRole("button", { name: /消息内容/ }));
+    expect(await screen.findByText("提醒详情")).toBeInTheDocument();
+    view.rerender(<BusinessAlerts active={false} />);
+    await waitFor(() => expect(screen.queryByText("提醒详情")).not.toBeInTheDocument());
+  });
+
 it("消息分类展示最新、售出和库存", async () => {
     const view = renderLight(<BusinessAlerts />, { user: "admin" });
     await screen.findByText("暂无消息");
@@ -60,23 +69,30 @@ it("消息分类展示最新、售出和库存", async () => {
     expect(notificationsApi.syncInventory).toHaveBeenCalledTimes(2);
   });
 it("未读消息逐页滚动加载且不自动标已读", async () => {
+    const height = vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(600);
+    const clientHeight = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(200);
     const items = Array.from({ length: 11 }, (_, i) => ({ id: 11 - i, notification_type: "OTHER", title: "提醒", message: `通知 ${11 - i}`, entity_type: "other", entity_id: String(i), created_at: "2026-11-21T09:30:00", read_at: null }));
     vi.mocked(notificationsApi.list).mockImplementation(async (params) => ({ items: params.cursor ? items.slice(10) : items.slice(0, 10), next_cursor: params.cursor ? null : "page-2" }));
     renderLight(<DashboardPage />, { user: "admin" });
     await screen.findByRole("button", { name: /通知 11/ });
+    expect(screen.queryByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
     const scroll = document.querySelector(".business-alerts__scroll")!;
+    scroll.scrollTop = 400;
     fireEvent.scroll(scroll);
     expect(await screen.findByRole("button", { name: /^通知 1 未读.*通知时间/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
     expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ cursor: "page-2", category: "latest" }));
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
+    height.mockRestore();
+    clientHeight.mockRestore();
   });
 
 it("点击分润通知只标记当前消息并展示详情", async () => {
     const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `订单 HS${id} 分润`, entity_type: "order", entity_id: `HS${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
     vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
     vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, sale_amount: "300.00", cost_amount: "100.00", allocatable_profit: "150.00" })));
-    vi.mocked(reportsApi.commission).mockResolvedValue({ order_groups: [{ order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "180.00", orders: [{ user_id: 1, user_name: "何一", order_id: 1, order_no: "HS1", profit_base: "180.00", rate: "60.00" }, { user_id: null, user_name: "公司", order_id: 1, order_no: "HS1", profit_base: "120.00", rate: "40.00" }] }], people: [], total: { order_count: 1, profit_base: "180.00" } });
+    vi.mocked(reportsApi.commission).mockResolvedValue({ order_groups: [{ order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "300.00", personnel_profit_base: "180.00", orders: [{ user_id: 1, user_name: "何一", order_id: 1, order_no: "HS1", profit_base: "180.00", rate: "60.00" }, { user_id: null, user_name: "公司", order_id: 1, order_no: "HS1", profit_base: "120.00", rate: "40.00" }] }], people: [], total: { order_count: 1, profit_base: "300.00" } });
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 7 }, orders: [] } as never);
     vi.mocked(employeesApi.list).mockResolvedValue([]);
     const navigate = vi.fn();
@@ -96,13 +112,13 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(screen.getByText("成本")).toBeInTheDocument();
     expect(screen.getByText("可分配利润")).toBeInTheDocument();
     expect(screen.getByText("150.00")).toBeInTheDocument();
-    expect(screen.getByText("已配置分润合计")).toBeInTheDocument();
+    expect(screen.getByText("可见人员分润合计")).toBeInTheDocument();
     expect(screen.getByText("何一")).toBeInTheDocument();
     expect(screen.queryByText("公司")).not.toBeInTheDocument();
     expect(screen.getAllByText("180.00")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "查看订单详情" }));
     expect(await screen.findByText("台账订单详情 1")).toBeInTheDocument();
-    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true });
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { fresh: true, imagePreviews: true });
     fireEvent.click(screen.getByRole("button", { name: "客户详情" }));
     expect(navigate).toHaveBeenCalledWith("/customers?customer_id=7");
   });
@@ -159,7 +175,7 @@ it("分润详情加载失败后可重试且不改变已读状态", async () => {
 it("分润弹窗可重试且切换消息时不显示旧详情", async () => {
     const first = { id: 1, title: "分润", message: "订单 HS1", entity_type: "order", entity_id: "HS1" };
     const second = { ...first, id: 2, message: "订单 HS2", entity_id: "HS2" };
-    const group = { order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "300.00", orders: [{ user_id: 1, user_name: "人员一", order_id: 1, order_no: "HS1", profit_base: "300.00", rate: "100.00" }] };
+    const group = { order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "300.00", personnel_profit_base: "300.00", orders: [{ user_id: 1, user_name: "人员一", order_id: 1, order_no: "HS1", profit_base: "300.00", rate: "100.00" }] };
     const report = { order_groups: [group], people: [], total: { order_count: 1, profit_base: "300.00" } };
     let finish!: (value: typeof report) => void;
     vi.mocked(reportsApi.commission).mockRejectedValueOnce(new Error("网络不可用")).mockResolvedValueOnce(report).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));

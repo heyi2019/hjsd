@@ -68,16 +68,9 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
     a = _make_unread(seeded_db, entity_id="A")
     b = _make_unread(seeded_db, entity_id="B")
     notification_service.mark_read_batch(seeded_db, [a.id], recipient_user_id=2, actor="pytest")
-    unread, unread_total = notification_query.list_notifications(
-        seeded_db, recipient_user_id=2, unread_only=True
-    )
-    assert unread_total == 1
+    unread, cursor = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="latest", cursor=None, limit=10)
     assert [n.id for n in unread] == [b.id]
-    all_rows, all_total = notification_query.list_notifications(
-        seeded_db, recipient_user_id=2, unread_only=False
-    )
-    assert all_total == 2
-    assert len(all_rows) == 2
+    assert cursor is None
     first = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="FIRST")
     second = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_ALLOCATED", entity_id="SECOND")
     third = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="THIRD")
@@ -110,25 +103,24 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
 
 def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seeded_db):
     rows = [_make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=str(i)) for i in range(3)]
-    _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="other")
+    other = _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="other")
     assert notification_service.unread_profit_counts(seeded_db, recipient_user_id=2)["allocated_profit_count"] == 3
-    first, total = notification_query.list_notifications(
-        seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", limit=2,
-    )
-    assert total == 3
+    seeded_db.delete(other)
+    seeded_db.flush()
+    first, cursor = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="sale", cursor=None, limit=2)
     assert [item.id for item in first] == [rows[2].id, rows[1].id]
     notification_service.mark_read_batch(seeded_db, [item.id for item in first], recipient_user_id=2, actor="pytest")
-    second, _ = notification_query.list_notifications(
-        seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", before_id=first[-1].id, limit=2,
-    )
+    second, _ = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="sale", cursor=cursor, limit=2)
     assert [item.id for item in second] == [rows[0].id]
+    for row in rows:
+        row.read_at = None
     rows[0].created_at = datetime(2026, 11, 22, 10)
     rows[1].created_at = datetime(2026, 11, 21, 10)
     rows[2].created_at = datetime(2026, 11, 21, 10)
     seeded_db.flush()
-    first, _ = notification_query.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, limit=2)
+    first, cursor = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="sale", cursor=None, limit=2)
     assert [item.id for item in first] == [rows[0].id, rows[2].id]
-    next_page, _ = notification_query.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, before_created_at=first[-1].created_at, before_id=first[-1].id, limit=2)
+    next_page, _ = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="sale", cursor=cursor, limit=2)
     assert [item.id for item in next_page] == [rows[1].id]
 
 
@@ -164,17 +156,17 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     seeded_db.flush()
     sync = seeded_client.post("/api/notifications/sync-inventory", headers=auth)
     assert sync.status_code == 200, sync.text
-    rows = seeded_client.get("/api/notifications", params={"category": "inventory", "unread_only": True}, headers=auth).json()["items"]
+    rows = seeded_client.get("/api/notifications/inbox", params={"category": "inventory"}, headers=auth).json()["items"]
     item = next(row for row in rows if row["entity_id"] == str(account.id))
     assert visible.order_no in item["message"]
     assert "成本 500.00" in item["message"]
-    assert seeded_client.post("/api/notifications/read", json={"ids": [item["id"]]}, headers=auth).status_code == 200
+    assert seeded_client.post("/api/notifications/read", json={"ids": [item["id"]], "category": "inventory"}, headers=auth).status_code == 200
     assert seeded_client.post("/api/notifications/sync-inventory", headers=auth).status_code == 200
-    read_rows = seeded_client.get("/api/notifications", params={"category": "inventory", "read_only": True}, headers=auth).json()["items"]
-    assert len([row for row in read_rows if row["entity_id"] == str(account.id)]) == 1
+    read_rows = seeded_client.get("/api/notifications/inbox", params={"category": "inventory"}, headers=auth).json()["items"]
+    assert len([row for row in read_rows if row["entity_id"] == str(account.id) and row["read_at"] is not None]) == 1
     visible.owner_id = 1
     seeded_db.flush()
-    for path, params in [("/api/notifications", {"category": "inventory"}), ("/api/notifications/inbox", {"category": "inventory"})]:
+    for path, params in [("/api/notifications/inbox", {"category": "inventory"})]:
         response = seeded_client.get(path, params=params, headers=auth)
         assert response.status_code == 200
         assert not any(row["id"] == item["id"] for row in response.json()["items"])
@@ -205,6 +197,88 @@ def test_inventory_sync_batches_numbers_and_is_idempotent(seeded_db):
     assert len(statements) == 1
 
 
+def test_inventory_sync_and_profit_notice_do_not_deadlock(v1_engine):
+    from uuid import uuid4
+    from sqlalchemy import create_engine, text
+    from app.dashboard.notifications.inventory import sync_inventory_notifications_for_user
+    from app.domain.base import Base
+    from app.settings.field_definitions.seeds import seed_foundation
+
+    # 独立 schema 与真正独立的事务连接，不能复用 seeded_db 的外层事务连接。
+    schema = f"notification_concurrency_{uuid4().hex[:12]}"
+    with v1_engine.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(v1_engine.url, connect_args={"options": f"-c search_path={schema}"})
+    try:
+        Base.metadata.create_all(engine)
+        with Session(engine) as setup:
+            seed_foundation(setup, actor="pytest")
+            setup.add_all([User(id=1, username="admin", display_name="admin", password_hash="test", role="ADMIN", owner_scope="ALL"),
+                           User(id=10, username="pytest", display_name="pytest", password_hash="test", role="ADMIN", owner_scope="ALL")])
+            setup.flush()
+            order = create_order(setup, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1, account_snapshot={"game_account": "aging-concurrent"})
+            _buy(setup, order)
+            setup.get(Account, order.account_id).inventory_entry_at = datetime(2020, 1, 1)
+            setup.commit()
+        user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
+        inventory_locked = Event()
+        sale_has_sequence = Event()
+        sale_inserting = Event()
+
+        def inventory_sync():
+            with Session(engine) as session:
+                connection = session.connection()
+                def before(_conn, _cursor, statement, _params, _context, _many):
+                    if statement.lstrip().upper().startswith("UPDATE DOCUMENT_SEQUENCES"):
+                        inventory_locked.set()
+                        assert sale_has_sequence.wait(5)
+                        assert sale_inserting.wait(5)
+                event.listen(connection, "before_cursor_execute", before)
+                result = sync_inventory_notifications_for_user(session, user)
+                session.commit()
+                return result
+
+        def profit_notice():
+            assert inventory_locked.wait(5)
+            with Session(engine) as session:
+                def after(_conn, _cursor, statement, _params, _context, _many):
+                    if statement.lstrip().upper().startswith("UPDATE DOCUMENT_SEQUENCES"):
+                        sale_has_sequence.set()
+                def before(_conn, _cursor, statement, _params, _context, _many):
+                    if statement.lstrip().upper().startswith("INSERT INTO NOTIFICATIONS"):
+                        sale_inserting.set()
+                connection = session.connection()
+                event.listen(connection, "after_cursor_execute", after)
+                event.listen(connection, "before_cursor_execute", before)
+                notification_service.create_notification(session, recipient_user_id=1, notification_type="PROFIT_PENDING", title="分润", message="待配置", entity_type="order", entity_id="concurrent")
+                session.commit()
+                return True
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            inventory = pool.submit(inventory_sync)
+            profit = pool.submit(profit_notice)
+            assert profit.result(timeout=10)
+            assert inventory.result(timeout=10) == 1
+        with Session(engine) as session:
+            assert sync_inventory_notifications_for_user(session, user) == 0
+            order = create_order(session, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1, account_snapshot={"game_account": "aging-second"})
+            _buy(session, order)
+            session.get(Account, order.account_id).inventory_entry_at = datetime(2020, 1, 1)
+            session.commit()
+        def concurrent_sync():
+            with Session(engine) as session:
+                result = sync_inventory_notifications_for_user(session, user)
+                session.commit()
+                return result
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(concurrent_sync) for _ in range(2)]
+            assert sorted(future.result(timeout=10) for future in futures) == [0, 1]
+    finally:
+        engine.dispose()
+        with v1_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
+
+
 def test_mark_read_not_found(seeded_db):
     assert notification_service.mark_read_batch(seeded_db, [999999], recipient_user_id=2, actor="pytest") == []
 
@@ -225,7 +299,7 @@ def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_clie
     first = _make_unread(seeded_db, recipient_user_id=1, entity_id="first")
     second = _make_unread(seeded_db, recipient_user_id=1, entity_id="second")
     other = _make_unread(seeded_db, recipient_user_id=2, entity_id="other")
-    payload = {"ids": [first.id, second.id, other.id, 999999]}
+    payload = {"ids": [first.id, second.id, other.id, 999999], "category": "latest"}
     response = seeded_client.post("/api/notifications/read", json=payload, headers={"X-Dev-User": "admin"})
     assert response.status_code == 200, response.text
     assert set(response.json()["read_ids"]) == {first.id, second.id}
@@ -519,27 +593,25 @@ def test_sell_api_creates_notification_visible_in_seller_inbox(seeded_client, se
         id=seller_id, username="seeduser1", roles=["OPERATOR"], owner_scope="SELF"
     )
     inbox = seeded_client.get(
-        "/api/notifications",
-        params={"unread_only": "true"},
+        "/api/notifications/inbox",
+        params={"category": "latest"},
         headers={"Authorization": f"Bearer {build_access_token(seller)}"},
     )
     assert inbox.status_code == 200, inbox.text
     body = inbox.json()
-    assert body["total"] >= 1
+    assert len(body["items"]) >= 1
     assert any(
         "分润" in (item.get("title", "") + item.get("message", ""))
         for item in body["items"]
     )
     _make_unread(seeded_db, recipient_user_id=seller_id, notification_type="OTHER", entity_id="newer")
     filtered = seeded_client.get(
-        "/api/notifications",
-        params={"unread_only": "true", "notification_type": "PROFIT_PENDING", "limit": 1},
+        "/api/notifications/inbox",
+        params={"category": "sale", "limit": 10},
         headers={"Authorization": f"Bearer {build_access_token(seller)}"},
     )
     assert filtered.status_code == 200, filtered.text
-    assert filtered.json()["total"] == 1
-    assert filtered.json()["unread_total"] == 2
-    assert filtered.json()["items"][0]["notification_type"] == "PROFIT_PENDING"
+    assert any(item["notification_type"] == "PROFIT_PENDING" for item in filtered.json()["items"])
 
 
 def test_profit_notification_details_only_returns_visible_owned_notifications(seeded_client, seeded_db):
@@ -579,6 +651,7 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     groups = report.json()["order_groups"]
     assert [row["order_id"] for row in groups] == [order.id]
     assert [Decimal(row["profit_base"]) for row in groups[0]["orders"]] == [Decimal("108.00"), Decimal("72.00"), Decimal("120.00")]
+    assert Decimal(groups[0]["personnel_profit_base"]) == Decimal("180.00")
     denied_other = seeded_client.get("/api/reports/commission", params={"notification_id": other.id}, headers={"X-Dev-User": "admin"})
     assert denied_other.status_code == 404
     employee = seeded_db.get(User, 2)
@@ -595,6 +668,7 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     limited = CurrentUser(id=1, username="admin", permissions=frozenset({"finance.read"}), owner_scope="ALL")
     limited_report = commission(db=seeded_db, user=limited, notification_id=mine.id, from_date=None, to_date=None, mine=False, all_people=False, user_id=None)
     assert [row["user_id"] for row in limited_report["order_groups"][0]["orders"]] == [1]
+    assert limited_report["order_groups"][0]["personnel_profit_base"] == Decimal("108.00")
     assert [row["user_id"] for row in limited_report["people"]] == [1]
     scoped_account = seeded_db.get(User, 2)
     scoped_account.role = "OPERATOR"

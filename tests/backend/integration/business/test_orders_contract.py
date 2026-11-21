@@ -86,7 +86,6 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
     assert isinstance(payload["alerts"], list)
     assert set(payload["orders"]) == {"total_count"}
     assert seeded_client.get("/api/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
-    assert seeded_client.get("/api/notifications/summary", headers=headers).status_code in {404, 405}
 
 
 def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, headers, monkeypatch):

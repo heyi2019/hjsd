@@ -52,6 +52,7 @@ class CommissionOrderGroupOut(ReportModel):
     inventory_date: date | None = None
     outbound_date: date | None = None
     profit_base: Decimal
+    personnel_profit_base: Decimal
     orders: list[CommissionOrderOut]
 
 

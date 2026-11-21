@@ -19,7 +19,7 @@ export function OrderDetailDialog({ orderId, onClose, onPartyNavigate }: { order
     setDetail(null);
     setLoading(true);
     setError(false);
-    void ordersApi.executionDetail(orderId, { imagePreviews: true }).then((result) => {
+    void ordersApi.executionDetail(orderId, { fresh: true, imagePreviews: true }).then((result) => {
       if (active) setDetail(result);
     }).catch(() => {
       if (active) setError(true);

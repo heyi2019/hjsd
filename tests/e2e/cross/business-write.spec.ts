@@ -178,11 +178,11 @@ test("客户需求池：新建、查询与转单", async ({ request }) => {
 test("系统通知：查询当前用户的未读通知", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
-  const listed = await request.get(`${apiBase}/notifications?unread_only=true`, { headers });
+  const listed = await request.get(`${apiBase}/notifications/inbox?category=latest`, { headers });
   expect(listed.status()).toBe(200);
   const body = await listed.json();
   expect(Array.isArray(body.items)).toBe(true);
-  expect(typeof body.unread_total).toBe("number");
+  expect(body.next_cursor === null || typeof body.next_cursor === "string").toBe(true);
 });
 
 test("治理能力：报表导出与订单附件闭环", async ({ request }) => {

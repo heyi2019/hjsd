@@ -5,7 +5,7 @@ import base64
 import json
 from datetime import datetime
 
-from sqlalchemy import String, and_, cast, func, or_, select
+from sqlalchemy import String, and_, cast, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -91,40 +91,3 @@ def inbox_page(session: Session, *, recipient_user_id: int, category: str, curso
     was_unread = last.read_at is None or (category != "latest" and last.read_at > snapshot)
     data = {"category": category, "phase": "unread" if was_unread else "read", "time": last.created_at.isoformat(), "id": last.id, "snapshot": snapshot.isoformat()}
     return rows[:limit], base64.urlsafe_b64encode(json.dumps(data).encode()).decode()
-
-
-def list_notifications(
-    session: Session,
-    *,
-    recipient_user_id: int,
-    unread_only: bool = False,
-    read_only: bool = False,
-    category: str | None = None,
-    notification_type: str | None = None,
-    entity_type: str | None = None,
-    before_id: int | None = None,
-    before_created_at: datetime | None = None,
-    sort_by_time: bool = False,
-    limit: int = 50,
-    user: CurrentUser | None = None,
-) -> tuple[list[Notification], int]:
-    if sort_by_time and (before_id is None) != (before_created_at is None):
-        raise Validation("通知时间分页需要同时提供时间和编号")
-    stmt = _notification_query(recipient_user_id, category=category, notification_type=notification_type, entity_type=entity_type)
-    if user is not None:
-        stmt = stmt.where(visibility_filter(session, user))
-    if before_created_at is not None and before_id is not None and sort_by_time:
-        stmt = stmt.where(or_(Notification.created_at < before_created_at, and_(Notification.created_at == before_created_at, Notification.id < before_id)))
-    elif before_id is not None:
-        stmt = stmt.where(Notification.id < before_id)
-    if unread_only:
-        stmt = stmt.where(Notification.read_at.is_(None))
-    if read_only:
-        stmt = stmt.where(Notification.read_at.is_not(None))
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    rows = list(
-        session.scalars(
-            stmt.order_by(*([Notification.created_at.desc(), Notification.id.desc()] if sort_by_time else [Notification.id.desc()])).limit(limit)
-        ).all()
-    )
-    return rows, int(session.scalar(count_stmt) or 0)

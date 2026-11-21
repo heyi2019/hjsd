@@ -90,7 +90,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <ErrorBanner error={summaryError} onRetry={() => void load()} />
-      <Space wrap className="customer-list-filters customer-list-filters--separated">
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced customer-list-filters">
         <SearchInput
           aria-label="搜索客户"
           enterButton={(

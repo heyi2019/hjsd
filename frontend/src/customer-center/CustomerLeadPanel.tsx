@@ -168,7 +168,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <ErrorBanner error={summaryError} onRetry={() => void load()} />
-      <Space wrap className="customer-list-filters customer-list-filters--separated">
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced customer-list-filters">
         <SearchInput type="search" aria-label="搜索客户需求" maxLength={128} allowClear value={searchInput}
           placeholder="搜索需求编号 / 客户 / 需求目标"
           onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}

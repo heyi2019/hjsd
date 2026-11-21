@@ -225,7 +225,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       }
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
-      <Space wrap className="counterparty-filter-bar">
+      <Space wrap className="ui-filter-bar counterparty-filter-bar">
         <SearchInput type="search" aria-label="搜索合作方" maxLength={128} allowClear value={searchInput}
           placeholder="搜索合作方编号 / 名称 / 联系方式"
           onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}

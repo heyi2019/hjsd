@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { BusinessAlerts } from "@/app/workbench/messages/BusinessAlerts";
+import { ProfitNotificationModal } from "@/app/workbench/messages/ProfitNotificationModal";
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { ordersApi } from "@/shared/api/orders.api";
@@ -91,6 +92,22 @@ it("分润详情加载失败后可重试且不改变已读状态", async () => {
     expect(await screen.findByText(/成本 100.00.*售出 200.00.*待分配利润 60.00/)).toBeInTheDocument();
     expect(screen.queryByText("分润详情加载失败。")).not.toBeInTheDocument();
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
+  });
+
+it("分润弹窗可重试且切换消息时不显示旧详情", async () => {
+    const first = { id: 1, title: "分润", message: "订单 HS1", entity_type: "order", entity_id: "HS1" };
+    const second = { ...first, id: 2, message: "订单 HS2", entity_id: "HS2" };
+    const detail = { notification_id: 1, order_no: "HS1", order_type: "HS", sale_amount: "300.00", stock_no: "KU1", inventory_entry_at: "2026-11-10", removed_at: null, recovery_operator: null };
+    let finish!: (items: typeof detail[]) => void;
+    vi.mocked(notificationsApi.profitDetails).mockRejectedValueOnce(new Error("网络不可用")).mockResolvedValueOnce([detail]).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    const view = renderLight(<ProfitNotificationModal selected={first} onClose={() => {}} />, { user: "admin" });
+    expect(await screen.findByText("订单详情暂时无法查看。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(await screen.findByText("KU1")).toBeInTheDocument();
+    view.rerender(<ProfitNotificationModal selected={second} onClose={() => {}} />);
+    expect(screen.queryByText("KU1")).not.toBeInTheDocument();
+    await act(async () => { finish([{ ...detail, notification_id: 2, order_no: "HS2", stock_no: "KU2" }]); });
+    expect(await screen.findByText("KU2")).toBeInTheDocument();
   });
 
 it("连续点击消息均能打开且保持滚动位置", async () => {

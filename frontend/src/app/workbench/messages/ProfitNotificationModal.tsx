@@ -1,23 +1,25 @@
-import { Descriptions, Modal, Spin, Typography } from "antd";
+import { Button, Descriptions, Modal, Spin, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from "../../../shared/api/notifications.api";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../../../shared/lib/format";
 
 export function ProfitNotificationModal({ selected, onClose }: { selected: NotificationItem; onClose: () => void }) {
-  const [detail, setDetail] = useState<ProfitDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [result, setResult] = useState<{ id: number; loading: boolean; error: boolean; detail: ProfitDetail | null }>({ id: selected.id, loading: true, error: false, detail: null });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setResult({ id: selected.id, loading: true, error: false, detail: null });
     void notificationsApi.profitDetails([selected.id]).then((items) => {
-      if (!cancelled) setDetail(items.find((item) => item.notification_id === selected.id) ?? null);
-    }).catch(() => { if (!cancelled) setError(true); }).finally(() => { if (!cancelled) setLoading(false); });
+      if (!cancelled) setResult({ id: selected.id, loading: false, error: false, detail: items.find((item) => item.notification_id === selected.id) ?? null });
+    }).catch(() => { if (!cancelled) setResult({ id: selected.id, loading: false, error: true, detail: null }); });
     return () => { cancelled = true; };
-  }, [selected.id]);
+  }, [selected.id, attempt]);
+  const loading = result.id !== selected.id || result.loading;
+  const detail = result.id === selected.id ? result.detail : null;
   return (
     <Modal open title="订单分润通知详情" onCancel={onClose} footer={null} width={720} destroyOnHidden>
-      {loading ? <div className="dashboard-notification-detail__loading"><Spin /></div> : error || !detail ? <Typography.Text type="warning">订单详情暂时无法查看。</Typography.Text> : (
+      {loading ? <div className="dashboard-notification-detail__loading"><Spin /></div> : !detail ? <div><Typography.Text type="warning">订单详情暂时无法查看。</Typography.Text>{result.error && <Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button>}</div> : (
         <section className="dashboard-notification-detail" aria-label={`订单 ${detail.order_no}`}>
           <Descriptions bordered size="small" column={2}>
             <Descriptions.Item label="订单号">{detail.order_no}</Descriptions.Item>

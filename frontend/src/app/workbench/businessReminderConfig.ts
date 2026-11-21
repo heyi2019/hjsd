@@ -15,8 +15,9 @@ export const DEFAULT_BUSINESS_REMINDER_CONFIG: BusinessReminderConfig = {
 };
 
 function positiveInteger(value: string | undefined, fallback: number): number {
+  if (!value || /[^0-9]/.test(value)) return fallback;
   const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+  return parsed >= 1 && parsed <= 365 ? parsed : fallback;
 }
 
 function enabled(value: string | undefined, fallback: boolean): boolean {

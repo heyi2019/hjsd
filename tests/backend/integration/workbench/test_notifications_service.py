@@ -38,6 +38,24 @@ def _make_unread(seeded_db, **kwargs):
     )
 
 
+def test_inventory_reminder_uses_default_for_noncanonical_or_out_of_range_days(seeded_db):
+    from app.domain.options import OptionSet
+    from app.workbench.reminder_config import REMINDER_CODE, read_reminder_config
+
+    setting = seeded_db.scalar(select(OptionSet).where(OptionSet.code == REMINDER_CODE))
+    if setting is None:
+        setting = OptionSet(code=REMINDER_CODE, label="业务提醒", group="BUSINESS", editable=False, options=[])
+        seeded_db.add(setting)
+    for value, expected in [
+        ("1", 1), ("014", 14), ("365", 365), ("0" * 5000 + "1", 1),
+        ("0", 7), ("366", 7), ("1e2", 7), ("1.0", 7), ("+14", 7),
+        (" 14 ", 7), ("1\n", 7), ("１４", 7), ("9" * 5000, 7),
+    ]:
+        setting.options = [{"value": "inventory_aging_days", "label": value}]
+        seeded_db.flush()
+        assert read_reminder_config(seeded_db)["inventory_aging_days"] == expected, value
+
+
 def test_create_notification_rejects_blank_title_or_message(seeded_db):
     with pytest.raises(Validation, match="通知标题和内容不能为空"):
         notification_service.create_notification(

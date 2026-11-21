@@ -6,6 +6,25 @@ from app.settings.field_definitions.catalog_seed import seed_catalog
 OPTION_SETS = "/api/option-sets"
 
 
+def test_business_reminder_rejects_invalid_inventory_aging_days(client, headers):
+    url = f"{OPTION_SETS}/BUSINESS_OVERVIEW_REMINDERS"
+    options = [{"value": "inventory_aging_days", "label": "365"}]
+    invalid = [{"value": "inventory_aging_days", "label": "366"}]
+    assert client.post(OPTION_SETS, json={"code": "BUSINESS_OVERVIEW_REMINDERS", "label": "业务提醒", "options": invalid}, headers=headers).status_code == 422
+    response = client.post(OPTION_SETS, json={"code": "BUSINESS_OVERVIEW_REMINDERS", "label": "业务提醒", "options": options}, headers=headers)
+    assert response.status_code == 201, response.text
+
+    for value in ("0", "366", "1e2", "1.0", "+14", " 14 ", "1\n", "１４", "9" * 5000):
+        response = client.put(url, json={"options": [{"value": "inventory_aging_days", "label": value}]}, headers=headers)
+        assert response.status_code == 422, value
+        assert client.get(url, headers=headers).json()["options"] == options
+
+    response = client.put(url, json={"options": [{"value": "inventory_aging_days", "label": "1"}]}, headers=headers)
+    assert response.status_code == 200, response.text
+    response = client.put(url, json={"options": [{"value": "inventory_aging_days", "label": "0" * 5000 + "1"}]}, headers=headers)
+    assert response.status_code == 200, response.text
+
+
 def test_business_reminder_configuration_rejects_invalid_switches(client, headers):
     url = f"{OPTION_SETS}/BUSINESS_OVERVIEW_REMINDERS"
     valid = [

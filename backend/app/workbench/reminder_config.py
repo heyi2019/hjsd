@@ -18,6 +18,16 @@ DEFAULT_REMINDERS = {
 REMINDER_SWITCH_KEYS = frozenset({"profit_notifications_enabled", "overdue_installments_enabled"})
 
 
+def _inventory_aging_days(value: object) -> int | None:
+    if not isinstance(value, str) or not value.isascii() or not value.isdecimal():
+        return None
+    digits = value.lstrip("0")
+    if not digits or len(digits) > 3:
+        return None
+    days = int(digits)
+    return days if days <= 365 else None
+
+
 def _enabled(key: str, value: str | None) -> bool:
     if value is None:
         return DEFAULT_REMINDERS[key]
@@ -27,20 +37,19 @@ def _enabled(key: str, value: str | None) -> bool:
 
 
 def validate_reminder_options(options: list[dict[str, str]]) -> None:
-    """拒绝保存读取时无法解析的提醒开关。"""
+    """拒绝保存无效的提醒开关和库存提醒天数。"""
     for option in options:
         if option["value"] in REMINDER_SWITCH_KEYS:
             _enabled(option["value"], option["label"])
+        elif option["value"] == "inventory_aging_days" and _inventory_aging_days(option["label"]) is None:
+            raise Validation("库存提醒天数必须为 1 至 365 的整数", details={"field": "inventory_aging_days"})
 
 
 def read_reminder_config(session: Session) -> dict[str, Any]:
     row = session.scalar(select(OptionSet).where(OptionSet.code == REMINDER_CODE))
     values = {item.get("value"): item.get("label") for item in (row.options if row else [])}
-    try:
-        aging_days = int(values.get("inventory_aging_days", DEFAULT_REMINDERS["inventory_aging_days"]))
-        if aging_days <= 0:
-            raise ValueError
-    except (TypeError, ValueError):
+    aging_days = _inventory_aging_days(values.get("inventory_aging_days"))
+    if aging_days is None:
         aging_days = DEFAULT_REMINDERS["inventory_aging_days"]
 
     return {

@@ -36,18 +36,28 @@ class NotificationInboxOut(BaseModel):
     next_cursor: str | None
 
 
+class ProfitAllocationDetailOut(BaseModel):
+    id: int
+    allocation_type: str | None
+    user_name: str
+    rate: Decimal
+    amount: Decimal
+
+
 class ProfitNotificationDetailOut(BaseModel):
     notification_id: int
     order_no: str
     order_type: str
     sale_amount: Decimal | None
+    order_profit: Decimal
     game_type: str | None = None
     cost_amount: Decimal | None = None
     allocatable_profit: Decimal | None = None
     stock_no: str | None
     inventory_entry_at: datetime
-    removed_at: datetime | None
-    recovery_operator: str | None
+    sold_at: datetime | None
+    inventory_operator: str | None
+    allocations: list[ProfitAllocationDetailOut] = Field(default_factory=list)
 
 
 class PendingProfitOrderOut(BaseModel):

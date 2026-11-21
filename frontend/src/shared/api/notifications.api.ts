@@ -6,13 +6,15 @@ export interface ProfitNotificationDetail {
   order_no: string;
   order_type: string;
   sale_amount: string | null;
+  order_profit: string;
   game_type?: string | null;
   cost_amount?: string | null;
   allocatable_profit?: string | null;
   stock_no: string | null;
   inventory_entry_at: string;
-  removed_at: string | null;
-  recovery_operator: string | null;
+  sold_at: string | null;
+  inventory_operator: string | null;
+  allocations: { id: number; allocation_type: string | null; user_name: string; rate: string; amount: string }[];
 }
 
 export const notificationsApi = {

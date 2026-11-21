@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.notifications import Notification
-from app.domain.trade import Account, Order, OrderEvent
+from app.domain.trade import Account, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 from app.dashboard.notifications import query as notification_query
 from app.dashboard.notifications import triggers
@@ -522,6 +522,11 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     order = _order(seeded_db, "details")
     _buy(seeded_db, order)
     _sell(seeded_db, order)
+    seeded_db.add_all([
+        OrderProfitAllocation(order_id=order.id, user_id=1, role="BUYER", allocation_type="BUY", allocation_rate=Decimal("60"), allocation_amount=Decimal("0")),
+        OrderProfitAllocation(order_id=order.id, user_id=2, role="SALES", allocation_type="SELL", allocation_rate=Decimal("40"), allocation_amount=Decimal("0")),
+    ])
+    seeded_db.flush()
     mine = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
     pending = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
     other = _make_unread(seeded_db, recipient_user_id=_uid(seeded_db, "seeduser2"), notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
@@ -546,9 +551,23 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     detail = response.json()[0]
     assert detail["stock_no"] == execution["account"]["stock_no"]
     assert detail["inventory_entry_at"] == execution["account"]["inventory_entry_at"]
-    assert detail["removed_at"] == execution["detail_view"]["lifecycle"]["removed_at"]
+    assert detail["sold_at"] == execution["detail_view"]["lifecycle"]["sold_at"]
     recovery = next(row for row in execution["detail_view"]["execution_rows"] if row["category"] == "INBOUND")
-    assert detail["recovery_operator"] == recovery["operator"]
+    assert detail["inventory_operator"] == recovery["operator"]
+    assert [row["allocation_type"] for row in detail["allocations"]] == ["BUY", "SELL"]
+    assert [Decimal(row["amount"]) for row in detail["allocations"]] == [Decimal("180.00"), Decimal("120.00")]
+    assert all(row["user_name"] for row in detail["allocations"])
+    from app.operations.r3_commission import r3_commission_reconciliation
+    report = r3_commission_reconciliation(seeded_db)
+    group = next(item for item in report["order_groups"] if item["order_id"] == order.id)
+    assert [row["amount"] for row in detail["allocations"]] == [str(row["profit_base"]) for row in group["orders"]]
+    from app.dashboard.notifications.profit_details import profit_details_for_notifications
+    limited = CurrentUser(id=1, username="admin", permissions=frozenset({"finance.read"}), owner_scope="ALL")
+    limited_detail = profit_details_for_notifications(seeded_db, [mine], limited)[0]
+    assert len(limited_detail.allocations) == 1
+    assert limited_detail.allocations[0].amount == Decimal("180.00")
+    report_user = CurrentUser(id=1, username="admin", permissions=frozenset({"finance.read", "report.read"}), owner_scope="ALL")
+    assert len(profit_details_for_notifications(seeded_db, [mine], report_user)[0].allocations) == 2
     scoped_account = seeded_db.get(User, 2)
     scoped_account.role = "OPERATOR"
     scoped_account.owner_scope = "SELF"
@@ -567,6 +586,7 @@ def test_profit_notification_details_batch_does_not_query_per_order(seeded_clien
         order = _order(seeded_db, f"batch-{index}")
         _buy(seeded_db, order)
         _sell(seeded_db, order)
+        seeded_db.add(OrderProfitAllocation(order_id=order.id, user_id=1, role="BUYER", allocation_type="BUY", allocation_rate=Decimal("100"), allocation_amount=Decimal("0")))
         ids.append(_make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no).id)
     statements = []
     connection = seeded_db.connection()

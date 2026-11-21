@@ -32,6 +32,12 @@ export function mergeCustomerSearch(current: CustomerOption[], rows: CustomerOpt
   return [...current.filter((item) => selected.has(item.id) && !rowIds.has(item.id)), ...rows];
 }
 
+export function getPartySelectionDelta(previous: number[], next: number[]) {
+  const previousIds = new Set(previous);
+  const nextIds = new Set(next);
+  return { added: next.filter((id) => !previousIds.has(id)), removed: previous.filter((id) => !nextIds.has(id)) };
+}
+
 /** 板块6：参与方信息 = 参与方链接（客户 / 合作方）+ PARTICIPANT 自定义字段。复用既有渲染（meta.orderParties 与 orderExtras）。 */
 export function OrderDetailPartySection({
   meta,
@@ -226,10 +232,11 @@ export function OrderDetailPartySection({
                   popupRender={(menu) => <>{menu}{newCustomerNames[role]?.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="customer.create" disabled={!customersReady} loading={customerCreate.pending} type="link" onClick={() => void addCustomer(role)}>{`新建${label}：${newCustomerNames[role].trim()}`}</PermissionButton></div> : null}</>}
                   options={customerOptions}
                   onChange={(ids: number[]) => {
+                    const { added, removed } = getPartySelectionDelta(selected, ids);
                     setSelectedCustomers((current) => ({ ...current, [role]: ids }));
                     setNewCustomerNames((current) => ({ ...current, [role]: "" }));
-                    ids.filter((id) => !selected.includes(id)).forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "customer", entity_id: id, role }));
-                    selected.filter((id) => !ids.includes(id)).forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "customer", entity_id: id, role, operation: "remove" }));
+                    added.forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "customer", entity_id: id, role }));
+                    removed.forEach((id) => onPartyEdit?.(meta.orderId!, { entity_type: "customer", entity_id: id, role, operation: "remove" }));
                   }}
                 />
               </div>;
@@ -251,14 +258,20 @@ export function OrderDetailPartySection({
                   popupRender={(menu) => <>{menu}{newCounterpartyName.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="counterparty.manage" disabled={!counterpartiesReady} loading={counterpartyCreate.pending} type="link" onClick={() => void addCounterparty()}>{`新建合作方：${newCounterpartyName.trim()}`}</PermissionButton></div> : null}</>}
                   options={counterparties.filter((item) => item.type === counterpartyRole).map((item) => ({ value: item.id, label: `${item.counterparty_no} · ${item.display_name}` }))}
                   onChange={(ids: number[]) => {
-                  const removed = selectedCounterpartyIds.filter((id) => !ids.includes(id));
+                  const { added, removed } = getPartySelectionDelta(selectedCounterpartyIds, ids);
                     setSelectedCounterpartyIds(ids);
                     setNewCounterpartyName("");
+                  const rolesById = new Map<number, string[]>();
+                  for (const item of order?.counterparties ?? []) {
+                    if (Number.isNaN(item.id)) continue;
+                    const roles = rolesById.get(item.id) ?? [];
+                    roles.push(item.role);
+                    rolesById.set(item.id, roles);
+                  }
                   const rolesFor = (id: number) => {
-                    const roles = order?.counterparties?.filter((item) => item.id === id).map((item) => item.role) ?? [];
-                    return roles.length ? roles : [counterpartyRole];
+                    return rolesById.get(id) ?? [counterpartyRole];
                   };
-                  ids.filter((id) => !selectedCounterpartyIds.includes(id)).forEach((id) => rolesFor(id).forEach((role) => onPartyEdit?.(meta.orderId!, { entity_type: "counterparty", entity_id: id, role })));
+                  added.forEach((id) => rolesFor(id).forEach((role) => onPartyEdit?.(meta.orderId!, { entity_type: "counterparty", entity_id: id, role })));
                   removed.forEach((id) => rolesFor(id).forEach((role) => onPartyEdit?.(meta.orderId!, { entity_type: "counterparty", entity_id: id, role, operation: "remove" })));
                   }}
                 />

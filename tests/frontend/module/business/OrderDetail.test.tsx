@@ -9,7 +9,7 @@ import { buildOperationPlatformUsage, OrderDetailOperationSection, resolveOperat
 import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
 import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
-import { buildCustomerOptions, mergeCustomerSearch } from "@/business/OrderDetailView/OrderDetailPartySection";
+import { buildCustomerOptions, getPartySelectionDelta, mergeCustomerSearch } from "@/business/OrderDetailView/OrderDetailPartySection";
 import type { OrderDetailMeta } from "@/business/OrderDetailView/OrderDetail.shared";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
@@ -58,6 +58,15 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("参与方选择增删保留原顺序且不重复扫描", () => {
+    expect(getPartySelectionDelta([1, 1, 2], [2, 3, 3])).toEqual({ added: [3, 3], removed: [1, 1] });
+    let reads = 0;
+    const counted = (start: number) => new Proxy(Array.from({ length: 200 }, (_, i) => start + i), {
+      get(target, key, receiver) { if (typeof key === "string" && /^\d+$/.test(key)) reads += 1; return Reflect.get(target, key, receiver); },
+    });
+    expect(getPartySelectionDelta(counted(0), counted(100)).added).toHaveLength(100);
+    expect(reads).toBeLessThanOrEqual(1000);
+  });
   it("平台占用检查排除当前行且线性读取已有上架", () => {
     let reads = 0;
     const listings = Array.from({ length: 200 }, (_, i) => ({ get platform() { reads += 1; return `平台${i}`; }, eventId: i }));

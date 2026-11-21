@@ -29,7 +29,6 @@
   --label: #1c1c1e;
 
   /* 面板 / 强调（--panel/--accent/--accent-cyan 已删除，改用 --color-surface/--color-primary/--color-info） */
-  --panel-2: rgba(255, 255, 255, 0.72);
   --soft: rgba(118, 118, 128, 0.12);
   --on-accent: #fff;
   --danger-button-bg: #b23b3b;
@@ -92,7 +91,6 @@
   --radius-xs: 8px;
   --radius-compact: 9px;
   --radius-control: 11px;
-  --radius-wide: 14px;
   --radius-glass: 18px;
   /* 边框宽度（2026-09-18 收口，消除 border 散落 1/1.5/2/3px；dimension 双主题同值，不加 dark 覆盖） */
   --border-w: 1px;
@@ -102,7 +100,6 @@
   /* 定位偏移（2026-09-18 收口，消除 top/left/right/bottom/inset 散落 px；dimension 双主题同值，不加 dark 覆盖） */
   --pos-4: 4px;
   --pos-8: 8px;
-  --pos-neg-3: -3px;
   /* 2026-09-18 二维孤儿清理：负向定位偏移（装饰光斑，维度契约此前漏守负值） */
   --pos-neg-70: -70px;
   --pos-neg-100: -100px;
@@ -133,7 +130,6 @@
      与 forms.css / StudioExpensePanel.css 等注释口径重新对齐；触控目标低于 44pt 属知情取舍。 */
   --ui-control-height: 36px;
   --ui-control-height-compact: 30px;
-  --ui-control-height-compact-inner: 28px;
   --ui-control-height-chip: 24px;
   /* 标准小号档 24px：与 antd Button 的 controlHeightSM 同值，用于表格行内操作与密集增删行。
      是设计系统承认的标准档位（非破例），使用时必须显式写 size="small"，不得靠 CSS 默认继承。 */
@@ -288,7 +284,6 @@
   --font-data-display-title: 600 1rem/1.4 var(--font-sans); /* Body · 17，二级容器/多数据展示标题 */
   --font-nav-primary: 600 0.8824rem/1.4 var(--font-sans); /* Subheadline · 15，一级导航 */
   --font-nav-secondary: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13，二级导航 */
-  --font-nav-tertiary: 500 0.7059rem/1.4 var(--font-sans); /* Caption 1 · 12，三级及以下导航 */
   --font-nav-caption: 700 0.7059rem/1.4 var(--font-sans); /* Caption 2 · 12，导航分组说明 */
   --font-body-m: 400 1rem/1.6 var(--font-sans); /* Body · 17 */
   --font-body-s: 400 0.8824rem/1.5 var(--font-sans); /* Subheadline · 15 */
@@ -321,7 +316,6 @@
   --ls-tighter: -0.3px;
 
   /* 品牌蓝点缀。品牌蓝语义令牌。 */
-  --tint-brand: rgba(10, 99, 216, 0.12);
   --brand-ink: #0757c7;
   --brand-border: #b7d5fb;
   --brand-hover: #7db5f4;
@@ -510,7 +504,6 @@
      行号系跨项目搬运残留；且该文件现由 styles.css:3 的 body 规则承载背景令牌。） */
   --color-bg: #0b1420;
   --label: #f3f8ff;
-  --panel-2: rgba(20, 40, 64, 0.78);
   --soft: rgba(255, 255, 255, 0.1);
   --row-selected: rgba(10, 132, 255, 0.26);
   /* 暗色玻璃基色更暗且 alpha 更高（0.72 vs 亮色 0.62），滑桿系数沿用同一套乘法口径 */
@@ -623,7 +616,6 @@
     --cal-dropdown-bg: var(--color-antd-bg-container);
     --glass-tint: var(--color-antd-bg-container); /* G3：玻璃稀释面整体翻实底，不被 color-mix(transparent) 稀释回半透明 */
     --glass-hi-tint: var(--color-antd-bg-container); /* G3：玻璃-hi 稀释面同样翻实底（须实底，非半透明描边色） */
-    --panel-2: var(--color-antd-bg-container);
     --color-surface: var(--color-antd-bg-container);
   }
 }
@@ -644,7 +636,6 @@
     --glass-tint: var(--color-antd-bg-container); /* G3：玻璃稀释面整体翻实底 */
     --glass-hi-tint: var(--color-antd-bg-container); /* G3：玻璃-hi 稀释面同样翻实底（须实底，非半透明描边色） */
     --color-surface: var(--color-antd-bg-container);
-    --panel-2: var(--color-antd-bg-container);
     --color-text-secondary: var(--color-text-primary);
     --color-text-tertiary: #48484a; /* 亮色：三级并入原次级（#48484a） */
     --color-border: #8e8e93;

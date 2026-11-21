@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
-  vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids }));
+  vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids, read_at: "2026-11-21T10:00:00", next_read_id: null }));
 });
 
 describe("DashboardPage：动作入口（数据已迁数据中心）", () => {

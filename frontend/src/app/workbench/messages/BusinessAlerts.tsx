@@ -16,6 +16,7 @@ export function BusinessAlerts(props: Parameters<typeof useWorkbenchMessages>[0]
         {ordered.length ? (
           <List
             size="small"
+            rowKey="id"
             dataSource={ordered}
             renderItem={(item) => {
               const isProfit = isProfitNotification(item);

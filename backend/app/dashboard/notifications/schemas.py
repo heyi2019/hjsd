@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -56,10 +57,13 @@ class PendingProfitOrderOut(BaseModel):
 
 class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=10)
+    category: Literal["latest", "sale", "inventory"] | None = None
 
 
 class NotificationReadOut(BaseModel):
     read_ids: list[int]
+    read_at: datetime | None = None
+    next_read_id: int | None = None
 
 
 __all__ = ["NotificationListOut", "NotificationOut"]

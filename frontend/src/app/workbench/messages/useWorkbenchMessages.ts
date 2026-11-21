@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from "../../../shared/api/notifications.api";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { useSession } from "../../../shared/state/session";
@@ -26,9 +26,6 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const scrollRef = useRef<HTMLDivElement>(null);
   const busy = useRef(new Set<number>());
   const inventorySync = useRef<Promise<unknown> | null>(null);
-  const refreshAfterRead = useRef<number | null>(null);
-  const preserve = useRef<{ count: number; top: number } | null>(null);
-  const restoreTop = useRef<number | null>(null);
   const loadMore = async () => {
     const state = cursor.current;
     if (!active || state.loading || state.done) return;
@@ -36,27 +33,19 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     const generation = state.generation;
     setNotificationLoading(true);
     try {
-      const target = preserve.current?.count ?? PAGE_SIZE;
-      const items: NotificationItem[] = [];
-      const details: ProfitDetail[] = [];
-      let next = state.next;
-      do {
-        const page = await notificationsApi.list({ limit: PAGE_SIZE, category, ...(next ? { cursor: next } : {}) });
-        if (cursor.current.generation !== generation) return;
-        const ids = page.items.filter(isProfitNotification).map((item) => item.id);
-        if (ids.length) {
-          try { details.push(...await notificationsApi.profitDetails(ids)); } catch { /* 消息仍可展示 */ }
-        }
-        if (cursor.current.generation !== generation) return;
-        if (page.next_cursor && page.next_cursor === next) throw new Error("消息分页游标异常");
-        items.push(...page.items);
-        next = page.next_cursor ?? undefined;
-      } while (next && items.length < target);
+      const page = await notificationsApi.list({ limit: PAGE_SIZE, category, ...(state.next ? { cursor: state.next } : {}) });
+      if (cursor.current.generation !== generation) return;
+      const ids = page.items.filter(isProfitNotification).map((item) => item.id);
+      let details: ProfitDetail[] = [];
+      if (ids.length) {
+        try { details = await notificationsApi.profitDetails(ids); } catch { /* 消息仍可展示 */ }
+      }
+      if (cursor.current.generation !== generation) return;
+      if (page.next_cursor && page.next_cursor === state.next) throw new Error("消息分页游标异常");
       setNotificationDetails((current) => ({ ...current, ...Object.fromEntries(details.map((item) => [item.notification_id, item])) }));
-      setNotifications((current) => [...current, ...items]);
-      if (preserve.current) { restoreTop.current = preserve.current.top; preserve.current = null; }
-      state.next = next;
-      state.done = !next;
+      setNotifications((current) => [...current, ...page.items]);
+      state.next = page.next_cursor ?? undefined;
+      state.done = !page.next_cursor;
       setHasMore(!state.done);
       setNotificationError(null);
     } catch {
@@ -65,7 +54,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       if (cursor.current.generation === generation) { state.loading = false; setNotificationLoading(false); }
     }
   };
-  useEffect(() => { setSelected(null); preserve.current = null; restoreTop.current = null; }, [category, username]);
+  useEffect(() => { setSelected(null); }, [category, username]);
   useEffect(() => { inventorySync.current = null; }, [active, username]);
   useEffect(() => {
     if (!active) return;
@@ -76,7 +65,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     setNotificationDetails({});
     setNotificationError(null);
     setRetryItem(null);
-    if (scrollRef.current && !preserve.current) scrollRef.current.scrollTop = 0;
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
     setHasMore(true);
     setInventorySyncError(false);
     setNotificationLoading(true);
@@ -96,17 +85,10 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, notifications.length, notificationLoading, hasMore, notificationError]);
 
-  useLayoutEffect(() => {
-    if (!notificationLoading && restoreTop.current !== null && scrollRef.current) {
-      scrollRef.current.scrollTop = restoreTop.current;
-      restoreTop.current = null;
-    }
-  }, [notificationLoading, notifications]);
   useEffect(() => {
     if (!active) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "hidden" || notificationLoading || selected || busy.current.size || (scrollRef.current?.scrollTop ?? 0) > 0) return;
-      preserve.current = { count: notifications.length, top: 0 };
       if (category !== "sale") inventorySync.current = null;
       setReload((n) => n + 1);
     }, 5 * 60_000);
@@ -119,11 +101,25 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     const generation = cursor.current.generation;
     try {
       if (!item.read_at) {
-        const result = await notificationsApi.markReadBatch([item.id]);
+        const result = await notificationsApi.markReadBatch([item.id], category);
         if (cursor.current.generation !== generation) return;
         if (!result.read_ids.includes(item.id)) throw new Error("标记已读失败，请重试。");
-        if (category === "latest") setNotifications((current) => current.filter((entry) => entry.id !== item.id));
-        else refreshAfterRead.current = generation;
+        if (category !== "latest" && !result.read_at) {
+          setNotifications((current) => current.filter((entry) => entry.id !== item.id));
+          setNotificationError("消息已不可用。");
+          return;
+        }
+        setNotifications((current) => {
+          const remaining = current.filter((entry) => entry.id !== item.id);
+          if (category === "latest") return remaining;
+          const updated = { ...item, read_at: result.read_at };
+          const position = remaining.findIndex((entry) => entry.id === result.next_read_id);
+          if (position >= 0) {
+            if (!remaining[position].read_at) remaining[position] = { ...remaining[position], read_at: updated.read_at };
+            remaining.splice(position, 0, updated);
+          } else remaining.push(updated);
+          return remaining;
+        });
         onProfitNotificationsRead?.();
       }
       setNotificationError(null);
@@ -134,11 +130,6 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       if (cursor.current.generation === generation) { setNotificationError("标记已读失败，请重试。"); setRetryItem(item); }
     } finally {
       busy.current.delete(item.id);
-      if (!busy.current.size && refreshAfterRead.current === cursor.current.generation) {
-        refreshAfterRead.current = null;
-        preserve.current = { count: notifications.length, top: scrollRef.current?.scrollTop ?? 0 };
-        setReload((n) => n + 1);
-      }
     }
   };
   const ordered = dataOwner === username ? notifications : [];

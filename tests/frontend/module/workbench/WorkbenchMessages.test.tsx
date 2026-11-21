@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.syncInventory).mockResolvedValue({ created: 0 });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
-  vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids }));
+  vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids, read_at: "2026-11-21T10:00:00", next_read_id: null }));
 });
 
 describe("工作台消息", () => {
@@ -76,15 +76,15 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(within(button).getByText(/2026-11-20 08:30/)).toBeInTheDocument();
     fireEvent.click(button);
     expect(await screen.findByText("订单分润通知详情")).toBeInTheDocument();
-    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1]);
-    expect(notificationsApi.markReadBatch).not.toHaveBeenCalledWith([2]);
+    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1], "latest");
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalledWith([2], "latest");
     expect(await screen.findByText("KU0007")).toBeInTheDocument();
   });
 
 it("连续点击消息均能打开且保持滚动位置", async () => {
     const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_PENDING", title: "分润", message: `订单 ${id}`, entity_type: "order", entity_id: `${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
     vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
-    const pending: Record<number, (value: { read_ids: number[] }) => void> = {};
+    const pending: Record<number, (value: { read_ids: number[]; read_at: string | null; next_read_id: number | null }) => void> = {};
     vi.mocked(notificationsApi.markReadBatch).mockImplementation(([id]) => new Promise((resolve) => { pending[id] = resolve; }));
     const open = vi.fn();
     renderLight(<BusinessAlerts onPendingProfitNotificationsClick={open} />, { user: "admin" });
@@ -93,13 +93,17 @@ it("连续点击消息均能打开且保持滚动位置", async () => {
     const second = screen.getByRole("button", { name: /订单 2/ });
     const scroll = document.querySelector(".business-alerts__scroll") as HTMLDivElement;
     scroll.scrollTop = 150;
+    const listCalls = vi.mocked(notificationsApi.list).mock.calls.length;
     fireEvent.click(first);
     fireEvent.click(second);
-    pending[1]({ read_ids: [1] });
+    pending[1]({ read_ids: [1], read_at: "2026-11-21T10:00:00", next_read_id: null });
     await waitFor(() => expect(open).toHaveBeenCalledWith(1));
-    pending[2]({ read_ids: [2] });
+    pending[2]({ read_ids: [2], read_at: "2026-11-21T10:00:00", next_read_id: 1 });
     await waitFor(() => expect(open).toHaveBeenCalledWith(2));
     expect(scroll.scrollTop).toBe(150);
+    await waitFor(() => expect(within(first).getByText("已读")).toBeInTheDocument());
+    expect(notificationsApi.list).toHaveBeenCalledTimes(listCalls);
+    expect(second.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
 it("停留工作台时定时刷新，滚动查看期间不打断", async () => {
@@ -158,7 +162,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
       { id: 2, title: "订单分润待配置", message: "订单 TH0002 待配置分润", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "TH0002", created_at: "2026-11-21T09:30:00", read_at: null },
       { id: 3, title: "订单分润待配置", message: "订单 HS0001 待配置分润", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "HS0001", read_at: "2026-11-20T10:00:00" },
     ], next_cursor: null });
-    vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [2] });
+    vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [2], read_at: "2026-11-21T10:00:00", next_read_id: null });
     vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 2, order_no: "TH0002", order_type: "TH", game_type: "王者荣耀", cost_amount: "100.00", sale_amount: "200.00", allocatable_profit: "60.00", stock_no: null, inventory_entry_at: "2026-11-20", removed_at: null, recovery_operator: null }]);
 
     renderLight(<DashboardPage onDashboardNavigate={onDashboardNavigate} />, { user: "admin" });
@@ -176,7 +180,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
     await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
     expect(notificationsApi.pendingOrder).toHaveBeenCalledWith(2);
     expect(ordersApi.listPage).not.toHaveBeenCalled();
-    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2]);
+    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2], "sale");
   });
 
 it("待配置通知订单不可见时提示且不跳转", async () => {

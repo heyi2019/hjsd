@@ -19,6 +19,7 @@ from app.settings.auth.session import (
 )
 from app.domain.notifications import Notification
 from app.domain.trade import Order
+from app.domain.users import User
 from app.shared.scope import owner_scope_filter
 from app.dashboard.notifications.profit_details import profit_details_for_notifications
 from app.dashboard.notifications import query, schemas, service
@@ -128,13 +129,18 @@ def mark_notifications_read(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> schemas.NotificationReadOut:
+    # 同一接收人的并发已读操作按事务排序，保证返回的位置包含先提交的消息。
+    db.scalar(select(User.id).where(User.id == user.id).with_for_update())
     ids = service.mark_read_batch(
         db,
         payload.ids,
         recipient_user_id=user.id,
         actor=user.username,
     )
-    return schemas.NotificationReadOut(read_ids=ids)
+    read_at, next_read_id = (None, None)
+    if len(ids) == 1 and payload.category in ("sale", "inventory"):
+        read_at, next_read_id = query.read_position(db, user=user, category=payload.category, notification_id=ids[0])
+    return schemas.NotificationReadOut(read_ids=ids, read_at=read_at, next_read_id=next_read_id)
 
 
 __all__ = ["router"]

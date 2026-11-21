@@ -41,8 +41,18 @@ def _notification_query(recipient_user_id: int, *, category: str | None = None, 
     return stmt
 
 
+def read_position(session: Session, *, user: CurrentUser, category: str, notification_id: int) -> tuple[datetime | None, int | None]:
+    base = _notification_query(user.id, category=category).where(visibility_filter(session, user))
+    item = session.scalar(base.where(Notification.id == notification_id))
+    if item is None or item.read_at is None:
+        return None, None
+    older = or_(Notification.created_at < item.created_at, and_(Notification.created_at == item.created_at, Notification.id < item.id))
+    next_id = session.scalar(base.with_only_columns(Notification.id).where(Notification.read_at.is_not(None), older).order_by(Notification.created_at.desc(), Notification.id.desc()).limit(1))
+    return item.read_at, next_id
+
+
 def inbox_page(session: Session, *, recipient_user_id: int, category: str, cursor: str | None, limit: int, user: CurrentUser | None = None) -> tuple[list[Notification], str | None]:
-    """按未读优先和通知时间分页；同一轮分页不重复返回期间刚读过的消息。"""
+    """按分页开始时的已读状态排序，期间状态变化不造成漏项或重复。"""
     snapshot = datetime.now()
     phase = "unread"
     before_time = None
@@ -67,7 +77,9 @@ def inbox_page(session: Session, *, recipient_user_id: int, category: str, curso
     for current in (["unread"] if category == "latest" else ["unread", "read"]):
         if phase == "read" and current == "unread":
             continue
-        stmt = base.where(Notification.read_at.is_(None) if current == "unread" else Notification.read_at <= snapshot)
+        unread_at_snapshot = or_(Notification.read_at.is_(None), Notification.read_at > snapshot)
+        unread = Notification.read_at.is_(None) if category == "latest" else unread_at_snapshot
+        stmt = base.where(unread if current == "unread" else Notification.read_at <= snapshot)
         if before_time is not None and current == phase:
             stmt = stmt.where(or_(Notification.created_at < before_time, and_(Notification.created_at == before_time, Notification.id < before_id)))
         rows.extend(session.scalars(stmt.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit + 1 - len(rows))).all())
@@ -76,7 +88,8 @@ def inbox_page(session: Session, *, recipient_user_id: int, category: str, curso
     if len(rows) <= limit:
         return rows, None
     last = rows[limit - 1]
-    data = {"category": category, "phase": "unread" if last.read_at is None else "read", "time": last.created_at.isoformat(), "id": last.id, "snapshot": snapshot.isoformat()}
+    was_unread = last.read_at is None or (category != "latest" and last.read_at > snapshot)
+    data = {"category": category, "phase": "unread" if was_unread else "read", "time": last.created_at.isoformat(), "id": last.id, "snapshot": snapshot.isoformat()}
     return rows[:limit], base64.urlsafe_b64encode(json.dumps(data).encode()).decode()
 
 

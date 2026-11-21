@@ -23,5 +23,5 @@ export const notificationsApi = {
   syncInventory: () => api.post<{ created: number }>("/notifications/sync-inventory").then(r => r.data),
   pendingOrder: (notificationId?: number) => api.get<{ order_no: string | null; order_id: number | null }>("/notifications/pending-order", { params: notificationId === undefined ? undefined : { notification_id: notificationId } }).then(r => r.data),
   profitDetails: (ids: number[]) => api.get<ProfitNotificationDetail[]>("/notifications/profit-details", { params: { ids }, paramsSerializer: { indexes: null } }).then(r => r.data),
-  markReadBatch: (ids: number[]) => api.post<{ read_ids: number[] }>("/notifications/read", { ids }).then(r => r.data),
+  markReadBatch: (ids: number[], category: "latest" | "sale" | "inventory") => api.post<{ read_ids: number[]; read_at: string | null; next_read_id: number | null }>("/notifications/read", { ids, category }).then(r => r.data),
 };

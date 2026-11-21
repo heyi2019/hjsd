@@ -11,7 +11,7 @@ from app.domain.trade import OrderEvent
 from app.domain.users import User
 from app.business import schemas
 from app.shared.order_amounts import ZERO
-from app.business.output_labels import _selected_operator_label
+from app.business.orders.output_labels import _selected_operator_label
 
 
 def _apply_common_output(output, order):

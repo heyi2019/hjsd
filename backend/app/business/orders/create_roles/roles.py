@@ -9,7 +9,7 @@ from app.shared.order_access import get_order
 from app.customers.counterparties import assert_counterparty_usable
 from app.customers.customer_merge import assert_customer_usable
 from app.domain.trade import Order
-from app.business._shared import _validate_participant_roles
+from app.business.orders._shared import _validate_participant_roles
 
 def _customer_role(order_id: int, customer_id: int, role: str):
     from app.domain.parties import OrderCustomerRole

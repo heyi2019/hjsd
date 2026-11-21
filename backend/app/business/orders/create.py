@@ -26,7 +26,7 @@ from app.core.errors import ErrorCode, Validation
 from app.domain.trade import Account, Order, OrderFormField
 from app.domain.enums import AuditAction, OrderStatus
 
-from app.business._shared import (
+from app.business.orders._shared import (
     _create_inline_inventory_account,
     _normalize_account_snapshot,
     _validate_existing_account_context,

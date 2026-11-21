@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from app.core.actor import actor_name as _actor
-from app.business.output_labels import _selected_operator_label
+from app.business.orders.output_labels import _selected_operator_label
 from app.business.orders.router_outputs._shared import (
     _event_output,
     _operator_names,

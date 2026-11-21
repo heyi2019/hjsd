@@ -18,7 +18,7 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.business import schemas
-from app.business.output_labels import _selected_operator_label
+from app.business.orders.output_labels import _selected_operator_label
 from app.business.orders.router_outputs._shared import (
     _apply_common_output,
     _event_output,

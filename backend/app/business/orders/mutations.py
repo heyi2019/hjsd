@@ -30,7 +30,7 @@ from app.domain.enums import (
     AuditAction,
 )
 
-from .._shared import _audit_value
+from ._shared import _audit_value
 
 _UNSET = object()
 

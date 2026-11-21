@@ -22,7 +22,7 @@ from app.business.installments import create as inst_create
 from app.business.installments import recovery as inst_recovery
 from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.orders import events
-from app.business._shared import _audit_value
+from app.business.orders._shared import _audit_value
 from app.business.shared.cancellation_model import get_cancellation_offset as _get_offset_event
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event

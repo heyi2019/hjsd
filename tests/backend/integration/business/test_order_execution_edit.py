@@ -952,6 +952,35 @@ def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, se
     assert active_listings(seeded_db, order.id) == set()
 
 
+def test_batch_linked_unlisting_conflict_matches_in_linear_time(seeded_client, seeded_db, headers, monkeypatch):
+    from app.business.order_detail.editing import events as editing_events
+
+    account = create_account(seeded_db, game_account="linked-conflict-batch", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
+
+    class LinkedEvent:
+        reads = 0
+
+        def __init__(self, event_id):
+            self.event_id = event_id
+
+        @property
+        def id(self):
+            type(self).reads += 1
+            return self.event_id
+
+    linked = [LinkedEvent(10000 + index) for index in range(200)]
+    monkeypatch.setattr(editing_events, "_linked_unlistings", lambda _db, _event: linked)
+    drafts = [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["平台乙"]}}]
+    drafts.extend({"id": 20000 + index, "expected_amount": "0", "amount": "0"} for index in range(200))
+    drafts.append({"id": 10199, "expected_amount": "0", "amount": "0"})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": drafts})
+    assert response.status_code == 422, response.text
+    assert "不能同时编辑关联下架记录" in response.text
+    assert LinkedEvent.reads <= 400
+
+
 def test_cannot_reduce_partially_unlisted_multi_platform_record(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="edit-multi-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

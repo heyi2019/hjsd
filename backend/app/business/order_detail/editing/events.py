@@ -85,6 +85,7 @@ def validate_event_edits(
 ) -> tuple[list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]], Decimal]:
     changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]] = []
     cost_delta = Decimal("0")
+    requested_event_ids = {item.id for item in payload.events}
     requested_operator_ids = {
         operator_id
         for item in payload.events
@@ -129,7 +130,7 @@ def validate_event_edits(
                 linked = _linked_unlistings(db, event)
                 if linked and (len(old_platforms) != 1 or len(new_platforms) != 1):
                     raise Validation("已有下架记录的多平台上架不能直接修改平台，请先核对历史记录")
-                if linked and any(other.id in {e.id for e in linked} for other in payload.events):
+                if linked and any(item.id in requested_event_ids for item in linked):
                     raise Validation("修改上架平台时不能同时编辑关联下架记录，请分开保存")
         if item.operator_user_ids is not None:
             ids = item.operator_user_ids

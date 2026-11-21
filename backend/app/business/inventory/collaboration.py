@@ -30,15 +30,9 @@ def register_order_execution_batch_loader(loader: Any) -> None:
 
 
 def load_order_execution_batch(db: Any, order_ids: list[int], user: Any) -> list[Any]:
-    if _order_execution_batch_loader is not None:
-        return _order_execution_batch_loader(db, order_ids, user)
-    results = []
-    for order_id in order_ids:
-        try:
-            results.append(load_order_execution(db, order_id, user))
-        except Exception:
-            results.append(None)
-    return results
+    if _order_execution_batch_loader is None:
+        raise RuntimeError("订单执行明细批量加载器未注册")
+    return _order_execution_batch_loader(db, order_ids, user)
 
 
 def register_order_list_payload_builder(builder: Any) -> None:

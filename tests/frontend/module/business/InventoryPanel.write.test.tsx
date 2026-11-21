@@ -361,6 +361,29 @@ describe("InventoryPanel：写入与长路径", () => {
     await screen.findByText(`草稿:${original}`);
     expect(ordersApi.executionDetail).toHaveBeenCalledWith(21, { fresh: true });
   });
+  it("库存详情预览加载时点击编辑，取得完整详情且旧预览不覆盖", async () => {
+    let finishPreview!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
+    vi.mocked(ordersApi.executionDetail).mockReset()
+      .mockReturnValueOnce(new Promise((resolve) => { finishPreview = resolve; }))
+      .mockResolvedValueOnce({ account: { ...accounts[0], account_images: ["original"] }, image_previews: false, orders: [] } as never);
+    function Probe() {
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const [draft, setDraft] = useState("");
+      const removed = useRef(new Set<number>());
+      const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef: removed });
+      return <><button onClick={() => void cache.loadOrderExecution(21)}>展开</button>
+        <button onClick={() => void cache.loadEditorExecution(accounts[0] as Account, 21).then((detail) => setDraft(detail?.account.account_images?.[0] ?? ""))}>编辑</button>
+        <span>{`草稿:${draft}`}</span><span>{`缓存:${cache.orderExecutionDetails[21]?.account.account_images?.[0] ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "展开" }));
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("草稿:original")).toBeInTheDocument();
+    await act(async () => finishPreview({ account: { ...accounts[0], account_images: ["thumbnail"] }, image_previews: true, orders: [] } as never));
+    expect(screen.getByText("缓存:original")).toBeInTheDocument();
+  });
+
   it.each(["success", "failure"])("库存详情强制刷新后忽略更早请求的%s结果", async (oldResult) => {
     let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     let rejectOld!: (error: Error) => void;

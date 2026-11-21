@@ -153,7 +153,6 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       setOrderExecutionDetails((current) => current[orderId] ? current : { ...current, [orderId]: cached });
       return cached;
     }
-    if (executionLoading[row.id] || orderExecutionLoading[orderId]) return null;
     orderAccountIds.current[orderId] = row.id;
     const version = startOrderRequest(orderId);
     const accountVersion = accountVersions.current(row.id);

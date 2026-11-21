@@ -31,7 +31,7 @@ import {
   sectionLabel,
   buildFormExtraDisplay,
   type FieldConfigMap,
-} from "@/business/ConfigurableField";
+} from "@/shared/forms/ConfigurableField";
 
 it("嵌套表单的必填字段标签显示星号", () => {
   renderLight(

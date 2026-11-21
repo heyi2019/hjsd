@@ -13,7 +13,7 @@ vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
 vi.mock("@/shared/api/pools.api");
 
-vi.mock("@/business/ConfigurableField", () => ({
+vi.mock("@/shared/forms/ConfigurableField", () => ({
   FieldConfigContext: createContext({}),
   SectionLabelsContext: createContext({}),
   CustomFieldSection: () => null,
@@ -25,7 +25,7 @@ vi.mock("@/business/ConfigurableField", () => ({
 vi.mock("@/business/shared/order-create/recovery/RecoveryAccountSection", () => ({
   RecoveryAccountSection: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
-vi.mock("@/business/recovery/RecoveryCustomerSection", () => ({
+vi.mock("@/business/shared/forms/RecoveryCustomerSection", () => ({
   RecoveryCustomerSection: () => null,
 }));
 vi.mock("@/business/shared/order-create/recovery/RecoveryFeeSection", () => ({

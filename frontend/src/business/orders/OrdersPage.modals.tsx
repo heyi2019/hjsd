@@ -3,7 +3,7 @@ import { normalizeError } from "../../shared/api/client";
 import { CashflowModal } from "../../finance/cashflow";
 import { InventoryRebateModal } from "../shared/rebate";
 import { OrderProfileModal, OrderPlatformOffsaleModal } from "../shared/operations";
-import { OrderDeleteDialog } from "../OrderDeleteDialog";
+import { OrderDeleteDialog } from "./OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
 import { AllocationModal } from "./OrderAllocationModal";

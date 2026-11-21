@@ -1,13 +1,13 @@
 import { Form } from "antd";
 import type { SelectProps } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { EmployeeOption } from "../shared/api/types/org";
-import { currentDevUser } from "../shared/api/client";
-import { employeesApi } from "../shared/api/org.api";
-import { notifyReferenceDataRefreshed, subscribeReferenceDataChanged } from "../shared/state/referenceDataEvents";
-import { useSession } from "../shared/state/session";
-import { Select } from "../shared/ui";
-import { appMessage } from "../shared/ui/appFeedback";
+import type { EmployeeOption } from "../api/types/org";
+import { currentDevUser } from "../api/client";
+import { employeesApi } from "../api/org.api";
+import { notifyReferenceDataRefreshed, subscribeReferenceDataChanged } from "../state/referenceDataEvents";
+import { useSession } from "../state/session";
+import { Select } from "../ui";
+import { appMessage } from "../ui/appFeedback";
 import { CfgItem } from "./ConfigurableField";
 import "./ResponsibleEmployeeSelect.css";
 

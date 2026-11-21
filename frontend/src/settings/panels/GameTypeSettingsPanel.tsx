@@ -1,4 +1,4 @@
-import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
+import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Checkbox, Form, Input, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";

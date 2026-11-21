@@ -1,8 +1,8 @@
 import { Input } from "antd";
-import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
-import { CustomerSourceFields } from "../CustomerSourceInput";
+import { CfgItem, CfgNestedItem, sectionLabel } from "../../../shared/forms/ConfigurableField";
+import { CustomerSourceFields } from "./CustomerSourceInput";
 import type { ReactNode } from "react";
-import { BusinessRegistrationGroup, BusinessRegistrationSection } from "../../shared/ui";
+import { BusinessRegistrationGroup, BusinessRegistrationSection } from "../../../shared/ui";
 
 export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; title?: string; customerOptional?: boolean } = {}) {
   const configuredTitle = sectionLabel("PARTICIPANT", "客户信息");

@@ -1,5 +1,5 @@
 import { today } from "../../../../shared/lib/format";
-import type { FieldConfigMap } from "../../../ConfigurableField";
+import type { FieldConfigMap } from "../../../../shared/forms/ConfigurableField";
 
 /** 建单表单值。字段由后端表单配置驱动，故保持 Record 形态。 */
 type Values = Record<string, unknown>;

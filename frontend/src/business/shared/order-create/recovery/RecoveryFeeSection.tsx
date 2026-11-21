@@ -1,4 +1,4 @@
-import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../../../ConfigurableField";
+import { CfgItem, useFieldConfig, fieldLabel, sectionLabel } from "../../../../shared/forms/ConfigurableField";
 import type { Pool } from "../../../../shared/api/types/finance";
 import type { ReactNode } from "react";
 import { PurchaseFinanceSection } from "../finance/PurchaseFinanceSection";

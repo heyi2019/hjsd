@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { CustomerSourceFields } from "@/business/CustomerSourceInput";
+import { CustomerSourceFields } from "@/business/shared/forms/CustomerSourceInput";
 import { FinanceExpenseItems } from "@/business/shared/order-create/finance/FinanceExpenseItems";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 

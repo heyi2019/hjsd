@@ -16,7 +16,7 @@ import { useInventoryList } from "@/business/inventory/InventoryPanel/useInvento
 import { useExecutionCache } from "@/business/inventory/InventoryPanel/useExecutionCache";
 import { useInventoryActions } from "@/business/inventory/InventoryPanel/useInventoryActions";
 import type { InventoryOrderRow } from "@/business/inventory/InventoryPanel/types";
-import { FieldConfigScope } from "@/business/ConfigurableField";
+import { FieldConfigScope } from "@/shared/forms/ConfigurableField";
 import { BusinessRegistrationForm } from "@/shared/ui";
 import { appMessage } from "@/shared/ui/appFeedback";
 

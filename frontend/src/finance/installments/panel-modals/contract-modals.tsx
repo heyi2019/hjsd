@@ -1,5 +1,5 @@
 import { Input, Typography } from "antd";
-import { CfgItem } from "../../../business/ConfigurableField";
+import { CfgItem } from "../../../shared/forms/ConfigurableField";
 import { DateField, Select, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
 import { cancelRefundIntro } from "../../../shared/lib/cancellationCopy";
 import type { ContractTableController } from "../useContractTableController";

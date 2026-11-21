@@ -4,7 +4,7 @@ import type { AccountExecutionDetail, AccountExecutionEvent } from "../../../sha
 import type { Account } from "../../../shared/api/types/accounts";
 import type { Pool } from "../../../shared/api/types/finance";
 import { BusinessRegistrationForm, PermissionButton } from "../../../shared/ui";
-import { CustomFieldSections, FieldConfigScope, FieldConfigStatus, useOrderFormConfig } from "../../ConfigurableField";
+import { CustomFieldSections, FieldConfigScope, FieldConfigStatus, useOrderFormConfig } from "../../../shared/forms/ConfigurableField";
 import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
 import { OrderDetailFinanceSection } from "./OrderDetailFinanceSection";

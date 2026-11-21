@@ -12,7 +12,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 import { Card, DatePicker, Form, Input, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { CfgItem, CustomFieldSections, FieldConfigScope } from "../business/ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../shared/forms/ConfigurableField";
 import { formExtraOrUndefined, mergeFormExtra } from "../shared/lib/formExtra";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cashflowsApi } from "../shared/api/cashflows.api";
@@ -38,7 +38,7 @@ import { ConfirmButton,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
-import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../shared/forms/ResponsibleEmployeeSelect";
 import type { FundsPageController } from "./useFundsPageController";
 import { useBusinessPeriod, type PeriodState } from "../shared/state/businessPeriod";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";

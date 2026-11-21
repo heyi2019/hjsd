@@ -14,13 +14,13 @@ import { today } from "../../../shared/lib/format";
 import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { moneyRules } from "../../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
-import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../../ConfigurableField";
-import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
+import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../../../shared/forms/ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { InventoryAccountSummary } from "../inventory/InventoryAccountSummary";
 import "./rebate-modal.css";
-import { indexEmployeeNames } from "../../employee-names";
+import { indexEmployeeNames } from "../employee-names";
 
 type RebateKind = "BUY" | "SELL";
 

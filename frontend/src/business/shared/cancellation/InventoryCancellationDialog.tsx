@@ -10,11 +10,11 @@ import {
   MoneyInput,
   Select,
 } from "../../../shared/ui";
-import { CfgItem, CustomFieldSections, FieldConfigScope } from "../../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../../../shared/forms/ConfigurableField";
 import { money } from "../../../shared/lib/format";
 import { compareMoney } from "../../../shared/lib/money";
 import { moneyRules } from "../../../shared/lib/validators";
-import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import "./InventoryCancellationDialog.css";
 
 export type InventoryCancellationOffset = {

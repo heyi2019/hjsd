@@ -4,7 +4,7 @@ import type { Pool } from "../../../../shared/api/types/finance";
 import { sumMoney } from "../../../../shared/lib/money";
 import { moneyRules } from "../../../../shared/lib/validators";
 import { BusinessRegistrationSection, MoneyInput, Select } from "../../../../shared/ui";
-import { CfgItem, fieldLabel, sectionLabel, useFieldConfig } from "../../../ConfigurableField";
+import { CfgItem, fieldLabel, sectionLabel, useFieldConfig } from "../../../../shared/forms/ConfigurableField";
 import { FinancePrimaryCard } from "./FinancePrimaryCard";
 import { FinanceTotal } from "./FinanceTotal";
 

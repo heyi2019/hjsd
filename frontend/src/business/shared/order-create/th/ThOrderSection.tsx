@@ -3,7 +3,7 @@ import type { EmployeeOption, GameTypeOption } from "../../../../shared/api/type
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
 import { ThFeeSection } from "./ThFeeSection";
 import { ThSupplierSection } from "./ThSupplierSection";
-import { CustomFieldSection } from "../../../ConfigurableField";
+import { CustomFieldSection } from "../../../../shared/forms/ConfigurableField";
 
 /** 提号复用回收页主结构：账号信息、费用明细、付款信息保持一致，仅客户区替换为供货方区。 */
 export function ThOrderSection(props: { pools: Pool[]; gameTypes?: GameTypeOption[]; employees?: EmployeeOption[] }) {

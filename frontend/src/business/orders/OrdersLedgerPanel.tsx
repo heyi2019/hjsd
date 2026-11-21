@@ -11,10 +11,10 @@ import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
 import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
 import { ToolbarMultiSelect } from "../../shared/ui/ToolbarMultiSelect";
-import "../BusinessLedger.css";
+import "../shared/BusinessLedger.css";
 import "./OrdersLedgerPanel.css";
 import type { ReactNode } from "react";
-import { indexEmployeeNames } from "../employee-names";
+import { indexEmployeeNames } from "../shared/employee-names";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
  *  「游戏账号/产品」而非入库操作人。本次保持默认隐藏目标不变，只把序号换成稳定 key，

@@ -5,7 +5,7 @@ import { renderLight } from "@fixtures/render";
 import * as client from "@/shared/api/client";
 import { CreateBusinessModal } from "@/business/shared/order-create/CreateBusinessModal";
 import { DgOrderSection } from "@/business/shared/order-create/dg/DgOrderSection";
-import { FieldConfigContext } from "@/business/ConfigurableField";
+import { FieldConfigContext } from "@/shared/forms/ConfigurableField";
 import { Form } from "antd";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";

@@ -19,7 +19,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 
 import * as client from "@/shared/api/client";
 import { employeesApi } from "@/shared/api/org.api";
-import { ResponsibleEmployeeSelect } from "@/business/ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "@/shared/forms/ResponsibleEmployeeSelect";
 import { defaultOperatorUserIds } from "@/business/shared/order-detail/editing/use-order-detail-editor";
 
 const employees = [

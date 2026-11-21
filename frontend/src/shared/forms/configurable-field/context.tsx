@@ -2,11 +2,11 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { Form, Input } from "antd";
-import { orderFormFieldsApi } from "../../shared/api/orders.api";
-import { normalizeError, type NormalizedError } from "../../shared/api/client";
-import { ErrorBanner } from "../../shared/ui/ErrorBanner";
-import type { OrderFormField } from "../../shared/api/types/forms";
-import { subscribeReferenceDataChanged } from "../../shared/state/referenceDataEvents";
+import { orderFormFieldsApi } from "../../api/orders.api";
+import { normalizeError, type NormalizedError } from "@/shared/api/client";
+import { ErrorBanner } from "../../ui/ErrorBanner";
+import type { OrderFormField } from "../../api/types/forms";
+import { subscribeReferenceDataChanged } from "../../state/referenceDataEvents";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
 

@@ -1,7 +1,7 @@
 import { Input } from "antd";
 import type { ReactNode } from "react";
 import { BusinessRegistrationGroup, BusinessRegistrationSection } from "../../../../shared/ui";
-import { CfgItem, CfgNestedItem, sectionLabel } from "../../../ConfigurableField";
+import { CfgItem, CfgNestedItem, sectionLabel } from "../../../../shared/forms/ConfigurableField";
 
 /** 提号复用回收页客户信息的结构，只将业务主体替换为供货方。 */
 export function ThSupplierSection(props: { participantExtras?: ReactNode } = {}) {

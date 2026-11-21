@@ -1,5 +1,5 @@
 import { DatePicker, Form } from "antd";
-import { BusinessRegistrationField } from "../shared/ui";
+import { BusinessRegistrationField } from "../../../shared/ui";
 import "./InstallmentScheduleFields.css";
 
 export type InstallmentScheduleItem = { due_on?: unknown };

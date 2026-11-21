@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ThFeeSection } from "@/business/shared/order-create/th/ThFeeSection";
 import { Form } from "antd";
-import { FieldConfigContext, type FieldConfigMap } from "@/business/ConfigurableField";
+import { FieldConfigContext, type FieldConfigMap } from "@/shared/forms/ConfigurableField";
 import type { Pool } from "@/shared/api/types/finance";
 import type { OrderFormField } from "@/shared/api/types/forms";
 

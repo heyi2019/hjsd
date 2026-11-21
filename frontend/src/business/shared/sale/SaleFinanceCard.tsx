@@ -4,8 +4,8 @@ import type { Pool } from "../../../shared/api/types/finance";
 import { AdaptiveFormGrid, MoneyInput, Select } from "../../../shared/ui";
 import { compareMoney } from "../../../shared/lib/money";
 import { moneyRules } from "../../../shared/lib/validators";
-import { CfgItem } from "../../ConfigurableField";
-import { InstallmentScheduleFields } from "../../InstallmentScheduleFields";
+import { CfgItem } from "../../../shared/forms/ConfigurableField";
+import { InstallmentScheduleFields } from "../forms/InstallmentScheduleFields";
 
 export function SaleFinanceCard({
   isConsignment,

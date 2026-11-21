@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { Button, Form } from "antd";
-import { DeliveryInfoSection } from "@/business/DeliveryInfoSection";
+import { DeliveryInfoSection } from "@/business/shared/forms/DeliveryInfoSection";
 import { renderLight } from "@fixtures/render";
 
 vi.mock("@/shared/lib/optionSets", () => ({

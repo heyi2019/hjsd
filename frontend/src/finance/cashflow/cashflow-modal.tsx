@@ -1,7 +1,7 @@
 import { Form, Input, Typography } from "antd";
 import { useEffect, useState } from "react";
-import { CfgItem, CustomFieldSection, FieldConfigScope } from "../../business/ConfigurableField";
-import { ResponsibleEmployeeSelect } from "../../business/ResponsibleEmployeeSelect";
+import { CfgItem, CustomFieldSection, FieldConfigScope } from "../../shared/forms/ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../../shared/forms/ResponsibleEmployeeSelect";
 import { currentDevUser, normalizeError } from "../../shared/api/client";
 import { useSession } from "../../shared/state/session";
 import { requiredMoneyRules } from "../../shared/lib/validators";

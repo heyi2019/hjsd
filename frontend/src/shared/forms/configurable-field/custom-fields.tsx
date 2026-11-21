@@ -2,11 +2,11 @@
 import { DatePicker, Form, Input, InputNumber, Switch, Typography } from "antd";
 import { createContext, useContext } from "react";
 import type { ReactElement, ReactNode } from "react";
-import { dateValueFromEvent, dateValueProps, Select } from "../../shared/ui";
-import type { OrderFormField } from "../../shared/api/types/forms";
+import { dateValueFromEvent, dateValueProps, Select } from "../../ui";
+import type { OrderFormField } from "../../api/types/forms";
 import { useFieldConfig, useSectionLabels, type FieldConfigMap } from "./context";
 import { isConditionActive, useConditionFieldValue } from "./rules";
-import { requiredTextRules } from "../../shared/lib/validators";
+import { requiredTextRules } from "../../lib/validators";
 
 const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, string> = {
   ACCOUNT_PRODUCT: "账号 / 产品补充信息",

@@ -1,4 +1,4 @@
-import { CfgItem, FieldConfigScope } from "../../ConfigurableField";
+import { CfgItem, FieldConfigScope } from "../../../shared/forms/ConfigurableField";
 import { Form, Input, Modal, Typography } from "antd";
 import { useEffect } from "react";
 import type { Account } from "../../../shared/api/types/accounts";

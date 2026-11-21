@@ -1,7 +1,7 @@
-import { CfgItem, FieldConfigScope } from "./ConfigurableField";
+import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import { Form, Input, Modal, Typography } from "antd";
 import { useEffect } from "react";
-import type { Order } from "../shared/api/types/orders";
+import type { Order } from "../../shared/api/types/orders";
 
 /** 物理删除二次确认：订单、绑定库存及其从属业务数据全部清除，删除原因写入审计日志。 */
 export function OrderDeleteDialog({ order, submitting, onCancel, onConfirm }: {

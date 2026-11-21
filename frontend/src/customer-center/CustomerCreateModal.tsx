@@ -1,6 +1,6 @@
 import { Input, Typography } from "antd";
 import type { FormInstance } from "antd";
-import { CfgItem, CustomFormField, FieldConfigScope } from "../business/ConfigurableField";
+import { CfgItem, CustomFormField, FieldConfigScope } from "../shared/forms/ConfigurableField";
 import type { OrderFormField } from "../shared/api/types/forms";
 import { BusinessActionModal, BusinessRegistrationForm, BusinessRegistrationSection, InlineError, PermissionButton } from "../shared/ui";
 

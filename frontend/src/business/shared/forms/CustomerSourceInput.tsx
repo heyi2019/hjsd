@@ -1,7 +1,7 @@
 import { Form, Input } from "antd";
-import { Select } from "../shared/ui";
-import { useOptionSet } from "../shared/lib/optionSets";
-import { CfgItem } from "./ConfigurableField";
+import { Select } from "../../../shared/ui";
+import { useOptionSet } from "../../../shared/lib/optionSets";
+import { CfgItem } from "../../../shared/forms/ConfigurableField";
 
 /** 客户来源只允许选择预设值；「其他」时再收集具体渠道，避免自由输入导致来源口径分散。 */
 export function CustomerSourceFields(props: { name: string; otherName: string }) {

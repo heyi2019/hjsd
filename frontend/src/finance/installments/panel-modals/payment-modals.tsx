@@ -1,5 +1,5 @@
 import { Input, Typography } from "antd";
-import { CfgItem } from "../../../business/ConfigurableField";
+import { CfgItem } from "../../../shared/forms/ConfigurableField";
 import { DateField, MoneyInput, Select, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
 import { requiredMoneyRules } from "../../../shared/lib/validators";
 import type { ContractTableController } from "../useContractTableController";

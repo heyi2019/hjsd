@@ -9,14 +9,14 @@ import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, In
 import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
 import type { EmployeeOption } from "../shared/api/types/org";
-import { CfgItem, CustomFieldSections, FieldConfigScope } from "../business/ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../shared/forms/ConfigurableField";
 import { today } from "../shared/lib/format";
 import { compareMoney } from "../shared/lib/money";
 import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
-import { ResponsibleEmployeeSelect } from "../business/ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../shared/forms/ResponsibleEmployeeSelect";
 
 const Modal = BusinessActionModal;
 

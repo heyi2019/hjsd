@@ -1,9 +1,9 @@
 import { Input } from "antd";
-import { CustomFieldSection } from "../../../ConfigurableField";
+import { CustomFieldSection } from "../../../../shared/forms/ConfigurableField";
 import type { EmployeeOption, GameTypeOption } from "../../../../shared/api/types/org";
 import { RecoveryAccountSection } from "../recovery/RecoveryAccountSection";
-import { CfgItem, CfgNestedItem, sectionLabel } from "../../../ConfigurableField";
-import { CustomerSourceFields } from "../../../CustomerSourceInput";
+import { CfgItem, CfgNestedItem, sectionLabel } from "../../../../shared/forms/ConfigurableField";
+import { CustomerSourceFields } from "../../forms/CustomerSourceInput";
 import { BusinessRegistrationGroup, BusinessRegistrationSection } from "../../../../shared/ui";
 
 /** 代挂前端表单：沿用统一出售事实登记，订单创建阶段只登记寄售账号与委托客户。 */

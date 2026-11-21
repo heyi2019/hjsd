@@ -1,4 +1,4 @@
-import { CfgGroup, CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
+import { CfgGroup, CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 /** 字段编辑表单 JSX：从 useOrderFormFieldsPanelController 逐字提取（纯渲染函数，不调用 hooks）。 */
 import { Form, Input, InputNumber, Space, Switch } from "antd";
 import type { FormInstance } from "antd";

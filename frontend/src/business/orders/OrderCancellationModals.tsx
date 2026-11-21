@@ -1,7 +1,7 @@
 import { Input, Typography } from "antd";
-import { CfgItem, CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
+import { CfgItem, CustomFieldSections, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import { DateField, MoneyInput, Select, BusinessActionModal, BusinessRegistrationForm, dateValueFromEvent, dateValueProps } from "../../shared/ui";
-import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../../shared/forms/ResponsibleEmployeeSelect";
 import { executionActionLabel, money, today } from "../../shared/lib/format";
 import { cancelRefundIntro } from "../../shared/lib/cancellationCopy";
 import { requiredMoneyRules } from "../../shared/lib/validators";

@@ -1,4 +1,4 @@
-import { CfgItem, FieldConfigScope } from "../../business/ConfigurableField";
+import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import { Form, InputNumber, Switch, Typography } from "antd";
 import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";

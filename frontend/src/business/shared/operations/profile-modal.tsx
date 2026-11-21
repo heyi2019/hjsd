@@ -8,7 +8,7 @@ import { employeesApi } from "../../../shared/api/org.api";
 import type { Account } from "../../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { BusinessActionModal, BusinessRegistrationForm, InlineError } from "../../../shared/ui";
-import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
+import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import "./profile-modal.css";

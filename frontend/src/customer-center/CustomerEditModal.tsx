@@ -2,7 +2,7 @@ import { Form, Input } from "antd";
 import type { FormInstance } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
-import { CustomFormField } from "../business/ConfigurableField";
+import { CustomFormField } from "../shared/forms/ConfigurableField";
 import { BusinessActionModal, BusinessRegistrationForm, InlineError, PermissionButton } from "../shared/ui";
 
 export function CustomerEditModal({

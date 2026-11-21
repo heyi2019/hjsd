@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { OrderDetailDialog } from "../shared/order-detail/OrderDetailDialog";
 import "./OrderAllocationModal.css";
 import type { FormInstance } from "antd";
-import { CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
+import { CustomFieldSections, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import {
   AdaptiveFormGrid,
   BusinessActionModal,
@@ -18,7 +18,7 @@ import { useKeyedLatestRequest } from "../../shared/hooks/useLatestRequest";
 import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { moneyRules } from "../../shared/lib/validators";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
-import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
+import { EmployeeSelectControl } from "../../shared/forms/ResponsibleEmployeeSelect";
 import type { OrdersPageController } from "./useOrdersPageController";
 import {
   ALLOCATION_TYPE_LABEL,

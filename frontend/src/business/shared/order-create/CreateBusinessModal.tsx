@@ -2,13 +2,13 @@ import { appMessage } from "../../../shared/ui/appFeedback";
 /** 业务创建弹窗：所有入口都明确指定业务类型，账号信息只在订单快照或库存关联中出现。 */
 import { Form } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection, CustomFieldSections, CustomFieldSectionsProvider, FieldConfigStatus } from "../../ConfigurableField";
+import { useOrderFormConfig, useOrderFormSectionLabels, FieldConfigContext, SectionLabelsContext, CustomFieldSection, CustomFieldSections, CustomFieldSectionsProvider, FieldConfigStatus } from "../../../shared/forms/ConfigurableField";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { normalizeError } from "../../../shared/api/client";
 import { today } from "../../../shared/lib/format";
 import { BusinessActionModal, BusinessRegistrationForm, ConfirmDialog, ErrorBanner, PermissionButton } from "../../../shared/ui";
 import { RecoveryAccountSection } from "./recovery/RecoveryAccountSection";
-import { RecoveryCustomerSection } from "../../recovery/RecoveryCustomerSection";
+import { RecoveryCustomerSection } from "../forms/RecoveryCustomerSection";
 import { RecoveryFeeSection } from "./recovery/RecoveryFeeSection";
 import { ThOrderSection } from "./th/ThOrderSection";
 import { DgOrderSection } from "./dg/DgOrderSection";

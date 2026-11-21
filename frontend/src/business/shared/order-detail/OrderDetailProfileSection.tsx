@@ -21,10 +21,10 @@ import {
   useOrderFormConfig,
   useOrderFormSectionLabels,
   FieldConfigStatus,
-} from "../../ConfigurableField";
+} from "../../../shared/forms/ConfigurableField";
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { Select } from "../../../shared/ui";
-import { indexEmployeeNames } from "../../employee-names";
+import { indexEmployeeNames } from "../employee-names";
 
 type AccountProfileKey =
   | "gameType"

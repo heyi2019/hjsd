@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { useCreateBusinessLookups } from "@/business/shared/order-create/create/useCreateBusinessLookups";
 import { useOrderDetailEditor } from "@/business/shared/order-detail/editing/use-order-detail-editor";
-import { EmployeeSelectControl } from "@/business/ResponsibleEmployeeSelect";
+import { EmployeeSelectControl } from "@/shared/forms/ResponsibleEmployeeSelect";
 import { api } from "@/shared/api/client";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
@@ -16,7 +16,7 @@ import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { Account } from "@/shared/api/types/accounts";
 import type { EmployeeOption } from "@/shared/api/types/org";
 import { clearOptionSetsCache, useOptionSet } from "@/shared/lib/optionSets";
-import { useOrderFormConfig, useOrderFormSectionLabels } from "@/business/configurable-field/context";
+import { useOrderFormConfig, useOrderFormSectionLabels } from "@/shared/forms/configurable-field/context";
 import { UsersPanel } from "@/users/UsersPanel";
 import { TeamsPanel } from "@/users/TeamsPanel";
 

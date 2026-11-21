@@ -1,6 +1,6 @@
 import { BusinessActionModal, BusinessRegistrationForm, InlineError, PermissionButton } from "../../../shared/ui";
-import { CustomFieldSections, FieldConfigScope } from "../../../business/ConfigurableField";
-import { ResponsibleEmployeeSelect } from "../../../business/ResponsibleEmployeeSelect";
+import { CustomFieldSections, FieldConfigScope } from "../../../shared/forms/ConfigurableField";
+import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import type { FormInstance } from "antd";
 import type { ReactNode } from "react";
 import type { NormalizedError } from "../../../shared/api/client";

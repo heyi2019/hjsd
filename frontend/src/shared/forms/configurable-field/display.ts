@@ -1,5 +1,5 @@
 /** form_extra 历史值展示兜底口径；拆分自 ConfigurableField.tsx。 */
-import type { OrderFormField } from "../../shared/api/types/forms";
+import type { OrderFormField } from "../../api/types/forms";
 
 export type FormExtraStatus = "active" | "inactive" | "deleted";
 

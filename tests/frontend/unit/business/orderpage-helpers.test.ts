@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildAllocationOptionGroups, pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators } from "@/business/orders/helpers";
-import { indexEmployeeNames } from "@/business/employee-names";
+import { indexEmployeeNames } from "@/business/shared/employee-names";
 
 describe("订单台账冲销 helpers", () => {
   it("分润候选按动作预分组并保留员工原顺序和禁用状态", () => {

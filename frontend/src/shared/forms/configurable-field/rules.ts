@@ -2,10 +2,10 @@
 import { Form } from "antd";
 import { useCallback, useRef } from "react";
 import type { Rule } from "antd/es/form";
-import type { RequiredWhen } from "../../shared/api/types/forms";
+import type { RequiredWhen } from "../../api/types/forms";
 import { fieldConfigFor, useFieldConfig } from "./context";
 import type { FieldConfigMap } from "./context";
-import { requiredTextRules } from "../../shared/lib/validators";
+import { requiredTextRules } from "../../lib/validators";
 
 export function isFieldActive(config: FieldConfigMap, key: string): boolean {
   const def = fieldConfigFor(config, key);

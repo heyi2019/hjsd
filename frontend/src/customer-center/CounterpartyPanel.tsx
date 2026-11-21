@@ -5,7 +5,7 @@ import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from
 import { ColumnsType } from "antd/es/table";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue, useOrderFormConfig } from "../business/ConfigurableField";
+import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue, useOrderFormConfig } from "../shared/forms/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
 import type { Counterparty } from "../shared/api/types/customers";
 import { normalizeError } from "../shared/api/client";

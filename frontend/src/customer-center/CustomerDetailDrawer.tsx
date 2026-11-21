@@ -1,6 +1,6 @@
 import { Descriptions, Drawer, Spin, Typography } from "antd";
 import type { ReactNode } from "react";
-import { buildFormExtraDisplay, formatExtraDisplayValue } from "../business/ConfigurableField";
+import { buildFormExtraDisplay, formatExtraDisplayValue } from "../shared/forms/ConfigurableField";
 import type { Customer, CustomerBusiness, CustomerDetail, CustomerInstallment } from "../shared/api/types/customers";
 import type { OrderFormField } from "../shared/api/types/forms";
 import { money } from "../shared/lib/format";

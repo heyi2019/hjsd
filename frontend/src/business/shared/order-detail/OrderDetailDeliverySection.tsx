@@ -15,7 +15,7 @@ import {
   isFieldActive,
   useOrderFormConfig,
   FieldConfigStatus,
-} from "../../ConfigurableField";
+} from "../../../shared/forms/ConfigurableField";
 import { useOptionSet } from "../../../shared/lib/optionSets";
 import {
   OrderSectionHeading,

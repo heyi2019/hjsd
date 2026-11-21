@@ -1,9 +1,9 @@
 import { Form, Input } from "antd";
-import { AdaptiveFormGrid, BusinessRegistrationGroup, Select } from "../shared/ui";
-import { CfgItem, sectionLabel } from "./ConfigurableField";
-import { useOptionSet } from "../shared/lib/optionSets";
-import type { EmployeeOption } from "../shared/api/types/org";
-import { ResponsibleEmployeeSelect } from "./ResponsibleEmployeeSelect";
+import { AdaptiveFormGrid, BusinessRegistrationGroup, Select } from "../../../shared/ui";
+import { CfgItem, sectionLabel } from "../../../shared/forms/ConfigurableField";
+import { useOptionSet } from "../../../shared/lib/optionSets";
+import type { EmployeeOption } from "../../../shared/api/types/org";
+import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import "./DeliveryInfoSection.css";
 
 /** 建单时已知的账号交接条件；实际交付完成仍在订单详情中登记。 */

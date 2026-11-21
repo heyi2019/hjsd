@@ -9,7 +9,7 @@ import { installmentsApi } from "../../../shared/api/installments.api";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { today } from "../../../shared/lib/format";
 import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
-import { serializeInstallmentSchedule } from "../../InstallmentScheduleFields";
+import { serializeInstallmentSchedule } from "../forms/InstallmentScheduleFields";
 import type { SaleCustomerInput } from "../../../shared/api/orders-api/orders";
 
 export interface CollectPaymentInput {

@@ -20,7 +20,7 @@ vi.mock("@/shared/api/profitAllocation.api");
 vi.mock("@/shared/api/pools.api");
 vi.mock("@/shared/api/rebates.api");
 vi.mock("@/shared/api/reports.api");
-vi.mock("@/shared/api/stocks.api");;
+vi.mock("@/shared/api/stocks.api");
 
 let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
@@ -134,12 +134,5 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     // 反证：失败态绝不允许回落到 0 计数（改回 String(...length) 本例会红）
     expect(within(totalCard).queryByText("0")).toBeNull();
     expect(within(customerCard).queryByText("0")).toBeNull();
-  });
-
-  it("点「代挂」卡打开代挂登记弹窗", async () => {
-    renderLight(<WorkbenchPage />, { user: "admin" });
-    await screen.findByRole("button", { name: "代挂" });
-    await ui.click(screen.getByRole("button", { name: "代挂" }));
-    expect(await screen.findByText("新建代挂订单")).toBeInTheDocument();
   });
 });

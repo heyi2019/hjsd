@@ -65,18 +65,18 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 92,
+        "files": 93,
         "layers": {
           "fast": 27,
-          "quick": 8,
+          "quick": 9,
           "react": 45,
           "deep": 12
         },
         "cases": {
           "fast": 185,
-          "quick": 124,
+          "quick": 125,
           "react": 893,
-          "deep": 113
+          "deep": 112
         },
         "byArea": {
           "unit": {
@@ -87,7 +87,7 @@
             "system": 5
           },
           "module": {
-            "workbench": 7,
+            "workbench": 8,
             "business": 19,
             "customer": 2,
             "finance": 4,

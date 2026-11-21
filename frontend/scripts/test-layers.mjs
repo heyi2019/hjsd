@@ -53,6 +53,7 @@ export const fastTests = [
 // 不包含库存/客户/资金等长链路全量页面回归。
 export const quickTests = [
   "tests/frontend/module/workbench/WorkbenchPage.test.tsx",
+  "tests/frontend/module/workbench/QuickAccess.test.tsx",
   "tests/frontend/module/workbench/Notifications.test.tsx",
   "tests/frontend/module/system/LoginPage.test.tsx",
   "tests/frontend/module/system/UserCenterPage.test.tsx",

@@ -282,6 +282,7 @@ CROSS_FLOW_LABEL = {
 FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "WorkbenchPage.deep.test.tsx":         "A01",
     "WorkbenchPage.test.tsx":              "A01",
+    "QuickAccess.test.tsx":                 "A01",
     "Notifications.test.tsx":          "A01",
     "CreateBusinessModal.deep.test.tsx":   "B01",
     "CreateBusinessModal.test.tsx":        "B01",

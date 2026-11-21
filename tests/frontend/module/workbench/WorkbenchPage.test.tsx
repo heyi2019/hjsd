@@ -1,6 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { act } from "react";
-import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { WorkbenchPage } from "@/app/WorkbenchPage";
@@ -9,9 +8,7 @@ import { notificationsApi } from "@/shared/api/notifications.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { workbenchSummary } from "@fixtures/api-responses";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
-/** 2026-10-13：工作台数据总览（资金账户/统计/入口卡）已迁至「经营中心 · 数据中心」
- *  （用例见 reporting/DataCenterPanel.test.tsx）。本文件只覆盖瘦身后的工作台：
- *  纯动作入口——新建业务卡 + 登记弹窗，以及「数据已迁走」的回归断言。 */
+/** 工作台页面组合、业务总览及消息交互；快捷入口功能由 QuickAccess.test.tsx 覆盖。 */
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/workbench.api");
@@ -74,6 +71,7 @@ it("工作台展示业务总览指标和业务提醒", async () => {
 
     renderLight(<WorkbenchPage />, { user: "admin" });
 
+    expect(screen.getByRole("button", { name: /售出库存账号/ })).toBeInTheDocument();
     const overview = await screen.findByRole("region", { name: "我的业务总览" });
     for (const [label, value] of [
       ["在库账号", "1"],
@@ -105,38 +103,6 @@ it("查看消息标记已读时不重复加载业务总览", async () => {
     expect(await screen.findByText("库存提醒")).toBeInTheDocument();
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2], "latest");
     expect(workbenchApi.summary).toHaveBeenCalledTimes(1);
-  });
-
-// —— 以下 6 条原在 WorkbenchPage.interactions.test.tsx ——
-// 同一页面、同一份 mock 契约，拆两个文件等于让同样的 jsdom+antd 启动付两遍。
-it("viewer 无 order.create → 看不到新建业务卡", async () => {
-    await act(async () => {
-      renderLight(<WorkbenchPage />, { user: "viewer" });
-      await Promise.resolve();
-    });
-    // 无卡可点：给一帧让权限门控渲染完再断言（sync 渲染，无需 waitFor 数据）。
-    expect(screen.queryByRole("button", { name: /自营·回收/ })).toBeNull();
-  });
-
-it("点击回收账号卡直接打开回收登记弹窗（不跳转页面）", async () => {
-    renderLight(<WorkbenchPage />, { user: "admin" });
-    fireEvent.click(await screen.findByRole("button", { name: /自营·回收/ }));
-    const modal = await screen.findByText("新建回收订单");
-    expect(modal.closest(".ant-modal-content")).toBeTruthy();
-  });
-
-it("点击共同出售口进入业务中心库存页", async () => {
-    const onNavigate = vi.fn();
-    renderLight(<WorkbenchPage onNavigate={onNavigate} />, { user: "admin" });
-    fireEvent.click(await screen.findByRole("button", { name: /售出库存账号/ }));
-    expect(onNavigate).toHaveBeenCalledWith("business", "inventory");
-  });
-
-it("点击提号卡直接打开提号登记弹窗（不跳转页面）", async () => {
-    renderLight(<WorkbenchPage />, { user: "admin" });
-    fireEvent.click(await screen.findByRole("button", { name: "提号" }));
-    const modal = await screen.findByText("新建提号订单");
-    expect(modal.closest(".ant-modal-content")).toBeTruthy();
   });
 
 it("订单请求完成时不产生未包裹 act 的异步更新警告", async () => {

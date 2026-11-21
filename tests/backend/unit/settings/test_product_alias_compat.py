@@ -5,7 +5,7 @@ from datetime import date
 import pytest
 from pydantic import ValidationError
 
-from app.business.schemas import OrderAccountSnapshot, OrderCreate
+from app.business.orders.schemas import OrderAccountSnapshot, OrderCreate
 from app.business.inventory.schemas import AccountProfileUpdate
 
 

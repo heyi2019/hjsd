@@ -440,7 +440,7 @@ class TestInstallmentsApi:
 
     def test_sale_customer_creation_keeps_customer_permission_check(self, seeded_db):
         from app.business.shared.operations.sale import apply_sale_details
-        from app.business.schemas import CustomerDraftInput
+        from app.business.orders.schemas import CustomerDraftInput
         from app.core.errors import PermissionDenied
         from app.core.security import PERM_ORDER_UPDATE
         order = _order(seeded_db, order_type="HS", account_id=_account(seeded_db, "sale-customer-permission").id)

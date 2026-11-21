@@ -24,7 +24,7 @@ from app.settings.auth.session import (
 from app.domain.trade import Account, Order, OrderEvent
 from app.shared.audit import record_audit
 from app.shared.form_field_rules import validate_form_extra
-from app.business import schemas
+from app.business.orders import schemas
 from app.shared.order_access import get_order as orders_get_order
 from app.business.shared.operations.consignment import post_consignment_operation
 from app.business.orders.create import add_customer_role

@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.core.money import to_money
 from app.core.schemas import RequestModel
 from app.shared.installment_amounts import total_receivable
-from app.business.schemas import CustomerDraftInput
+from app.business.orders.schemas import CustomerDraftInput
 
 
 class ScheduleCreate(RequestModel):

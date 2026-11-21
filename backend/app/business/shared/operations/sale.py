@@ -9,7 +9,7 @@ from app.shared.order_access import get_order
 from ...orders.create import add_customer_role
 from ..delivery_fields import DELIVERY_FIELDS
 from ...orders.participants import resolve_customer_role
-from ...schemas import CustomerDraftInput
+from ...orders.schemas import CustomerDraftInput
 
 
 def sale_form_context(

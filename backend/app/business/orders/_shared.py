@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
-from app.business.schemas import OrderAccountSnapshot
+from app.business.orders.schemas import OrderAccountSnapshot
 from app.business.inventory.profile import create_account
 from sqlalchemy.orm import Session
 from app.core.errors import (

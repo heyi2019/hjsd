@@ -10,7 +10,7 @@ from app.domain.parties import Counterparty, Customer
 from app.customers.counterparties import create_counterparty, update_counterparty
 from app.customers.customers import create_customer, update_customer
 
-from ..schemas import CounterpartyDraftInput, CustomerDraftInput
+from .schemas import CounterpartyDraftInput, CustomerDraftInput
 
 
 def resolve_customer_role(

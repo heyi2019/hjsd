@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.money import to_money, to_money_or_zero
 from app.domain.trade import OrderEvent
 from app.domain.users import User
-from app.business import schemas
+from app.business.orders import schemas
 from app.shared.order_amounts import ZERO
 from app.business.orders.output_labels import _selected_operator_label
 

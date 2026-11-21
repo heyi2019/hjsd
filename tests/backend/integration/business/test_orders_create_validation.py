@@ -21,7 +21,7 @@ from app.customers.customers import create_customer, set_customer_status
 from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.settings.field_definitions.order_types import get_order_type_by_code, set_order_type_active
-from app.business import schemas
+from app.business.orders import schemas
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 

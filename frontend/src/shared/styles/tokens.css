@@ -318,24 +318,12 @@
   /* 品牌蓝点缀。品牌蓝语义令牌。 */
   --brand-ink: #0757c7;
   --brand-border: #b7d5fb;
-  --brand-hover: #7db5f4;
   --brand-soft: rgba(10, 99, 216, 0.1);
 
   /* 品牌蓝字面量收口（antd 适配器清扫：零视觉变化，1:1 等价引用 styles.css/a11y.css 内硬编码 brand hex） */
   --brand-50: #eaf3ff; /* 导航激活态最浅底 */
-  --brand-100: #f1f7ff; /* 浅蓝底 / hover */
   --brand-200: #d6eaff; /* 导航激活态渐变止点 */
-  --brand-300: #c6def8; /* 边框（ord-line-trigger / calendar） */
-  --brand-edge-1: #c7dcef; /* login 输入边框 */
-  --brand-edge-2: #e1ebf5; /* 表格 th/td 边框 */
-  --brand-edge-3: #e7f0f9; /* 禁用按钮底 */
-  --brand-edge-4: #d6e4f1; /* 卡片 / 面板边框（多处） */
-  --brand-edge-5: #cddfec; /* 虚线分隔 */
-  --brand-edge-6: #d9e6f0; /* 网格线 / 边框 */
-  --brand-edge-7: #e1ebf4; /* 边框 */
-  --brand-edge-8: #eaf2fa; /* segments 底 */
   --brand-surface-1: #f6faff; /* metric-card-container--brand 底 */
-  --brand-surface-2: #f9fcff; /* ord-line-panel 底 */
   --brand-head-dark-grad: linear-gradient(120deg, rgba(8, 48, 107, 0.9), rgba(8, 32, 70, 0.78)); /* 深蓝 .view-head 品牌渐变底 */
 
   /* 中性 / 语义字面量收口（选项1：彻底贯彻令牌优先；原 styles.css 内 #fff 等） */
@@ -372,32 +360,6 @@
   --color-success: #14724b;
   --color-warning: #b45309;
   --color-error: #b23b3b;
-  --danger-solid: var(--color-error); /* 实底 danger 按钮底：浅色 error 对白 5.86 已达标 */
-
-  /* 自动化状态卡（.automation-status.success/.failed）的柔和状态色：装饰用淡边框 + 8% 淡底。
-     语义上 ≠ --color-success / --color-error 主色（主色是深邃墨色，此处要淡），不可就近归档。
-     浅色值 = 原 styles.css 硬编码原样搬运，零视觉变化。 */
-  --status-success-border: #a9dfc3;
-  --status-success-soft: #f0faf5;
-  --status-failed-border: #efb0b0;
-  --status-failed-soft: #fff5f5;
-  --status-neutral-border: #dfe4ee;
-  --status-neutral-soft: #f7f9fc;
-  --status-success-shadow: 0 2px 8px rgba(35, 125, 83, 0.06);
-  --status-failed-shadow: 0 2px 8px rgba(174, 59, 59, 0.06);
-  --wash-warning-soft: #fff8e6;
-  --wash-warning-softer: #fffaf0;
-
-  /* 文件类型徽章色（附件列表 MIME → 色点）：装饰性色点，无文字承载，故不参与对比度约束；
-     浅色值 = 原 AttachmentsWorkspace.tsx 硬编码原样搬运，零视觉变化。 */
-  --color-filetype-image: #34c759;
-  --color-filetype-pdf: #ff3b30;
-  --color-filetype-excel: #1f8a3b;
-  --color-filetype-word: #2b6cef;
-  --color-filetype-archive: #ff9f0a;
-  --color-filetype-text: #8e8e93;
-  --color-filetype-audio: #0a63d8;
-  --color-filetype-video: #ff2d55;
 
   /* antd 桥接专用（AppWorkspace ConfigProvider 运行时读取；原 AppWorkspace.tsx 内硬编码原样搬运）：
      antd 容器 / 浮层底色必须**不透明**，不能用半透明的 --color-surface；占位符色此前无令牌。 */
@@ -435,10 +397,6 @@
   --form-max-width: 720px;
 
   /* ── 看板组件库专用令牌（2026-09-23 Apple 化收口，零视觉变化；尺寸双主题同值） ── */
-  /* 强调色（编辑器/选择面板 chrome，非语义主色，需独立品牌橙/蓝） */
-  --accent-amber: #e98a00;
-  --accent-blue: #377dff;
-  --border-amber: #f9d9b2;
   /* 字号补充档（iOS 阶梯外的编辑器/卡身字号） */
   --fs-18: 1.0588rem; /* 18 */
   --fs-19: 1.1176rem; /* 19 */
@@ -540,28 +498,7 @@
   --color-success: #34d399;
   --color-warning: #fbbf24;
   --color-error: #f87171;
-  --danger-solid: #d0343a; /* 实底 danger 按钮底：error(#f87171) 白字仅 2.77，压深到 4.93 达标（error 文字色不变） */
   --color-info: #64a8ff;
-  /* 状态柔和色深色覆盖：由 --color-success / --color-error 派生，自动跟随主色、不新增字面量 */
-  --status-success-border: color-mix(in srgb, var(--color-success) 50%, transparent);
-  --status-success-soft: color-mix(in srgb, var(--color-success) 12%, transparent);
-  --status-failed-border: color-mix(in srgb, var(--color-error) 50%, transparent);
-  --status-failed-soft: color-mix(in srgb, var(--color-error) 12%, transparent);
-  --status-neutral-border: rgba(255, 255, 255, 0.14);
-  --status-neutral-soft: rgba(255, 255, 255, 0.06);
-  --status-success-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
-  --status-failed-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
-  --wash-warning-soft: color-mix(in srgb, var(--color-warning) 14%, transparent);
-  --wash-warning-softer: color-mix(in srgb, var(--color-warning) 8%, transparent);
-  /* 文件类型徽章色深色覆盖（Apple 深色系统色变体，暗底上更亮一档以保持可辨） */
-  --color-filetype-image: #30d158;
-  --color-filetype-pdf: #ff453a;
-  --color-filetype-excel: #248a3d;
-  --color-filetype-word: #0a84ff;
-  --color-filetype-archive: #ff9f0a;
-  --color-filetype-text: #8e8e93;
-  --color-filetype-audio: #6aaeff;
-  --color-filetype-video: #ff375f;
   /* antd 桥接专用深色覆盖 */
   --color-antd-bg-container: #14263e;
   --color-antd-bg-elevated: #14263e;
@@ -569,24 +506,12 @@
 
   /* 品牌蓝字面量收口：暗色覆盖（选项2；原 hex 未覆盖，现补齐保持令牌一致，避免浅薰衣草回退到深底） */
   --brand-50: #13253b;
-  --brand-100: #18304b;
   --brand-200: #1d3b5c;
-  --brand-300: #27507b;
-  --brand-edge-1: #23415f;
-  --brand-edge-2: #13253b;
-  --brand-edge-3: #18304b;
-  --brand-edge-4: #23415f;
-  --brand-edge-5: #27507b;
-  --brand-edge-6: #23415f;
-  --brand-edge-7: #13253b;
-  --brand-edge-8: #18304b;
   --brand-surface-1: #0e1c2d;
-  --brand-surface-2: #102238;
 
   /* 暗色品牌蓝覆盖：激活态与 hover 使用更亮的蓝，避免在深色玻璃底上失去边界。 */
   --brand-ink: #9bc9ff;
   --brand-border: #7db5f4;
-  --brand-hover: #9bc9ff;
   --brand-soft: rgba(90, 168, 255, 0.16);
 
   /* 图表分类调色板·暗色（随浅色同系，暗态略提亮保可见） */
@@ -595,11 +520,6 @@
   --chart-3: #4fd6c4;
   --chart-4: #30d158;
   --chart-5: #fbbf24;
-
-  /* 看板组件库强调色·暗色（独立橙/蓝提亮保可见） */
-  --accent-amber: #ffb340;
-  --accent-blue: #64a8ff;
-  --border-amber: rgba(255, 178, 64, 0.35);
 }
 
 /* 无障碍：降低透明度（对应 macOS「降低透明度」，此前全站零适配）。

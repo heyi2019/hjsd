@@ -40,6 +40,7 @@ vi.mock("axios", () => {
         return resp;
       }),
     };
+    inst.get = (url: string, config: any = {}) => inst.request({ ...config, method: "get", url });
     instances.push(inst);
     return inst;
   });
@@ -71,6 +72,7 @@ vi.mock("axios", () => {
 
 import axios from "axios";
 import { clearApiCache, setDevUser } from "@/shared/api/client";
+import { reportsApi } from "@/shared/api/reports.api";
 import "@/shared/state/referenceDataEvents";
 
 function apiInstance() {
@@ -82,6 +84,35 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     clearApiCache();
     localStorage.removeItem("hj.dev-user");
     (axios as any).__resetCalls();
+  });
+
+  it("每次报表导出都请求后端，不缓存或合并导出动作", async () => {
+    const params = { from: "2026-10-01", to: "2026-10-31", mine: true };
+    const first = await reportsApi.exportCsv("commission", params);
+    const second = await reportsApi.exportCsv("commission", params);
+    const [third, fourth] = await Promise.all([
+      reportsApi.exportCsv("commission", params),
+      reportsApi.exportCsv("commission", params),
+    ]);
+
+    expect([first, second, third, fourth]).toEqual(["NET-1", "NET-2", "NET-3", "NET-4"]);
+    expect((axios as any).__getCallCount()).toBe(4);
+  });
+
+  it("重新读取经营报表时等待最新结果", async () => {
+    const params = { from: "2026-10-01", to: "2026-10-31" };
+    const reports = [
+      () => reportsApi.monthlyPnl(params),
+      () => reportsApi.commission(params),
+      () => reportsApi.businessPnl(params),
+      () => reportsApi.dataCenter(params),
+      () => reportsApi.orderProfit(params),
+    ];
+    for (const read of reports) {
+      const first = await read();
+      expect(await read()).not.toBe(first);
+    }
+    expect((axios as any).__getCallCount()).toBe(10);
   });
 
   it("切换操作用户后不会复用上一用户的缓存", async () => {

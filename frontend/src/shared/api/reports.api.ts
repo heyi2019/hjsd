@@ -1,19 +1,30 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import type { AuditEntityStat, AuditLogRow } from "./types/ops";
 import type { BusinessPnlReport, CommissionReport, DataCenterSummary, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
+type ReportPeriodParams = { from?: string; to?: string };
+export type ReportExportParams = ReportPeriodParams & { mine?: boolean; all_people?: boolean; user_id?: number };
+
+function getFreshReport<T>(url: string, params?: ReportPeriodParams): Promise<T> {
+  const config: CacheAwareRequestConfig = { params, refreshCache: true };
+  return api.get<T>(url, config).then((response) => response.data);
+}
+
 export const reportsApi = {
-  exportCsv: (name: string, params?: {from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number}) => api.get<Blob>(`/reports/${name}/export.csv`, {params, responseType: "blob"}).then(r => r.data),
+  exportCsv: (name: string, params?: ReportExportParams) => {
+    const config: CacheAwareRequestConfig = { params, responseType: "blob", bypassCache: true };
+    return api.get<Blob>(`/reports/${name}/export.csv`, config).then((response) => response.data);
+  },
   monthlyPnl: (params?: { from?: string; to?: string }) =>
-    api.get<MonthlyPnlReport>("/reports/monthly-pnl", { params }).then((r) => r.data),
+    getFreshReport<MonthlyPnlReport>("/reports/monthly-pnl", params),
   commission: (params?: { from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number }) =>
-    api.get<CommissionReport>("/reports/commission", { params }).then((r) => r.data),
+    getFreshReport<CommissionReport>("/reports/commission", params),
   businessPnl: (params?: { from?: string; to?: string }) =>
-    api.get<BusinessPnlReport>("/reports/business-pnl", { params }).then((r) => r.data),
+    getFreshReport<BusinessPnlReport>("/reports/business-pnl", params),
   dataCenter: (params?: { from?: string; to?: string }) =>
-    api.get<DataCenterSummary>("/reports/data-center", { params }).then((r) => r.data),
+    getFreshReport<DataCenterSummary>("/reports/data-center", params),
   orderProfit: (params?: { from?: string; to?: string }) =>
-    api.get<OrderProfitReport>("/reports/order-profit", { params }).then((r) => r.data),
+    getFreshReport<OrderProfitReport>("/reports/order-profit", params),
 };
 
 export const auditApi = {

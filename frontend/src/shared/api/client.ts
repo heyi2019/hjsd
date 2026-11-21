@@ -16,7 +16,11 @@ export function setDevUser(user: string): void {
 }
 
 export const api = axios.create({ baseURL: API_BASE, timeout: 15_000 });
-export type CacheAwareRequestConfig = AxiosRequestConfig & { refreshCache?: boolean };
+export type CacheAwareRequestConfig = AxiosRequestConfig & {
+  refreshCache?: boolean;
+  /** 用于每次都必须到达后端的 GET，例如需要逐次记录审计的导出。 */
+  bypassCache?: boolean;
+};
 
 api.interceptors.request.use((config) => {
   const token = import.meta.env.DEV ? null : localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -126,7 +130,7 @@ function startCachedRequest(key: string, config: InternalAxiosRequestConfig): Pr
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const method = String(config.method || "get").toUpperCase();
-  if (method !== "GET") return config;
+  if (method !== "GET" || (config as InternalAxiosRequestConfig & CacheAwareRequestConfig).bypassCache) return config;
   const key = buildCacheKey(config);
   if ((config as InternalAxiosRequestConfig & CacheAwareRequestConfig).refreshCache) {
     let request = refreshPending.get(key);

@@ -161,14 +161,23 @@ describe("ReportsPage：经营中心报表", () => {
     }
   });
 
-  it("初始加载合并后的经营损益，不提前加载隐藏 Tab", async () => {
-    renderLight(<ReportsPage />, { user: "admin" });
+  it("只加载当前入口的报表，切回我的收益时不重拉原标签", async () => {
+    const { rerender } = renderLight(<ReportsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "经营损益" });
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenCalledTimes(1));
     expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(reportsApi.commission)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.orderProfit)).not.toHaveBeenCalled();
     expect(vi.mocked(poolsApi.list)).not.toHaveBeenCalled();
+    rerender(<ReportsPage active={false} />);
+    vi.mocked(reportsApi.monthlyPnl).mockClear();
+    vi.mocked(reportsApi.businessPnl).mockClear();
+    rerender(<ReportsPage active initialReportTab="my-earnings" initialReportFrom="2020-01-01" initialReportTo="2020-01-31" />);
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({
+      from: "2020-01-01", to: "2020-01-31", mine: true,
+    }));
+    expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.businessPnl)).not.toHaveBeenCalled();
   });
 
   it("日期筛选提供本期和上期快捷入口，账期按每月16日至次月15日计算", async () => {
@@ -194,6 +203,64 @@ describe("ReportsPage：经营中心报表", () => {
     expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
     expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true, ...currentReportPeriod() }));
     expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
+  });
+
+  it("从历史周期进入我的收益时首次请求就使用指定周期", async () => {
+    renderLight(
+      <ReportsPage initialReportTab="my-earnings" initialReportFrom="2020-01-01" initialReportTo="2020-01-31" />,
+      { user: "admin" },
+    );
+
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
+    expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
+      [{ from: "2020-01-01", to: "2020-01-31", mine: true }],
+    ]);
+    const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
+    await setAntdDateRange(pane, ui, "2020-02-01", "2020-02-29");
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({
+      from: "2020-02-01", to: "2020-02-29", mine: true,
+    }));
+    vi.mocked(optionSetsApi.get).mockRejectedValueOnce(new Error("配置加载失败"));
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(await screen.findByText("当期配置读取失败，请重试")).toBeVisible();
+    vi.mocked(reportsApi.commission).mockClear();
+    await ui.click(screen.getByRole("button", { name: /重新加载/ }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
+    expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
+      [{ from: "2020-02-01", to: "2020-02-29", mine: true }],
+    ]);
+  });
+
+  it("切回我的收益时不按上次的全员口径或周期请求", async () => {
+    const { rerender } = renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("分润对账");
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
+    rerender(<ReportsPage active={false} />);
+    vi.mocked(reportsApi.commission).mockClear();
+
+    rerender(<ReportsPage active initialReportTab="my-earnings" initialReportFrom="2020-01-01" initialReportTo="2020-01-31" />);
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
+    expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
+      [{ from: "2020-01-01", to: "2020-01-31", mine: true }],
+    ]);
+    rerender(<ReportsPage active={false} />);
+    vi.mocked(reportsApi.commission).mockClear();
+    rerender(<ReportsPage active />);
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
+    expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
+      [{ from: "2020-01-01", to: "2020-01-31", all_people: true }],
+    ]);
+  });
+
+  it("周期配置失败时不显示尚未请求的报表空态", async () => {
+    vi.mocked(optionSetsApi.get).mockRejectedValueOnce(new Error("配置加载失败"));
+    renderLight(<ReportsPage />, { user: "admin" });
+
+    expect(await screen.findByText("当期配置读取失败，请重试")).toBeVisible();
+    expect(screen.getByText("所选区间无数据")).not.toBeVisible();
+    expect(screen.getByText("所选区间无业务数据")).not.toBeVisible();
+    expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportsApi.businessPnl)).not.toHaveBeenCalled();
   });
 
   it("我的收益显示分润人员的真实姓名", async () => {

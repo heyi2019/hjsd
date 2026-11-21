@@ -17,18 +17,25 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
   const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "pnl");
   const periodState = useBusinessPeriod();
+  const entryKey = JSON.stringify([initialReportTab, initialReportFrom, initialReportTo, initialReportAll]);
+  const [appliedEntry, setAppliedEntry] = useState<string | null>(null);
   useEffect(() => {
     // keep-alive 下离开经营中心时保留个人视图，避免隐藏页在切换期间改请求口径；
     // 重新激活后再按 URL 入口决定是「我的收益」还是完整分润对账。
-    if (!active) return;
+    if (!active) {
+      setAppliedEntry(null);
+      return;
+    }
+    if (!periodState.ready || appliedEntry === entryKey) return;
     setMyEarnings(initialReportTab === "my-earnings");
-    if (periodState.ready && initialReportAll) {
+    if (initialReportAll) {
       periodState.useAllPeriods();
-    } else if (periodState.ready && initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
+    } else if (initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
       periodState.setPeriod({ from: initialReportFrom, to: initialReportTo });
     }
     if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
-  }, [active, initialReportTab, initialReportFrom, initialReportTo, initialReportAll, periodState.ready]);
+    setAppliedEntry(entryKey);
+  }, [active, initialReportTab, initialReportFrom, initialReportTo, initialReportAll, periodState.ready, appliedEntry, entryKey]);
   const reportRange: ReportRange = {
     params: periodState.period ?? {},
     picker: <BusinessPeriodPicker label="报表日期区间" state={periodState} showAll />,
@@ -39,18 +46,20 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
     { key: "r3", label: "分润对账", render: () => <Commission range={reportRange} mine={myEarnings} /> },
     { key: "pnl", label: "经营损益", render: () => <OperatingPnl range={reportRange} /> },
   ];
+  const entryReady = periodState.ready && appliedEntry === entryKey;
 
   return (
-    <ReportsActiveContext.Provider value={active && periodState.ready}>
+    <ReportsActiveContext.Provider value={active && entryReady}>
     <section className="ui-stack">
       <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
+      {active && !entryReady && !periodState.error ? <div role="status">正在准备报表…</div> : null}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
         items={tabItems.map(({ render, ...item }) => ({
           ...item,
           // 隐藏 Tab 不挂载：避免首屏同时发起 13 组请求，也避免切换无关页面时产生状态更新。
-          children: activeTab === item.key ? render() : null,
+          children: activeTab === item.key ? <div hidden={!entryReady}>{render()}</div> : null,
         }))}
       />
     </section>

@@ -1,19 +1,11 @@
 /** 报表导出按钮：按当前页筛选导出该报表 CSV。 */
 
 import { useState } from "react";
-import { reportsApi } from "../../shared/api/reports.api";
+import { reportsApi, type ReportExportParams } from "../../shared/api/reports.api";
 import { normalizeError } from "../../shared/api/client";
+import { downloadBlob } from "../../shared/api/download";
 import { ExportButton } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
-
-type ReportExportParams = {
-  from?: string;
-  to?: string;
-  /** 分润对账专用：与 /reports/commission 列表同口径，避免「我的收益/指定员工」导出成默认全员。 */
-  mine?: boolean;
-  all_people?: boolean;
-  user_id?: number;
-};
 
 export function ReportExportButton({ name, params }: { name: string; params?: ReportExportParams }) {
   const [exporting, setExporting] = useState(false);
@@ -36,12 +28,7 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
     setExporting(true);
     try {
       const blob = await reportsApi.exportCsv(name, exportParams);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `${name}.csv`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `${name}.csv`);
       appMessage.success("报表已导出");
     } catch (err) {
       appMessage.error(normalizeError(err).message);

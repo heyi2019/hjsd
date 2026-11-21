@@ -312,7 +312,7 @@ def test_cancelling_new_installment_only_refunds_its_own_payments(seeded_db):
 
 
 def test_cancelled_installment_does_not_inflate_receivable_totals(seeded_client, seeded_db, headers):
-    from app.business.orders.create import add_customer_role
+    from app.business.orders.create_roles.roles import add_customer_role
     from app.customers.customer_detail import get_customer_detail
     from app.customers.customers import create_customer
     account = _account(seeded_db, "cancelled-installment-totals")

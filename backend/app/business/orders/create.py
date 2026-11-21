@@ -38,8 +38,6 @@ from app.business.orders.create_roles.guards import (
 from app.business.orders.create_roles.roles import (
     _counterparty_role,
     _customer_role,
-    add_counterparty_role,
-    add_customer_role,
 )
 
 def create_order(
@@ -306,11 +304,4 @@ def create_order(
     return order
 
 
-__all__ = [
-    "create_order",
-    "add_customer_role",
-    "add_counterparty_role",
-    "_assert_no_duplicate_inventory_account",
-    "_customer_role",
-    "_counterparty_role",
-]
+__all__ = ["create_order"]

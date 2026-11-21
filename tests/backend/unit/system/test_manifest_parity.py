@@ -44,6 +44,33 @@ GUARD_AREA = {
 }
 
 
+def test_case_number_map_uses_published_numbers_when_cache_conflicts(tmp_path, monkeypatch):
+    from scripts import gen_test_case_library as generator
+
+    csv_path = tmp_path / "cases.csv"
+    cache_path = tmp_path / "map.json"
+    csv_path.write_text("\ufeff\ufeff测试编号,功能编号,测试层级,自动化测试文件及函数,测试函数标识\nIT-B01-003,B01,IT,tests/a.test.ts,case a\n", encoding="utf-8")
+    cache_path.write_text(json.dumps({"IT|B01|a.test.ts|case a": 8, "IT|B01|old.test.ts|old": 3, "IT|B01|b.test.ts|case b": 9}), encoding="utf-8")
+    monkeypatch.setattr(generator, "OUT_CSV", str(csv_path))
+    monkeypatch.setattr(generator, "CASE_MAP", str(cache_path))
+
+    numbers = generator._load_number_map()
+    assert numbers["IT|B01|a.test.ts|case a"] == 3
+    assert "IT|B01|old.test.ts|old" not in numbers
+    assert numbers["IT|B01|b.test.ts|case b"] == 9
+
+
+def test_case_library_rejects_silent_reclassification(tmp_path, monkeypatch):
+    from scripts import gen_test_case_library as generator
+
+    csv_path = tmp_path / "cases.csv"
+    csv_path.write_text("测试编号,功能编号,测试层级,自动化测试文件及函数,测试函数标识\nIT-B01-003,B01,IT,tests/a.test.ts,case a\n", encoding="utf-8")
+    monkeypatch.setattr(generator, "OUT_CSV", str(csv_path))
+    case = {"自动化测试文件及函数": "tests/a.test.ts", "测试函数标识": "case a", "测试层级": "IT", "功能编号": "B02"}
+    with pytest.raises(ValueError, match="分类发生变化"):
+        generator._check_published_classifications([case])
+
+
 def _manifest() -> dict:
     assert MANIFEST_PATH.exists(), f"manifest 不存在：{MANIFEST_PATH}"
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))

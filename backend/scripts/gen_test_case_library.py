@@ -474,30 +474,62 @@ def _load_number_map() -> dict[str, int]:
     因历史编号带空洞（删过的用例留号），重排后实测 2666 条里 **1640 条**
     与入库快照不一致，报告的 nodeid↔编号关联整体错位。
 
-    故优先读生成器产物；缺失时从**入库的**《测试用例库.csv》自举同一份映射
+    以入库的《测试用例库.csv》为准，并合并未冲突的本地缓存
     （csv 的「测试层级 / 功能编号 / 自动化测试文件及函数 / 测试函数标识 /
     测试编号」五列足以还原 key 与序号）。两份都无才是真正的首次生成，
     返回空 dict 走原有分配逻辑。
     """
-    if os.path.exists(CASE_MAP):
-        return json.load(open(CASE_MAP, encoding="utf-8"))
-    if not os.path.exists(OUT_CSV):
-        return {}
     out: dict[str, int] = {}
-    with open(OUT_CSV, encoding="utf-8-sig", newline="") as f:
-        for row in csv.DictReader(f):
-            rel = row.get("自动化测试文件及函数") or ""
-            name = row.get("测试函数标识") or ""
-            tier = row.get("测试层级") or ""
-            func = row.get("功能编号") or ""
-            # 只取编号末段数字，不假设前缀结构：层级前缀可能是 E2E（含数字），
-            # 用 [A-Z]+ 会把全部 53 条 E2E 漏掉、编号照样漂移。
-            parts = (row.get("测试编号") or "").rsplit("-", 1)
-            if not (rel and name and tier and func and len(parts) == 2 and parts[1].isdigit()):
+    if os.path.exists(OUT_CSV):
+        with open(OUT_CSV, encoding="utf-8-sig", newline="") as f:
+            reader = csv.DictReader(f)
+            if reader.fieldnames:
+                reader.fieldnames = [name.lstrip("\ufeff") for name in reader.fieldnames]
+            for row in reader:
+                rel = row.get("自动化测试文件及函数") or ""
+                name = row.get("测试函数标识") or ""
+                tier = row.get("测试层级") or ""
+                func = row.get("功能编号") or ""
+                # 只取编号末段数字，不假设前缀结构：层级前缀可能是 E2E（含数字），
+                # 用 [A-Z]+ 会把全部 53 条 E2E 漏掉、编号照样漂移。
+                parts = (row.get("测试编号") or "").rsplit("-", 1)
+                if not (rel and name and tier and func and len(parts) == 2 and parts[1].isdigit()):
+                    continue
+                key = f"{tier}|{func}|{os.path.basename(rel)}|{name}"
+                out[key] = int(parts[1])
+    occupied = {(key.split("|", 2)[0], key.split("|", 2)[1], value) for key, value in out.items()}
+    if os.path.exists(CASE_MAP):
+        with open(CASE_MAP, encoding="utf-8") as f:
+            cached = json.load(f)
+        for key, value in cached.items():
+            parts = key.split("|", 2)
+            if len(parts) < 3 or key in out or (parts[0], parts[1], value) in occupied:
                 continue
-            key = f"{tier}|{func}|{os.path.basename(rel)}|{name}"
-            out[key] = int(parts[1])
+            out[key] = value
+            occupied.add((parts[0], parts[1], value))
     return out
+
+
+def _check_published_classifications(cases: list[dict]) -> None:
+    """已有用例变更分类时停止生成，避免悄悄更换测试编号。"""
+    if not os.path.exists(OUT_CSV):
+        return
+    with open(OUT_CSV, encoding="utf-8-sig", newline="") as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames:
+            reader.fieldnames = [name.lstrip("\ufeff") for name in reader.fieldnames]
+        published = {
+            (row.get("自动化测试文件及函数"), row.get("测试函数标识")): (row.get("测试层级"), row.get("功能编号"))
+            for row in reader
+        }
+    changed = []
+    for case in cases:
+        key = (case["自动化测试文件及函数"], case["测试函数标识"])
+        current = (case["测试层级"], case["功能编号"])
+        if key in published and published[key] != current:
+            changed.append(f"{key[0]}::{key[1]} {published[key]} -> {current}")
+    if changed:
+        raise ValueError(f"已有测试的分类发生变化（{len(changed)} 条），请先确认编号迁移：\n" + "\n".join(changed))
 
 
 def main() -> None:
@@ -561,6 +593,8 @@ def main() -> None:
         primary, related = e2e_file_modules(fn)
         for tname, doc, body in scan_ts(full, exclude_methods=E2E_STRUCTURAL):
             cases.append(_stage("E2E", func, rel, tname, doc, body, fn, primary, related, ""))
+
+    _check_published_classifications(cases)
 
     # ---- 稳定分配序号 ----
     cases.sort(key=lambda c: (c["功能编号"], c["测试层级"], c["自动化测试文件及函数"], c["测试函数标识"]))

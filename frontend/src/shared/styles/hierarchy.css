@@ -57,7 +57,7 @@
   .page-content { padding: var(--space-3); }
 }
 
-@media (min-width: 801px) {
+@media (min-width: 961px) {
   .sidebar.glass {
     position: sticky;
     top: var(--space-4);

@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
+from sqlalchemy import select
+
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
@@ -14,6 +16,7 @@ from app.funds.installments import create as inst_create
 from app.funds.rebates import create_rebate
 from app.business.create import create_order
 from app.business.events import post_event
+from app.domain.trade import Cashflow
 
 D = date(2026, 10, 4)
 
@@ -240,6 +243,29 @@ class TestOrdersApi:
         assert fetched.status_code == 200, fetched.text
         assert fetched.json()["events"][0]["operator"] == "种子用户9"
         assert fetched.json()["cashflows"][0]["operator"] == "种子用户9"
+
+    def test_detail_cashflows_match_each_event_operator_and_handle_missing_source(
+        self, seeded_client, seeded_db, headers
+    ):
+        order = _order(seeded_db)
+        buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100.00", occurred_on=D,
+                            actor="pytest", operator_user_ids=[9])
+        sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount="200.00", occurred_on=D,
+                             actor="pytest", operator_user_ids=[1])
+        response = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
+        assert response.status_code == 200, response.text
+        result = response.json()
+        event_operators = {event["event_no"]: event["operator"] for event in result["events"]}
+        flow_operators = {flow["source_id"]: flow["operator"] for flow in result["cashflows"]}
+        assert flow_operators[buy.event_no] == event_operators[buy.event_no] == "种子用户9"
+        assert flow_operators[sell.event_no] == event_operators[sell.event_no] != "-"
+
+        flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == buy.event_no))
+        flow.source_id = "MISSING-EVENT"
+        seeded_db.flush()
+        response = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
+        assert response.status_code == 200, response.text
+        assert next(item for item in response.json()["cashflows"] if item["source_id"] == "MISSING-EVENT")["operator"] == "-"
 
     def test_order_detail_aggregates_finance_installment_and_audit(
         self, seeded_client, seeded_db, headers

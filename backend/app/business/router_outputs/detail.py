@@ -1,6 +1,8 @@
 """orders.router_outputs.detail：订单详情输出装配。"""
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,13 @@ from app.business.router_outputs._shared import (
 )
 
 
+def _index_events_by_number(events: Sequence[OrderEvent]) -> dict[str, OrderEvent]:
+    indexed: dict[str, OrderEvent] = {}
+    for event in events:
+        indexed.setdefault(event.event_no, event)
+    return indexed
+
+
 def _order_detail_output(
     db: Session, order, user: CurrentUser
 ) -> schemas.OrderDetailOut:
@@ -39,6 +48,7 @@ def _order_detail_output(
     cancellable = cancellable_by_event(list(events))
     output.events = [_event_output(event, operator_names, cancellable) for event in events]
     if user.has(PERM_FINANCE_READ):
+        events_by_number = _index_events_by_number(events)
         cashflows = db.scalars(
             select(Cashflow)
             .where(Cashflow.order_id == order.id)
@@ -57,7 +67,7 @@ def _order_detail_output(
                     "source_id": item.source_id,
                     "note": item.note,
                     "operator": _selected_operator_label(
-                        next((event for event in events if event.event_no == item.source_id), None),
+                        events_by_number.get(item.source_id),
                         operator_names,
                     ) or "-",
                 }

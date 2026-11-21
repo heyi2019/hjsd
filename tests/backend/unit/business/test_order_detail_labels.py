@@ -4,12 +4,34 @@ from datetime import datetime
 
 from app.business.order_detail.view.derived import _finance_type
 from app.business.output_labels import _elapsed_label
+from app.business.router_outputs import detail
 
 
 def test_buy_finance_type_uses_order_cost_label():
     assert _finance_type("BUY", "OUT", order_type="HS") == "回收成本"
     assert _finance_type("BUY", "OUT", order_type="TH") == "提号成本"
     # DG 不允许 BUY（仅全款），且已无「代挂成本」概念（2026-11-18 口径改版）。
+
+
+def test_cashflow_operator_event_lookup_preserves_first_match_with_linear_indexing():
+    class Event:
+        reads = 0
+
+        def __init__(self, number):
+            self.number = number
+
+        @property
+        def event_no(self):
+            type(self).reads += 1
+            return self.number
+
+    events = [Event(f"EV-{i}") for i in range(200)]
+    duplicate = Event("EV-0")
+    index = getattr(detail, "_index_events_by_number", lambda _events: {})(events + [duplicate])
+    assert index.get("EV-0") is events[0]
+    assert index.get("EV-199") is events[199]
+    assert index.get("missing") is None
+    assert Event.reads <= 201
 
 
 def test_elapsed_label_uses_current_time_for_unsold_inventory():

@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.core.security import CurrentUser
-from app.business.stocks.collaboration import load_order_execution
+from app.business.stocks.collaboration import load_order_execution, load_order_execution_batch
 from app.business.stocks.schemas import AccountOut
 
 
@@ -126,11 +126,22 @@ def build_inventory_ledger_csv(
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(INVENTORY_EXPORT_HEADERS)
     failed_details = 0
-    for (account, order), account_out in zip(pairs, accounts, strict=True):
-        try:
-            detail = load_order_execution(db, order.id, user)
-        except Exception:
-            detail = None
+    try:
+        with db.begin_nested():
+            details = load_order_execution_batch(db, [order.id for _, order in pairs], user)
+            if len(details) != len(pairs):
+                raise ValueError("订单详情数量不匹配")
+    except Exception:
+        details = []
+        for _, order in pairs:
+            try:
+                with db.begin_nested():
+                    detail = load_order_execution(db, order.id, user)
+                details.append(detail)
+            except Exception:
+                details.append(None)
+    for (account, order), account_out, detail in zip(pairs, accounts, details, strict=True):
+        if detail is None:
             failed_details += 1
         writer.writerow(_row(account_out, _detail_text(detail, order.id)))
     return f"\ufeff{output.getvalue()}", failed_details

@@ -1,7 +1,7 @@
 """订单详情事件、流水与操作人查询装配。"""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -22,12 +22,13 @@ class DetailEventContext:
     event_cashflows: dict[int, ExecutionCashflowOut]
     order_cashflows: dict[int, list[ExecutionCashflowOut]]
     deposit_loss_flow_nos: set[str]
-    action_model_rebate_nos: set[str]
+    action_model_rebate_nos_by_order: dict[int, set[str]] = field(default_factory=dict)
+    duplicate_event_cashflow_sources: set[str] = field(default_factory=set)
 
 
 def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
     if not order_ids:
-        return DetailEventContext({}, {}, {}, set(), set())
+        return DetailEventContext({}, {}, {}, set())
 
     events = list(
         db.scalars(
@@ -36,15 +37,13 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
             .order_by(OrderEvent.occurred_on, OrderEvent.id)
         ).all()
     )
-    action_model_rebate_nos = {
-        event.source_id
-        for event in events
-        if event.event_type == EventType.REBATE.value
-        and event.source_type == CashflowSourceType.REBATE.value
-        and event.source_id
-    }
+    action_model_rebate_nos_by_order: dict[int, set[str]] = {}
+    for event in events:
+        if event.event_type == EventType.REBATE.value and event.source_type == CashflowSourceType.REBATE.value and event.source_id:
+            action_model_rebate_nos_by_order.setdefault(event.order_id, set()).add(event.source_id)
     event_nos = [event.event_no for event in events]
     event_cashflows: dict[int, ExecutionCashflowOut] = {}
+    duplicate_event_cashflow_sources: set[str] = set()
     order_cashflows: dict[int, list[ExecutionCashflowOut]] = {}
     deposit_loss_flow_nos: set[str] = set()
     if event_nos:
@@ -62,6 +61,8 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 category=flow.category,
             ):
                 deposit_loss_flow_nos.add(flow.flow_no)
+            if flow.source_id in event_cashflows:
+                duplicate_event_cashflow_sources.add(flow.source_id)
             event_cashflows[flow.source_id] = _cashflow_output(flow, pool)
     for flow, pool in db.execute(
         select(Cashflow, Pool)
@@ -128,7 +129,8 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
         event_cashflows=event_cashflows,
         order_cashflows=order_cashflows,
         deposit_loss_flow_nos=deposit_loss_flow_nos,
-        action_model_rebate_nos=action_model_rebate_nos,
+        action_model_rebate_nos_by_order=action_model_rebate_nos_by_order,
+        duplicate_event_cashflow_sources=duplicate_event_cashflow_sources,
     )
 
 

@@ -23,6 +23,7 @@ def build_finance_summary(
     order_rebates: dict[int, list[ExecutionRebateOut]],
     action_model_rebate_nos: set[str],
     deposit_loss_flow_nos: set[str],
+    profit_flows_by_order: dict[int, tuple[Decimal, Decimal]] | None = None,
 ) -> ExecutionFinanceSummaryOut:
     """按详情明细计算收入、支出与净额。
 
@@ -49,13 +50,9 @@ def build_finance_summary(
         ),
         zero,
     )
-    bad_debt_expense = sum(
-        (
-            expense
-            for _rebate_income, expense in order_profit_flow_by_order(db, order_ids=order_ids).values()
-        ),
-        zero,
-    ) if order_ids else zero
+    profit_flows = (profit_flows_by_order if profit_flows_by_order is not None
+                    else order_profit_flow_by_order(db, order_ids=order_ids)) if order_ids else {}
+    bad_debt_expense = sum((profit_flows[order_id][1] for order_id in set(order_ids) if order_id in profit_flows), zero)
     total_expense += bad_debt_expense
     total_income = cashflow_income + rebate_income
     return ExecutionFinanceSummaryOut(

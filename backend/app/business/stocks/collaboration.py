@@ -26,6 +26,7 @@ from typing import Any
 
 # 订单执行明细加载器：签名 (db, order_id, user)，返回执行明细读模型或抛错
 _order_execution_loader: Any = None
+_order_execution_batch_loader: Any = None
 
 # 订单列表摘要组装器：签名 (db, orders) -> list[dict]
 _order_list_payload_builder: Any = None
@@ -38,6 +39,23 @@ def register_order_execution_loader(loader: Any) -> None:
     """注册订单执行明细加载器（由 orders 域调用）。"""
     global _order_execution_loader
     _order_execution_loader = loader
+
+
+def register_order_execution_batch_loader(loader: Any) -> None:
+    global _order_execution_batch_loader
+    _order_execution_batch_loader = loader
+
+
+def load_order_execution_batch(db: Any, order_ids: list[int], user: Any) -> list[Any]:
+    if _order_execution_batch_loader is not None:
+        return _order_execution_batch_loader(db, order_ids, user)
+    results = []
+    for order_id in order_ids:
+        try:
+            results.append(load_order_execution(db, order_id, user))
+        except Exception:
+            results.append(None)
+    return results
 
 
 def register_order_list_payload_builder(builder: Any) -> None:
@@ -92,7 +110,9 @@ __all__ = [
     "build_order_list_payload",
     "delete_linked_order",
     "load_order_execution",
+    "load_order_execution_batch",
     "register_linked_order_deleter",
     "register_order_execution_loader",
+    "register_order_execution_batch_loader",
     "register_order_list_payload_builder",
 ]

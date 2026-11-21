@@ -88,17 +88,22 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
 
 @pytest.mark.parametrize("extension", ["csv", "xlsx"])
 def test_orders_export_batches_detail_queries(seeded_client, headers, seeded_db, extension):
-    for i in range(5):
-        _seed_order(seeded_db, order_no=f"HS-BATCH-{i}")
+    _seed_order(seeded_db, order_no="HS-BATCH-0")
     statements = []
 
     def capture(_conn, _cursor, statement, _params, _context, _many):
         sql = " ".join(statement.lower().split())
-        if sql.startswith("select") and any(f"from {name}" in sql for name in ("order_events", "cashflows", "rebate_records", "installments", "attachments", "audit_logs")):
+        if sql.startswith("select") and any(f"from {name}" in sql for name in ("order_events", "cashflow", "rebate_records", "installments", "attachments", "audit_logs")):
             statements.append(sql)
 
     sqlalchemy_event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
     try:
+        first = seeded_client.get(f"/api/orders/export.{extension}", headers=headers)
+        assert first.status_code == 200, first.text
+        first_count = len(statements)
+        statements.clear()
+        for i in range(1, 5):
+            _seed_order(seeded_db, order_no=f"HS-BATCH-{i}")
         response = seeded_client.get(f"/api/orders/export.{extension}", headers=headers)
     finally:
         sqlalchemy_event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
@@ -108,7 +113,7 @@ def test_orders_export_batches_detail_queries(seeded_client, headers, seeded_db,
     else:
         values = list(openpyxl.load_workbook(io.BytesIO(response.content), read_only=True).worksheets[0].values)
         assert all(any(f"HS-BATCH-{i}" in row for row in values) for i in range(5))
-    assert len(statements) <= 12
+    assert len(statements) <= first_count + 1
 
 
 def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seeded_db):

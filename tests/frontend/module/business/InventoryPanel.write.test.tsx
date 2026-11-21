@@ -86,6 +86,7 @@ beforeEach(() => {
   resolveMock(vi.mocked(ordersApi.stockSale), {});
   resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
   resolveMock(vi.mocked(customersApi.page), { items: [{ id: 7, display_name: "买家A", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 });
+  vi.mocked(customersApi.options).mockResolvedValue([{ id: 7, customer_no: "C0007", display_name: "买家A" }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });

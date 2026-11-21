@@ -15,6 +15,8 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const [selected, setSelected] = useState<NotificationItem | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationDetails, setNotificationDetails] = useState<Record<number, ProfitDetail>>({});
+  const [failedDetails, setFailedDetails] = useState<number[]>([]);
+  const [detailsRetrying, setDetailsRetrying] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [inventorySyncError, setInventorySyncError] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(true);
@@ -38,7 +40,10 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       const ids = page.items.filter(isProfitNotification).map((item) => item.id);
       let details: ProfitDetail[] = [];
       if (ids.length) {
-        try { details = await notificationsApi.profitDetails(ids); } catch { /* 消息仍可展示 */ }
+        try { details = await notificationsApi.profitDetails(ids); }
+        catch {
+          if (cursor.current.generation === generation) setFailedDetails((current) => [...new Set([...current, ...ids])]);
+        }
       }
       if (cursor.current.generation !== generation) return;
       if (page.next_cursor && page.next_cursor === state.next) throw new Error("消息分页游标异常");
@@ -63,6 +68,8 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     setDataOwner(username);
     setNotifications([]);
     setNotificationDetails({});
+    setFailedDetails([]);
+    setDetailsRetrying(false);
     setNotificationError(null);
     setRetryItem(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -133,6 +140,24 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     }
   };
   const ordered = dataOwner === username ? notifications : [];
+  const retryDetails = async () => {
+    if (detailsRetrying || !failedDetails.length) return;
+    const generation = cursor.current.generation;
+    setDetailsRetrying(true);
+    try {
+      for (let offset = 0; offset < failedDetails.length; offset += PAGE_SIZE) {
+        const ids = failedDetails.slice(offset, offset + PAGE_SIZE);
+        const details = await notificationsApi.profitDetails(ids);
+        if (cursor.current.generation !== generation) return;
+        setNotificationDetails((current) => ({ ...current, ...Object.fromEntries(details.map((item) => [item.notification_id, item])) }));
+        setFailedDetails((current) => current.filter((id) => !ids.includes(id)));
+      }
+    } catch {
+      // 保留未恢复的条目，允许再次重试。
+    } finally {
+      if (cursor.current.generation === generation) setDetailsRetrying(false);
+    }
+  };
   const retryInventory = () => { inventorySync.current = null; setReload((n) => n + 1); };
-  return { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, hasMore, scrollRef, loadMore, openNotification, ordered };
+  return { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, failedDetails, detailsRetrying, retryDetails, hasMore, scrollRef, loadMore, openNotification, ordered };
 }

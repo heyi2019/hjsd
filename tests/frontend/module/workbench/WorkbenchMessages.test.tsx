@@ -81,6 +81,18 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(await screen.findByText("KU0007")).toBeInTheDocument();
   });
 
+it("分润详情加载失败后可重试且不改变已读状态", async () => {
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 7, notification_type: "PROFIT_PENDING", title: "分润", message: "订单 HS7", entity_type: "order", entity_id: "HS7", created_at: "2026-11-20T08:30:00", read_at: null }], next_cursor: null });
+    vi.mocked(notificationsApi.profitDetails).mockRejectedValueOnce(new Error("网络不可用")).mockResolvedValueOnce([{ notification_id: 7, order_no: "HS7", order_type: "HS", sale_amount: "200.00", cost_amount: "100.00", allocatable_profit: "60.00", stock_no: null, inventory_entry_at: "2026-11-10", removed_at: null, recovery_operator: null }]);
+    renderLight(<BusinessAlerts />, { user: "admin" });
+    expect(await screen.findByText("分润详情加载失败。")).toBeInTheDocument();
+    expect(screen.getByText("未读")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试分润详情" }));
+    expect(await screen.findByText(/成本 100.00.*售出 200.00.*待分配利润 60.00/)).toBeInTheDocument();
+    expect(screen.queryByText("分润详情加载失败。")).not.toBeInTheDocument();
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
+  });
+
 it("连续点击消息均能打开且保持滚动位置", async () => {
     const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_PENDING", title: "分润", message: `订单 ${id}`, entity_type: "order", entity_id: `${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
     vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });

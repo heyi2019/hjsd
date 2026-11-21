@@ -41,7 +41,7 @@ def _initial_markers_for_file(filename: str) -> set[str]:
         "test_numbering.py",
         "test_state_machine.py",
         "test_game_types.py",
-        "test_product_alias_compat.py",
+        "test_product_account_fields.py",
     }:
         markers.add("unit")
 

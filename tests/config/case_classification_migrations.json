@@ -104,5 +104,23 @@
     "previous_nodeid": "tests/frontend/module/business/ResponsibleEmployeeSelect.test.tsx::详情新增动作行默认当前员工",
     "old_id": "IT-SYS12-139",
     "new_id": "IT-B01-626"
+  },
+  {
+    "nodeid": "tests/backend/unit/settings/test_product_account_fields.py::test_product_aliases_are_rejected",
+    "previous_nodeid": "tests/backend/unit/settings/test_product_alias_compat.py::test_product_aliases_are_rejected",
+    "old_id": "UT-F04-001",
+    "new_id": "UT-F04-001"
+  },
+  {
+    "nodeid": "tests/backend/unit/settings/test_product_account_fields.py::test_product_aliases_are_rejected_even_with_canonical_value",
+    "previous_nodeid": "tests/backend/unit/settings/test_product_alias_compat.py::test_product_aliases_are_rejected_even_with_canonical_value",
+    "old_id": "UT-F04-002",
+    "new_id": "UT-F04-002"
+  },
+  {
+    "nodeid": "tests/backend/unit/settings/test_product_account_fields.py::test_product_contract_uses_canonical_account_fields_only",
+    "previous_nodeid": "tests/backend/unit/settings/test_product_alias_compat.py::test_product_contract_uses_canonical_account_fields_only",
+    "old_id": "UT-F04-003",
+    "new_id": "UT-F04-003"
   }
 ]

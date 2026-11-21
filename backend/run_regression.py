@@ -151,7 +151,7 @@ GROUPS = {
         "tests/backend/unit/business/test_orders_common.py",
         "tests/backend/unit/finance/test_finance_attributes.py",
         "tests/backend/unit/finance/test_rebate_current_contract.py",
-        "tests/backend/unit/settings/test_product_alias_compat.py",
+        "tests/backend/unit/settings/test_product_account_fields.py",
         "tests/backend/unit/system/test_main_contract.py",
         # 列表列「界面↔注册表」守卫：纯静态读前端源码，无 DB/HTTP，0.04s。
         # 曾长期游离在所有分组之外 —— 前端把报表视图拆成 ./reports/*.tsx 后它指错文件、
@@ -211,7 +211,7 @@ GROUPS = {
         "tests/backend/integration/settings/test_game_types.py",
         "tests/backend/integration/settings/test_game_types_contract.py",
         "tests/backend/integration/settings/test_option_sets_api.py",
-        "tests/backend/unit/settings/test_product_alias_compat.py",
+        "tests/backend/unit/settings/test_product_account_fields.py",
     ],
     "accounts": [
         "tests/backend/integration/business/test_accounts_contract.py",

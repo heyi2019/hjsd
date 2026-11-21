@@ -187,7 +187,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_policy_rule_consumption.py": "F01",
     "test_pool_balances_batch.py": "D01",
     "test_pools_api.py": "D01",
-    "test_product_alias_compat.py": "F04",
+    "test_product_account_fields.py": "F04",
     "test_profit_allocation_modes.py": "B10",
     "test_public_release_security.py": "SYS01",
     "test_ratelimit.py": "SYS01",

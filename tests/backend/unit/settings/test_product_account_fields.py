@@ -1,4 +1,4 @@
-"""MASTER-01 产品别名兼容：旧别名必须仍可解析为当前主数据。"""
+"""MASTER-01 产品账号字段契约：使用当前字段并拒绝旧字段。"""
 
 from datetime import date
 

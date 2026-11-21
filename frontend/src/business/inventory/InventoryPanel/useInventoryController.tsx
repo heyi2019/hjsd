@@ -53,6 +53,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   handleExport,
   exporting,
   locallyRemovedIdsRef,
+  markLocallyRemoved,
   } = list;
 
   // —— 详情缓存域：明细缓存 + 展开滚动记忆（注入列表的 setRows/setError / 本地移除集合）——
@@ -133,6 +134,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     expandTo, expandedOrderIds,
     removeFromInventory: (accountId, orderId) => {
       const wasVisible = rows.some((row) => row.account.id === accountId);
+      markLocallyRemoved(accountId);
       removeFromInventory(accountId, orderId);
       if (wasVisible) setTotalCount((current) => Math.max(0, current - 1));
     },

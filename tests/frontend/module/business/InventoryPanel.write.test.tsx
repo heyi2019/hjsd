@@ -466,6 +466,37 @@ describe("InventoryPanel：写入与长路径", () => {
     await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
     expect(Object.keys(submit.mock.calls[0][0])).not.toContain("__field_config_ready_INVVOID");
   });
+  it("售出移除后切换页面，不因其他页缺少该账号而重新显示旧库存", async () => {
+    const stale = inventoryLedgerResponse([{
+      account: accounts[0],
+      order: { id: 21, order_no: "HS0001", order_type: "HS", account_id: 1, status: "ACTIVE" },
+    }]);
+    let serverVisible = true;
+    vi.mocked(stocksApi.inventoryLedger).mockImplementation(async (params) => (
+      params.offset || !serverVisible ? inventoryLedgerResponse([]) : stale
+    ) as never);
+    function ListProbe() {
+      const list = useInventoryList({});
+      return <><button onClick={() => { list.markLocallyRemoved(1); list.setRows([]); }}>售出</button>
+        <button onClick={() => list.setPage(2)}>第二页</button><button onClick={() => list.setPage(1)}>第一页</button>
+        <button onClick={() => { serverVisible = false; void list.load(); }}>确认售出</button>
+        <button onClick={() => { serverVisible = true; void list.load(); }}>恢复库存</button>
+        <span>{list.rows.map((row) => row.account.game_account).join(",")}</span></>;
+    }
+    renderLight(<ListProbe />, { user: "admin" });
+    expect(await screen.findByText("acc-1")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "售出" }));
+    await ui.click(screen.getByRole("button", { name: "第二页" }));
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 10 })));
+    await ui.click(screen.getByRole("button", { name: "第一页" }));
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 })));
+    expect(screen.queryByText("acc-1")).not.toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "确认售出" }));
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(4));
+    await ui.click(screen.getByRole("button", { name: "恢复库存" }));
+    expect(await screen.findByText("acc-1")).toBeInTheDocument();
+  });
+
   it("重新进入库存时先恢复第一页和默认库龄，再发一次请求", async () => {
     function ListProbe({ active }: { active: boolean }) {
       const list = useInventoryList({ active, initialAgeGtDays: 30 });

@@ -42,6 +42,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   const [exporting, setExporting] = useState(false);
   const [serverGameTypes, setServerGameTypes] = useState<string[]>([]);
   const locallyRemovedIdsRef = useRef(new Set<number>());
+  const removalOriginsRef = useRef(new Map<number, string>());
   const loadSequence = useLatestRequest();
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
@@ -59,6 +60,12 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     sort_desc: sortDesc,
   }), [businessMode, inventoryType, gameTypeFilter, inventoryOperatorIds, ageGtDays, keyword, dateRange, sortDesc]);
 
+  const queryKey = JSON.stringify([filters, page, pageSize]);
+  const markLocallyRemoved = (id: number) => {
+    locallyRemovedIdsRef.current.add(id);
+    removalOriginsRef.current.set(id, queryKey);
+  };
+
   const load = useCallback(async () => {
     const requestId = loadSequence.start();
     setListLoading(true);
@@ -69,8 +76,11 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
         .filter(({ account }) => !locallyRemovedIdsRef.current.has(account.id))
         .map(({ account, order }) => toInventoryOrderRow(account, order as InventoryOrderRow));
       const freshIds = new Set(data.items.map(({ account }) => account.id));
-      locallyRemovedIdsRef.current.forEach((id) => {
-        if (!freshIds.has(id)) locallyRemovedIdsRef.current.delete(id);
+      removalOriginsRef.current.forEach((origin, id) => {
+        if (origin === queryKey && !freshIds.has(id)) {
+          locallyRemovedIdsRef.current.delete(id);
+          removalOriginsRef.current.delete(id);
+        }
       });
       setRows(list);
       setTotalCount(data.total);
@@ -91,7 +101,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     } finally {
       if (loadSequence.isCurrent(requestId)) setListLoading(false);
     }
-  }, [filters, page, pageSize, loadSequence]);
+  }, [filters, page, pageSize, loadSequence, queryKey]);
 
   const wasActiveRef = useRef(false);
   const previousInitialAgeRef = useRef(initialAgeGtDays);
@@ -152,6 +162,6 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     page, setPage, pageSize, setPageSize, error, setError, listLoading, listError,
     businessOptions, inventoryTypeOptions, gameTypeOptions, load,
     countInventoryRows, totalCount, setTotalCount,
-    handleExport, exporting, locallyRemovedIdsRef,
+    handleExport, exporting, locallyRemovedIdsRef, markLocallyRemoved,
   };
 }

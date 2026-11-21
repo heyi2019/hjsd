@@ -27,7 +27,7 @@ RESALE = "resale"
 WAIVE = "waive"
 EXTEND = "extend"
 
-# 合约级：逐字对应改造前 contractColumns.tsx 的 disabled / 渲染条件
+# 合约级动作可用状态。
 _PAY_BLOCKED = frozenset({
     InstallmentStatus.SETTLED.value,
     InstallmentStatus.DELIVERED.value,

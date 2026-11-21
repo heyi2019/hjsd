@@ -1,4 +1,4 @@
-"""installments.repayments.waive：期次减免（BAS-03，从 repayment.py 逐字拆出）。"""
+"""分期期次减免。"""
 from __future__ import annotations
 
 from collections.abc import Mapping

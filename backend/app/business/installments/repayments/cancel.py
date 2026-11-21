@@ -1,4 +1,4 @@
-"""installments.repayments.cancel：取消与冲销（BAS-03，从 repayment.py 逐字拆出）。"""
+"""分期取消与冲销。"""
 from __future__ import annotations
 
 from collections.abc import Mapping

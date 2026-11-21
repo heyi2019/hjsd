@@ -1,4 +1,4 @@
-"""installments.repayments.extend：期次展期（BAS-03，从 repayment.py 逐字拆出）。"""
+"""分期期次展期。"""
 from __future__ import annotations
 
 from collections.abc import Mapping

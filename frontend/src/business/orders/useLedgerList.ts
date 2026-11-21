@@ -23,9 +23,7 @@ export interface InitialLedgerFilters {
 }
 
 /**
- * 订单台账「列表域」：数据加载、筛选、分页、排序、导出与选项词典，以及派生的 filteredOrders。
- * 从 useOrdersPageController 拆出，保持纯参数入 / 扁平返回出，不持有任何 modal / 账号动作状态。
- * 这样主 hook 只保留跨域共享枢纽（selectedOrder / actionOrder / users / loadLedgerDetail）与动作编排。
+ * 订单台账列表：数据加载、筛选、分页、排序、导出与选项词典。
  */
 export function useLedgerList(params: { active: boolean; initialMine: boolean; initialFilters?: InitialLedgerFilters }) {
   const { active, initialMine, initialFilters } = params;

@@ -137,7 +137,6 @@ export function useContractTableController(params: { contractType: string; reloa
   const overdueCount = totals?.overdue_count ?? 0;
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
-  // 表格列定义是纯渲染配置，逐字提取到 contractColumns 工厂；依赖由本 controller 注入。
   const { columns, scheduleColumns } = buildContractColumns({
     payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,

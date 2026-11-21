@@ -19,7 +19,6 @@ import { pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators,
 
 /**
  * 订单「冲销 / 取消」域：普通订单的分笔冲销、原路退款与分期合约取消。
- * 从 useOrdersPageController 拆出，依赖注入 selectedOrder / load / setSelectedOrder。
  * 余额一律取后端 event.cancellable_amount，前端只挑事件与顺序，不做第二套金额账。
  */
 export function useOrderCancellation(params: {

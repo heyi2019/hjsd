@@ -12,8 +12,7 @@ import { formatOrderAmount } from "./helpers";
 
 /**
  * 订单台账列定义域：库存共享字段与订单字段的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
- * 从 useOrdersPageController 拆出为「依赖注入式」hook —— 所有打开弹窗的动作由调用方传入，
- * 本模块只描述列的展示与点击转发，不持有任何状态、不发任何请求。
+ * 弹窗动作由调用方传入，本模块负责列展示与点击转发。
  */
 export function useLedgerColumns(params: {
   canDeleteOrder: boolean;

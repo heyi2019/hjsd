@@ -34,7 +34,6 @@ interface OrderActionModalsDeps {
 
 /**
  * 订单台账的动作弹窗域：资金收支 / 分润配置 / 交付 / 下架 / 账号动作。
- * 逐字切片自 useOrdersPageController，返回值与主 hook 的 spread 并集契约逐字段一致。
  */
 export function useOrderActionModals({
   selectedOrder,

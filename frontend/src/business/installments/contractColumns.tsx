@@ -1,8 +1,4 @@
-/** 分期合约表的表格列定义（从 useContractTableController 逐字提取，行为等价）。
- *
- * 纯渲染配置：依赖 17 个由 controller 传入的状态/表单/opener/权限，函数体内无
- * hook 调用，故为普通工厂而非 hook。controller 只保留状态编排，列定义内聚于此。
- */
+/** 分期合约表及期次表的列定义。 */
 import type { Dispatch, SetStateAction } from "react";
 import { Space } from "antd";
 import type { ColumnsType } from "antd/es/table";

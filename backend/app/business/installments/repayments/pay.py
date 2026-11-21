@@ -1,4 +1,4 @@
-"""installments.repayments.pay：收款与期次选取（BAS-03，从 repayment.py 逐字拆出）。"""
+"""分期收款与期次选取。"""
 from __future__ import annotations
 
 from collections.abc import Mapping

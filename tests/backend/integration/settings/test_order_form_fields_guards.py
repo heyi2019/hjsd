@@ -16,7 +16,7 @@ from sqlalchemy import select
 from app.core.errors import Validation
 from app.domain.trade import OrderFormField, OrderFormSectionLabel
 from app.business.shared.form_config import form_fields as ff
-from app.business.schemas import OrderFormFieldCreate, SectionLabelsSaveIn
+from app.business.shared.form_config.schemas import OrderFormFieldCreate, SectionLabelsSaveIn
 
 
 # --------------------------------------------------------------------------- #

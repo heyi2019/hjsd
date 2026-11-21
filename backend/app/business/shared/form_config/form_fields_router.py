@@ -19,7 +19,7 @@ from app.settings.auth.session import (
     get_current_user,
     require_permissions,
 )
-from app.business import schemas
+from . import schemas
 
 router = APIRouter(tags=["ORD-01/02 建单表单配置"])
 

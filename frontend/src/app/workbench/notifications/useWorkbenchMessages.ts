@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { notificationsApi } from "../../../shared/api/notifications.api";
+import { notificationsApi, type NotificationCategory } from "../../../shared/api/notifications.api";
 import { useNotificationDetails } from "./useNotificationDetails";
 import { useReminderSync } from "./useReminderSync";
 import type { NotificationItem } from "../../../shared/api/types/common";
@@ -11,14 +11,14 @@ export function isProfitNotification(item: NotificationItem) {
   return item.entity_type === "order" && (item.notification_type === "PROFIT_PENDING" || item.notification_type === "PROFIT_ALLOCATED");
 }
 
-export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProfitNotificationsRead, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void; onProfitNotificationsRead?: () => void; active?: boolean }) {
+export function useWorkbenchMessages({ onPendingProfitNotificationsClick, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void; active?: boolean }) {
   const { username } = useSession();
   const [dataOwner, setDataOwner] = useState(username);
   const [selected, setSelected] = useState<NotificationItem | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [notificationLoading, setNotificationLoading] = useState(true);
-  const [category, setCategory] = useState<"latest" | "sale" | "inventory" | "contract">("latest");
+  const [category, setCategory] = useState<NotificationCategory>("latest");
   const [retryItem, setRetryItem] = useState<NotificationItem | null>(null);
   const [reload, setReload] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -112,7 +112,6 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
           } else remaining.push(updated);
           return remaining;
         });
-        onProfitNotificationsRead?.();
       }
       setNotificationError(null);
       setRetryItem(null);

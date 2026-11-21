@@ -1,3 +1,4 @@
+"""NOTIFY-02 逾期合约按权限和提醒设置生成通知。"""
 from datetime import date, timedelta
 from decimal import Decimal
 

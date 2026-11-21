@@ -91,6 +91,22 @@ it("工作台展示业务总览指标和业务提醒", async () => {
     expect(within(alerts).getByRole("tab", { name: "库存消息" })).toBeInTheDocument();
   });
 
+it("查看消息标记已读时不重复加载业务总览", async () => {
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [
+      { id: 1, notification_type: "PROFIT_PENDING", title: "分润提醒", message: "订单 HS1 待分润", entity_type: "order", entity_id: "HS1", created_at: "2026-11-20T08:30:00", read_at: null },
+      { id: 2, notification_type: "INVENTORY_AGING", title: "库存提醒", message: "库存已超期", entity_type: "account", entity_id: "2", created_at: "2026-11-20T08:30:00", read_at: null },
+    ], next_cursor: null });
+    renderLight(<DashboardPage />, { user: "admin" });
+    await screen.findByRole("button", { name: /订单 HS1 待分润/ });
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: /订单 HS1 待分润/ }));
+    await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1], "latest"));
+    fireEvent.click(screen.getByRole("button", { name: /库存已超期/ }));
+    expect(await screen.findByText("库存提醒")).toBeInTheDocument();
+    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2], "latest");
+    expect(dashboardApi.summary).toHaveBeenCalledTimes(1);
+  });
+
 // —— 以下 6 条原在 DashboardPage.interactions.test.tsx ——
 // 同一页面、同一份 mock 契约，拆两个文件等于让同样的 jsdom+antd 启动付两遍。
 it("viewer 无 order.create → 看不到新建业务卡", async () => {

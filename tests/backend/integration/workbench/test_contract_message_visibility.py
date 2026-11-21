@@ -1,4 +1,4 @@
-"""合约消息按当前数据权限展示并支持已读排序。"""
+"""NOTIFY-02 合约消息按当前数据权限展示并支持已读排序。"""
 from datetime import date, datetime
 
 from sqlalchemy import select

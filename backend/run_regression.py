@@ -150,7 +150,6 @@ GROUPS = {
         "tests/backend/unit/business/test_cancellation_model.py",
         "tests/backend/unit/business/test_orders_common.py",
         "tests/backend/unit/finance/test_finance_attributes.py",
-        "tests/backend/unit/system/test_notifications_contract.py",
         "tests/backend/unit/finance/test_rebate_current_contract.py",
         "tests/backend/unit/settings/test_product_alias_compat.py",
         "tests/backend/unit/system/test_main_contract.py",
@@ -323,11 +322,13 @@ GROUPS = {
         "tests/backend/integration/settings/test_policy_allocation.py",
     ],
     "governance": [
-        "tests/backend/unit/system/test_notifications_contract.py",
         "tests/backend/integration/system/test_attachments_contract.py",
         "tests/backend/integration/system/test_audit_contract.py",
         "tests/backend/integration/system/test_attachments_service.py",
-        "tests/backend/integration/system/test_notifications_service.py",
+        "tests/backend/integration/workbench/test_contract_message_visibility.py",
+        "tests/backend/integration/workbench/test_notifications_service.py",
+        "tests/backend/integration/workbench/test_overdue_notifications.py",
+        "tests/backend/integration/workbench/test_profit_notifications_settings.py",
     ],
     "migration": [
         "tests/backend/integration/system/test_migration.py",

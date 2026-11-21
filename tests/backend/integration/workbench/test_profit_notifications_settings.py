@@ -1,4 +1,4 @@
-"""分润提醒开关控制新通知，不改动订单和已有消息。"""
+"""NOTIFY-01 分润提醒开关控制新通知，不改动订单和已有消息。"""
 from datetime import date
 
 import pytest

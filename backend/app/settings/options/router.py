@@ -27,6 +27,7 @@ from app.settings.auth.session import (
 from app.shared.audit import record_audit
 from app.domain.options import OptionSet
 from app.settings.options import schemas
+from app.workbench.reminder_config import REMINDER_CODE, validate_reminder_options
 
 router = APIRouter(tags=["option-sets"])
 
@@ -77,6 +78,8 @@ def create_option_set(
 ) -> schemas.OptionSetOut:
     if payload.code == COMPANY_PROFIT_CODE:
         raise Validation("请通过公司分润设置修改")
+    if payload.code == REMINDER_CODE:
+        validate_reminder_options([item.model_dump() for item in payload.options])
     if db.scalars(select(OptionSet).where(OptionSet.code == payload.code)).first():
         raise AppError(ErrorCode.VALIDATION_ERROR, "选项词典 code 已存在", details={"code": payload.code})
     row = OptionSet(
@@ -121,6 +124,8 @@ def update_option_set(
             options = payload.options
             if len(options) != 1 or options[0].value != "start_day" or not options[0].label.isascii() or not options[0].label.isdigit() or not 1 <= int(options[0].label) <= 31:
                 raise Validation("每月起始日必须为 1 至 31 的整数")
+    if code == REMINDER_CODE and payload.options is not None:
+        validate_reminder_options([item.model_dump() for item in payload.options])
     before = {
         "label": row.label,
         "group": row.group,

@@ -6,6 +6,36 @@ from app.settings.field_definitions.catalog_seed import seed_catalog
 OPTION_SETS = "/api/option-sets"
 
 
+def test_business_reminder_configuration_rejects_invalid_switches(client, headers):
+    url = f"{OPTION_SETS}/BUSINESS_OVERVIEW_REMINDERS"
+    valid = [
+        {"value": "inventory_aging_days", "label": "7"},
+        {"value": "profit_notifications_enabled", "label": "1"},
+        {"value": "overdue_installments_enabled", "label": "0"},
+    ]
+    invalid = [dict(item) for item in valid]
+    invalid[1]["label"] = "false"
+    payload = {"code": "BUSINESS_OVERVIEW_REMINDERS", "label": "业务提醒", "options": invalid}
+    assert client.post(OPTION_SETS, json=payload, headers=headers).status_code == 422
+    payload["options"] = valid
+    created = client.post(OPTION_SETS, json=payload, headers=headers)
+    assert created.status_code == 201, created.text
+
+    for index in (1, 2):
+        for bad in ("false", "true", "2", " "):
+            invalid = [dict(item) for item in valid]
+            invalid[index]["label"] = bad
+            response = client.put(url, json={"options": invalid}, headers=headers)
+            assert response.status_code == 422, response.text
+            assert client.get(url, headers=headers).json()["options"] == valid
+
+    valid[1]["label"] = "0"
+    valid[2]["label"] = "1"
+    saved = client.put(url, json={"options": valid}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["options"] == valid
+
+
 def test_list_empty_initially(client, headers):
     body = client.get(OPTION_SETS, headers=headers).json()
     assert body["items"] == []

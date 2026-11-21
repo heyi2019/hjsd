@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { notificationsApi } from "../../../shared/api/notifications.api";
+import { notificationsApi, type NotificationCategory } from "../../../shared/api/notifications.api";
 import type { NotificationItem } from "../../../shared/api/types/common";
 
 type Options = {
   active: boolean;
   username: string;
-  category: "latest" | "sale" | "inventory" | "contract";
+  category: NotificationCategory;
   selected: NotificationItem | null;
   loading: boolean;
   notificationCount: number;

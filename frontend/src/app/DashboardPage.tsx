@@ -78,7 +78,6 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
         <BusinessAlerts
           onPartyNavigate={onDashboardNavigate}
           onPendingProfitNotificationsClick={(notificationId) => void openPendingProfitAllocation(notificationId)}
-          onProfitNotificationsRead={() => void loadSummary()}
           active={active}
         />
       </div>

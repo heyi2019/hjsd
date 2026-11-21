@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
-import { orderTypesApi, ordersApi } from "../../shared/api/orders.api";
+import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
-import type { Order, OrderType } from "../../shared/api/types/orders";
+import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
 import { ACCOUNT_STATUS_LABEL, today } from "../../shared/lib/format";
@@ -40,7 +40,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
   const previousSummaryQuery = useRef<{ keyword: string | undefined; filters: string; revision: number } | null>(null);
   const previousListQuery = useRef<{ keyword: string | undefined; filters: string; revision: number } | null>(null);
-  const [types, setTypes] = useState<OrderType[]>([]);
   const [loadError, setLoadError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [mineOrders, setMineOrders] = useState(initialMine);
@@ -178,17 +177,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     return () => { cancelled = true; };
   }, [active, initialMine, username]);
 
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    void orderTypesApi.list().then((result) => {
-      if (!cancelled) setTypes(result);
-    }).catch((error) => {
-      if (!cancelled) setLoadError(normalizeError(error));
-    });
-    return () => { cancelled = true; };
-  }, [active, setLoadError]);
-
   // keep-alive 重新激活、筛选变更、翻页或排序变更时均由后端返回当前页。
   useEffect(() => {
     if (!active || initializedQueryKey !== initialQueryKey) {
@@ -243,7 +231,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     };
   }, [active, initializedQueryKey, initialQueryKey, queryFilters, searchRevision]);
 
-  const typeNames = useMemo(() => Object.fromEntries(types.map((type) => [type.code, type.name])), [types]);
   const filteredOrders = orders;
 
   return {
@@ -289,7 +276,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     orderBusinessModeOptions,
     inventoryStatusOptions,
     gameTypeOptions,
-    typeNames,
     filteredOrders,
     load,
   };

@@ -45,7 +45,7 @@ export function useOrdersPageController(params: {
     inventoryOperatorIds, setInventoryOperatorIds, saleOperatorIds, setSaleOperatorIds, myOperator, setMineOrders,
     dateRange, setDateRange, keyword, setKeyword,
     orderBusinessOptions, orderBusinessModeOptions, inventoryStatusOptions,
-    gameTypeOptions, typeNames, filteredOrders, pageTotal, ledgerSummary, summaryLoading, summaryError, load,
+    gameTypeOptions, filteredOrders, pageTotal, ledgerSummary, summaryLoading, summaryError, load,
   } = list;
 
   // —— 建单入口 / 当前选中订单（跨域共享枢纽） ——
@@ -188,7 +188,6 @@ export function useOrdersPageController(params: {
     setPageSize: setPageSize,
     sharedCancellationEvent: sharedCancellationEvent,
     submitCancelTransaction: submitCancelTransaction,
-    typeNames: typeNames,
   };
 
 }

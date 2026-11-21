@@ -8,6 +8,7 @@ import { installmentsApi } from "@/shared/api/installments.api";
 const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
 import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
+import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
@@ -101,6 +102,8 @@ beforeEach(() => {
   seedOptionSets();
   seedOrderFormFields();
   setupLedgerApi();
+  vi.mocked(customersApi.options).mockResolvedValue([]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
@@ -295,7 +298,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByText("状态由对应业务流程更新，点击订单后继续处理付款、入库、售出或回款")).toBeNull();
 
     // 搜索框右侧紧跟订单日期区间筛选
-    const search = screen.getByPlaceholderText("搜索订单号 / 游戏账号/产品 / 对方 / 备注");
+    const search = screen.getByRole("searchbox", { name: "搜索订单" });
     const startDate = screen.getAllByLabelText("订单日期区间")[0];
     expect(search.compareDocumentPosition(startDate) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
@@ -843,6 +846,17 @@ describe("OrdersPage：四类订单台账", () => {
     renderLight(<OrdersPage />);
     await ui.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
+  });
+
+  it("无关的订单类型接口失败不应影响订单台账", async () => {
+    let rejectTypes!: (reason: Error) => void;
+    const typesRequest = new Promise<Awaited<ReturnType<typeof orderTypesApi.list>>>((_, reject) => { rejectTypes = reject; });
+    void typesRequest.catch(() => {});
+    vi.mocked(orderTypesApi.list).mockReturnValue(typesRequest);
+    await openLedger();
+    await act(async () => { rejectTypes(new Error("订单类型读取失败")); await Promise.resolve(); });
+    expect(screen.queryByText(/订单类型读取失败/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("HS-2026-0001").length).toBeGreaterThan(0);
   });
 
   it("新建订单菜单提供回收、提号、代挂三个表单", async () => {

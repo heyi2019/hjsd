@@ -35,48 +35,11 @@ h1, h2, h3, h4, h5, h6, p, figure, blockquote, ul, ol, dl, dd {
   margin-block: 0;
 }
 
-/* Desktop content hierarchy: page / section / card / body / auxiliary. */
-.workspace > .view-head h1 {
-  font: var(--font-h1);
-  letter-spacing: var(--ls-tight);
-}
-
-.ui-page-layout > h2,
-.fin-page-header h2,
-.pay-page-header h1,
-.erp-page-head h2 {
-  font: var(--font-section);
-  letter-spacing: var(--ls-tighter);
-}
-
-.ui-section-header h3,
-.ui-card h3,
-.ant-card-head-title,
-.channel-settings h3 {
+/* 公共容器标题层级。 */
+.ant-card-head-title {
   font: var(--font-card-title);
   font-weight: 600 !important;
   letter-spacing: 0;
-}
-
-.ui-card h3,
-.ui-section-header h3,
-.channel-settings h3 {
-  font-weight: 600;
-}
-
-.workspace > article.ui-card > h2,
-.workspace > .ui-card > h2 {
-  font: var(--font-card-title);
-  letter-spacing: 0;
-}
-
-.workspace > .view-head p,
-.fin-page-header p,
-.fin-page-header span,
-.pay-page-header span,
-.pay-source-bar span,
-.fin-card-meta {
-  font: var(--font-body-s);
 }
 
 table,
@@ -88,19 +51,6 @@ table,
 th,
 .ant-table-thead > tr > th {
   font: var(--font-table-header);
-}
-
-/* Money, counts and dates must remain visually aligned as values change. */
-.kpi-grid strong,
-.ord-biz-summary strong,
-.small-metric-card strong,
-.ord-day-order b,
-.ord-depth-grid b,
-.ord-period-grid b,
-.ord-detail-grid strong,
-.ui-page-layout .ant-statistic-content,
-.ui-metric-value {
-  font-variant-numeric: tabular-nums;
 }
 
 /* antd Statistic 内容值：antd 内部按 heading3 派生（fontSize 15 → 26px，阶梯外）。

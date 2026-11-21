@@ -20,7 +20,7 @@
  * transition-duration 作用于「进入该状态」的过程，故按下/松手可分别设速。
  */
 @media (prefers-reduced-motion: no-preference) {
-  :where(.ant-btn, .permission-tree summary) {
+  :where(.ant-btn) {
     /* 定位上下文：供 ::after 按压高亮覆盖；零特异性下若 antd 已设 relative 也不冲突。 */
     position: relative;
     /* 真机复验（2026-10-13）修正：本构建 antd v5 基类 .ant-btn 实测声明了
@@ -46,11 +46,6 @@
      文字链按钮(.ant-btn-link)不缩量，仅保留 ::after 按压高亮（下方），避免行内文字抖动。
      时长/缓动须 !important 才能压过基类 .ant-btn 的 !important（同特异性后者生效）。 */
   :where(.ant-btn:not(:disabled):not(.ant-btn-link)):active {
-    transform: scale(0.97);
-    transition-duration: var(--dur-fast) !important;
-    transition-timing-function: var(--ease) !important;
-  }
-  :where(.permission-tree summary):active {
     transform: scale(0.97);
     transition-duration: var(--dur-fast) !important;
     transition-timing-function: var(--ease) !important;

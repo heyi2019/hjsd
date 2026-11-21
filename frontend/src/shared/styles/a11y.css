@@ -10,10 +10,7 @@
 }
 
 /* 侧栏项目已有选中材质，焦点提示内嵌以避免产生额外的框线层级。 */
-.sidebar .nav-item:focus-visible,
-.sidebar .nav-level-two:focus-visible,
-.sidebar .nav-level-three button:focus-visible,
-.sidebar .system-nav-items .nav-item:focus-visible {
+.sidebar .nav-item:focus-visible {
   outline: var(--border-w-2) solid var(--color-primary);
   outline-offset: var(--border-w-2);
   box-shadow: none;

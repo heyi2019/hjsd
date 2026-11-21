@@ -3,7 +3,6 @@ import { CfgItem, CfgNestedItem, sectionLabel } from "../ConfigurableField";
 import { CustomerSourceFields } from "../CustomerSourceInput";
 import type { ReactNode } from "react";
 import { BusinessRegistrationGroup, BusinessRegistrationSection } from "../../shared/ui";
-import "./RecoveryCustomerSection.css";
 
 export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; title?: string; customerOptional?: boolean } = {}) {
   const configuredTitle = sectionLabel("PARTICIPANT", "客户信息");
@@ -18,7 +17,7 @@ export function RecoveryCustomerSection(props: { customerExtras?: ReactNode; tit
         <CfgNestedItem name="customer_wechat" label="微信号"><Input placeholder="可选填" /></CfgNestedItem>
         <CfgNestedItem name="customer_qq" label="QQ"><Input placeholder="可选填" /></CfgNestedItem>
       </BusinessRegistrationGroup>
-      <CfgItem className="account-note" name="note" label="客户备注">
+      <CfgItem className="business-registration-section__field--full" name="note" label="客户备注">
         <Input placeholder="可选填" />
       </CfgItem>
       {props.customerExtras}

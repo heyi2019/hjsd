@@ -2,15 +2,6 @@
   min-width: 0;
 }
 
-.order-form-fields__container {
-  margin-top: var(--space-4);
-  padding: var(--space-4);
-  border: var(--border-w) solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--glass-tint);
-  box-shadow: var(--e1);
-}
-
 /* 筛选工具栏按“标签 + 控件”成组排布，避免 Space 的 flex-shrink 把中文标签压成竖排。 */
 .order-form-fields__toolbar {
   display: grid;

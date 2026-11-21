@@ -129,9 +129,6 @@
   color: var(--color-error) !important;
 }
 /* 多行输入：标签顶对齐到首行基线（垂直居中会让标签悬在 80+px 文本框中央） */
-.studio-ledger-modal .studio-ledger-form .ant-form-item:has(textarea) .ant-form-item-row {
-  align-items: flex-start;
-}
 .studio-ledger-modal .studio-ledger-form .ant-form-item:has(textarea) .ant-form-item-label > label {
   padding-top: 13px;
 }

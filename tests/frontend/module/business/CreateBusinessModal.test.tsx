@@ -113,8 +113,8 @@ it("HS 建单客户备注复用账号备注的整行输入样式", async () => {
   const accountNote = screen.getByLabelText("账号备注");
   const customerNote = screen.getByLabelText("客户备注");
   expect(customerNote.tagName).toBe("INPUT");
-  expect(customerNote.closest(".ant-form-item")).toHaveClass("account-note");
-  expect(accountNote.closest(".ant-form-item")).toHaveClass("account-note");
+  expect(customerNote.closest(".ant-form-item")).toHaveClass("business-registration-section__field--full");
+  expect(accountNote.closest(".ant-form-item")).toHaveClass("business-registration-section__field--full");
 });
 
 it.each(["HS", "TH", "DG"])("%s 建单提供换绑手机号字段", async (orderType) => {

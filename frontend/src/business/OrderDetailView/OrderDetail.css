@@ -192,8 +192,6 @@
   vertical-align: top;
 }
 .order-detail .ant-descriptions-view > table col { width: auto !important; }
-.order-detail .ant-descriptions-item-label.order-detail__datetime,
-.order-detail .ant-descriptions-item-content.order-detail__datetime { width: auto; max-width: none; }
 .order-detail .ant-descriptions-item-label.order-detail__multiline,
 .order-detail .ant-descriptions-item-content.order-detail__multiline { white-space: pre-line; }
 .order-detail .ant-descriptions-bordered .ant-descriptions-item-label { background: var(--soft); }
@@ -205,25 +203,10 @@
 .order-detail--editing .inventory-execution-list, .order-detail--editing .order-finance-list { margin-top: var(--space-4); }
 .inventory-edit-operator { min-width: var(--col-w-190); }
 .order-detail__section { display: grid; gap: var(--space-3); margin-top: 0; }
-.order-detail__section--profile { margin-top: 0; }
-/* 只读态按板块分栏后，每个 Tab 面板内只有一个板块，原本用于「板块堆叠」的上外边距不再需要。 */
-.order-detail__tabs .order-detail__section,
-.order-detail__tabs .inventory-execution-list,
-.order-detail__tabs .order-finance-list { margin-top: 0; }
 .order-detail__section-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-height: var(--sz-24); padding-inline-start: var(--space-3); border-inline-start: var(--border-w-3) solid var(--color-primary); }
 .order-detail__section-heading .ant-typography { color: var(--color-text-primary); font-weight: 700; }
 .inventory-execution-list { display: grid; gap: var(--space-3); margin-top: 0; }
 .inventory-execution-table { overflow-x: hidden; overflow-y: hidden; }
-.inventory-execution-table .ant-table,
-.inventory-execution-table .ant-table-container,
-.inventory-execution-table .ant-table-content,
-.inventory-execution-table .ant-table-content > table {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  table-layout: fixed !important;
-}
-.inventory-execution-table .ant-table-content { overflow-x: hidden !important; }
 .inventory-execution-table .ant-table-tbody > tr > td { white-space: normal; overflow-wrap: anywhere; }
 .order-detail__data-table .ant-table-cell-fix-left,
 .order-detail__data-table .ant-table-cell-fix-right { background: var(--glass); }
@@ -261,15 +244,6 @@
 /* 金额单元格：右对齐 + 等宽数字，与上方汇总卡数值列对齐。 */
 .order-detail__cell-amount { display: grid; min-width: 0; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; }
 .order-detail__cell-amount .ui-money { font-weight: 700; }
-.order-finance-table .ant-table,
-.order-finance-table .ant-table-container,
-.order-finance-table .ant-table-content,
-.order-finance-table .ant-table-content > table {
-  width: 100% !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  table-layout: fixed !important;
-}
 .order-finance-table .ant-table-thead > tr > th,
 .order-finance-table .ant-table-tbody > tr > td {
   min-width: 0;

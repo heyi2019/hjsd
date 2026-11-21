@@ -25,7 +25,7 @@ export function DgOrderSection(props: { gameTypes?: GameTypeOption[]; employees?
           <CfgNestedItem name="dg_customer_wechat" label="微信号"><Input placeholder="可选填" /></CfgNestedItem>
           <CfgNestedItem name="dg_customer_qq" label="QQ"><Input placeholder="可选填" /></CfgNestedItem>
         </BusinessRegistrationGroup>
-        <CfgItem className="account-note" name="dg_note" label="代挂备注">
+        <CfgItem className="business-registration-section__field--full" name="dg_note" label="代挂备注">
           <Input placeholder="可选填" />
         </CfgItem>
         <CustomFieldSection section="PARTICIPANT" testIdSuffix="participant" />

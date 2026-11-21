@@ -9,6 +9,7 @@ import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { useReferenceRefresh } from "../../shared/hooks/useReferenceRefresh";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import "./SettingsSubpanel.css";
 import "./GameTypeSettingsPanel.css";
 
 export function GameTypeSettingsPanel() {
@@ -135,7 +136,7 @@ export function GameTypeSettingsPanel() {
       <Typography.Paragraph type="secondary">
         新建订单和账号时使用这里的标准选项，支持模糊搜索；每个游戏类型可配置对应的渠道／区服。勾选默认后，新建表单会自动带出该类型。默认项不能停用。
       </Typography.Paragraph>
-      <div className="game-type-settings__container">
+      <div className="settings-subpanel game-type-settings__container">
         <Typography.Title level={5}>已配置游戏类型</Typography.Title>
         <DataTable<GameTypeOption>
           size="small"
@@ -152,7 +153,7 @@ export function GameTypeSettingsPanel() {
         />
       </div>
       <PermissionGate permission="order-type.manage">
-        <div className="game-type-settings__container">
+        <div className="settings-subpanel game-type-settings__container">
           <Typography.Title level={5}>{editingId === null ? "新增游戏类型" : "编辑游戏类型"}</Typography.Title>
           <FieldConfigScope scope="SYSGAME" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={submit} initialValues={{ sort_order: 0 }}>
             <CfgItem name="game_type_name" label="游戏类型" rules={[{ required: true, message: "请输入游戏类型" }]}>

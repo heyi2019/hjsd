@@ -5,6 +5,7 @@
 import { Segmented, Typography } from "antd";
 import type { OrderFormField } from "../../shared/api/types/forms";
 import { DataTable, ErrorBanner, Select } from "../../shared/ui";
+import "./SettingsSubpanel.css";
 import "./OrderFormFieldsPanel.css";
 import { useOrderFormFieldsPanelController } from "./useOrderFormFieldsPanelController";
 import { SectionManagementCard } from "./OrderFormFieldsPanel.sections";
@@ -49,7 +50,7 @@ export function OrderFormFieldsPanel({
     <section className="order-form-fields-panel">
       <ErrorBanner error={error} onRetry={() => void load(activeType)} />
       <ErrorBanner error={sectionError} onRetry={() => void loadSectionLabels(activeType)} retrying={sectionLoading} />
-      <div className="order-form-fields__container">
+      <div className="settings-subpanel order-form-fields__container">
         <div className="order-form-fields__toolbar">
           <Typography.Text strong>表单</Typography.Text>
           <Select
@@ -107,7 +108,7 @@ export function OrderFormFieldsPanel({
         />
       </div>
       {editingId === null && !groupedScopeOptions.find((group) => group.label === "系统设置")?.options.some((option) => option.value === activeType) ? (
-        <div className="order-form-fields__container order-form-fields__create-container">
+        <div className="settings-subpanel order-form-fields__container order-form-fields__create-container">
           <Typography.Title level={5}>新增自定义字段</Typography.Title>
           {editorForm}
         </div>

@@ -22,17 +22,6 @@
   --resizable-modal-width: min(720px, calc(100vw - 32px));
 }
 
-.inventory-void-modal .ant-form-vertical .ant-form-item-label {
-  flex: 0 0 108px !important;
-  width: 108px !important;
-  max-width: 108px !important;
-  text-align: left;
-}
-
-.inventory-void-modal .ant-form-vertical .ant-form-item-row {
-  gap: var(--space-2);
-}
-
 /* 库存取消与订单台账取消共用：先明确影响，再填写资金与原因。 */
 .inventory-void-modal .inventory-cancellation-note {
   margin: 0 0 var(--space-4);
@@ -58,71 +47,4 @@
 
 .inventory-void-modal .inventory-void-fields .ant-form-item-row {
   align-items: center;
-}
-
-.inventory-refund-meta {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-/* 规范：左标签、右填写（每行一个字段，标签在左、控件占右侧剩余宽度） */
-.inventory-refund-meta .ant-form-item {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-  margin-bottom: 0;
-}
-
-.inventory-refund-meta .ant-form-item-row {
-  flex-direction: row !important;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-}
-
-.inventory-refund-meta .ant-form-item-label {
-  flex: 0 0 108px !important;
-  max-width: 108px !important;
-  padding: 0 var(--space-2) 0 0 !important;
-  text-align: left;
-  line-height: 32px;
-}
-
-.inventory-refund-meta .ant-form-item-label > label {
-  white-space: nowrap;
-}
-
-.inventory-refund-meta .ant-form-item-control {
-  flex: 1 1 auto !important;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.inventory-refund-meta .ant-form-item-control-input,
-.inventory-refund-meta .ant-form-item-control-input-content {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-}
-
-/* 「退款操作人」沿用 .responsible-employee-select 的 width: max-content + 标签不折行，
-   放进本弹窗会撑破列宽。收回为 100% 宽并允许标签换行。 */
-.inventory-refund-meta .responsible-employee-select .ant-select,
-.inventory-refund-meta .responsible-employee-select .ant-form-item-control-input {
-  width: 100% !important;
-  max-width: 100%;
-}
-
-.inventory-refund-meta .inventory-refund-employee .ant-select-selector {
-  min-width: 0;
-  width: 100%;
-  max-width: 100%;
-}
-
-.inventory-refund-meta .inventory-refund-employee .ant-select-selection-overflow {
-  flex-wrap: wrap;
-  min-width: 0;
-  max-width: 100%;
-  overflow: hidden;
 }

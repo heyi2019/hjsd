@@ -12,12 +12,6 @@
   }
 }
 
-.orders-ledger-panel .orders-ledger-filter-label {
-  font: var(--font-table-header);
-  color: var(--color-text-primary);
-  white-space: nowrap;
-}
-
 .orders-ledger-panel .orders-ledger-card .ant-input,
 .orders-ledger-panel .orders-ledger-card .ant-picker,
 .orders-ledger-panel .orders-ledger-card .ant-select-selector,

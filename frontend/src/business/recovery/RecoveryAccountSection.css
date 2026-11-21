@@ -1,11 +1,3 @@
-.account-section {
-  min-width: 0;
-}
-
-.account-section .account-note {
-  grid-column: 1 / -1;
-}
-
 /* 图片佐证单独占满整行，避免字段标签与上传卡片在窄列中互相遮挡。 */
 .account-section .account-secondary-images {
   grid-column: 1 / -1;
@@ -14,17 +6,4 @@
 
 .account-section .account-secondary-images .ant-form-item-row {
   grid-template-columns: max-content minmax(0, 1fr) !important;
-}
-
-.account-section .business-registration-group {
-  grid-column: 1 / -1;
-}
-
-.account-section__selected-account {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 18px;
-  margin: 4px 0 16px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
 }

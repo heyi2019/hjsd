@@ -23,7 +23,6 @@
 }
 
 .counterparty-detail-stats .ui-stat {
-  gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
 }
 

@@ -9,7 +9,6 @@ import type { OrderFormField } from "../../shared/api/types/forms";
 import { normalizeError } from "../../shared/api/client";
 import { useOptionSet } from "../../shared/lib/optionSets";
 import { buildGroupedScopeOptions, useFormScopes } from "../formScopes";
-import "./OrderFormFieldsPanel.css";
 import {
   DEFAULT_SECTION_ORDER,
   FIELD_SECTION_OPTIONS,

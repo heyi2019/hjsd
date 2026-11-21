@@ -185,7 +185,7 @@ export function RecoveryAccountSection(props: {
         </CfgItem>
       ) : null}
       {props.businessResponsibleLabel ? <ResponsibleEmployeeSelect name="business_responsible_ids" label={props.businessResponsibleLabel} employees={props.employees ?? []} /> : null}
-      <CfgItem name={fieldNames.accountNote} label="账号备注" className="account-note">
+      <CfgItem name={fieldNames.accountNote} label="账号备注" className="business-registration-section__field--full">
         <Input placeholder="可选填" />
       </CfgItem>
       {props.accountExtras}

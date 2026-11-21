@@ -34,7 +34,7 @@ export function ConfigCenterPanel() {
     PANEL_REGISTRY[key]?.(setSelected) ?? null;
 
   return (
-    <div className="config-center">
+    <div className="ui-stack config-center">
       <nav className="config-center__nav" aria-label="配置中心导航">
         {groups.map((group) => (
           <div key={group.code} className="config-center__group">

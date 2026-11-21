@@ -319,6 +319,9 @@
   min-width: 0;
   margin-bottom: 0;
 }
+.business-registration-section__fields > .business-registration-section__field--full {
+  grid-column: 1 / -1;
+}
 .business-registration-group__title {
   margin: 0;
   font-size: var(--fs-18);

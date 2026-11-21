@@ -17,7 +17,7 @@ export function ThSupplierSection(props: { participantExtras?: ReactNode } = {})
         <CfgNestedItem name="supplier_wechat" label="微信号"><Input placeholder="可选填" /></CfgNestedItem>
         <CfgNestedItem name="supplier_qq" label="QQ"><Input placeholder="可选填" /></CfgNestedItem>
       </BusinessRegistrationGroup>
-      <CfgItem className="account-note" name="supplier_note" label="供货方备注">
+      <CfgItem className="business-registration-section__field--full" name="supplier_note" label="供货方备注">
         <Input placeholder="可选填" />
       </CfgItem>
       {props.participantExtras}

@@ -1,9 +1,6 @@
 /** 配置中心：顶部页签菜单 + 下方现有配置页面。 */
 .config-center {
-  display: flex;
-  flex-direction: column;
   align-items: stretch;
-  gap: 16px;
 }
 
 .config-center__nav {

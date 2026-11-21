@@ -1,9 +1,3 @@
-.inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td {
-  /* 保留主表展开单元格的原始水平留白，主表卡片位置不参与详情对齐。 */
-  padding: var(--space-3) var(--space-4) !important;
-  background: transparent !important;
-  border-bottom: 0;
-}
 .inventory-table .ant-table-tbody > tr.ant-table-row > td { vertical-align: middle; }
 .inventory-empty-cell { display: inline-block; min-width: 100%; text-align: center; color: var(--color-text-secondary); }
 .inventory-row-actions { flex-wrap: nowrap; white-space: nowrap; }
@@ -257,7 +251,6 @@
 .order-finance-pool-select .ant-select-selector { padding-inline: var(--space-1) !important; }
 @media (max-width: 640px) { .order-finance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
-  .inventory-table .ant-table-tbody > tr.ant-table-expanded-row > td { padding: var(--space-2) var(--space-3) !important; }
   .order-detail {
     width: calc(100% - var(--space-3) * 2);
     min-width: 0;

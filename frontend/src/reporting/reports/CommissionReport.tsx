@@ -76,7 +76,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
         ]}
       />
       <DataTable<CommissionOrderGroup>
-         className="commission-table"
+         className="ui-datatable--expandable"
          columns={arrangeCommission(columns)}
          rows={orderRows}
          loading={loading}

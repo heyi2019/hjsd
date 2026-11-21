@@ -144,7 +144,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
         { label: "超30天库存账号", kind: "count", amount: !controller.listLoading && controller.inventoryStats ? String(controller.inventoryStats.over_30d_count) : "—" },
       ]} />
       <DataTable
-        className="inventory-table"
+        className="ui-datatable--expandable inventory-table"
         columns={arrangeColumns(columns)}
         rows={rows}
         loading={controller.listLoading}

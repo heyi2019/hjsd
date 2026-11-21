@@ -9,6 +9,16 @@
 .ui-datatable .ant-pagination {
   margin-block: var(--space-4) var(--space-1) !important;
 }
+.ui-datatable--expandable .ant-table-tbody > tr.ant-table-expanded-row > td {
+  padding: var(--space-3) var(--space-4) !important;
+  background: transparent !important;
+  border-bottom: 0;
+}
+@media (max-width: 640px) {
+  .ui-datatable--expandable .ant-table-tbody > tr.ant-table-expanded-row > td {
+    padding: var(--space-2) var(--space-3) !important;
+  }
+}
 /* 业务中心：把默认 Tab / 表格组合收成一个轻量工作面板。 */
 .page-content .page-enter > .ui-stack > .ant-tabs > .ant-tabs-nav {
   margin-block-end: var(--space-3);

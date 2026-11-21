@@ -778,6 +778,40 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       expect(await screen.findByRole("button", { name: /登记出售/ })).toBeInTheDocument();
     });
 
+    it("快速打开不同合约的登记出售时，较早请求不会覆盖当前合约", async () => {
+      const recovered = [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }];
+      installmentListFixture.mockResolvedValueOnce(withBackendActions([
+        { ...baseInstallment, status: "CLOSED", dispositions: recovered },
+        { ...baseInstallment, id: 2, inst_no: "HS0002-INS01", status: "CLOSED", dispositions: recovered },
+      ]));
+      let finishFirst!: (value: Awaited<ReturnType<typeof ordersApi.listPage>>) => void;
+      let finishSecond!: (value: Awaited<ReturnType<typeof ordersApi.listPage>>) => void;
+      vi.mocked(ordersApi.listPage).mockReset()
+        .mockReturnValueOnce(new Promise((resolve) => { finishFirst = resolve; }))
+        .mockReturnValueOnce(new Promise((resolve) => { finishSecond = resolve; }));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      const firstRow = (await screen.findByText("HS0001-INS01")).closest("tr")!;
+      const secondRow = screen.getByText("HS0002-INS01").closest("tr")!;
+      await ui.click(within(firstRow).getByRole("button", { name: /登记出售/ }));
+      await ui.click(within(secondRow).getByRole("button", { name: /登记出售/ }));
+      await act(async () => finishSecond(pageResponse([resaleOrder], { limit: 500 }) as never));
+      expect(await screen.findByText("登记出售 · HS0002-INS01")).toBeVisible();
+      await act(async () => finishFirst(pageResponse([resaleOrder], { limit: 500 }) as never));
+      expect(screen.getByText("登记出售 · HS0002-INS01")).toBeVisible();
+    });
+
+    it("离开分期页面后，未完成的出售订单请求不会打开弹窗", async () => {
+      installmentListFixture.mockResolvedValue(withBackendActions([{ ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] }]));
+      let finish!: (value: Awaited<ReturnType<typeof ordersApi.listPage>>) => void;
+      vi.mocked(ordersApi.listPage).mockReset().mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      const view = renderLight(<InstallmentsPanel />, { user: "admin" });
+      await ui.click(await screen.findByRole("button", { name: /登记出售/ }));
+      view.rerender(<InstallmentsPanel active={false} />);
+      await act(async () => finish(pageResponse([resaleOrder], { limit: 500 }) as never));
+      view.rerender(<InstallmentsPanel active />);
+      expect(screen.queryByRole("dialog", { name: /登记出售/ })).not.toBeInTheDocument();
+    });
+
     it("登记出售可选择第500条以后的订单", async () => {
       installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] }]));
       const first = Array.from({ length: 500 }, (_, index) => ({ ...order, id: index + 100, order_no: `HS${index + 100}` }));

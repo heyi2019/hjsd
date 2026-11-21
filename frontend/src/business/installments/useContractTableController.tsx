@@ -150,6 +150,7 @@ export function useContractTableController(params: { contractType: string; reloa
     openResale, submitCancel, submitSettleEarly, submitDefault, submitWaive,
     submitExtend, updateOperationOperators,
   } = useContractActions({
+    active,
     payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,

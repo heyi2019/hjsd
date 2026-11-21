@@ -1,6 +1,6 @@
 /** 分期合约表的写操作集合：从 useContractTableController 提取，函数体一字未改。
  * 只负责 13 个写方法，读/状态/表格列仍留在主 controller。 */
-import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { FormInstance } from "antd";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { installmentsApi, type InstallmentListParams } from "../../shared/api/installments.api";
@@ -15,6 +15,7 @@ import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 
 export function useContractActions(params: {
+  active: boolean;
   payTarget: Installment | null;
   deliverTarget: Installment | null;
   recoverTarget: Installment | null;
@@ -53,8 +54,10 @@ export function useContractActions(params: {
     payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
-    write, load, setError, setResaleOrders, setExporting, filters,
+    write, load, setError, setResaleOrders, setExporting, filters, active,
   } = params;
+  const resaleRequest = useRef(0);
+  useEffect(() => () => { resaleRequest.current += 1; }, [active]);
 
   const exportCsv = async () => {
     setExporting(true);
@@ -146,10 +149,12 @@ export function useContractActions(params: {
   };
 
   const openResale = async (row: Installment) => {
+    const request = ++resaleRequest.current;
     try {
       const orders: Order[] = [];
       while (true) {
         const page = await ordersApi.listPage({ status: "COMPLETED", limit: 500, offset: orders.length });
+        if (request !== resaleRequest.current) return;
         if (!page.items.length && orders.length < page.total) throw new Error("出售订单读取不完整，请重试");
         orders.push(...page.items);
         if (orders.length >= page.total) break;
@@ -159,7 +164,7 @@ export function useContractActions(params: {
       setResaleTarget(row);
       resaleForm.setFieldsValue({ occurred_on: today() });
     } catch (err) {
-      setError(normalizeError(err));
+      if (request === resaleRequest.current) setError(normalizeError(err));
     }
   };
 

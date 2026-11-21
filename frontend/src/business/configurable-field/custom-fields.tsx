@@ -1,9 +1,10 @@
 /** 自定义字段渲染与选项解析；拆分自 ConfigurableField.tsx。 */
 import { DatePicker, Form, Input, InputNumber, Switch, Typography } from "antd";
-import type { ReactElement } from "react";
+import { createContext, useContext } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { dateValueFromEvent, dateValueProps, Select } from "../../shared/ui";
 import type { OrderFormField } from "../../shared/api/types/forms";
-import { useFieldConfig, useSectionLabels } from "./context";
+import { useFieldConfig, useSectionLabels, type FieldConfigMap } from "./context";
 import { isConditionActive, useConditionFieldValue } from "./rules";
 import { requiredTextRules } from "../../shared/lib/validators";
 
@@ -17,13 +18,37 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
   EXTRA: "其他补充信息",
 };
 
+type SectionGroups = Map<string, OrderFormField[]>;
+const CustomFieldSectionsContext = createContext<{ config: FieldConfigMap; groups: SectionGroups } | null>(null);
+
+function groupCustomFields(config: FieldConfigMap): SectionGroups {
+  const groups: SectionGroups = new Map();
+  for (const field of Object.values(config)) {
+    if (!field.is_custom || !field.is_active) continue;
+    const section = field.section ?? "EXTRA";
+    const defs = groups.get(section) ?? [];
+    defs.push(field);
+    groups.set(section, defs);
+  }
+  for (const defs of groups.values()) defs.sort((a, b) => a.sort_order - b.sort_order);
+  return groups;
+}
+
+/** 多个独立板块共享当前表单的字段分组；每次表单重渲染时重新读取配置。 */
+export function CustomFieldSectionsProvider({ children }: { children: ReactNode }): ReactElement {
+  const config = useFieldConfig();
+  return <CustomFieldSectionsContext.Provider value={{ config, groups: groupCustomFields(config) }}>{children}</CustomFieldSectionsContext.Provider>;
+}
+
 /** 渲染当前作用域（FieldConfigContext）下的自定义字段区块；无自定义字段时不渲染。
  *  值通过 CustomFormField 归集到 form_extra.<field_key>，随表单提交上报。 */
 export function CustomFieldSection(props: { testIdSuffix?: string; section?: OrderFormField["section"] } = {}): ReactElement | null {
   const cfg = useFieldConfig();
-  const defs = Object.values(cfg)
-    .filter((field) => field.is_custom && field.is_active && (field.section ?? "EXTRA") === (props.section ?? "EXTRA"))
-    .sort((a, b) => a.sort_order - b.sort_order);
+  const cached = useContext(CustomFieldSectionsContext);
+  const defs = cached?.config === cfg
+    ? cached.groups.get(props.section ?? "EXTRA") ?? []
+    : Object.values(cfg).filter((field) => field.is_custom && field.is_active && (field.section ?? "EXTRA") === (props.section ?? "EXTRA"))
+      .sort((a, b) => a.sort_order - b.sort_order);
   return <CustomFieldSectionContent defs={defs} section={props.section ?? "EXTRA"} testIdSuffix={props.testIdSuffix} />;
 }
 
@@ -43,17 +68,11 @@ function CustomFieldSectionContent({ defs, section, testIdSuffix }: { defs: Orde
 /** 在没有固定板块布局的表单中展示所有已配置的自定义字段。 */
 export function CustomFieldSections({ testIdSuffix, excludeSections = [] }: { testIdSuffix?: string; excludeSections?: string[] }): ReactElement {
   const cfg = useFieldConfig();
+  const cached = useContext(CustomFieldSectionsContext);
   const excluded = new Set(excludeSections);
-  const sections = new Map<string, OrderFormField[]>();
-  for (const field of Object.values(cfg)) {
-    const section = field.section ?? "EXTRA";
-    if (!field.is_custom || !field.is_active || excluded.has(section)) continue;
-    const defs = sections.get(section) ?? [];
-    defs.push(field);
-    sections.set(section, defs);
-  }
-  return <>{[...sections].map(([section, defs]) => <CustomFieldSectionContent key={section} section={section}
-    defs={defs.sort((a, b) => a.sort_order - b.sort_order)}
+  const sections = cached?.config === cfg ? cached.groups : groupCustomFields(cfg);
+  return <>{[...sections].filter(([section]) => !excluded.has(section)).map(([section, defs]) => <CustomFieldSectionContent key={section} section={section}
+    defs={defs}
     testIdSuffix={testIdSuffix ? `${testIdSuffix}-${section.toLowerCase()}` : undefined} />)}</>;
 }
 

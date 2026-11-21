@@ -18,6 +18,7 @@ import {
   CfgNestedItem,
   CustomFieldSection,
   CustomFieldSections,
+  CustomFieldSectionsProvider,
   CustomFormField,
   FieldConfigContext,
   SectionLabelsContext,
@@ -394,6 +395,41 @@ it("多个自定义板块只扫描一次配置，保持分组与字段排序", (
   expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.queryByLabelText("字段5-1")).toBeNull();
   expect(reads).toBeLessThanOrEqual(fields.length * 2);
+});
+
+it("独立字段板块共享配置分组，并在原配置对象更新后重新渲染", () => {
+  let reads = 0;
+  const sections = ["ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "OPERATION", "FINANCE", "PARTICIPANT", "EXTRA"] as const;
+  const fields = sections.map((section, index) => ({
+    ...makeField({ id: index + 1, field_key: `field_${index}`, label: `字段${index}`, section }),
+    get is_custom() { reads += 1; return true; },
+  }));
+  const config: FieldConfigMap = Object.fromEntries(fields.map((field) => [field.field_key, field]));
+  const view = () => <Form><FieldConfigContext.Provider value={config}><CustomFieldSectionsProvider>
+    {sections.map((section) => <CustomFieldSection key={section} section={section} />)}
+    <CustomFieldSections excludeSections={[...sections]} />
+  </CustomFieldSectionsProvider></FieldConfigContext.Provider></Form>;
+  const { rerender } = renderLight(view());
+  expect(screen.getByLabelText("字段0")).toBeInTheDocument();
+  expect(screen.getByLabelText("字段6")).toBeInTheDocument();
+  expect(reads).toBeLessThanOrEqual(fields.length * 2);
+  config.field_0 = { ...config.field_0, label: "更新字段", section: "BUSINESS" };
+  rerender(view());
+  expect(screen.queryByLabelText("字段0")).toBeNull();
+  expect(screen.getByLabelText("更新字段")).toBeInTheDocument();
+});
+
+it("内层字段配置覆盖外层分组缓存", () => {
+  const outer = makeField({ id: 1, field_key: "outer", label: "外层字段", section: "BUSINESS" });
+  const inner = makeField({ id: 2, field_key: "inner", label: "内层字段", section: "BUSINESS" });
+  const extra = makeField({ id: 3, field_key: "extra", label: "内层运营字段", section: "OPERATION" });
+  renderLight(<Form><FieldConfigContext.Provider value={{ outer }}><CustomFieldSectionsProvider>
+    <CustomFieldSection section="BUSINESS" />
+    <FieldConfigContext.Provider value={{ inner, extra }}><CustomFieldSection section="BUSINESS" /><CustomFieldSections excludeSections={["BUSINESS"]} /></FieldConfigContext.Provider>
+  </CustomFieldSectionsProvider></FieldConfigContext.Provider></Form>);
+  expect(screen.getByLabelText("外层字段")).toBeInTheDocument();
+  expect(screen.getByLabelText("内层字段")).toBeInTheDocument();
+  expect(screen.getByLabelText("内层运营字段")).toBeInTheDocument();
 });
 
 it("自定义板块随配置变化更新", () => {

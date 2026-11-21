@@ -1,0 +1,11 @@
+.business-ledger-filters {
+  align-items: center;
+}
+
+/* 由表格内容层承载横向溢出，避免外层宽度随数据或空态反复漂移。 */
+@media (min-width: 768px) {
+  .inventory-table .ant-table {
+    width: auto;
+    min-width: 0;
+  }
+}

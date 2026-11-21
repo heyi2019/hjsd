@@ -1,17 +1,6 @@
-/* 订单台账与库存中心共用同一套列表密度：筛选区、表格文字和行内操作不另起字号。 */
-.orders-ledger-panel .orders-ledger-filters {
-  align-items: center;
-}
+@import "../BusinessLedger.css";
 
-/* 订单台账外层贴合容器，横向溢出交给 DataTable 的内容层承载。
-   外层使用 max-content 会在空态/重排时反复撑宽，导致列位置漂移。 */
-@media (min-width: 768px) {
-  .orders-ledger .ant-table {
-    width: auto;
-    min-width: 0;
-  }
-}
-
+/* 订单台账与库存中心共用同一套列表密度。 */
 .orders-ledger-panel .orders-ledger-card .ant-input,
 .orders-ledger-panel .orders-ledger-card .ant-picker,
 .orders-ledger-panel .orders-ledger-card .ant-select-selector,

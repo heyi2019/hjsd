@@ -1,15 +1,4 @@
-.inventory-filters {
-  align-items: center;
-}
-
-/* 桌面端表格外层贴合容器，横向溢出交给 DataTable 的内容层承载。
-   外层若使用 max-content，会让空态/重排时整张表反复按理想宽度测量，库存编号等列随之漂移。 */
-@media (min-width: 768px) {
-  .inventory-table .ant-table {
-    width: auto;
-    min-width: 0;
-  }
-}
+@import "../BusinessLedger.css";
 
 /* 取消交易的金额和收款账户始终保持同一行，避免紧凑弹窗误触发窄屏规则。 */
 .adaptive-form-grid.inventory-void-fields {

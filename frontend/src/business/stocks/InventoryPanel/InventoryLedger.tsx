@@ -72,7 +72,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
 
   return (
     <Card className="glass" title="库存中心" extra={createAction}>
-      <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced business-ledger-filters">
         <SearchInput
           allowClear
           searchButtonLabel="搜索库存账号"

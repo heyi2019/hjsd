@@ -104,7 +104,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
   return (
     <section className="ui-stack orders-ledger-panel">
       <Card className="glass orders-ledger-card" title="订单台账" extra={createAction}>
-        <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
+        <Space wrap className="ui-filter-bar ui-filter-bar--spaced business-ledger-filters">
           <SearchInput
             allowClear
             searchButtonLabel="执行订单搜索"

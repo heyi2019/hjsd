@@ -127,8 +127,8 @@
   .ui-filter-bar.ant-space > * { flex: 0 1 auto; max-width: 100%; }
   .customer-list-filters > :first-child,
   .counterparty-filter-bar > :first-child,
-  .inventory-filters > :first-child { flex: 1 1 100%; }
-  .inventory-filters > :first-child .ui-ledger-search { width: 100%; }
+  .business-ledger-filters > :first-child { flex: 1 1 100%; }
+  .business-ledger-filters > :first-child .ui-ledger-search { width: 100%; }
   .studio-expense-filters > * { flex: 0 1 auto; max-width: 100%; }
   .ui-filter-bar.funds-cashflow-filters > :first-child { flex: 1 1 100%; max-width: 100%; }
   .ant-table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }

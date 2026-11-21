@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from decimal import Decimal
+from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
@@ -107,6 +108,14 @@ def _out_of_scope_error(pool_id: int) -> NotFound:
 
 def _deposit_not_found(deposit_id: int) -> NotFound:
     return NotFound(f"押金 {deposit_id} 不存在", details={"deposit_id": deposit_id})
+
+
+def _locked_deposit(session: Session, deposit_id: int, user: CurrentUser | None) -> Deposit:
+    """串行化押金操作并重新读取状态，避免并发请求使用过期余额。"""
+    deposit = session.get(Deposit, deposit_id, with_for_update=True, populate_existing=True)
+    if deposit is None or not _can_see_pool(user, deposit.pool_id):
+        raise _deposit_not_found(deposit_id)
+    return deposit
 
 
 def _source_order_not_found(order_id: int) -> NotFound:

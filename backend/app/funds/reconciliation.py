@@ -17,6 +17,7 @@ from app.core.money import to_money
 from app.shared.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, Direction, ReconciliationStatus
+from app.domain.foundation import Pool
 from app.domain.trade import BalanceSnapshot, Cashflow, Reconciliation
 from app.shared.form_field_rules import validate_form_extra
 from app.settings.field_definitions.pools import assert_pool_usable
@@ -29,7 +30,7 @@ def _get_reconciliation(
     reconciliation_id: int,
     user: CurrentUser | None = None,
 ) -> Reconciliation:
-    item = session.get(Reconciliation, reconciliation_id)
+    item = session.get(Reconciliation, reconciliation_id, with_for_update=True, populate_existing=True)
     if item is None or (user is not None and not user.can_see_pool(item.pool_id)):
         raise NotFound(
             f"对账记录 {reconciliation_id} 不存在",
@@ -80,6 +81,8 @@ def create_reconciliation(
         type_message="对账账户必须为文本",
     )
     statement = _non_negative(statement_balance, field="statement_balance")
+    # 同账户的对账检查与首次快照写入必须串行；不阻塞流水外键检查。
+    session.execute(select(Pool.id).where(Pool.id == pool.id).with_for_update(key_share=True)).scalar_one()
     duplicate = session.scalar(
         select(Reconciliation.id).where(
             Reconciliation.pool_id == pool.id,

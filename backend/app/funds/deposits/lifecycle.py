@@ -27,8 +27,7 @@ from app.shared.form_field_rules import validate_form_extra
 from .._common import _positive, _text
 from ._shared import (
     _assert_returnable,
-    _can_see_pool,
-    _deposit_not_found,
+    _locked_deposit,
     _outstanding,
     _status_after_loss,
     _status_after_return,
@@ -46,9 +45,7 @@ def return_deposit(
     operator_user_ids: list[int] | None = None,
     user: CurrentUser | None = None,
 ) -> Deposit:
-    deposit = session.get(Deposit, deposit_id)
-    if deposit is None or not _can_see_pool(user, deposit.pool_id):
-        raise _deposit_not_found(deposit_id)
+    deposit = _locked_deposit(session, deposit_id, user)
     _assert_returnable(deposit, "退还")
     money = _positive(amount, field="amount")
     outstanding = _outstanding(deposit)
@@ -127,9 +124,7 @@ def cancel_deposit(
     全额写一笔反向流水（DEPOSIT_CANCEL，方向 IN）把占用冲平，
     保证池内余额与押金台账始终勾稽。已发生退还/损失的走 return/loss。
     """
-    deposit = session.get(Deposit, deposit_id)
-    if deposit is None or not _can_see_pool(user, deposit.pool_id):
-        raise _deposit_not_found(deposit_id)
+    deposit = _locked_deposit(session, deposit_id, user)
     if deposit.status != DepositStatus.PAID.value or to_money(
         deposit.returned_amount
     ) > 0 or to_money(deposit.lost_amount) > 0:
@@ -215,9 +210,7 @@ def lose_deposit(
     user: CurrentUser | None = None,
 ) -> Cashflow:
     """把未释放押金转为受控运营费用，押金占用同步减少。"""
-    deposit = session.get(Deposit, deposit_id)
-    if deposit is None or not _can_see_pool(user, deposit.pool_id):
-        raise _deposit_not_found(deposit_id)
+    deposit = _locked_deposit(session, deposit_id, user)
     _assert_returnable(deposit, "登记损失")
     text_reason = _text(
         reason,

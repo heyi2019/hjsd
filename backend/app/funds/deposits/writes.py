@@ -32,7 +32,7 @@ from app.customers.counterparties import assert_counterparty_usable
 from .._common import _positive
 from ._shared import (
     _can_see_pool,
-    _deposit_not_found,
+    _locked_deposit,
     _normalize_ledger_type,
     _out_of_scope_error,
     _source_order_not_found,
@@ -139,9 +139,7 @@ def _editable_deposit(
     *,
     user: CurrentUser | None = None,
 ) -> Deposit:
-    deposit = session.get(Deposit, deposit_id)
-    if deposit is None or not _can_see_pool(user, deposit.pool_id):
-        raise _deposit_not_found(deposit_id)
+    deposit = _locked_deposit(session, deposit_id, user)
     if deposit.status != DepositStatus.PAID.value or to_money(deposit.returned_amount) > 0 or to_money(deposit.lost_amount) > 0:
         raise Validation(
             "只有未发生退还/损失的押金可编辑或删除",

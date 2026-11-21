@@ -11,15 +11,175 @@ from sqlalchemy.orm import sessionmaker
 from app.core.errors import AppError, Validation
 from app.domain.base import Base
 from app.domain.enums import AccountingAttribute, Direction
-from app.domain.foundation import Pool
-from app.domain.trade import Cashflow
+from app.domain.foundation import AuditLog, Pool
+from app.domain.trade import BalanceSnapshot, Cashflow, Deposit, Reconciliation
 from app.domain.users import User
 from app.funds.balances import pool_balance
 from app.funds.transfers import create_transfer, repair_transfer
+from app.funds.deposits.lifecycle import return_deposit, lose_deposit, cancel_deposit
+from app.funds.deposits.writes import create_deposit, update_deposit, delete_deposit
+from app.funds.reconciliation import create_reconciliation, resolve_reconciliation
 from app.funds.cashflows import create_cashflow, delete_cashflow, reverse_cashflow, update_cashflow
 from app.settings.field_definitions.seeds import seed_foundation
 
 pytestmark = pytest.mark.db
+
+
+@pytest.mark.parametrize("same_account", [True, False])
+def test_concurrent_reconciliation_creation_keeps_one_snapshot(v1_engine, same_account):
+    database = f"heijin_recon_concurrency_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            session.add(User(username="pytest", display_name="测试", password_hash="unused"))
+            pool_id = session.scalar(select(Pool.id).where(Pool.code == "HJ_INVEST"))
+            session.commit()
+        reached, proceed = Event(), Event()
+        day = date(2026, 11, 1)
+
+        def second():
+            with factory() as session:
+                connection = session.connection()
+                def before(_conn, _cursor, sql, _parameters, _context, _many):
+                    sql = sql.lower()
+                    if "from pools" in sql and "for no key update" in sql:
+                        reached.set()
+                def after(_conn, _cursor, sql, _parameters, _context, _many):
+                    if "from reconciliations" in sql.lower() and not reached.is_set():
+                        reached.set()
+                        assert proceed.wait(10)
+                event.listen(connection, "before_cursor_execute", before)
+                event.listen(connection, "after_cursor_execute", after)
+                try:
+                    create_reconciliation(session, pool_id=pool_id, reconciled_on=day,
+                                          account_label="甲" if same_account else "乙",
+                                          statement_balance="0", actor="pytest")
+                    session.commit()
+                    return "accepted"
+                except Validation:
+                    session.rollback()
+                    return "rejected"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            create_reconciliation(first, pool_id=pool_id, reconciled_on=day,
+                                  account_label="甲", statement_balance="0", actor="pytest")
+            future = executor.submit(second)
+            try:
+                assert reached.wait(10), "第二次对账未到达检查"
+                first.commit()
+            finally:
+                proceed.set()
+            assert future.result(timeout=10) == ("rejected" if same_account else "accepted")
+        with factory() as session:
+            assert len(session.scalars(select(Reconciliation)).all()) == (1 if same_account else 2)
+            assert len(session.scalars(select(BalanceSnapshot)).all()) == 1
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
+
+
+@pytest.mark.parametrize("action", ["return", "partial", "loss", "cancel", "edit", "delete", "resolve"])
+def test_deposit_and_reconciliation_competing_actions_are_serialized(v1_engine, action):
+    database = f"heijin_fund_concurrency_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        day = date(2026, 11, 1)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            session.add(User(username="pytest", display_name="测试", password_hash="unused"))
+            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool_id = pool.id
+            if action == "resolve":
+                row = create_reconciliation(session, pool_id=pool_id, reconciled_on=day,
+                                            account_label="并发账户", statement_balance="0", actor="pytest")
+            else:
+                row = create_deposit(session, pool_id=pool_id, amount="100", paid_on=day, actor="pytest")
+            row_id = row.id
+            session.commit()
+        reached, proceed = Event(), Event()
+        table = "reconciliations" if action == "resolve" else "deposits"
+
+        def second():
+            with factory() as session:
+                # 路由可能提前读取实体；加锁时仍必须刷新会话里的旧对象。
+                preloaded = session.get(Reconciliation if action == "resolve" else Deposit, row_id)
+                assert preloaded is not None
+                connection = session.connection()
+
+                def before(_conn, _cursor, sql, _parameters, _context, _many):
+                    sql = sql.lower()
+                    if f"from {table}" in sql and "for update" in sql:
+                        reached.set()
+
+                def after(_conn, _cursor, sql, _parameters, _context, _many):
+                    if f"from {table}" in sql.lower() and not reached.is_set():
+                        reached.set()
+                        assert proceed.wait(10)
+
+                event.listen(connection, "before_cursor_execute", before)
+                event.listen(connection, "after_cursor_execute", after)
+                try:
+                    if action in {"return", "partial", "delete"}:
+                        return_deposit(session, row_id, amount="40" if action == "partial" else "60", released_on=day, actor="pytest")
+                    elif action == "loss":
+                        lose_deposit(session, row_id, amount="60", lost_on=day, category="OTHER", reason="损失", actor="pytest")
+                    elif action == "cancel":
+                        cancel_deposit(session, row_id, cancelled_on=day, reason="取消", actor="pytest")
+                    elif action == "edit":
+                        update_deposit(session, row_id, pool_id=pool_id, amount="200", paid_on=day, actor="pytest")
+                    else:
+                        resolve_reconciliation(session, row_id, actor="pytest", reason="第二次核销")
+                    session.commit()
+                    return "accepted"
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            if action == "resolve":
+                resolve_reconciliation(first, row_id, actor="pytest", reason="首次核销")
+            elif action == "delete":
+                delete_deposit(first, row_id, actor="pytest")
+            else:
+                return_deposit(first, row_id, amount="60", released_on=day, actor="pytest")
+            future = executor.submit(second)
+            try:
+                assert reached.wait(10), "并发请求未到达记录读取"
+                first.commit()
+            finally:
+                proceed.set()
+            assert future.result(timeout=10) == ("accepted" if action == "partial" else "rejected")
+        with factory() as session:
+            if action == "resolve":
+                row = session.get(Reconciliation, row_id)
+                assert row.status == "RESOLVED" and row.reason == "首次核销"
+                assert len(session.scalars(select(AuditLog).where(AuditLog.entity_type == "reconciliation", AuditLog.action == "RECONCILIATION_RESOLVE")).all()) == 1
+            elif action == "delete":
+                assert session.get(Deposit, row_id) is None
+            else:
+                row = session.get(Deposit, row_id)
+                assert row.returned_amount == (100 if action == "partial" else 60)
+                assert row.lost_amount == 0 and row.paid_amount == 100
+                flows = session.scalars(select(Cashflow).where(Cashflow.source_type == "DEPOSIT", Cashflow.source_id == str(row_id))).all()
+                assert sorted(flow.category for flow in flows) == ["DEPOSIT_HOLD"] + ["DEPOSIT_RELEASE"] * (2 if action == "partial" else 1)
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
 
 
 def test_concurrent_transfer_repairs_only_create_one_counterpart(v1_engine):

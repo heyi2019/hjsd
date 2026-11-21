@@ -179,6 +179,7 @@ GROUPS = {
     "p0": [
         "tests/backend/integration/settings/test_order_types_api.py",
         "tests/backend/integration/business/test_orders_contract.py",
+        "tests/backend/integration/workbench/test_overview.py",
         "tests/backend/integration/business/test_orders_create_validation.py",
         "tests/backend/integration/business/test_orders_query_contract.py",
         "tests/backend/integration/business/test_orders_account_effects.py",
@@ -221,6 +222,7 @@ GROUPS = {
     ],
     "orders": [
         "tests/backend/integration/business/test_orders_contract.py",
+        "tests/backend/integration/workbench/test_overview.py",
         "tests/backend/integration/business/test_orders_create_validation.py",
         "tests/backend/integration/business/test_orders_query_contract.py",
         "tests/backend/integration/business/test_orders_account_effects.py",

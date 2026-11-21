@@ -23,7 +23,7 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 134,
+        "files": 135,
         "cases": 1914,
         "kinds": {
           "unit": {
@@ -39,7 +39,7 @@
             }
           },
           "integration": {
-            "files": 104,
+            "files": 105,
             "cases": 1570,
             "byArea": {
               "business": 42,
@@ -48,7 +48,7 @@
               "operations": 7,
               "settings": 13,
               "system": 10,
-              "workbench": 4
+              "workbench": 5
             }
           }
         },
@@ -87,14 +87,14 @@
             "system": 5
           },
           "module": {
-            "workbench": 8,
+            "workbench": 4,
             "business": 19,
             "customer": 2,
             "finance": 4,
             "operations": 3,
-            "settings": 15,
+            "settings": 16,
             "shared": 9,
-            "system": 5
+            "system": 8
           }
         },
         "_baseline_note": "前端测试文件按当前磁盘同步；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",

@@ -82,6 +82,7 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const [plan, setPlan] = useState<SaleInstallmentPlan | null>(null);
 
   useEffect(() => {
+    setPlan(null);
     const count = Number(periods);
     const sale = String(saleAmount ?? "");
     const down = String(downPayment || "0");
@@ -90,7 +91,6 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
     const fee = Number(serviceFee ?? 0);
     if (!Number.isInteger(count) || count <= 0 || saleValid === null
       || downValid === null || downValid > 0 || !Number.isFinite(fee) || fee < 0) {
-      setPlan(null);
       return;
     }
     let cancelled = false;

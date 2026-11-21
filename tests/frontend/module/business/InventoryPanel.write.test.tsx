@@ -2061,6 +2061,18 @@ describe("库存售出三表单分支", () => {
     await waitFor(() => expect(perPeriod).toHaveValue("9999999999999999.99"));
   });
 
+  it("分期金额变更后等待新预览时不显示旧的最后一期金额", async () => {
+    const preview = { per_period: "50.00", per_period_service_fee: "0.00", last_period: "49.99" } as never;
+    vi.mocked(installmentsApi.previewSalePlan).mockReset().mockResolvedValue(preview);
+    renderLight(<RecoverySaleModal account={accounts[0] as Account} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    fireEvent.change(await screen.findByLabelText("售出金额"), { target: { value: "100" } });
+    await ui.click(screen.getByText("分期付款"));
+    await waitFor(() => expect(screen.getByText("最后一期：49.99 元")).toBeInTheDocument());
+    vi.mocked(installmentsApi.previewSalePlan).mockReturnValue(new Promise(() => {}));
+    fireEvent.change(screen.getByLabelText("售出金额"), { target: { value: "120" } });
+    await waitFor(() => expect(screen.queryByText("最后一期：49.99 元")).not.toBeInTheDocument());
+  });
+
   it("提号库存售出可选择分期出售，确立时收首付", async () => {
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
       ...allFormFields().filter((field) => field.order_type_code === scope),

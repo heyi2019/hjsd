@@ -812,6 +812,23 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       expect(screen.queryByRole("dialog", { name: /登记出售/ })).not.toBeInTheDocument();
     });
 
+    it("登记出售加载期间打开其他操作，不会弹出旧的登记出售", async () => {
+      installmentListFixture.mockResolvedValue(withBackendActions([
+        { ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] },
+        { ...baseInstallment, id: 2, inst_no: "HS0002-INS01" },
+      ]));
+      let finish!: (value: Awaited<ReturnType<typeof ordersApi.listPage>>) => void;
+      vi.mocked(ordersApi.listPage).mockReset().mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      const first = (await screen.findByText("HS0001-INS01")).closest("tr")!;
+      const second = screen.getByText("HS0002-INS01").closest("tr")!;
+      await ui.click(within(first).getByRole("button", { name: /登记出售/ }));
+      await ui.click(within(second).getByRole("button", { name: /登记收款/ }));
+      await act(async () => finish(pageResponse([resaleOrder], { limit: 500 }) as never));
+      expect(screen.getByText("分期收款 · HS0002-INS01")).toBeVisible();
+      expect(screen.queryByText("登记出售 · HS0001-INS01")).not.toBeInTheDocument();
+    });
+
     it("登记出售可选择第500条以后的订单", async () => {
       installmentListFixture.mockResolvedValueOnce(withBackendActions([{ ...baseInstallment, status: "CLOSED", dispositions: [{ id: 1, installment_id: 1, account_id: 2, action: "RECOVER", occurred_on: "2026-10-12", note: "回收" }] }]));
       const first = Array.from({ length: 500 }, (_, index) => ({ ...order, id: index + 100, order_no: `HS${index + 100}` }));
@@ -854,6 +871,51 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
         { resale_order_id: 20, occurred_on: "2026-10-20", note: "转售给下家", form_extra: undefined, operator_user_ids: [1] },
       ));
       expect(successSpy).toHaveBeenCalledWith("已登记出售，原分期与出售订单的利润关联保留");
+    });
+
+    it("上一笔收款完成时不关闭新合约的收款弹窗", async () => {
+      installmentListFixture.mockResolvedValue(withBackendActions([
+        { ...baseInstallment },
+        { ...baseInstallment, id: 2, inst_no: "HS0002-INS01" },
+      ]));
+      let finish!: (value: Awaited<ReturnType<typeof installmentsApi.pay>>) => void;
+      vi.mocked(installmentsApi.pay).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      const first = (await screen.findByText("HS0001-INS01")).closest("tr")!;
+      const second = screen.getByText("HS0002-INS01").closest("tr")!;
+      await ui.click(within(first).getByRole("button", { name: /登记收款/ }));
+      let modal = openModal("分期收款");
+      await ui.type(within(modal).getByLabelText("本次实收"), "50");
+      await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
+      await waitFor(() => expect(installmentsApi.pay).toHaveBeenCalled());
+      await ui.click(within(modal).getByRole("button", { name: "Close" }));
+      await ui.click(within(second).getByRole("button", { name: /登记收款/ }));
+      modal = openModal("分期收款");
+      await ui.type(within(modal).getByLabelText("本次实收"), "30");
+      await act(async () => finish({} as never));
+      expect(screen.getByRole("dialog", { name: /分期收款 · HS0002-INS01/ })).toBeVisible();
+      expect(within(openModal("分期收款")).getByLabelText("本次实收")).toHaveValue("30");
+    });
+
+    it("上一笔收款失败时不在新合约弹窗显示旧错误", async () => {
+      installmentListFixture.mockResolvedValue(withBackendActions([
+        { ...baseInstallment }, { ...baseInstallment, id: 2, inst_no: "HS0002-INS01" },
+      ]));
+      let fail!: (reason: Error) => void;
+      vi.mocked(installmentsApi.pay).mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      const first = (await screen.findByText("HS0001-INS01")).closest("tr")!;
+      const second = screen.getByText("HS0002-INS01").closest("tr")!;
+      await ui.click(within(first).getByRole("button", { name: /登记收款/ }));
+      const modal = openModal("分期收款");
+      await ui.type(within(modal).getByLabelText("本次实收"), "50");
+      await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
+      await waitFor(() => expect(installmentsApi.pay).toHaveBeenCalled());
+      await ui.click(within(modal).getByRole("button", { name: "Close" }));
+      await ui.click(within(second).getByRole("button", { name: /登记收款/ }));
+      await act(async () => fail(new Error("旧合约收款失败")));
+      expect(within(openModal("分期收款")).queryByText(/旧合约收款失败/)).not.toBeInTheDocument();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("旧合约收款失败"));
     });
 
     it("收款提交失败 → Modal 内 InlineError 展示错误", async () => {

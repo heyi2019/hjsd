@@ -5,6 +5,7 @@ import type { Installment, InstallmentTotals, Schedule } from "../../shared/api/
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useRequestSession } from "../../shared/hooks/useLatestRequest";
 import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { useSession } from "../../shared/state/session";
@@ -38,6 +39,10 @@ export function useContractTableController(params: { contractType: string; reloa
   const [defaultTarget, setDefaultTarget] = useState<Installment | null>(null);
   const [waiveTarget, setWaiveTarget] = useState<Schedule | null>(null);
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
+  const actionSession = useRequestSession(JSON.stringify([
+    active, payTarget?.id, deliverTarget?.id, recoverTarget?.id, resaleTarget?.id,
+    cancelTarget?.id, settleTarget?.id, defaultTarget?.id, waiveTarget?.id, extendTarget?.id,
+  ]));
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [listError, setListError] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -151,6 +156,7 @@ export function useContractTableController(params: { contractType: string; reloa
     submitExtend, updateOperationOperators,
   } = useContractActions({
     active,
+    actionSession,
     payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,

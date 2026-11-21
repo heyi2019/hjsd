@@ -12,10 +12,12 @@ import { downloadBlob } from "../../shared/api/download";
 import { today } from "../../shared/lib/format";
 import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 
 export function useContractActions(params: {
   active: boolean;
+  actionSession: LatestRequest;
   payTarget: Installment | null;
   deliverTarget: Installment | null;
   recoverTarget: Installment | null;
@@ -54,10 +56,23 @@ export function useContractActions(params: {
     payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
-    write, load, setError, setResaleOrders, setExporting, filters, active,
+    write, load, setError, setResaleOrders, setExporting, filters, active, actionSession,
   } = params;
   const resaleRequest = useRef(0);
   useEffect(() => () => { resaleRequest.current += 1; }, [active]);
+
+  const runAction = async (action: (isCurrent: () => boolean) => Promise<void>) => {
+    const session = actionSession.current();
+    const isCurrent = () => actionSession.isCurrent(session);
+    await write.run(async () => {
+      try {
+        await action(isCurrent);
+      } catch (error) {
+        if (isCurrent()) throw error;
+        appMessage.error(normalizeError(error).message);
+      }
+    });
+  };
 
   const exportCsv = async () => {
     setExporting(true);
@@ -72,7 +87,7 @@ export function useContractActions(params: {
 
   const submitPay = async (values: Record<string, unknown>) => {
     if (!payTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.pay(payTarget.id, {
           amount: values.amount as string,
           paid_on: values.paid_on as string,
@@ -81,15 +96,17 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("收款已登记");
-        setPayTarget(null);
-        payForm.resetFields();
+        if (isCurrent()) {
+          setPayTarget(null);
+          payForm.resetFields();
+        }
         await load();
     });
   };
 
   const submitDeliver = async (values: Record<string, unknown>) => {
     if (!deliverTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.deliver(deliverTarget.id, {
           delivered_on: values.delivered_on as string,
           note: values.note as string,
@@ -99,8 +116,10 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("已完成交付，不新增现金流");
-        setDeliverTarget(null);
-        deliverForm.resetFields();
+        if (isCurrent()) {
+          setDeliverTarget(null);
+          deliverForm.resetFields();
+        }
         await load();
     });
   };
@@ -117,7 +136,7 @@ export function useContractActions(params: {
 
   const submitRecover = async (values: Record<string, unknown>) => {
     if (!recoverTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.recover(recoverTarget.id, {
           occurred_on: values.occurred_on as string,
           note: values.note as string,
@@ -125,15 +144,17 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("逾期账号已登记回收");
-        setRecoverTarget(null);
-        recoverForm.resetFields();
+        if (isCurrent()) {
+          setRecoverTarget(null);
+          recoverForm.resetFields();
+        }
         await load();
     });
   };
 
   const submitResale = async (values: Record<string, unknown>) => {
     if (!resaleTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.resale(resaleTarget.id, {
           resale_order_id: Number(values.resale_order_id),
           occurred_on: values.occurred_on as string,
@@ -142,19 +163,23 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("已登记出售，原分期与出售订单的利润关联保留");
-        setResaleTarget(null);
-        resaleForm.resetFields();
+        if (isCurrent()) {
+          setResaleTarget(null);
+          resaleForm.resetFields();
+        }
         await load();
     });
   };
 
   const openResale = async (row: Installment) => {
     const request = ++resaleRequest.current;
+    const session = actionSession.current();
+    const isCurrent = () => request === resaleRequest.current && actionSession.isCurrent(session);
     try {
       const orders: Order[] = [];
       while (true) {
         const page = await ordersApi.listPage({ status: "COMPLETED", limit: 500, offset: orders.length });
-        if (request !== resaleRequest.current) return;
+        if (!isCurrent()) return;
         if (!page.items.length && orders.length < page.total) throw new Error("出售订单读取不完整，请重试");
         orders.push(...page.items);
         if (orders.length >= page.total) break;
@@ -164,13 +189,13 @@ export function useContractActions(params: {
       setResaleTarget(row);
       resaleForm.setFieldsValue({ occurred_on: today() });
     } catch (err) {
-      if (request === resaleRequest.current) setError(normalizeError(err));
+      if (isCurrent()) setError(normalizeError(err));
     }
   };
 
   const submitCancel = async (values: Record<string, unknown>) => {
     if (!cancelTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         const result = await installmentsApi.cancel(cancelTarget.id, {
           cancelled_on: values.cancelled_on as string,
           reason: values.reason as string,
@@ -178,15 +203,17 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success(cancelRefundSuccess(result.refund_amount, cancelTarget.contract_type));
-        setCancelTarget(null);
-        cancelForm.resetFields();
+        if (isCurrent()) {
+          setCancelTarget(null);
+          cancelForm.resetFields();
+        }
         await load();
     });
   };
 
   const submitSettleEarly = async (values: Record<string, unknown>) => {
     if (!settleTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.settleEarly(settleTarget.id, {
           paid_on: values.paid_on as string,
           pool_id: values.pool_id === undefined ? undefined : Number(values.pool_id),
@@ -195,26 +222,30 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("已提前结清，剩余应收一次性收清");
-        setSettleTarget(null);
-        settleForm.resetFields();
+        if (isCurrent()) {
+          setSettleTarget(null);
+          settleForm.resetFields();
+        }
         await load();
     });
   };
 
   const submitDefault = async (values: Record<string, unknown>) => {
     if (!defaultTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.markDefault(defaultTarget.id, { reason: values.reason as string, operator_user_ids: values.operator_user_ids as number[] | undefined, form_extra: formExtraOrUndefined(values.form_extra) });
         appMessage.success("已登记违约，合约进入 DEFAULTED");
-        setDefaultTarget(null);
-        defaultForm.resetFields();
+        if (isCurrent()) {
+          setDefaultTarget(null);
+          defaultForm.resetFields();
+        }
         await load();
     });
   };
 
   const submitWaive = async (values: Record<string, unknown>) => {
     if (!waiveTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.waiveSchedule(waiveTarget.installment_id, waiveTarget.period_no, {
           amount: values.amount as string,
           waived_on: values.waived_on as string,
@@ -223,15 +254,17 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("期次减免已登记");
-        setWaiveTarget(null);
-        waiveForm.resetFields();
+        if (isCurrent()) {
+          setWaiveTarget(null);
+          waiveForm.resetFields();
+        }
         await load();
     });
   };
 
   const submitExtend = async (values: Record<string, unknown>) => {
     if (!extendTarget) return;
-    await write.run(async () => {
+    await runAction(async (isCurrent) => {
         await installmentsApi.extendSchedule(extendTarget.installment_id, extendTarget.period_no, {
           new_due_on: values.new_due_on as string,
           reason: values.reason as string,
@@ -239,8 +272,10 @@ export function useContractActions(params: {
           form_extra: formExtraOrUndefined(values.form_extra),
         });
         appMessage.success("期次展期已登记");
-        setExtendTarget(null);
-        extendForm.resetFields();
+        if (isCurrent()) {
+          setExtendTarget(null);
+          extendForm.resetFields();
+        }
         await load();
     });
   };

@@ -73,11 +73,7 @@ def lock_edit_pools(db: Session, order_id: int, payload: ExecutionEditRequest, u
     event_nos = select(OrderEvent.event_no).where(OrderEvent.order_id == order_id, OrderEvent.id.in_(event_ids))
     event_flow = and_(Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value, Cashflow.source_id.in_(event_nos))
     named_flow = and_(Cashflow.order_id == order_id, Cashflow.flow_no.in_([item.flow_no for item in flow_items]))
-    # 兼容历史流水缺少 order_id，但仍通过事件来源引用本订单。
-    legacy_event_nos = select(OrderEvent.event_no).where(OrderEvent.order_id == order_id)
-    legacy_flow = and_(Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
-                       Cashflow.source_id.in_(legacy_event_nos), Cashflow.flow_no.in_([item.flow_no for item in flow_items]))
-    pool_ids = set(db.scalars(select(Cashflow.pool_id).where(or_(event_flow, named_flow, legacy_flow))).all())
+    pool_ids = set(db.scalars(select(Cashflow.pool_id).where(or_(event_flow, named_flow))).all())
     if any(not user.can_see_pool(pool_id) for pool_id in pool_ids):
         raise NotFound("关联资金流水不存在")
     for item in flow_items:
@@ -103,11 +99,8 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order: Order, item
         flow = db.scalar(select(Cashflow).where(Cashflow.flow_no == item.flow_no).with_for_update().execution_options(populate_existing=True))
         if flow is None or not user.can_see_pool(flow.pool_id):
             raise NotFound("资金明细不存在")
-        flow_order_id = flow.order_id
-        if flow_order_id is None and flow.source_type == CashflowSourceType.ORDER_EVENT.value:
-            flow_order_id = db.scalar(select(OrderEvent.order_id).where(OrderEvent.event_no == flow.source_id))
         # 编排入口已锁定目标订单与账号，复用该事务中的订单，不逐条重新查询。
-        if flow_order_id is None or flow_order_id != target_order.id or target_order.account_id != account_id:
+        if flow.order_id != target_order.id or target_order.account_id != account_id:
             raise NotFound("资金明细不存在")
         amount_changed = item.amount is not None and item.amount != flow.amount
         pool_changed = item.pool_id is not None and item.pool_id != flow.pool_id

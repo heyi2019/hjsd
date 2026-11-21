@@ -759,14 +759,13 @@ def test_order_detail_rebate_date_edit_syncs_all_records(seeded_client, seeded_d
     assert seeded_db.get(Cashflow, flow_id).occurred_on == date(2026, 10, 2)
 
 
-def test_batch_cashflow_edits_reuse_locked_order_and_keep_event_fallback(seeded_client, seeded_db, headers):
+def test_batch_cashflow_edits_reuse_locked_order(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="cashflow-batch-query", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
     sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=date(2026, 10, 1), actor="pytest")
     flows = [seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == event.event_no, Cashflow.source_type == "ORDER_EVENT")) for event in (buy, sell)]
     assert all(flow is not None for flow in flows)
-    flows[1].order_id = None  # 历史事件流水依赖 source_id 回查订单。
     seeded_db.commit()
     order_queries = []
 
@@ -786,6 +785,43 @@ def test_batch_cashflow_edits_reuse_locked_order_and_keep_event_fallback(seeded_
     assert len(order_queries) == 0
     seeded_db.expire_all()
     assert [seeded_db.get(Cashflow, flow.id).note for flow in flows] == ["甲", "乙"]
+
+
+def test_cashflow_edit_rejects_missing_order_link(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="cashflow-missing-order", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    event, _ = post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no))
+    flow.order_id = None
+    seeded_db.commit()
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
+        "events": [], "cashflows": [{"flow_no": flow.flow_no, "note": "不应保存"}],
+    })
+    assert response.status_code == 404, response.text
+
+
+def test_event_cashflow_order_link_migration_backfills_and_rejects_orphans(seeded_db):
+    from importlib.util import module_from_spec, spec_from_file_location
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[4] / "backend/scripts/backfill_event_cashflow_order_id.py"
+    spec = spec_from_file_location("event_cashflow_migration", path)
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    account = create_account(seeded_db, game_account="cashflow-migration", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    event, _ = post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no))
+    flow.order_id = None
+    seeded_db.flush()
+    migration.backfill_event_cashflow_order_id(seeded_db.connection())
+    seeded_db.refresh(flow)
+    assert flow.order_id == order.id
+    flow.order_id = None
+    flow.source_id = "missing-event"
+    seeded_db.flush()
+    with pytest.raises(RuntimeError, match="无法关联订单"):
+        migration.backfill_event_cashflow_order_id(seeded_db.connection())
 
 
 def test_cashflow_batch_cross_order_rejects_and_rolls_back_prior_edit(seeded_client, seeded_db, headers):

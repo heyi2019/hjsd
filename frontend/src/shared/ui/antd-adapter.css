@@ -434,16 +434,26 @@
   min-width: 0 !important;
 }
 
-:where(.ant-input:hover, .ant-input-number:hover, .ant-select-selector:hover, .ant-picker:hover, .ant-input-affix-wrapper:hover) {
+:where(:is(.ant-input, .ant-input-number, .ant-picker, .ant-input-affix-wrapper):not([class*="-status-error"]):not([class*="-status-warning"]):hover, .ant-select:not([class*="-status-error"]):not([class*="-status-warning"]) .ant-select-selector:hover) {
   border-color: var(--brand-border) !important;
 }
 
-:where(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-select-focused .ant-select-selector, .ant-picker-focused, .ant-input-affix-wrapper-focused) {
+:where(:is(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-picker-focused, .ant-input-affix-wrapper-focused):not([class*="-status-error"]):not([class*="-status-warning"]), .ant-select-focused:not([class*="-status-error"]):not([class*="-status-warning"]) .ant-select-selector) {
   border-color: var(--color-primary) !important;
   /* Apple 聚焦光环：贴边实色环 + 外溢柔光 + 投影，经 --ease-spring 过渡产生轻微绽放过冲
      （仅色/透明度插值，无位移/缩放，不触发前庭不适；reduced-motion 下为快速淡入，仍合规）。 */
   box-shadow: var(--focus-glow) !important;
   transition: border-color 160ms var(--ease-spring), box-shadow 220ms var(--ease-spring);
+}
+
+/* 错误和警告保留语义边框与焦点环，避免被普通蓝色焦点覆盖。 */
+:where(:is(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-picker-focused, .ant-input-affix-wrapper-focused)[class*="-status-error"], .ant-select-focused[class*="-status-error"] .ant-select-selector) {
+  border-color: var(--color-error) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-error) 24%, transparent) !important;
+}
+:where(:is(.ant-input:focus, .ant-input-focused, .ant-input-number-focused, .ant-picker-focused, .ant-input-affix-wrapper-focused)[class*="-status-warning"], .ant-select-focused[class*="-status-warning"] .ant-select-selector) {
+  border-color: var(--color-warning) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-warning) 24%, transparent) !important;
 }
 
 :where(.ant-modal-content, .ant-drawer-content) {

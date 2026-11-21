@@ -38,8 +38,8 @@
 /* 直接操纵（Apple HIG）：可点卡片悬浮轻抬、按下即时缩量，松手弹簧回弹。
    与 interactions.css 的按钮/导航反馈同源；仅供「减弱动效」未开启的用户。 */
 @media (prefers-reduced-motion: no-preference) {
-  .ui-entry-card:hover { transform: translateY(-2px); }
-  .ui-entry-card:active {
+  .ui-entry-card:not(.ui-entry-card--disabled):hover { transform: translateY(-2px); }
+  .ui-entry-card:not(.ui-entry-card--disabled):active {
     transform: scale(0.98);
     transition-duration: var(--dur-fast);
     transition-timing-function: var(--ease);

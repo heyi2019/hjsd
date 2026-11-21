@@ -8,6 +8,8 @@
 import { theme as antdTheme, type ThemeConfig } from "antd";
 import type { ResolvedThemeMode } from "./theme";
 
+const COMPONENTS = { Button: { controlHeightSM: 24 } } as const;
+
 const BRAND = {
   colorPrimary: "#0a63d8",
   colorInfo: "#0a84ff",
@@ -22,6 +24,7 @@ export function buildTheme(mode: ResolvedThemeMode): ThemeConfig {
   if (mode === "dark") {
     return {
       algorithm: antdTheme.darkAlgorithm,
+      components: COMPONENTS,
       token: {
         ...BRAND,
         colorBorder: "rgba(255,255,255,0.12)",
@@ -42,6 +45,7 @@ export function buildTheme(mode: ResolvedThemeMode): ThemeConfig {
   }
   return {
     algorithm: antdTheme.defaultAlgorithm,
+    components: COMPONENTS,
     token: {
       ...BRAND,
       colorBorder: "rgba(60,60,67,0.18)",

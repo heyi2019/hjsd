@@ -140,7 +140,7 @@
    内嵌 input 交回 wrapper 的 flex 居中，高度自适应。 */
 /* 普通 Ant 控件锁定统一高度 = --ui-control-height（36px；2026-11-12 用户裁决回退到 36px 口径，
    推翻 Issue #17 的 iOS HIG 44pt 触控目标结论，与 forms.css / StudioExpensePanel.css 注释重新对齐）。
-   small / 表格紧凑态由业务选择器显式覆盖（如 .ant-btn-sm 走 antd 24px、紧凑弹窗 textarea 交回 rows）。
+   small / 表格紧凑态由业务选择器显式覆盖（如 .ant-btn-sm 走 Button 主题令牌 24px、紧凑弹窗 textarea 交回 rows）。
    历史：Issue #17(b5635fed) 曾把此值由 36px 抬到 44px 以满足触控目标；现按 11-12 裁决回退，
    触控目标低于 44pt 属知情取舍。 */
 :where(.ant-input:not(.ant-input-affix-wrapper > .ant-input):not(textarea), .ant-input-number:not(.ant-input-number-affix-wrapper > .ant-input-number), .ant-input-number-affix-wrapper, .ant-select-selector, .ant-picker, .ant-input-affix-wrapper:not(.ant-input-textarea-affix-wrapper)) {
@@ -157,8 +157,8 @@
   min-height: 0 !important;
 }
 
-/* 普通按钮同样锁定 36px 高（与控件口径一致，11-12 裁决）；.ant-btn-sm 由 antd 默认 24px 覆盖。 */
-:where(.ant-btn:not(.ant-btn-sm), .ant-btn-primary, .ant-btn-color-primary) {
+/* 普通按钮同样锁定 36px 高（与控件口径一致，11-12 裁决）；.ant-btn-sm 由 Button 主题令牌设置为 24px。 */
+:where(.ant-btn:not(.ant-btn-sm)) {
   min-height: var(--ui-control-height) !important;
   height: var(--ui-control-height) !important;
 }
@@ -283,7 +283,6 @@
 }
 
 :where(.ant-empty-description) {
-  color: var(--color-text-secondary) !important;
   font: var(--font-body-s) !important;
 }
 

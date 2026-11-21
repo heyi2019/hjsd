@@ -134,8 +134,8 @@
   --ui-control-height-compact: 30px;
   --ui-control-height-compact-inner: 28px;
   --ui-control-height-chip: 24px;
-  /* 标准小号档 24px：与 antd controlHeightSM 同值，用于表格行内操作与密集增删行。
-     是设计系统承认的标准档位（非破例），使用时必须显式写 size="sm"，不得靠 CSS 默认继承。 */
+  /* 标准小号档 24px：与 antd Button 的 controlHeightSM 同值，用于表格行内操作与密集增删行。
+     是设计系统承认的标准档位（非破例），使用时必须显式写 size="small"，不得靠 CSS 默认继承。 */
   --ui-control-height-sm: 24px;
   /* 控件高度补充档（2026-09-11 收口，对齐散落 32/36px；维度值双主题同值，不加 dark 覆盖） */
   --ui-control-height-md: 32px;

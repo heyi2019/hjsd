@@ -148,8 +148,6 @@ export function useContractTableController(params: { contractType: string; reloa
     return () => { totalsSeqRef.current += 1; };
   }, [active, loadTotals, reloadKey]);
 
-  // 写操作已提取到 useContractActions（函数体一字未改）：传入 state/form/setter
-  // 与共享的 write/load，保持原闭包语义；返回字段与原 controller 完全一致。
   const {
     exportCsv, submitPay, submitDeliver, openDeliver, submitRecover, submitResale,
     openResale, submitCancel, submitSettleEarly, submitDefault, submitWaive,

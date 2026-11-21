@@ -1,7 +1,4 @@
-"""orders 执行详情编辑路由（ORD-01）。
-
-从 orders/router.py 按资源拆分，函数体一字未改，URL 与挂载点不变。
-"""
+"""订单执行详情与编辑接口。"""
 
 from typing import Literal
 

@@ -1,7 +1,4 @@
-"""orders 主订单路由（ORD-01）。
-
-从 orders/router.py 按资源拆分，函数体一字未改，URL 与挂载点不变。
-"""
+"""订单创建、查询与删除接口。"""
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response

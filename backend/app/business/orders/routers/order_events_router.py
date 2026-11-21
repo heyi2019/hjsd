@@ -1,7 +1,4 @@
-"""orders 事件与客户角色路由（ORD-02）。
-
-从 orders/router.py 按资源拆分，函数体一字未改，URL 与挂载点不变。
-"""
+"""订单事件与客户角色接口。"""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select

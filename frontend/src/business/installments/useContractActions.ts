@@ -1,5 +1,4 @@
-/** 分期合约表的写操作集合：从 useContractTableController 提取，函数体一字未改。
- * 只负责 13 个写方法，读/状态/表格列仍留在主 controller。 */
+/** 分期合约的写操作与导出。 */
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { FormInstance } from "antd";
 import { appMessage } from "../../shared/ui/appFeedback";

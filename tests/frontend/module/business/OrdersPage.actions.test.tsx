@@ -15,6 +15,7 @@ import { installmentsApi } from "@/shared/api/installments.api";
 const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
 import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
+import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
@@ -207,6 +208,8 @@ const actionAllocationRows: ProfitAllocation[] = [
 beforeEach(() => {
   seedOptionSets();
   seedOrderFormFields();
+  vi.mocked(customersApi.options).mockResolvedValue([]);
+  vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(orders));

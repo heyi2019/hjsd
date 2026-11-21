@@ -952,6 +952,75 @@ def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, se
     assert active_listings(seeded_db, order.id) == set()
 
 
+def test_listing_draft_conflict_checks_do_not_rescan_all_drafts(seeded_client, seeded_db, headers, monkeypatch):
+    from app.business.order_detail.editing.schemas import ExecutionEditItem
+
+    account = create_account(seeded_db, game_account="listing-draft-scan", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listings = [post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [f"原平台{i}"]})[0] for i in range(20)]
+    drafts = [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [f"新平台{i}"]}} for i, listing in enumerate(listings)]
+    drafts += [{"id": 100000 + i, "expected_amount": "0", "amount": "0"} for i in range(100)]
+    original_getattribute = ExecutionEditItem.__getattribute__
+    reads = 0
+
+    def count_reads(item, name):
+        nonlocal reads
+        if name == "id":
+            reads += 1
+        return original_getattribute(item, name)
+
+    monkeypatch.setattr(ExecutionEditItem, "__getattribute__", count_reads)
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": drafts})
+    assert response.status_code == 404, response.text
+    assert reads < 1000, reads
+
+
+def test_listing_drafts_reject_conflicting_new_platforms(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="listing-draft-collision", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    first, second = [post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [name]})[0] for name in ("原甲", "原乙")]
+    drafts = [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [platform]}} for listing, platform in ((first, "新甲"), (second, " 新甲 "))]
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": drafts})
+    assert response.status_code == 422, response.text
+    assert "该平台已上架" in response.text
+
+
+def test_inactive_listing_draft_does_not_mask_later_conflict(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="listing-inactive-draft", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    first, second = [post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [name]})[0] for name in ("原甲", "原乙")]
+    post_event(seeded_db, order.id, event_type="OPERATE", operation_type="UNLIST", occurred_on=date(2026, 10, 2), actor="pytest", form_extra={"consignment_event_id": second.id, "consignment_platforms": ["原乙"], "platform_unlist_scope": "PLATFORM"})
+    drafts = [
+        {"id": first.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]}},
+        {"id": second.id, "expected_amount": "1", "amount": "1", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": ["新平台"]}},
+    ]
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": drafts})
+    assert response.status_code == 409, response.text
+    assert "执行记录已被修改" in response.text
+
+
+def test_repeated_listing_draft_is_rejected_before_platform_conflict(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="listing-duplicate-draft", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    first, second = [post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [name]})[0] for name in ("原甲", "原乙")]
+    drafts = [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [platform]}} for listing, platform in ((first, "新甲"), (second, "其他"), (second, " 新甲 "))]
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": drafts})
+    assert response.status_code == 422, response.text
+    assert "同一执行记录不能重复修改" in response.text
+
+
+def test_duplicate_drafts_for_same_listing_are_rejected_without_mutation(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="listing-self-duplicate-draft", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["原平台"]})
+    drafts = [{"id": listing.id, "expected_amount": "0", "amount": "0", "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [platform]}} for platform in ("新甲", "新乙")]
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": drafts})
+    assert response.status_code == 422, response.text
+    assert "同一执行记录不能重复修改" in response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, listing.id).form_extra["consignment_platforms"] == ["原平台"]
+
+
 def test_batch_linked_unlisting_conflict_matches_in_linear_time(seeded_client, seeded_db, headers, monkeypatch):
     from app.business.order_detail.editing import events as editing_events
 

@@ -86,6 +86,13 @@ def validate_event_edits(
     changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]] = []
     cost_delta = Decimal("0")
     requested_event_ids = {item.id for item in payload.events}
+    draft_ids_by_platform: dict[str, set[int]] = {}
+    for item in payload.events:
+        proposed = (item.form_extra or {}).get("consignment_platforms")
+        if isinstance(proposed, list):
+            for value in proposed:
+                if isinstance(value, str) and value.strip():
+                    draft_ids_by_platform.setdefault(value.strip(), set()).add(item.id)
     requested_operator_ids = {
         operator_id
         for item in payload.events
@@ -119,13 +126,13 @@ def validate_event_edits(
             if old_platforms != new_platforms:
                 active = active_listings(db, order_id)
                 other_active = {platform for listing_id, platform in active if listing_id != event.id}
-                active_ids = {listing_id for listing_id, _ in active}
-                for other in payload.events:
-                    if other.id != event.id and other.id in active_ids and other.form_extra is not None:
-                        proposed = other.form_extra.get("consignment_platforms")
-                        if isinstance(proposed, list):
-                            other_active.update(value.strip() for value in proposed if isinstance(value, str) and value.strip())
-                if isinstance(new_platforms, list) and any(isinstance(platform, str) and platform.strip() in other_active for platform in new_platforms):
+                active_ids = {listing_id for listing_id, _ in active if listing_id != event.id}
+                if isinstance(new_platforms, list) and any(
+                    isinstance(platform, str) and (
+                        platform.strip() in other_active
+                        or not active_ids.isdisjoint(draft_ids_by_platform.get(platform.strip(), ()))
+                    ) for platform in new_platforms
+                ):
                     raise Validation("该平台已上架，请先下架后再重新上架")
                 linked = _linked_unlistings(db, event)
                 if linked and (len(old_platforms) != 1 or len(new_platforms) != 1):

@@ -24,11 +24,11 @@
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
         "files": 132,
-        "cases": 1884,
+        "cases": 1903,
         "kinds": {
           "unit": {
             "files": 31,
-            "cases": 342,
+            "cases": 345,
             "byArea": {
               "business": 7,
               "customer": 1,
@@ -40,7 +40,7 @@
           },
           "integration": {
             "files": 101,
-            "cases": 1542,
+            "cases": 1558,
             "byArea": {
               "business": 42,
               "customer": 8,

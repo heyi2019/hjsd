@@ -572,44 +572,44 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(within(second).getByLabelText("分润备注")).toHaveValue(""));
   });
 
-  it("连续打开不同订单的分润配置，较晚返回的换算不能覆盖当前订单", async () => {
-    let finishFirst!: (result: { value: string | null }) => void;
-    const firstConversion = new Promise<{ value: string | null }>((resolve) => { finishFirst = resolve; });
-    vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
-    vi.mocked(profitAllocationApi.allocations).mockImplementation(async (id) => profitAllocationResponse([], {
-      allocatable_profit: id === 1 ? "1000.00" : "2000.00",
-      totals_by_type: { BUY: { allocation_amount: id === 1 ? "100.00" : "200.00", allocation_rate: "" } },
-    }));
-    vi.mocked(profitAllocationApi.convert).mockImplementation((id) => id === 1 ? firstConversion : Promise.resolve({ value: "20.00" }));
-
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润配置");
-    await waitFor(() => expect(profitAllocationApi.convert).toHaveBeenCalledWith(1, "AMOUNT_TO_RATE", "100.00"));
-    await openRowMenu("DG-2026-0002", "分润配置");
-    const modal = await modalOf(/分润 · DG-2026-0002/);
-    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("200.00");
-    await act(async () => finishFirst({ value: "10.00" }));
-    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("200.00");
-    expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("20.00");
-    await clickModalOk(modal);
-    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(2, expect.arrayContaining([
-      expect.objectContaining({ allocation_type: "BUY", allocation_amount: "200.00" }),
-    ]), expect.any(Object)));
-  });
-
-  it.each(["请求失败", "没有结果"])("打开分润配置时比例换算%s，保留金额并提示", async (failure) => {
-    const warning = vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
+  it("打开分润配置直接展示后端汇总金额与比例，不逐行换算", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
-      totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "9.99" } },
+      totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "20.00" } },
     }));
-    if (failure === "请求失败") vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
-    else vi.mocked(profitAllocationApi.convert).mockResolvedValueOnce({ value: null });
+    vi.mocked(profitAllocationApi.convert).mockReset().mockResolvedValue({ value: "20.00" });
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("100.00");
-    expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("");
-    expect(warning).toHaveBeenCalledWith("分润比例换算失败，请重新编辑金额重试");
+    expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("20.00");
+    expect(profitAllocationApi.convert).not.toHaveBeenCalled();
+  });
+
+  it("连续打开不同订单的分润配置，较晚返回的汇总不能覆盖当前订单", async () => {
+    let finishFirst!: (result: Awaited<ReturnType<typeof profitAllocationApi.allocations>>) => void;
+    const first = new Promise<Awaited<ReturnType<typeof profitAllocationApi.allocations>>>((resolve) => { finishFirst = resolve; });
+    vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
+    vi.mocked(profitAllocationApi.allocations).mockImplementation((id) => id === 1 ? first : Promise.resolve(profitAllocationResponse([], {
+      totals_by_type: { BUY: { allocation_amount: "200.00", allocation_rate: "20.00" } },
+    })));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    await waitFor(() => expect(profitAllocationApi.allocations).toHaveBeenCalledWith(1));
+    await openRowMenu("DG-2026-0002", "分润配置");
+    const modal = await modalOf(/分润 · DG-2026-0002/);
+    await act(async () => finishFirst(profitAllocationResponse([], {
+      totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "10.00" } },
+    })));
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("200.00");
+    expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("20.00");
+  });
+
+  it("分润汇总读取失败时提示错误且不打开弹窗", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockRejectedValueOnce(new Error("汇总读取失败"));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("汇总读取失败")));
+    expect(screen.queryByText(/分润 · HS-2026-0001/)).not.toBeInTheDocument();
   });
 
   it("分润比例换算失败时清空旧比例并提示重试", async () => {
@@ -638,7 +638,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     const firstConversion = new Promise<{ value: string | null }>((resolve) => { finishFirst = resolve; });
     vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
     vi.mocked(profitAllocationApi.allocations).mockImplementation(async (id) => profitAllocationResponse([], {
-      totals_by_type: id === 1 ? {} : { BUY: { allocation_amount: "200.00", allocation_rate: "" } },
+      totals_by_type: id === 1 ? {} : { BUY: { allocation_amount: "200.00", allocation_rate: "20.00" } },
     }));
     vi.mocked(profitAllocationApi.convert).mockImplementation((id) => id === 1 ? firstConversion : Promise.resolve({ value: "20.00" }));
 
@@ -656,27 +656,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(second).getAllByLabelText("比例")[0]).toHaveValue("20.00");
     await act(async () => finishFirst({ value: "99.00" }));
     expect(within(second).getAllByLabelText("比例")[0]).toHaveValue("20.00");
-  });
-
-  it.each(["请求失败", "没有结果"])("比例分润%s时提示重试，避免原配置被当成空金额保存", async (failure) => {
-    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
-      totals_by_type: { BUY: { allocation_rate: "30.00", allocation_amount: "" } },
-    }));
-    if (failure === "请求失败") vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
-    else vi.mocked(profitAllocationApi.convert).mockResolvedValueOnce({ value: null });
-    vi.mocked(profitAllocationApi.convert).mockResolvedValueOnce({ value: "300.00" });
-
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "分润配置");
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith("分润金额换算失败，请重试"));
-    expect(screen.queryByRole("dialog", { name: /分润 · HS-2026-0001/ })).toBeNull();
-    await openRowMenu("HS-2026-0001", "分润配置");
-    const modal = await modalOf(/分润 · HS-2026-0001/);
-    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("300.00");
-    await clickModalOk(modal);
-    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
-      expect.objectContaining({ allocation_type: "BUY", allocation_amount: "300.00" }),
-    ]), expect.any(Object)));
   });
 
   it("上一单保存完成时，不关闭后来打开的分润配置", async () => {

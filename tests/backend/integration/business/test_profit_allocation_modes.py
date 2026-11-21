@@ -96,6 +96,24 @@ def test_convert_uses_total_profit_base_not_allocatable(seeded_db):
     ) == Decimal("20.00")
 
 
+@pytest.mark.parametrize(("buy", "sell", "buy_share", "sell_share", "sell_rate"), [
+    ("1000", "1500", "100", "200", "40.00"),
+    ("1500", "1000", "-100", "-150", "30.00"),
+])
+def test_allocation_view_returns_grouped_rates_for_display(seeded_db, buy, sell, buy_share, sell_share, sell_rate):
+    order_id = _order_with_profit(seeded_db, buy=buy, sell=sell)
+    seeded_db.get(Order, order_id).form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": buy_share},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": sell_share},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+    ])
+    view = policy_allocations.get_allocations_view(seeded_db, order_id)
+    assert view["totals_by_type"]["BUY"]["allocation_amount"] == Decimal(buy_share)
+    assert view["totals_by_type"]["BUY"]["allocation_rate"] == Decimal("20.00")
+    assert view["totals_by_type"]["SELL"]["allocation_rate"] == Decimal(sell_rate)
+
+
 def test_convert_on_loss_order_keeps_negative_direction(seeded_db):
     """亏损单换算同样以总利润为基数，方向随利润为负。"""
     order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")  # 利润 -500

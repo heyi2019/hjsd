@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
@@ -162,7 +163,13 @@ def get_allocations_view(
     total_amount = sum(amounts.values(), 0)
     for item in items:
         item.update(total_rate=str(total_rate), total_amount=str(total_amount))
-    return {"items": items, "total": len(items), "totals_by_type": summarize_allocations_by_type(items), **terms}
+    totals_by_type = summarize_allocations_by_type(items)
+    if not zero_profit:
+        for total in totals_by_type.values():
+            total["allocation_rate"] = (total["allocation_amount"] * Decimal("100") / terms["order_profit"]).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP,
+            )
+    return {"items": items, "total": len(items), "totals_by_type": totals_by_type, **terms}
 
 
 def convert_value(

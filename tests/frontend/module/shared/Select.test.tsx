@@ -13,6 +13,7 @@ vi.mock("antd", () => ({
 
 import { Select } from "@/shared/ui/Select";
 import { ToolbarSelect } from "@/shared/ui/ToolbarSelect";
+import { ToolbarMultiSelect } from "@/shared/ui/ToolbarMultiSelect";
 import { toolbarSelectionWidth } from "@/shared/ui/toolbarSelectionWidth";
 
 describe("工具栏多选宽度", () => {
@@ -40,5 +41,22 @@ describe("Select 公共弹层宽度", () => {
     render(<Select popupMatchSelectWidth={true} />);
 
     expect(receivedProps.popupMatchSelectWidth).toBe(true);
+  });
+});
+
+
+describe("公共下拉配置透传", () => {
+  it("保留调用方弹层类名与公共弹层类名", () => {
+    render(<Select popupClassName="legacy-popup" classNames={{ popup: { root: "custom-popup" } }} />);
+    expect((receivedProps.classNames as { popup: { root: string } }).popup.root.split(" ")).toEqual(
+      expect.arrayContaining(["ui-select-pop", "legacy-popup", "custom-popup"]),
+    );
+  });
+
+  it("多选保留调用方类名及样式，同时继续根据选中项计算宽度", () => {
+    render(<ToolbarMultiSelect selectedLabels={["何一"]} className="custom-multi" style={{ marginTop: 8 }} />);
+    expect(receivedProps.className).toContain("ui-filter-multi");
+    expect(receivedProps.className).toContain("custom-multi");
+    expect(receivedProps.style).toEqual({ marginTop: 8, width: toolbarSelectionWidth(["何一"]) });
   });
 });

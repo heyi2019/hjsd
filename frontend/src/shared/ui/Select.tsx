@@ -21,7 +21,7 @@ type SelectRef = React.ElementRef<typeof AntdSelect>;
 
 export const Select = forwardRef<SelectRef, SelectProps>((props, ref) => {
   const { popupClassName, classNames, virtual, popupMatchSelectWidth, ...restProps } = props;
-  const mergedPopup = ["ui-select-pop", popupClassName].filter(Boolean).join(" ").trim();
+  const mergedPopup = ["ui-select-pop", popupClassName, classNames?.popup?.root].filter(Boolean).join(" ").trim();
   return (
     <AntdSelect
       {...restProps}

@@ -873,6 +873,41 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       expect(successSpy).toHaveBeenCalledWith("已登记出售，原分期与出售订单的利润关联保留");
     });
 
+    it("收款完成后按当前日期筛选刷新，不回到提交时的旧筛选", async () => {
+      let finish!: (value: Awaited<ReturnType<typeof installmentsApi.pay>>) => void;
+      vi.mocked(installmentsApi.pay).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      await ui.click(await screen.findByRole("button", { name: /登记收款/ }));
+      const modal = openModal("分期收款");
+      await ui.type(within(modal).getByLabelText("本次实收"), "50");
+      await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
+      await waitFor(() => expect(installmentsApi.pay).toHaveBeenCalled());
+      await ui.click(within(modal).getByRole("button", { name: "Close" }));
+      await setAntdDateRange(document.body, ui, "2026-10-01", "2026-10-31");
+      await waitFor(() => expect(installmentsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" })));
+      await act(async () => finish({} as never));
+      await waitFor(() => expect(installmentsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" })));
+    });
+
+    it("离开分期页面后收款完成，不触发隐藏页面请求", async () => {
+      let finish!: (value: Awaited<ReturnType<typeof installmentsApi.pay>>) => void;
+      vi.mocked(installmentsApi.pay).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+      const view = renderLight(<InstallmentsPanel />, { user: "admin" });
+      await ui.click(await screen.findByRole("button", { name: /登记收款/ }));
+      const modal = openModal("分期收款");
+      await ui.type(within(modal).getByLabelText("本次实收"), "50");
+      await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
+      await waitFor(() => expect(installmentsApi.pay).toHaveBeenCalled());
+      view.rerender(<InstallmentsPanel active={false} />);
+      vi.mocked(installmentsApi.page).mockClear();
+      vi.mocked(installmentsApi.totals).mockClear();
+      await act(async () => finish({} as never));
+      expect(installmentsApi.page).not.toHaveBeenCalled();
+      expect(installmentsApi.totals).not.toHaveBeenCalled();
+      view.rerender(<InstallmentsPanel active />);
+      await waitFor(() => expect(installmentsApi.page).toHaveBeenCalled());
+    });
+
     it("上一笔收款完成时不关闭新合约的收款弹窗", async () => {
       installmentListFixture.mockResolvedValue(withBackendActions([
         { ...baseInstallment },

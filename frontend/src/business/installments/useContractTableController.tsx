@@ -89,6 +89,12 @@ export function useContractTableController(params: { contractType: string; reloa
   const load = useCallback(async () => {
     await Promise.all([loadList(), loadTotals()]);
   }, [loadList, loadTotals]);
+  const latestLoadRef = useRef({ active, load });
+  latestLoadRef.current = { active, load };
+  const reloadAfterAction = useCallback(async () => {
+    const current = latestLoadRef.current;
+    if (current.active) await current.load();
+  }, []);
 
   const resetKey = JSON.stringify([contractType, dateFrom, dateTo, status, sortDesc]);
   const previousResetKey = useRef(resetKey);
@@ -117,7 +123,7 @@ export function useContractTableController(params: { contractType: string; reloa
   } = useContractActions({
     active,
     modal,
-    load, setError, setResaleOrders, setExporting,
+    load: reloadAfterAction, setError, setResaleOrders, setExporting,
     filters: { contract_type: contractType, status: status || undefined, trade_date_from: dateFrom || undefined, trade_date_to: dateTo || undefined },
   });
 

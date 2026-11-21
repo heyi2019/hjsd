@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+import base64
+import json
 
 import pytest
 from sqlalchemy import select
@@ -12,6 +14,7 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order, OrderEvent
 from app.domain.users import User
+from app.dashboard.notifications import query as notification_query
 from app.dashboard.notifications import triggers
 from app.dashboard.notifications import service as notification_service
 from app.business.create import create_order
@@ -62,12 +65,12 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
     a = _make_unread(seeded_db, entity_id="A")
     b = _make_unread(seeded_db, entity_id="B")
     notification_service.mark_read_batch(seeded_db, [a.id], recipient_user_id=2, actor="pytest")
-    unread, unread_total = notification_service.list_notifications(
+    unread, unread_total = notification_query.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=True
     )
     assert unread_total == 1
     assert [n.id for n in unread] == [b.id]
-    all_rows, all_total = notification_service.list_notifications(
+    all_rows, all_total = notification_query.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=False
     )
     assert all_total == 2
@@ -88,19 +91,22 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
     assert page.json()["next_cursor"] is None
     latest = seeded_client.get("/api/notifications/inbox", params={"category": "latest"}, headers=headers)
     assert [item["id"] for item in latest.json()["items"]] == [first.id]
+    invalid_cursor = base64.urlsafe_b64encode(json.dumps({"category": "latest", "phase": "read", "snapshot": "2026-11-21T00:00:00", "time": "2026-11-21T00:00:00", "id": 1}).encode()).decode()
+    invalid = seeded_client.get("/api/notifications/inbox", params={"category": "latest", "cursor": invalid_cursor}, headers=headers)
+    assert invalid.status_code == 422
 
 
 def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seeded_db):
     rows = [_make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=str(i)) for i in range(3)]
     _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="other")
     assert notification_service.unread_profit_counts(seeded_db, recipient_user_id=2)["allocated_profit_count"] == 3
-    first, total = notification_service.list_notifications(
+    first, total = notification_query.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", limit=2,
     )
     assert total == 3
     assert [item.id for item in first] == [rows[2].id, rows[1].id]
     notification_service.mark_read_batch(seeded_db, [item.id for item in first], recipient_user_id=2, actor="pytest")
-    second, _ = notification_service.list_notifications(
+    second, _ = notification_query.list_notifications(
         seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", before_id=first[-1].id, limit=2,
     )
     assert [item.id for item in second] == [rows[0].id]
@@ -108,9 +114,9 @@ def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seed
     rows[1].created_at = datetime(2026, 11, 21, 10)
     rows[2].created_at = datetime(2026, 11, 21, 10)
     seeded_db.flush()
-    first, _ = notification_service.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, limit=2)
+    first, _ = notification_query.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, limit=2)
     assert [item.id for item in first] == [rows[0].id, rows[2].id]
-    next_page, _ = notification_service.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, before_created_at=first[-1].created_at, before_id=first[-1].id, limit=2)
+    next_page, _ = notification_query.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, before_created_at=first[-1].created_at, before_id=first[-1].id, limit=2)
     assert [item.id for item in next_page] == [rows[1].id]
 
 

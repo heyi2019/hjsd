@@ -1,14 +1,13 @@
 """SYS-01-04 系统通知接口。"""
 from __future__ import annotations
 
-from datetime import date, datetime, time, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.core.money import to_money
 from app.core.security import (
     CurrentUser,
     PERM_FINANCE_READ,
@@ -19,11 +18,11 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.notifications import Notification
-from app.domain.trade import Account, Order
-from app.domain.users import User
+from app.domain.trade import Order
 from app.shared.scope import owner_scope_filter
 from app.dashboard.notifications.profit_details import profit_details_for_notifications
-from app.dashboard.notifications import schemas, service
+from app.dashboard.notifications import query, schemas, service
+from app.dashboard.notifications.inventory import sync_inventory_notifications_for_user
 
 router = APIRouter(tags=["SYS-01-04 系统通知"])
 
@@ -33,36 +32,7 @@ def sync_inventory_notifications(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, int]:
-    """为当前用户可见的超期库存生成一次提醒，重复刷新不重复生成。"""
-    if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
-        return {"created": 0}
-    from app.business.stocks.inventory import _inventory_ledger_scope
-    from app.dashboard.service import _reminder_config
-
-    db.scalar(select(User.id).where(User.id == user.id).with_for_update())
-    days = _reminder_config(db)["inventory_aging_days"]
-    cutoff = datetime.combine(date.today() - timedelta(days=days), time.min)
-    pairs = db.execute(_inventory_ledger_scope(db, user).where(Account.inventory_entry_at < cutoff)).all()
-    existing = set(db.scalars(select(Notification.entity_id).where(
-        Notification.recipient_user_id == user.id,
-        Notification.notification_type == service.INVENTORY_AGING,
-        Notification.entity_type == "account",
-    )).all())
-    created = 0
-    for account, order in pairs:
-        key = str(account.id)
-        if key in existing:
-            continue
-        game_type = account.game_type or (order.account_snapshot or {}).get("game_type") or "未设置游戏类型"
-        service.create_notification(
-            db, recipient_user_id=user.id, notification_type=service.INVENTORY_AGING,
-            title="库存超期提醒", message=f"订单 {order.order_no} · {game_type} · 成本 {to_money(account.cost_amount)} · 库存 {account.stock_no or key} 已超过 {days} 天",
-            entity_type="account", entity_id=key,
-        )
-        existing.add(key)
-        created += 1
-    return {"created": created}
-
+    return {"created": sync_inventory_notifications_for_user(db, user)}
 
 @router.get("/notifications/pending-order", response_model=schemas.PendingProfitOrderOut)
 def pending_profit_order(
@@ -79,7 +49,7 @@ def pending_profit_order(
         ))
         items = [item] if item else []
     else:
-        items, _ = service.list_notifications(
+        items, _ = query.list_notifications(
             db, recipient_user_id=user.id, unread_only=True,
             notification_type=service.PROFIT_PENDING, entity_type="order", limit=1,
         )
@@ -113,7 +83,7 @@ def notification_inbox(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> schemas.NotificationInboxOut:
-    items, next_cursor = service.inbox_page(db, recipient_user_id=user.id, category=category, cursor=cursor, limit=limit)
+    items, next_cursor = query.inbox_page(db, recipient_user_id=user.id, category=category, cursor=cursor, limit=limit)
     return schemas.NotificationInboxOut(items=[schemas.NotificationOut.model_validate(item) for item in items], next_cursor=next_cursor)
 
 
@@ -131,7 +101,7 @@ def list_my_notifications(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> schemas.NotificationListOut:
-    items, total = service.list_notifications(
+    items, total = query.list_notifications(
         db,
         recipient_user_id=user.id,
         unread_only=unread_only,

@@ -5,12 +5,27 @@ import base64
 import json
 from datetime import datetime
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.domain.notifications import Notification
 from app.dashboard.notifications.service import INVENTORY_AGING, PROFIT_ALLOCATED, PROFIT_PENDING
+from app.core.security import CurrentUser, PERM_FINANCE_READ, PERM_ORDER_CREATE
+from app.domain.trade import Account
+
+
+def visibility_filter(session: Session, user: CurrentUser):
+    """历史库存提醒仍需满足当前账号的数据范围。"""
+    other = Notification.notification_type != INVENTORY_AGING
+    if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
+        return other
+    from app.business.stocks._common import scope_filter
+    visible = select(cast(Account.id, String))
+    scope = scope_filter(session, user)
+    if scope is not None:
+        visible = visible.where(scope)
+    return or_(other, and_(Notification.entity_type == "account", Notification.entity_id.in_(visible)))
 
 
 def _notification_query(recipient_user_id: int, *, category: str | None = None, notification_type: str | None = None, entity_type: str | None = None):
@@ -26,7 +41,7 @@ def _notification_query(recipient_user_id: int, *, category: str | None = None, 
     return stmt
 
 
-def inbox_page(session: Session, *, recipient_user_id: int, category: str, cursor: str | None, limit: int) -> tuple[list[Notification], str | None]:
+def inbox_page(session: Session, *, recipient_user_id: int, category: str, cursor: str | None, limit: int, user: CurrentUser | None = None) -> tuple[list[Notification], str | None]:
     """按未读优先和通知时间分页；同一轮分页不重复返回期间刚读过的消息。"""
     snapshot = datetime.now()
     phase = "unread"
@@ -46,6 +61,8 @@ def inbox_page(session: Session, *, recipient_user_id: int, category: str, curso
         except (ValueError, KeyError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
             raise Validation("通知分页游标无效") from exc
     base = _notification_query(recipient_user_id, category=category)
+    if user is not None:
+        base = base.where(visibility_filter(session, user))
     rows: list[Notification] = []
     for current in (["unread"] if category == "latest" else ["unread", "read"]):
         if phase == "read" and current == "unread":
@@ -76,10 +93,13 @@ def list_notifications(
     before_created_at: datetime | None = None,
     sort_by_time: bool = False,
     limit: int = 50,
+    user: CurrentUser | None = None,
 ) -> tuple[list[Notification], int]:
     if sort_by_time and (before_id is None) != (before_created_at is None):
         raise Validation("通知时间分页需要同时提供时间和编号")
     stmt = _notification_query(recipient_user_id, category=category, notification_type=notification_type, entity_type=entity_type)
+    if user is not None:
+        stmt = stmt.where(visibility_filter(session, user))
     if before_created_at is not None and before_id is not None and sort_by_time:
         stmt = stmt.where(or_(Notification.created_at < before_created_at, and_(Notification.created_at == before_created_at, Notification.id < before_id)))
     elif before_id is not None:

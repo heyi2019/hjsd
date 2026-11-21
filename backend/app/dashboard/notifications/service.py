@@ -85,14 +85,15 @@ def ensure_notification(
     )
 
 
-def unread_count(session: Session, *, recipient_user_id: int) -> int:
+def unread_count(session: Session, *, recipient_user_id: int, visibility=None) -> int:
+    stmt = select(func.count(Notification.id)).where(
+        Notification.recipient_user_id == recipient_user_id,
+        Notification.read_at.is_(None),
+    )
+    if visibility is not None:
+        stmt = stmt.where(visibility)
     return int(
-        session.scalar(
-            select(func.count(Notification.id)).where(
-                Notification.recipient_user_id == recipient_user_id,
-                Notification.read_at.is_(None),
-            )
-        )
+        session.scalar(stmt)
         or 0
     )
 

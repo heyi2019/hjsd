@@ -160,6 +160,12 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     assert seeded_client.post("/api/notifications/sync-inventory", headers=auth).status_code == 200
     read_rows = seeded_client.get("/api/notifications", params={"category": "inventory", "read_only": True}, headers=auth).json()["items"]
     assert len([row for row in read_rows if row["entity_id"] == str(account.id)]) == 1
+    visible.owner_id = 1
+    seeded_db.flush()
+    for path, params in [("/api/notifications", {"category": "inventory"}), ("/api/notifications/inbox", {"category": "inventory"})]:
+        response = seeded_client.get(path, params=params, headers=auth)
+        assert response.status_code == 200
+        assert not any(row["id"] == item["id"] for row in response.json()["items"])
 
 
 def test_mark_read_not_found(seeded_db):

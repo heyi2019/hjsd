@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
@@ -78,6 +79,48 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1]);
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalledWith([2]);
     expect(await screen.findByText("KU0007")).toBeInTheDocument();
+  });
+
+it("连续点击消息均能打开且保持滚动位置", async () => {
+    const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_PENDING", title: "分润", message: `订单 ${id}`, entity_type: "order", entity_id: `${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
+    const pending: Record<number, (value: { read_ids: number[] }) => void> = {};
+    vi.mocked(notificationsApi.markReadBatch).mockImplementation(([id]) => new Promise((resolve) => { pending[id] = resolve; }));
+    const open = vi.fn();
+    renderLight(<BusinessAlerts onPendingProfitNotificationsClick={open} />, { user: "admin" });
+    fireEvent.click(screen.getByRole("tab", { name: "售出消息" }));
+    const first = await screen.findByRole("button", { name: /订单 1/ });
+    const second = screen.getByRole("button", { name: /订单 2/ });
+    const scroll = document.querySelector(".business-alerts__scroll") as HTMLDivElement;
+    scroll.scrollTop = 150;
+    fireEvent.click(first);
+    fireEvent.click(second);
+    pending[1]({ read_ids: [1] });
+    await waitFor(() => expect(open).toHaveBeenCalledWith(1));
+    pending[2]({ read_ids: [2] });
+    await waitFor(() => expect(open).toHaveBeenCalledWith(2));
+    expect(scroll.scrollTop).toBe(150);
+  });
+
+it("停留工作台时定时刷新，滚动查看期间不打断", async () => {
+    const interval = vi.spyOn(window, "setInterval");
+    renderLight(<BusinessAlerts />, { user: "admin" });
+    await screen.findByText("暂无消息");
+    const calls = () => interval.mock.calls.filter((args) => args[1] === 5 * 60_000);
+    const run = async () => {
+      const handlers = calls();
+      const handler = handlers[handlers.length - 1]?.[0];
+      expect(typeof handler).toBe("function");
+      await act(async () => { (handler as () => void)(); });
+    };
+    const count = vi.mocked(notificationsApi.list).mock.calls.length;
+    await run();
+    await waitFor(() => expect(notificationsApi.list).toHaveBeenCalledTimes(count + 1));
+    const scroll = document.querySelector(".business-alerts__scroll") as HTMLDivElement;
+    scroll.scrollTop = 100;
+    await run();
+    expect(notificationsApi.list).toHaveBeenCalledTimes(count + 1);
+    interval.mockRestore();
   });
 
 it("标记已读失败时保留未读并可重试", async () => {

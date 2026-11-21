@@ -83,7 +83,7 @@ def notification_inbox(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> schemas.NotificationInboxOut:
-    items, next_cursor = query.inbox_page(db, recipient_user_id=user.id, category=category, cursor=cursor, limit=limit)
+    items, next_cursor = query.inbox_page(db, recipient_user_id=user.id, category=category, cursor=cursor, limit=limit, user=user)
     return schemas.NotificationInboxOut(items=[schemas.NotificationOut.model_validate(item) for item in items], next_cursor=next_cursor)
 
 
@@ -113,11 +113,12 @@ def list_my_notifications(
         before_created_at=before_created_at,
         sort_by_time=sort_by_time,
         limit=limit,
+        user=user,
     )
     return schemas.NotificationListOut(
         items=[schemas.NotificationOut.model_validate(item) for item in items],
         total=total,
-        unread_total=service.unread_count(db, recipient_user_id=user.id),
+        unread_total=service.unread_count(db, recipient_user_id=user.id, visibility=query.visibility_filter(db, user)),
     )
 
 

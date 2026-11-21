@@ -11,7 +11,7 @@ import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDet
 import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
 import { buildCustomerOptions, getPartySelectionDelta, groupCustomerIdsByRole, mergeCustomerSearch } from "@/business/OrderDetailView/OrderDetailPartySection";
 import type { OrderDetailMeta } from "@/business/OrderDetailView/OrderDetail.shared";
-import { orderFormFieldsApi } from "@/shared/api/orders.api";
+import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { renderApp, renderLight } from "@fixtures/render";
 
@@ -1338,6 +1338,35 @@ describe("OrderDetail", () => {
 // —— 原 OrderDetailImageGallery.test.tsx ——
 // 同属订单详情编辑链路，合并后保留图片替换/追加边界，同时减少一次 jsdom+React 启动。
 describe("OrderDetailImageGallery", () => {
+  it("订单详情放大时携带图片版本读取对应原图", async () => {
+    const load = vi.spyOn(ordersApi, "executionImage").mockResolvedValue("data:image/png;base64,original");
+    const previewAccount = { ...account, secondary_images: ["data:image/jpeg;base64,thumbnail"] };
+    const detail = { account: previewAccount, image_previews: true, image_versions: { secondary_images: ["version-1"] },
+      orders: [{ order_id: 35, order_no: "HS-35", order_type: "HS", events: [] }] } as unknown as AccountExecutionDetail;
+    renderLight(<OrderDetail row={previewAccount} detail={detail} contextOrderId={35} loading={false} />, { user: "admin" });
+    expect(load).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByAltText("二次图片 1"));
+    await waitFor(() => expect(load).toHaveBeenCalledWith(35, "secondary_images", 0, "version-1"));
+    await waitFor(() => expect(document.querySelector(".ant-image-preview-img")).toHaveAttribute("src", "data:image/png;base64,original"));
+  });
+  it("缩略图只在点击预览后请求对应原图", async () => {
+    const loadOriginal = vi.fn().mockResolvedValue("data:image/png;base64,original");
+    renderLight(<OrderDetailImageGallery images={["data:image/jpeg;base64,thumbnail"]} altPrefix="图片" loadOriginal={loadOriginal} />, { user: "admin" });
+    expect(loadOriginal).not.toHaveBeenCalled();
+    expect(screen.getByAltText("图片 1")).toHaveAttribute("src", "data:image/jpeg;base64,thumbnail");
+    fireEvent.click(screen.getByAltText("图片 1"));
+    await waitFor(() => expect(loadOriginal).toHaveBeenCalledWith(0));
+    await waitFor(() => expect(document.querySelector(".ant-image-preview-img")).toHaveAttribute("src", "data:image/png;base64,original"));
+  });
+  it("图片更新后忽略尚未返回的旧原图", async () => {
+    let finish!: (value: string) => void;
+    const loadOriginal = vi.fn(() => new Promise<string>((resolve) => { finish = resolve; }));
+    const { rerender } = renderLight(<OrderDetailImageGallery images={["old"]} altPrefix="图片" loadOriginal={loadOriginal} />, { user: "admin" });
+    fireEvent.click(screen.getByAltText("图片 1"));
+    rerender(<OrderDetailImageGallery images={["new"]} altPrefix="图片" loadOriginal={loadOriginal} />);
+    await act(async () => finish("old-original"));
+    expect(document.querySelector(".ant-image-preview-img")).toBeNull();
+  });
   it("相同图片重复出现时，替换指定位置不会改错另一张", async () => {
     const onChange = vi.fn();
     const duplicate = "data:image/png;base64,same";

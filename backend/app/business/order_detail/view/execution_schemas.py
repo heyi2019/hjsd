@@ -111,6 +111,8 @@ class ExecutionFinanceSummaryOut(BaseModel):
 
 class AccountExecutionDetailOut(BaseModel):
     account: AccountOut
+    image_previews: bool = False
+    image_versions: dict[str, list[str]] = Field(default_factory=dict)
     orders: list[AccountExecutionOrderOut]
     finance_summary: ExecutionFinanceSummaryOut
     detail_view: OrderDetailViewOut

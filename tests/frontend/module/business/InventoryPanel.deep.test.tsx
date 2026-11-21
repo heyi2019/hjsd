@@ -254,9 +254,25 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
   });
 
   it("运营 → 作图：打开图片编辑弹窗", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: inStockRow, orders: [] } as unknown as AccountExecutionDetail);
     await openPanel([inStockRow]);
     await clickOperation(rowOf(1), "作图");
     expect((await screen.findAllByText("作图")).length).toBeGreaterThan(0);
+  });
+
+  it("轻量库存行打开作图时先读取完整账号并保留已有图片", async () => {
+    const fullAccount = { ...inStockRow, account_images: ["data:image/png;base64,cHJvZmlsZQ=="] };
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: fullAccount, orders: [] } as unknown as AccountExecutionDetail);
+    vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
+    await openPanel([{ ...inStockRow, account_images: null }]);
+    await clickOperation(rowOf(1), "作图");
+    const modal = await screen.findByRole("dialog");
+    expect(await within(modal).findByRole("img", { name: "作图1" })).toHaveAttribute("src", "data:image/png;base64,cHJvZmlsZQ==");
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(21, { fresh: true });
+    await ui.click(within(modal).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(21, expect.objectContaining({
+      profile: { account_images: ["data:image/png;base64,cHJvZmlsZQ=="] },
+    })));
   });
 
   it("非代挂在库账号不展示下架入口", async () => {

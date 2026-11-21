@@ -8,7 +8,7 @@
  */
 import { Spin, Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 export function DataTable<T>(props: {
   columns: ColumnsType<T>;
@@ -56,6 +56,16 @@ export function DataTable<T>(props: {
   // 形成反馈闭环，使客户端自管翻页永远停在首页（行 11 永不出现）。回归见 DataTable.test
   // 用例“前端分页（默认）内部自管翻页，不回调调用方”。
   const prevPageRef = useRef(props.page);
+  const settledRows = useRef<T[]>([]);
+  const tableContent = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!props.loading) settledRows.current = props.rows;
+  }, [props.loading, props.rows]);
+  const displayedRows = props.loading ? settledRows.current : props.rows;
+  const refreshing = Boolean(props.loading && displayedRows.length);
+  useLayoutEffect(() => {
+    tableContent.current?.toggleAttribute("inert", refreshing);
+  }, [refreshing]);
 
   useEffect(() => {
     // 前端分页：尊重调用方期望的每页大小（缺省 10）；prop 变化时同步，覆盖初始值。
@@ -78,7 +88,7 @@ export function DataTable<T>(props: {
     if (!controlled && props.resetKey !== undefined) setInnerPage(1);
   }, [controlled, props.resetKey]);
 
-  if (props.loading) {
+  if (props.loading && !refreshing) {
     return (
       <div className="ui-table-loading" role="status" aria-live="polite" aria-busy="true" aria-label="正在加载数据">
         <Spin />
@@ -104,26 +114,29 @@ export function DataTable<T>(props: {
         },
       };
   const pagination = props.pagination !== undefined ? props.pagination : defaultPagination;
-  const tableScroll = props.rows.length > 0 ? (props.scroll ?? { x: "max-content" }) : undefined;
+  const tableScroll = displayedRows.length > 0 ? (props.scroll ?? { x: "max-content" }) : undefined;
 
   return (
     <div className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}>
-      <Table<T>
-        size={props.size ?? "small"}
-        columns={props.columns}
-        dataSource={props.rows}
-        rowKey={props.rowKey ?? defaultRowKey}
-        expandable={props.expandable}
-        rowSelection={props.rowSelection}
-        onRow={props.onRow}
-        // 有数据时横向滚动为默认标准；空数据不启用滚动容器，避免 antd 空态被固定高度或
-        // max-content 撑高。调用方传 scroll 仍只对有数据的表格生效。
-        scroll={tableScroll}
-        pagination={pagination}
-        locale={{
-          emptyText: <div className="ui-datatable__empty">{props.emptyText ?? "暂无数据"}</div>,
-        }}
-      />
+      <div ref={tableContent} aria-hidden={refreshing || undefined} aria-busy={refreshing || undefined}>
+        <Table<T>
+          size={props.size ?? "small"}
+          columns={props.columns}
+          dataSource={displayedRows}
+          rowKey={props.rowKey ?? defaultRowKey}
+          expandable={props.expandable}
+          rowSelection={props.rowSelection}
+          onRow={props.onRow}
+          // 有数据时横向滚动为默认标准；空数据不启用滚动容器，避免 antd 空态被固定高度或
+          // max-content 撑高。调用方传 scroll 仍只对有数据的表格生效。
+          scroll={tableScroll}
+          pagination={pagination}
+          locale={{
+            emptyText: <div className="ui-datatable__empty">{props.emptyText ?? "暂无数据"}</div>,
+          }}
+        />
+      </div>
+      {refreshing ? <div className="ui-table-refresh" role="status" aria-live="polite" aria-label="正在更新数据"><Spin size="small" /><span>正在更新数据…</span></div> : null}
     </div>
   );
 }

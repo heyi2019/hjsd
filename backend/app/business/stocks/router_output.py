@@ -51,9 +51,16 @@ def _account_output(
     *,
     extra_values: dict[str, object] | None = None,
     inventory_operator: str | None = None,
+    include_images: bool = True,
 ) -> AccountOut:
     """统一补齐库存来源订单；业务与类型以标准导入的账号字段为准。"""
-    output = AccountOut.model_validate(account)
+    if include_images:
+        output = AccountOut.model_validate(account)
+    else:
+        image_fields = {"secondary_images", "wallet_realname_images", "account_images"}
+        values = {column.key: getattr(account, column.key) for column in Account.__table__.columns
+                  if column.key in AccountOut.model_fields and column.key not in image_fields}
+        output = AccountOut.model_validate(values)
     output.extra_values = extra_values or {}
     if source_order is not None:
         output.source_order_id = source_order.id
@@ -69,6 +76,7 @@ def _account_outputs(
     user: CurrentUser | None = None,
     *,
     loaded_orders: list[Order] | None = None,
+    include_images: bool = True,
 ) -> list[AccountOut]:
     """批量补齐库存来源订单，避免列表逐账号查询。"""
     if loaded_orders is not None and user is not None:
@@ -101,6 +109,7 @@ def _account_outputs(
             account,
             source_orders.get(account.id),
             extra_values=extra_values.get(account.id),
+            include_images=include_images,
             inventory_operator=(
                 "、".join(
                     user_names[item]

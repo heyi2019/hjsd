@@ -288,6 +288,30 @@ async function clickModalOk(modal: HTMLElement) {
 }
 
 describe("OrdersPage：操作与筛选分支", () => {
+  it("订单预览使用缩略图，进入编辑前重新读取原图", async () => {
+    const original = "data:image/png;base64,original";
+    const preview = "data:image/jpeg;base64,thumbnail";
+    const selected = { ...order1, id: 1, account_id: 1 };
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async (_id, options) => ({
+      account: { id: 1, source_order_id: 1, account_images: [options?.imagePreviews ? preview : original] },
+      image_previews: Boolean(options?.imagePreviews),
+      orders: [],
+    }) as never);
+    function Probe() {
+      const ledger = useLedgerInlineEdit();
+      return <><Form form={ledger.invEditExtraForm} /><button onClick={() => void ledger.loadLedgerOrderDetail(1)}>展开</button>
+        <button onClick={() => void ledger.openLedgerEditor(selected)}>编辑</button>
+        <span>{`预览:${ledger.ledgerOrderDetails[1]?.account.account_images?.[0] ?? "无"}`}</span>
+        <span>{`草稿:${ledger.editingAccount?.account_images?.[0] ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "展开" }));
+    await screen.findByText(`预览:${preview}`);
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText(`草稿:${original}`);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true });
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { fresh: true });
+  });
   it("订单保存失败后，之前等待加载的其他订单不能覆盖当前草稿", async () => {
     let resolveSecond!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     const second = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveSecond = resolve; });
@@ -383,6 +407,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("类型筛选：切换 Segmented 后仅保留该类型订单", async () => {
+    vi.mocked(ordersApi.listPage).mockImplementation(async (params) => pageResponse(params?.order_type === "HS" ? [order1] : orders));
     await openLedger();
     fireEvent.click(screen.getByRole("radio", { name: /回收/ }));
     await waitFor(() => expect(screen.queryByText("DG-2026-0002")).toBeNull());
@@ -390,6 +415,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
 
   it("业务模式筛选：切换到分销后过滤自营订单", async () => {
+    vi.mocked(ordersApi.listPage).mockImplementation(async (params) => pageResponse(params?.business_mode === "DISTRIBUTION" ? [order2] : orders));
     await openLedger();
     fireEvent.click(screen.getByRole("radio", { name: "分销" }));
     await waitFor(() => expect(screen.queryByText("HS-2026-0001")).toBeNull());
@@ -918,7 +944,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(ordersApi.get).mockResolvedValue(order2);
     await openLedger();
     await openRowMenu("HS-2026-0001", "编辑");
-    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { fresh: true }));
     await openRowMenu("DG-2026-0002", "资金收支");
     const modal = await modalOf(/资金收支 · DG-2026-0002/);
     await act(async () => finish({

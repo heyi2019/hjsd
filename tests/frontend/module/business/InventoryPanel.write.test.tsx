@@ -337,6 +337,30 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(screen.getByRole("button", { name: "编辑乙" }));
     await screen.findByText("编辑行:2,草稿:无");
   });
+  it("库存详情预览后编辑会重新取得原图", async () => {
+    const original = "data:image/png;base64,original";
+    const thumbnail = "data:image/jpeg;base64,thumbnail";
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async (_id, options) => ({
+      account: { ...accounts[0], account_images: [options?.imagePreviews ? thumbnail : original] },
+      image_previews: Boolean(options?.imagePreviews), orders: [],
+    }) as never);
+    function Probe() {
+      const [, setRows] = useState<InventoryOrderRow[]>([]);
+      const [, setError] = useState<{ message: string; code?: string } | null>(null);
+      const [draft, setDraft] = useState("");
+      const removed = useRef(new Set<number>());
+      const cache = useExecutionCache({ setRows, setError, locallyRemovedIdsRef: removed });
+      return <><button onClick={() => void cache.loadOrderExecution(21)}>展开</button>
+        <button onClick={() => void cache.loadEditorExecution(accounts[0] as Account, 21).then((detail) => setDraft(detail?.account.account_images?.[0] ?? ""))}>编辑</button>
+        <span>{`预览:${cache.orderExecutionDetails[21]?.account.account_images?.[0] ?? "无"}`}</span><span>{`草稿:${draft}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "展开" }));
+    await screen.findByText(`预览:${thumbnail}`);
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText(`草稿:${original}`);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(21, { fresh: true });
+  });
   it.each(["success", "failure"])("库存详情强制刷新后忽略更早请求的%s结果", async (oldResult) => {
     let resolveOld!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     let rejectOld!: (error: Error) => void;
@@ -1036,7 +1060,7 @@ describe("InventoryPanel：写入与长路径", () => {
 
     await screen.findByRole("button", { name: "保存修改" });
     expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
-    expect(ordersApi.executionDetail).toHaveBeenCalledWith(21);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(21, { fresh: true });
   });
 
   it("上架提交保留大额寄售价精度", async () => {

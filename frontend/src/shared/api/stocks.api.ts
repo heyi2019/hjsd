@@ -22,7 +22,7 @@ export const stocksApi = {
     type_counts: Record<string, number>;
     game_types: string[];
     stats: InventoryStats;
-  }>("/stocks/inventory/ledger", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
+  }>("/stocks/inventory/ledger", { params: { ...params, include_images: false }, paramsSerializer: { indexes: null } }).then((r) => r.data),
   inventoryLedgerExport: async (params: {
     business_mode?: string;
     inventory_type?: string;

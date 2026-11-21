@@ -222,10 +222,10 @@ export function OrderDetailProfileSection({
           </Descriptions>
           <Descriptions className="order-detail__meta-table" size="small" bordered column={2}>
             <Descriptions.Item label="二次图片（选填）">
-              <OrderDetailImageGallery images={images.secondary} altPrefix="二次图片" ownerKey={account?.id} editing={editing} onChange={(next) => onProfileChange?.({ secondary_images: next })} />
+              <OrderDetailImageGallery images={images.secondary} field="secondary_images" altPrefix="二次图片" ownerKey={account?.id} editing={editing} onChange={(next) => onProfileChange?.({ secondary_images: next })} />
             </Descriptions.Item>
             <Descriptions.Item label="钱包实名图片（选填）">
-              <OrderDetailImageGallery images={images.walletRealname} altPrefix="钱包实名图片" ownerKey={account?.id} editing={editing} onChange={(next) => onProfileChange?.({ wallet_realname_images: next })} />
+              <OrderDetailImageGallery images={images.walletRealname} field="wallet_realname_images" altPrefix="钱包实名图片" ownerKey={account?.id} editing={editing} onChange={(next) => onProfileChange?.({ wallet_realname_images: next })} />
             </Descriptions.Item>
           </Descriptions>
         </div>

@@ -419,7 +419,7 @@ describe("OrdersPage：四类订单台账", () => {
     await ui.type(screen.getByLabelText("搜索订单"), "批量验收");
 
     expect((await screen.findAllByText("DG-2026-0003")).length).toBeGreaterThan(0);
-    expect(screen.queryByText("HS-2026-0001")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("HS-2026-0001")).toBeNull());
   });
 
   it("订单台账提供游戏类型下拉筛选", async () => {
@@ -568,7 +568,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getByText("资金明细")).toBeInTheDocument();
     expect(screen.getByText("操作明细")).toBeInTheDocument();
     expect(screen.getByText("参与方信息")).toBeInTheDocument();
-    expect(vi.mocked(ordersApi.executionDetail)).toHaveBeenCalledWith(1);
+    expect(vi.mocked(ordersApi.executionDetail)).toHaveBeenCalledWith(1, { imagePreviews: true });
   });
 
   it("同一账号有多张订单时，订单台账展开使用当前订单的详情上下文", async () => {
@@ -743,7 +743,7 @@ describe("OrdersPage：四类订单台账", () => {
     // 先展开行，让台账缓存一份「无寄售」的旧详情。
     const row = screen.getAllByText("HS-2026-0001").find((e) => e.closest("tr"))?.closest("tr");
     fireEvent.click(row!.querySelector(".ant-table-row-expand-icon") as Element);
-    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true }));
 
     // 随后在别处登记了寄售；回到台账点开运营下拉应拿到最新详情并显示下架。
     vi.mocked(ordersApi.executionDetail).mockResolvedValue(fresh as never);
@@ -979,7 +979,7 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     await accountUi.click(within(row as HTMLElement).getByRole("button", { name: "编辑" }));
     await screen.findByRole("button", { name: "保存修改" });
     expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1);
-    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1);
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { fresh: true });
   });
 
   it("只读订单详情加载员工列表并回显交付操作人", async () => {

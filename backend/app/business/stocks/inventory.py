@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy import Date, case, cast, exists, func, or_, select
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from app.core.money import to_money
 from app.core.like_pattern import like_contains
@@ -94,6 +94,7 @@ def inventory_ledger(
     inventory_operator_ids: list[int] | None = None,
     age_gt_days: int | None = None,
     limit: int | None = 10, offset: int = 0, user: CurrentUser | None = None,
+    include_images: bool = True,
 ) -> dict[str, Any]:
     """服务端筛选、排序、分页库存台账，并返回分页所需统计。"""
     type_expr = func.coalesce(
@@ -152,7 +153,12 @@ def inventory_ledger(
     filtered = stmt()
     total = int(session.scalar(select(func.count()).select_from(filtered.subquery())) or 0)
     order_by = Order.id.desc() if sort_desc else Order.id.asc()
-    items = list(session.execute(filtered.order_by(order_by).limit(limit).offset(offset)).all())
+    item_query = filtered.order_by(order_by).limit(limit).offset(offset)
+    if not include_images:
+        item_query = item_query.options(
+            defer(Account.secondary_images), defer(Account.wallet_realname_images), defer(Account.account_images),
+        )
+    items = list(session.execute(item_query).all())
     facet_query = stmt(include_type=False, include_search_date=False).with_only_columns(
         type_expr, func.count(Account.id), maintain_column_froms=True,
     ).group_by(type_expr)

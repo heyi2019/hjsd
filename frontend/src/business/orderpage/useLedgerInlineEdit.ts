@@ -40,12 +40,12 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     if (order.account_id == null) return;
     await loadLedgerOrderDetail(order.id, force);
   };
-  const loadLedgerOrderDetail = async (orderId: number, force = false): Promise<AccountExecutionDetail | null> => {
+  const loadLedgerOrderDetail = async (orderId: number, force = false, full = false): Promise<AccountExecutionDetail | null> => {
     if (!force && ledgerOrderDetails[orderId]) return ledgerOrderDetails[orderId];
     if (!force && detailRequestsRef.current[orderId]) return detailRequestsRef.current[orderId];
     const version = detailVersions.start(orderId);
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
-    const request = ordersApi.executionDetail(orderId)
+    const request = ordersApi.executionDetail(orderId, full ? { fresh: true } : { imagePreviews: true })
       .then(async (detail) => {
         if (!detailVersions.isCurrent(orderId, version)) return null;
         setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
@@ -97,7 +97,13 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
       const isCurrentAction = () => action === undefined || Boolean(params.actionRequest?.isCurrent(action));
       const intent = editIntent.start();
       orderDetailEditor.cancelPendingOpen();
-      const detail = await loadLedgerOrderDetail(order.id);
+      let detail = await loadLedgerOrderDetail(order.id, false, !ledgerOrderDetails[order.id] && !detailRequestsRef.current[order.id]);
+      if (detail?.image_previews && editIntent.isCurrent(intent) && isCurrentAction()) {
+        detail = await ordersApi.executionDetail(order.id, { fresh: true });
+        if (editIntent.isCurrent(intent) && isCurrentAction()) {
+          setLedgerOrderDetails((current) => ({ ...current, [order.id]: detail! }));
+        }
+      }
       if (!detail || !editIntent.isCurrent(intent) || !isCurrentAction()) return;
       const opened = await orderDetailEditor.openEditor(detail.account, isCurrentAction);
       if (opened && editIntent.isCurrent(intent) && isCurrentAction()) setExpandedOrderIds([String(order.id)]);

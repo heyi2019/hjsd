@@ -2,6 +2,9 @@ import { DeleteOutlined, EditOutlined, EyeOutlined, PlusOutlined } from "@ant-de
 import { Image, Space } from "antd";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useKeyedLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
+import { appMessage } from "../../shared/ui/appFeedback";
+import { normalizeError } from "../../shared/api/client";
+import { useImageOriginalLoader, type AccountImageField } from "./imageOriginalContext";
 
 type OrderDetailImageGalleryProps = {
   images: string[];
@@ -10,20 +13,31 @@ type OrderDetailImageGalleryProps = {
   editing?: boolean;
   onChange?: (images: string[]) => void;
   ownerKey?: string | number | null;
+  field?: AccountImageField;
+  loadOriginal?: (index: number) => Promise<string>;
 };
 
 type ImageEntry = { id: number; src: string };
 
 /** 详情只读图片统一展示：空值用短横线，有值展示缩略图并支持预览。 */
-export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing = false, onChange, ownerKey }: OrderDetailImageGalleryProps) {
+export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing = false, onChange, ownerKey, field, loadOriginal }: OrderDetailImageGalleryProps) {
   const visibleImages = images.slice(0, limit);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState(0);
+  const [previewSource, setPreviewSource] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const originalLoader = useImageOriginalLoader();
+  const previewSession = useRequestSession(ownerKey);
   const nextImageId = useRef(0);
   const currentImages = useRef<ImageEntry[] | null>(null);
   if (currentImages.current === null) currentImages.current = images.map((src) => ({ id: ++nextImageId.current, src }));
   const session = useRequestSession(editing ? ownerKey ?? "editing" : null);
   const replacements = useKeyedLatestRequest<number>();
+  useLayoutEffect(() => {
+    previewSession.invalidate();
+    setPreviewLoading(false);
+    setPreviewVisible(false);
+    setPreviewSource("");
+  }, [images, previewSession]);
   useLayoutEffect(() => {
     const remaining = [...(currentImages.current ?? [])];
     currentImages.current = images.map((src) => {
@@ -32,6 +46,23 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
     });
   }, [images]);
   if (!editing && !visibleImages.length) return "-";
+
+  const openPreview = async (index: number) => {
+    const version = previewSession.start();
+    setPreviewLoading(true);
+    try {
+      const source = loadOriginal ? await loadOriginal(index)
+        : !editing && field && originalLoader ? await originalLoader(field, index)
+          : visibleImages[index];
+      if (!previewSession.isCurrent(version)) return;
+      setPreviewSource(source);
+      setPreviewVisible(true);
+    } catch (error) {
+      if (previewSession.isCurrent(version)) appMessage.error(normalizeError(error).message || "原图加载失败，请重试");
+    } finally {
+      if (previewSession.isCurrent(version)) setPreviewLoading(false);
+    }
+  };
 
   const readImageData = (file: Blob) => new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -76,22 +107,23 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
 
   return (
     <Image.PreviewGroup
+      items={previewSource ? [previewSource] : []}
       preview={{
         visible: previewVisible,
-        current: previewIndex,
         onVisibleChange: setPreviewVisible,
       }}
     >
       <Space wrap className="order-detail__image-gallery">
         {visibleImages.map((src, index) => (
           <span key={`${altPrefix}-${src}-${index}`} className="order-detail__image-card">
-            <Image src={src} alt={`${altPrefix} ${index + 1}`} preview={false} />
+            <Image src={src} alt={`${altPrefix} ${index + 1}`} preview={false} onClick={() => { if (!previewLoading) void openPreview(index); }} />
             <span className="order-detail__image-actions">
               <button
                 type="button"
                 className="order-detail__image-action"
                 aria-label={`预览${altPrefix} ${index + 1}`}
-                onClick={() => { setPreviewIndex(index); setPreviewVisible(true); }}
+                disabled={previewLoading}
+                onClick={() => void openPreview(index)}
               >
                 <EyeOutlined />
               </button>

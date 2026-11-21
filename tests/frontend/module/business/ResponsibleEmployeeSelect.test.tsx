@@ -18,6 +18,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 }));
 
 import * as client from "@/shared/api/client";
+import { employeesApi } from "@/shared/api/org.api";
 import { ResponsibleEmployeeSelect } from "@/business/ResponsibleEmployeeSelect";
 import { defaultOperatorUserIds } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 
@@ -37,6 +38,7 @@ function Harness() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(employeesApi, "list").mockResolvedValue(employees);
   // 让 /auth/me 这条兜底路径失效：本用例只验证「按 username 匹配」这一条，
   // 若它挂了，默认值必须由 username 命中，而不是被异步接口掩盖。
   vi.mocked(client.currentUser).mockRejectedValue(new Error("no session"));

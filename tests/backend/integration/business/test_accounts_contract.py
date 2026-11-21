@@ -58,6 +58,78 @@ def _buy(seeded_db, account, amount="500"):
     return order
 
 class TestCreateAccountGuards:
+    def test_execution_detail_can_return_compressed_previews_without_changing_originals(self, seeded_client, seeded_db, headers):
+        import base64
+        from io import BytesIO
+        from PIL import Image
+
+        image = Image.effect_noise((900, 900), 80).convert("RGB")
+        buffer = BytesIO()
+        image.save(buffer, format="PNG")
+        original = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+        account = _account(seeded_db, "execution-preview-images")
+        account.account_images = [original]
+        order = _buy(seeded_db, account)
+        seeded_db.flush()
+
+        preview = seeded_client.get(f"/api/orders/{order.id}/execution-detail", params={"image_previews": "true"}, headers=headers)
+        assert preview.status_code == 200, preview.text
+        data = preview.json()
+        assert data["image_previews"] is True
+        thumbnail = data["account"]["account_images"][0]
+        assert len(thumbnail) < len(original) // 4
+        with Image.open(BytesIO(base64.b64decode(thumbnail.split(",", 1)[1]))) as resized:
+            assert max(resized.size) <= 320
+
+        version = data["image_versions"]["account_images"][0]
+        image_response = seeded_client.get(f"/api/orders/{order.id}/execution-images/account_images/0", params={"version": version}, headers=headers)
+        assert image_response.status_code == 200
+        assert image_response.json()["image"] == original
+        assert seeded_client.get(f"/api/orders/{order.id}/execution-images/not_a_field/0", headers=headers).status_code == 422
+        assert seeded_client.get(f"/api/orders/{order.id}/execution-images/account_images/0", params={"version": "outdated"}, headers=headers).status_code == 409
+
+        full = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
+        assert full.json()["account"]["account_images"] == [original]
+        seeded_db.refresh(account)
+        assert account.account_images == [original]
+
+    def test_inventory_light_page_omits_images_without_loading_them_and_detail_keeps_images(self, seeded_client, seeded_db, headers):
+        from sqlalchemy import event
+
+        account = _account(seeded_db, "light-inventory-images")
+        account.secondary_images = ["data:image/png;base64,secondary"]
+        account.wallet_realname_images = ["data:image/png;base64,wallet"]
+        account.account_images = ["data:image/png;base64,profile"]
+        order = _buy(seeded_db, account)
+        account_id, order_id = account.id, order.id
+        seeded_db.flush()
+        seeded_db.expire_all()
+        statements = []
+
+        def record_sql(_conn, _cursor, statement, _parameters, _context, _many):
+            statements.append(" ".join(statement.lower().split()))
+
+        connection = seeded_db.connection()
+        event.listen(connection, "before_cursor_execute", record_sql)
+        try:
+            response = seeded_client.get("/api/stocks/inventory/ledger", params={"include_images": "false"}, headers=headers)
+        finally:
+            event.remove(connection, "before_cursor_execute", record_sql)
+        assert response.status_code == 200, response.text
+        row = next(item["account"] for item in response.json()["items"] if item["account"]["id"] == account_id)
+        assert row["secondary_images"] is None
+        assert row["wallet_realname_images"] is None
+        assert row["account_images"] is None
+        assert not any("where stocks.id =" in sql and any(name in sql for name in ("secondary_images", "wallet_realname_images", "account_images")) for sql in statements)
+
+        detail = seeded_client.get(f"/api/orders/{order_id}/execution-detail", headers=headers)
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["account"]["secondary_images"] == ["data:image/png;base64,secondary"]
+        assert detail.json()["account"]["wallet_realname_images"] == ["data:image/png;base64,wallet"]
+        assert detail.json()["account"]["account_images"] == ["data:image/png;base64,profile"]
+        normal = seeded_client.get("/api/stocks/inventory/ledger", headers=headers)
+        assert next(item["account"] for item in normal.json()["items"] if item["account"]["id"] == account_id)["account_images"] == ["data:image/png;base64,profile"]
+
     def test_inventory_search_matches_cost_amount(self, seeded_db):
         account = _account(seeded_db, "amount-search-inventory")
         _buy(seeded_db, account, amount="5432.10")
@@ -600,6 +672,10 @@ class TestAccountsApi:
             f"/api/orders/{other_order.id}/execution-detail", headers=headers
         )
         assert hidden_detail.status_code == 404
+        hidden_image = seeded_client.get(
+            f"/api/orders/{other_order.id}/execution-images/account_images/0", headers=headers
+        )
+        assert hidden_image.status_code == 404
 
         inventory = seeded_client.get(
             "/api/stocks/inventory/ledger",

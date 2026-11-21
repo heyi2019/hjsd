@@ -161,7 +161,7 @@ export function OrderDetailOperationSection({
       ...makeRows("consignment", "上架平台", meta.listedPlatform, meta.listedAt, meta.listedOperator), ...createdRows("consignment"),
       ...makeRows("unlist", "下架平台", meta.unlistedPlatform, meta.unlistedAt, meta.unlistedOperator), ...createdRows("unlist"),
       ...makeRows("description", "描述", meta.accountDescription, meta.descriptionAt, meta.descriptionOperator), ...createdRows("description"),
-      ...makeRows("images", "作图", <OrderDetailImageGallery images={account?.account_images ?? []} altPrefix="作图" limit={9} />, meta.imagesAt, meta.imagesOperator), ...createdRows("images"),
+      ...makeRows("images", "作图", <OrderDetailImageGallery images={account?.account_images ?? []} field="account_images" ownerKey={account?.id} altPrefix="作图" limit={9} />, meta.imagesAt, meta.imagesOperator), ...createdRows("images"),
     ];
   }, [account, meta, operationDrafts, operationEvents]);
 

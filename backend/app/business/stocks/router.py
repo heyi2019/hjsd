@@ -123,6 +123,7 @@ def inventory_ledger(
     sort_desc: bool = Query(default=True),
     limit: int = Query(default=10, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    include_images: bool = Query(default=True),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> InventoryLedgerOut:
@@ -132,12 +133,12 @@ def inventory_ledger(
         game_type=game_type, keyword=keyword, date_from=date_from,
         date_to=date_to, inventory_operator_ids=inventory_operator_ids,
         age_gt_days=age_gt_days,
-        sort_desc=sort_desc, limit=limit, offset=offset, user=user,
+        sort_desc=sort_desc, limit=limit, offset=offset, user=user, include_images=include_images,
     )
     pairs = result["items"]
     accounts = [account for account, _order in pairs]
     orders = [order for _account, order in pairs]
-    account_outputs = _account_outputs(db, accounts, user, loaded_orders=orders)
+    account_outputs = _account_outputs(db, accounts, user, loaded_orders=orders, include_images=include_images)
     order_outputs = build_order_list_payload(db, orders, accounts=accounts)
     return InventoryLedgerOut(
         items=[{"account": account, "order": order}

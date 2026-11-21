@@ -14,6 +14,8 @@ import {
   VALUE_ADDED_SERVICE_LABEL,
 } from "../../shared/lib/labels";
 import { OrderDetailView } from "./OrderDetailView";
+import { ImageOriginalContext } from "./imageOriginalContext";
+import { ordersApi } from "../../shared/api/orders.api";
 import {
   type OrderEventDraft,
   type OrderOperationDraft,
@@ -238,7 +240,10 @@ export function OrderDetail({
 
   if (loading && !detail) return <Spin size="small" />;
 
+  const previewOrderId = contextOrderId ?? scopedDetail?.orders[0]?.order_id;
   return (
+    <ImageOriginalContext.Provider value={scopedDetail?.image_previews && previewOrderId != null && !editing
+      ? (field, index) => ordersApi.executionImage(previewOrderId, field, index, scopedDetail.image_versions?.[field]?.[index]) : null}>
     <OrderDetailView
       meta={meta}
       detail={scopedDetail}
@@ -272,5 +277,6 @@ export function OrderDetail({
       onCancel={onCancel}
       saving={saving}
     />
+    </ImageOriginalContext.Provider>
   );
 }

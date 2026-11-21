@@ -70,7 +70,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     accountLoadingByOrder.current[orderId] = row.id;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
-      const detail = await ordersApi.executionDetail(orderId);
+      const detail = await ordersApi.executionDetail(orderId, { imagePreviews: true });
       if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(row.id, accountVersion)) return;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
@@ -92,7 +92,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     orderLoadingTokens.current[orderId] = token;
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
-      const detail = await ordersApi.executionDetail(orderId);
+      const detail = await ordersApi.executionDetail(orderId, { imagePreviews: true });
       if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(detail.account.id, accountSnapshot.get(detail.account.id) ?? 0)) return null;
       orderAccountIds.current[orderId] = detail.account.id;
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
@@ -111,7 +111,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   }
 
   /** 动作弹窗读取最新订单；刷新抢先完成时重读，避免旧快照回写或用于交易。 */
-  async function loadActionExecution(row: Account, isActive: () => boolean): Promise<ActionExecution | null> {
+  async function loadActionExecution(row: Account, isActive: () => boolean, options?: { fresh?: boolean }): Promise<ActionExecution | null> {
     const orderId = row.source_order_id;
     if (orderId == null) return null;
     while (isActive()) {
@@ -125,7 +125,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
       orderLoadingTokens.current[orderId] = token;
       setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
       try {
-        const detail = await ordersApi.executionDetail(orderId);
+        const detail = options?.fresh ? await ordersApi.executionDetail(orderId, { fresh: true }) : await ordersApi.executionDetail(orderId);
         if (!isActive()) return null;
         if (!isCurrent()) continue;
         setExecutionDetails((current) => isCurrent() ? { ...current, [row.id]: detail } : current);
@@ -148,7 +148,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
   /** 编辑入口同时需要账号详情与当前订单详情，两者是同一份订单执行快照。 */
   async function loadEditorExecution(row: Account, orderId: number): Promise<AccountExecutionDetail | null> {
     const cached = executionDetails[row.id] ?? orderExecutionDetails[orderId];
-    if (cached) {
+    if (cached && !cached.image_previews) {
       setExecutionDetails((current) => current[row.id] ? current : { ...current, [row.id]: cached });
       setOrderExecutionDetails((current) => current[orderId] ? current : { ...current, [orderId]: cached });
       return cached;
@@ -164,7 +164,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
-      const detail = await ordersApi.executionDetail(orderId);
+      const detail = await ordersApi.executionDetail(orderId, { fresh: true });
       if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(row.id, accountVersion)) return null;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));

@@ -1,4 +1,4 @@
-import { api } from "../client";
+import { api, type CacheAwareRequestConfig } from "../client";
 import type { PageResponse } from "../types/common";
 import type { EventPostResult } from "../types/order-events";
 import type { Order } from "../types/orders";
@@ -100,8 +100,13 @@ export const ordersApi = {
       .then((r) => r.data),
   get: (orderId: number) =>
     api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
-  executionDetail: (orderId: number) =>
-    api.get<AccountExecutionDetail>(`/orders/${orderId}/execution-detail`).then((r) => r.data),
+  executionDetail: (orderId: number, options?: { fresh?: boolean; imagePreviews?: boolean }) =>
+    api.get<AccountExecutionDetail>(`/orders/${orderId}/execution-detail`, options ? {
+      ...(options.fresh ? { refreshCache: true } : {}),
+      ...(options.imagePreviews ? { params: { image_previews: true } } : {}),
+    } as CacheAwareRequestConfig : undefined).then((r) => r.data),
+  executionImage: (orderId: number, field: "secondary_images" | "wallet_realname_images" | "account_images", index: number, version?: string) =>
+    api.get<{ image: string }>(`/orders/${orderId}/execution-images/${field}/${index}`, { refreshCache: true, params: { version } } as CacheAwareRequestConfig).then((r) => r.data.image),
   updateExecution: (orderId: number, payload: OrderExecutionEditPayload) =>
     api.patch<{ ok: boolean }>(`/orders/${orderId}/execution-edit`, payload).then((r) => r.data),
   cancel: (orderId: number, payload: { reason: string; form_extra?: Record<string, unknown>; form_extra_scope?: string }) =>

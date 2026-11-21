@@ -240,6 +240,25 @@ describe("DataTable：三态一致（加载 / 空 / 有数据）", () => {
     expect(container.querySelector(".ant-table")).toBeNull();
   });
 
+  it("已有数据刷新时保留表格并禁止操作，完成后显示新结果", () => {
+    const onPageChange = vi.fn();
+    const props = { columns: tableColumns, rows: tableRows, page: 1, pageSize: 10, total: 12, onPageChange };
+    const { container, rerender } = render(<DataTable {...props} />);
+    const table = container.querySelector(".ant-table");
+    expect(table).toBeTruthy();
+
+    rerender(<DataTable {...props} rows={[]} loading />);
+    expect(container.querySelector(".ant-table")).toBe(table);
+    expect(screen.getByRole("status", { name: "正在更新数据" })).toBeInTheDocument();
+    expect(container.querySelector("[inert]")?.contains(table)).toBe(true);
+
+    rerender(<DataTable {...props} rows={[{ id: 101, name: "新结果" }]} total={1} />);
+    expect(container.querySelector(".ant-table")).toBe(table);
+    expect(container.querySelector("[inert]")).toBeNull();
+    expect(screen.getByText("新结果")).toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "正在更新数据" })).toBeNull();
+  });
+
   it("空数据渲染空态与自定义文案", () => {
     const { container } = render(
       <DataTable columns={tableColumns} rows={[]} page={1} pageSize={10} total={0} emptyText="暂无订单" onPageChange={() => {}} />,

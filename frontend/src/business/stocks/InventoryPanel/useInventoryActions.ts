@@ -32,7 +32,7 @@ export function useInventoryActions(params: {
   // cache 域注入
   loadExecution: (row: Account, force?: boolean) => Promise<void>;
   loadOrderExecution: (orderId: number, force?: boolean) => Promise<AccountExecutionDetail | null>;
-  loadActionExecution: (row: Account, isActive: () => boolean) => Promise<ActionExecution | null>;
+  loadActionExecution: (row: Account, isActive: () => boolean, options?: { fresh?: boolean }) => Promise<ActionExecution | null>;
   loadEditorExecution: (row: Account, orderId: number) => Promise<AccountExecutionDetail | null>;
   dropExecutionCache: (accountId: number) => void;
   expandTo: (ids: Key[]) => void;
@@ -77,8 +77,24 @@ export function useInventoryActions(params: {
   const editIntent = useLatestRequest();
   const editRequestsRef = useRef<Record<string, Promise<AccountExecutionDetail | null>>>({});
   function openProfile(account: Account, mode: OrderProfileTarget["mode"]) {
-    actionRequest.start();
-    setProfileTarget({ account, mode });
+    const request = actionRequest.start();
+    if (mode !== "images") {
+      setProfileTarget({ account, mode });
+      return;
+    }
+    if (account.source_order_id == null) {
+      appMessage.warning("当前账号没有绑定来源订单，无法读取图片");
+      return;
+    }
+    void withActionDetail(account, request, Promise.resolve(), (detail) => {
+      if (detail.account.id !== account.id) {
+        setError({ message: "账号详情与当前库存不一致，请刷新后重试" });
+        return;
+      }
+      setProfileTarget({ account: detail.account, mode });
+    }, { fresh: true }).catch((cause) => {
+      if (actionRequest.isCurrent(request)) setError(normalizeError(cause));
+    });
   }
   async function openEditor(account: Account, orderId?: number) {
     const action = actionRequest.start();
@@ -130,10 +146,11 @@ export function useInventoryActions(params: {
     request: number,
     dependencies: Promise<T>,
     onReady: (detail: AccountExecutionDetail, dependencies: T) => void,
+    options?: { fresh?: boolean },
   ) {
     const isActive = () => actionRequest.isCurrent(request);
-    let [result, values] = await Promise.all([loadActionExecution(account, isActive), dependencies]);
-    while (result && isActive() && !result.isCurrent()) result = await loadActionExecution(account, isActive);
+    let [result, values] = await Promise.all([loadActionExecution(account, isActive, options), dependencies]);
+    while (result && isActive() && !result.isCurrent()) result = await loadActionExecution(account, isActive, options);
     if (result?.isCurrent()) onReady(result.detail, values);
   }
   async function openCashflow(account: Account) {

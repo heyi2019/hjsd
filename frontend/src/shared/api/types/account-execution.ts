@@ -164,6 +164,8 @@ export interface ExecutionFinanceSummary {
 }
 
 export interface AccountExecutionDetail {
+  image_previews?: boolean;
+  image_versions?: Record<string, string[]>;
   account: Account;
   orders: AccountExecutionOrder[];
   /** 账号维度财务汇总：由后端按同一份明细算好下发，前端不再自行累加。 */

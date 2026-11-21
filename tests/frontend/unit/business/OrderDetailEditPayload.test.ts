@@ -1,10 +1,47 @@
 import { describe, expect, it } from "vitest";
-import { buildEventEdits, buildOrderEdits } from "@/business/OrderDetailView/editing/execution-edit-payload";
+import { buildEventEdits, buildFinanceEdits, buildOrderEdits } from "@/business/OrderDetailView/editing/execution-edit-payload";
 import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { resolveExecutionPlatform } from "@/business/OrderDetailView/OrderDetail.shared";
 import { mergeLedgerOrderWithDetail } from "@/business/orderpage/useLedgerInlineEdit";
 
 describe("详情编辑保存载荷", () => {
+  it("批量资金明细按草稿顺序匹配，保持首条同号记录和修改字段", () => {
+    let reads = 0;
+    const rows = Array.from({ length: 200 }, (_, index) => ({
+      get flow_no() { reads += 1; return `CF${index + 1}`; },
+      amount: "100", pool_id: 1, occurred_at: "", note: "原备注", operator_user_ids: [1],
+    }));
+    const drafts = Object.fromEntries(rows.map((_, index) => [`draft${index}`, {
+      flow_no: `CF${200 - index}`, amount: "120", pool_id: 2, occurred_at: "2026-11-01T10:00", note: "新备注", operator_user_ids: [2],
+    }]));
+    const result = buildFinanceEdits(rows, drafts);
+    expect(result).toHaveLength(200);
+    expect(result?.[0]).toEqual({ flow_no: "CF200", amount: "120", pool_id: 2, occurred_at: "2026-11-01T10:00", note: "新备注", operator_user_ids: [2] });
+    expect(result?.[199].flow_no).toBe("CF1");
+    expect(reads).toBeLessThanOrEqual(400);
+  });
+
+  it("资金明细未修改或无原记录时不提交，同号记录以首条为准", () => {
+    const rows = [
+      { flow_no: "CF1", amount: "100", pool_id: 1, occurred_at: null, note: "", operator_user_ids: [1] },
+      { flow_no: "CF1", amount: "200", pool_id: 2, occurred_at: null, note: "", operator_user_ids: [2] },
+    ];
+    expect(buildFinanceEdits(rows, {
+      first: { flow_no: "CF1", amount: "100", pool_id: 1, occurred_at: "", note: "", operator_user_ids: [1] },
+      missing: { flow_no: "missing", amount: "50", occurred_at: "", note: "" },
+    })).toEqual([]);
+  });
+
+  it.each([
+    [{ amount: "120" }, { flow_no: "CF1", amount: "120", note: "原备注" }],
+    [{ pool_id: 2 }, { flow_no: "CF1", pool_id: 2, note: "原备注" }],
+    [{ occurred_at: "2026-11-01T10:00" }, { flow_no: "CF1", occurred_at: "2026-11-01T10:00", note: "原备注" }],
+    [{ note: "新备注" }, { flow_no: "CF1", note: "新备注" }],
+    [{ operator_user_ids: [2] }, { flow_no: "CF1", note: "原备注", operator_user_ids: [2] }],
+  ])("资金明细单项修改时正确生成载荷 %#", (change, expected) => {
+    const rows = [{ flow_no: "CF1", amount: "100", pool_id: 1, occurred_at: null, note: "原备注", operator_user_ids: [1] }];
+    expect(buildFinanceEdits(rows, { CF1: { flow_no: "CF1", occurred_at: "", note: "原备注", ...change } })).toEqual([expected]);
+  });
   it("大量事件编辑只需线性匹配原记录，并保持草稿顺序", () => {
     let reads = 0;
     const events = Array.from({ length: 200 }, (_, index) => ({

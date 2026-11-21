@@ -281,6 +281,30 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(ordersApi.updateExecution).not.toHaveBeenCalled();
   });
 
+  it("保存详情时仅提交修改过的资金明细及其实际字段", async () => {
+    const detail = { account: accounts[0], orders: [], detail_view: { finance_rows: [
+      { flow_no: "CF1", amount: "100.00", pool_id: 1, occurred_at: "", note: "原备注", operator_user_ids: [1] },
+      { flow_no: "CF2", amount: "50.00", pool_id: 1, occurred_at: "", note: "", operator_user_ids: [1] },
+    ] } } as never;
+    vi.mocked(ordersApi.updateExecution).mockResolvedValueOnce({ ok: true });
+    function Probe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
+      return <><Form form={editor.invEditExtraForm} /><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+        <button onClick={() => editor.updateFinanceDraft("CF1", { amount: "120.00", pool_id: 3, note: "新备注", operator_user_ids: [2] })}>修改</button>
+        <button onClick={() => editor.updateFinanceDraft("CF2", { amount: "50.00" })}>保留</button>
+        <button onClick={() => void editor.saveInline()}>保存</button><span>{editor.inlineEditId ? "编辑中" : "未编辑"}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText("编辑中");
+    await ui.click(screen.getByRole("button", { name: "修改" }));
+    await ui.click(screen.getByRole("button", { name: "保留" }));
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(21, expect.objectContaining({
+      cashflows: [{ flow_no: "CF1", amount: "120.00", pool_id: 3, note: "新备注", operator_user_ids: [2] }],
+    })));
+  });
+
   it.each(["保存成功", "保存失败"])("%s前不能切换或取消当前编辑，避免丢失草稿", async (saveResult) => {
     let resolveSave!: (value: { ok: boolean }) => void;
     let rejectSave!: (error: Error) => void;

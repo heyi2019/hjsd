@@ -1,5 +1,5 @@
-import type { AccountExecutionEvent, AccountExecutionOrder } from "../../../shared/api/types/account-execution";
-import type { OrderDraft } from "./editor-types";
+import type { AccountExecutionEvent, AccountExecutionOrder, OrderDetailFinanceRow } from "../../../shared/api/types/account-execution";
+import type { FinanceDraft, OrderDraft } from "./editor-types";
 
 export type ExecutionEventDraft = {
   id: number;
@@ -104,5 +104,34 @@ export function buildEventEdits(
     ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
     ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
     ...(draft.form_extra !== undefined ? { form_extra: draft.form_extra } : {}),
+  }));
+}
+
+export function buildFinanceEdits(
+  rows: Array<Pick<OrderDetailFinanceRow, "flow_no" | "amount" | "pool_id" | "occurred_at" | "note" | "operator_user_ids">>,
+  drafts: Record<string, FinanceDraft>,
+) {
+  const originals = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    const flowNo = row.flow_no;
+    if (!originals.has(flowNo)) originals.set(flowNo, row);
+  }
+  return Object.values(drafts).filter((draft) => {
+    const original = originals.get(draft.flow_no);
+    return original && (
+      draft.amount !== undefined && draft.amount !== original.amount
+      || draft.pool_id !== undefined && draft.pool_id !== original.pool_id
+      || draft.occurred_at !== (original.occurred_at ?? "")
+      || draft.note !== (original.note ?? "")
+      || draft.operator_user_ids !== undefined
+        && JSON.stringify(draft.operator_user_ids) !== JSON.stringify(original.operator_user_ids ?? [])
+    );
+  }).map((draft) => ({
+    flow_no: draft.flow_no,
+    ...(draft.amount !== undefined ? { amount: draft.amount } : {}),
+    ...(draft.pool_id !== undefined ? { pool_id: draft.pool_id } : {}),
+    ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
+    note: draft.note,
+    ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
   }));
 }

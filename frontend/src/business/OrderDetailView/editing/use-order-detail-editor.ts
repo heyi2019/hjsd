@@ -13,7 +13,7 @@ import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useEmployeeOptions } from "../../../shared/hooks/useEmployeeOptions";
 import { useReferenceList } from "../../../shared/hooks/useReferenceList";
-import { buildEventEdits, buildOperationEventCreates, buildOrderEdits } from "./execution-edit-payload";
+import { buildEventEdits, buildFinanceEdits, buildOperationEventCreates, buildOrderEdits } from "./execution-edit-payload";
 import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
 import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
 import { editedMoneyError } from "./amount-validation";
@@ -269,25 +269,7 @@ export function useOrderDetailEditor(params: {
         const events = buildEventEdits(originalEvents, eventDrafts);
         if (events.some((item) => editedMoneyError(item.amount))) { appMessage.error("请填写有效的金额"); return; }
         const new_events = buildOperationEventCreates(operationDrafts);
-        const originalFinanceRows = detail?.detail_view.finance_rows ?? [];
-        const cashflows = Object.values(financeDrafts).filter((draft) => {
-          const original = originalFinanceRows.find((row) => row.flow_no === draft.flow_no);
-          return original && (
-            draft.amount !== undefined && draft.amount !== original.amount
-            || draft.pool_id !== undefined && draft.pool_id !== original.pool_id
-            || draft.occurred_at !== (original.occurred_at ?? "")
-            || draft.note !== (original.note ?? "")
-            || draft.operator_user_ids !== undefined
-              && JSON.stringify(draft.operator_user_ids) !== JSON.stringify(original.operator_user_ids ?? [])
-          );
-        }).map((draft) => ({
-          flow_no: draft.flow_no,
-          ...(draft.amount !== undefined ? { amount: draft.amount } : {}),
-          ...(draft.pool_id !== undefined ? { pool_id: draft.pool_id } : {}),
-          ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
-          note: draft.note,
-          ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
-        }));
+        const cashflows = buildFinanceEdits(detail?.detail_view.finance_rows ?? [], financeDrafts);
         if (cashflows.some((item) => item.amount !== undefined && editedMoneyError(item.amount))) { appMessage.error("请填写有效的金额"); return; }
         const orders = buildOrderEdits(detail?.orders ?? [], orderDrafts);
         const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));

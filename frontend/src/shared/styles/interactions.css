@@ -91,12 +91,12 @@
    导航是高频连续点击面，缩量过深会造成列表抖动感，Apple 侧栏
    实际给的是「背景变亮 + 极轻缩量」。 */
 @media (prefers-reduced-motion: no-preference) {
-  :where(.sidebar .nav-item, .sidebar .nav-level-three button, .sidebar .nav-level-four button) {
+  :where(.sidebar .nav-item) {
     transition-property: transform, background-color, color, opacity;
     transition-duration: var(--dur);
     transition-timing-function: var(--ease-spring);
   }
-  :where(.sidebar .nav-item, .sidebar .nav-level-three button, .sidebar .nav-level-four button):active {
+  :where(.sidebar .nav-item):active {
     transform: scale(0.985);
     transition-duration: var(--dur-fast);
     transition-timing-function: var(--ease);

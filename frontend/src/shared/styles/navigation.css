@@ -5,109 +5,7 @@
   box-sizing: border-box;
 }
 
-.nav-level-two,
-.team-navigation-list > button {
-  font: var(--font-nav-secondary) !important;
-}
-
-.nav-level-two,
-.nav-caption-toggle,
-.nav-level-three > div > button,
-.nav-level-four button {
-  min-width: 0;
-  min-height: var(--ui-control-height);
-  box-sizing: border-box;
-}
-
-.nav-level-two > span:first-child,
-.nav-level-three > div > button,
-.nav-level-four button {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nav-level-three > button,
-.nav-level-three > div > button,
-.nav-level-four button,
-.team-navigation .nav-level-four button {
-  display: flex;
-  align-items: center;
-  font: var(--font-nav-tertiary) !important;
-}
-
-/* Nested menus: keep level-three styling scoped and preserve the standard 4px gap. */
-.nav-level-three > button,
-.nav-level-three > div > button {
-  width: 100%;
-}
-
-.nav-level-four {
-  padding-block-start: var(--space-1);
-  border-left: 0;
-}
-
-.nav-caption,
-.team-navigation-group > span,
-.theme-switch-label,
-.degrade-switch .theme-switch-label,
-.sidebar-foot {
-  font: var(--font-nav-caption);
-  color: var(--color-text-secondary);
-}
-
-/* 设置层级：数据治理/AI/账号是一级，数据治理下的三个页面是二级。 */
-.nav-branch {
-  padding-left: var(--space-1);
-  border-left: 0;
-}
-
-.system-nav-group-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: calc(100% - var(--space-4));
-  min-height: var(--ui-control-height);
-  margin: 0 var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  font: var(--font-nav-secondary) !important;
-}
-
-.system-nav-items > .nav-branch > .nav-level-two {
-  display: flex;
-  height: var(--ui-control-height);
-  min-height: var(--ui-control-height);
-  align-items: center;
-  font: var(--font-nav-primary) !important;
-}
-
-/* 系统面板的三个分组同级；数据治理不应伪装成某个二级入口的分支。 */
-.system-nav-items > .system-nav-group {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.system-nav-items > .system-nav-group > .nav-level-two,
-.system-nav-items > .system-nav-group > .system-nav-group-title {
-  margin-left: var(--space-2);
-}
-
-.system-nav-items > .system-nav-group > .nav-level-three {
-  margin-left: var(--space-5);
-}
-
-.system-nav-items .nav-level-three button {
-  height: var(--ui-control-height);
-  min-height: var(--ui-control-height);
-  box-sizing: border-box;
-  font: var(--font-nav-tertiary) !important;
-}
-
 /* 主题切换是紧凑分段控件，不使用大块按钮比例。 */
-.theme-switch-label {
-  font: var(--font-nav-secondary);
-}
-
 .theme-switch-options {
   display: inline-flex;
   gap: 0;
@@ -139,12 +37,6 @@
   background: var(--color-antd-bg-container);
   color: var(--color-text-primary);
   box-shadow: var(--shadow-soft);
-}
-
-.user-caption,
-.sidebar .logout,
-.team-navigation-empty {
-  font: var(--font-nav-secondary);
 }
 
 @media (max-width: 960px) {

@@ -36,6 +36,8 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     creatorFilter,
     creatorOptions,
     detailData,
+    detailId,
+    detailError,
     detailLoading,
     detailTarget,
     editForm,
@@ -57,6 +59,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     pageSize,
     renderContact,
     requestEdit,
+    retryDetail,
     scheduleMergeSearch,
     rows,
     summary,
@@ -188,11 +191,14 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       />
       <CustomerDetailDrawer
         detailTarget={detailTarget}
+        detailId={detailId}
+        detailError={detailError}
         detailData={detailData}
         detailLoading={detailLoading}
         fieldDefs={fieldDefs}
         renderContact={renderContact}
         onClose={closeDetail}
+        onRetry={retryDetail}
         onRequestEdit={requestEdit}
       />
       <CustomerMergeModal

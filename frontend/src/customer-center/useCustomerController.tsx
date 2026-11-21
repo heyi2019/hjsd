@@ -29,6 +29,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Customer | null>(null);
   const [detailTarget, setDetailTarget] = useState<Customer | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailError, setDetailError] = useState<{ message: string; code?: string } | null>(null);
   const [mergeTarget, setMergeTarget] = useState<Customer | null>(null);
   const [mergeCandidates, setMergeCandidates] = useState<CustomerOption[] | null>(null);
   const mergeSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -149,6 +151,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
 
   const openDetail = async (row: Customer) => {
     const request = detailRequest.start();
+    setDetailId(row.id);
+    setDetailError(null);
     setDetailTarget(row);
     setDetailData(null);
     setDetailLoading(true);
@@ -156,7 +160,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       const detail = await customersApi.detail(row.id);
       if (detailRequest.isCurrent(request)) setDetailData(detail);
     } catch (err) {
-      if (detailRequest.isCurrent(request)) setError(normalizeError(err));
+      if (detailRequest.isCurrent(request)) setDetailError(normalizeError(err));
     } finally {
       if (detailRequest.isCurrent(request)) setDetailLoading(false);
     }
@@ -164,6 +168,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
 
   const openDetailById = async (customerId: number) => {
     const request = detailRequest.start();
+    setDetailId(customerId);
+    setDetailError(null);
     setDetailTarget(null);
     setDetailData(null);
     setDetailLoading(true);
@@ -173,7 +179,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       setDetailTarget(detail.customer);
       setDetailData(detail);
     } catch (err) {
-      if (detailRequest.isCurrent(request)) setError(normalizeError(err));
+      if (detailRequest.isCurrent(request)) setDetailError(normalizeError(err));
     } finally {
       if (detailRequest.isCurrent(request)) setDetailLoading(false);
     }
@@ -331,8 +337,9 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   // —— 弹窗收口：原 JSX 内联的状态更新收为方法，供展示组件回调（语义逐字等价）——
   const clearActionError = () => { write.clearError(); setCandidateError(null); };
   const cancelEdit = () => { clearActionError(); setEditTarget(null); editForm.resetFields(); };
-  const closeDetail = () => { detailRequest.invalidate(); setDetailTarget(null); setDetailData(null); setDetailLoading(false); };
-  const requestEdit = (target: Customer) => { detailRequest.invalidate(); clearActionError(); setEditTarget(target); setDetailTarget(null); setDetailLoading(false); };
+  const closeDetail = () => { detailRequest.invalidate(); setDetailId(null); setDetailTarget(null); setDetailData(null); setDetailError(null); setDetailLoading(false); };
+  const requestEdit = (target: Customer) => { closeDetail(); clearActionError(); setEditTarget(target); };
+  const retryDetail = () => { if (detailTarget) void openDetail(detailTarget); else if (detailId !== null) void openDetailById(detailId); };
   // 合并弹窗复用同一 Form 实例：取消或再次打开都必须清空，避免上次选的目标客户与原因残留
   // 导致把 A 客户误合并到 B 客户上次选的目标上（#13）。
   const cancelMerge = () => { if (mergeSearchTimer.current) clearTimeout(mergeSearchTimer.current); candidatesRequest.invalidate(); clearActionError(); setMergeTarget(null); setMergeCandidates(null); mergeForm.resetFields(); };
@@ -377,6 +384,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     creatorFilter,
     creatorOptions,
     detailData,
+    detailId,
+    detailError,
     detailLoading,
     detailTarget,
     editForm,
@@ -398,6 +407,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
     pageSize,
     renderContact,
     requestEdit,
+    retryDetail,
     requestMerge,
     scheduleMergeSearch,
     rows,

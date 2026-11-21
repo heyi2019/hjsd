@@ -42,6 +42,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [open, setOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Counterparty | null>(null);
   const [detailTarget, setDetailTarget] = useState<Counterparty | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const [detailError, setDetailError] = useState<{ message: string; code?: string } | null>(null);
   const [detailData, setDetailData] = useState<Counterparty | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const detailRequest = useLatestRequest();
@@ -100,6 +102,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
 
   const openDetail = async (id: number, row?: Counterparty) => {
     const request = detailRequest.start();
+    setDetailId(id);
+    setDetailError(null);
     setDetailTarget(row ?? null);
     setDetailData(null);
     setDetailLoading(true);
@@ -109,7 +113,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       if (!row) setDetailTarget(detail);
       setDetailData(detail);
     } catch (err) {
-      if (detailRequest.isCurrent(request)) setError(normalizeError(err));
+      if (detailRequest.isCurrent(request)) setDetailError(normalizeError(err));
     } finally {
       if (detailRequest.isCurrent(request)) setDetailLoading(false);
     }
@@ -347,17 +351,19 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
 
       <Drawer
         title={detailTarget ? `合作方档案 · ${detailTarget.counterparty_no}` : "合作方档案"}
-        open={Boolean(detailTarget)}
+        open={detailId !== null}
         onClose={() => {
           detailRequest.invalidate();
+          setDetailId(null);
           setDetailTarget(null);
           setDetailData(null);
+          setDetailError(null);
           setDetailLoading(false);
         }}
         width={640}
         destroyOnHidden
         extra={
-          detailTarget && detailTarget.status === "ACTIVE" ? (
+          detailData && detailTarget && detailTarget.status === "ACTIVE" ? (
             <PermissionButton
               permission="counterparty.manage"
               size="small"
@@ -365,6 +371,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
                 detailRequest.invalidate();
                 write.clearError();
                 setEditTarget(detailTarget);
+                setDetailId(null);
                 setDetailTarget(null);
                 setDetailData(null);
                 setDetailLoading(false);
@@ -375,7 +382,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
           ) : null
         }
       >
-        {detailLoading ? (
+        {detailError ? <ErrorBanner error={detailError} onRetry={() => { if (detailId !== null) void openDetail(detailId, detailTarget ?? undefined); }} retrying={detailLoading} /> : detailLoading ? (
           <div role="status" aria-label="正在加载合作方详情"><Spin /></div>
         ) : detailData ? (
           <>

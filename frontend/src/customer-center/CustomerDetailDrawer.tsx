@@ -6,30 +6,36 @@ import type { OrderFormField } from "../shared/api/types/forms";
 import { money } from "../shared/lib/format";
 import { orderTypeLabel } from "../shared/lib/labels";
 import { configurableLabel } from "../shared/lib/optionSets";
-import { DataTable, PermissionButton, StatRow, StatusTag } from "../shared/ui";
+import { DataTable, ErrorBanner, PermissionButton, StatRow, StatusTag } from "../shared/ui";
 
 export function CustomerDetailDrawer({
   detailTarget,
+  detailId,
+  detailError,
   detailData,
   detailLoading,
   fieldDefs,
   renderContact,
   onClose,
+  onRetry,
   onRequestEdit,
 }: {
   detailTarget: Customer | null;
+  detailId: number | null;
+  detailError: { message: string; code?: string } | null;
   detailData: CustomerDetail | null;
   detailLoading: boolean;
   fieldDefs: OrderFormField[];
   renderContact: (row: Customer, field: "phone" | "wechat" | "qq") => ReactNode;
   onClose: () => void;
+  onRetry: () => void;
   onRequestEdit: (target: Customer) => void;
 }) {
   const customer = detailData?.customer;
   return (
       <Drawer
         title={detailTarget ? `客户档案 · ${detailTarget.customer_no}` : "客户档案"}
-        open={Boolean(detailTarget)}
+        open={detailId !== null}
         onClose={onClose}
         width={720}
         destroyOnHidden
@@ -45,7 +51,7 @@ export function CustomerDetailDrawer({
           ) : null
         }
       >
-        {detailLoading ? (
+        {detailError ? <ErrorBanner error={detailError} onRetry={onRetry} retrying={detailLoading} /> : detailLoading ? (
           <div role="status" aria-label="正在加载客户详情"><Spin /></div>
         ) : customer ? (
           <>

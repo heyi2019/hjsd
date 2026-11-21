@@ -17,6 +17,10 @@
 from __future__ import annotations
 
 import re
+from types import SimpleNamespace
+
+import pytest
+import run_regression
 
 # 测试文件下沉后 parents[N] 的层数变了，写死层数只能撑到下一次搬家。
 from _repo import BE_TESTS
@@ -51,7 +55,49 @@ def _sources() -> dict[str, str]:
     return {p.name: p.read_text(encoding="utf-8") for p in paths}
 
 
-def test_db_marker_is_derived_from_fixtures(pytestconfig) -> None:
+def test_db_baseline_applies_only_to_full_collection():
+    _check_db_marker_counts(787, 1100, full_collection=False)
+    with pytest.raises(AssertionError, match="低于基线"):
+        _check_db_marker_counts(787, 1910, full_collection=True)
+    _check_db_marker_counts(DB_BASELINE, 1910, full_collection=True)
+
+
+def test_full_collection_detects_files_and_selection_filters():
+    registered = {"tests/backend/a.py", "tests/backend/b.py"}
+    assert _is_full_backend_collection(registered, registered, filtered=False)
+    assert not _is_full_backend_collection({"tests/backend/a.py"}, registered, filtered=False)
+    assert not _is_full_backend_collection(registered, registered, filtered=True)
+    assert not _is_full_backend_collection(set(), set(), filtered=False)
+
+
+def test_db_guard_rejects_low_full_count_but_accepts_large_partial(monkeypatch):
+    monkeypatch.setattr(run_regression, "all_paths", lambda: ["tests/backend/a.py", "tests/backend/b.py"])
+    options = SimpleNamespace(keyword="", markexpr="", deselect=[], ignore=[], ignore_glob=[])
+    config = SimpleNamespace(_hei_db_channel_stats=(787, 1100), option=options, args=["tests/backend"])
+    request = SimpleNamespace(session=SimpleNamespace(items=[SimpleNamespace(nodeid="tests/backend/a.py::test_a")]))
+    test_db_marker_is_derived_from_fixtures(config, request)
+    request.session.items.append(SimpleNamespace(nodeid="tests/backend/b.py::test_b"))
+    with pytest.raises(AssertionError, match="低于基线"):
+        test_db_marker_is_derived_from_fixtures(config, request)
+    options.keyword = "test_a"
+    test_db_marker_is_derived_from_fixtures(config, request)
+
+
+def _is_full_backend_collection(collected_files: set[str], registered_files: set[str], *, filtered: bool) -> bool:
+    return not filtered and bool(registered_files) and registered_files.issubset(collected_files)
+
+
+def _check_db_marker_counts(db_count: int, total: int, *, full_collection: bool) -> None:
+    assert db_count < total, "全部用例都被标 db，快速通道为空，派生规则把范围放大了"
+    if full_collection:
+        assert db_count > 0, "没有任何用例被标 db，派生规则已失效"
+        assert db_count >= DB_BASELINE, (
+            f"db 用例数 {db_count} 低于基线 {DB_BASELINE}："
+            "要么派生规则被削弱，要么基线需要连同理由一起下调"
+        )
+
+
+def test_db_marker_is_derived_from_fixtures(pytestconfig, request) -> None:
     """派生机制必须仍在工作：既不能一条都不标，也不能把全部用例标成连库。
 
     统计随「本次收集了多少」变化，所以数量基线只在全量收集时校验；单跑本文件或
@@ -63,13 +109,12 @@ def test_db_marker_is_derived_from_fixtures(pytestconfig) -> None:
         "`pytest -m \"not db\"` 会静默退化成「跑全部用例」。"
     )
     db_count, total = stats
-    assert db_count < total, "全部用例都被标 db，快速通道为空，派生规则把范围放大了"
-    if total >= 1000:  # 全量收集（当前 1521），基线才有意义
-        assert db_count > 0, "没有任何用例被标 db，派生规则已失效"
-        assert db_count >= DB_BASELINE, (
-            f"db 用例数 {db_count} 低于基线 {DB_BASELINE}："
-            "要么派生规则被削弱，要么基线需要连同理由一起下调"
-        )
+    selected_files = {item.nodeid.split("::", 1)[0] for item in request.session.items}
+    options = pytestconfig.option
+    filtered = bool(options.keyword or options.markexpr or options.deselect or
+                    options.ignore or options.ignore_glob or any("::" in arg for arg in pytestconfig.args))
+    is_full = _is_full_backend_collection(selected_files, set(run_regression.all_paths()), filtered=filtered)
+    _check_db_marker_counts(db_count, total, full_collection=is_full)
 
 
 def test_v1_engine_fixture_still_exists() -> None:

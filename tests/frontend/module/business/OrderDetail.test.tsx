@@ -54,6 +54,15 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("编辑寄售价时保留大额金额精度", () => {
+    const onEventEdit = vi.fn();
+    const listing = { id: 7, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: "2026-10-01T10:00:00", form_extra: { consignment_platforms: ["平台甲"], consignment_price: "9999999999999999.99" } } as never;
+    renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} editing orderType="HS" operationEvents={{ consignment: [listing] }} onEventEdit={onEventEdit} />);
+    const price = screen.getByRole("spinbutton", { name: "编辑寄售价格" });
+    expect(price).toHaveDisplayValue("9999999999999999.99");
+    fireEvent.change(price, { target: { value: "9999999999999999.98" } });
+    expect(onEventEdit).toHaveBeenCalledWith(listing, expect.objectContaining({ form_extra: expect.objectContaining({ consignment_price: "9999999999999999.98" }) }));
+  });
   it("保存中暂停编辑，避免保存完成后丢失后续输入", async () => {
     const { rerender } = renderLight(<OrderDetail row={account} loading={false} editing={account} saving />);
     const channel = await screen.findByLabelText("编辑渠道区服");

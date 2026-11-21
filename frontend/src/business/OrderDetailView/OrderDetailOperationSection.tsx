@@ -163,13 +163,13 @@ function editableOperationColumns(
         const extra = row.event ? eventExtra(row, draft as OrderEventDraft | undefined) : (draft?.form_extra ?? {});
         if (row.operationKey === "consignment") {
           const selectedPlatforms = platformValues(extra.consignment_platforms);
-          const currentPrice = extra.consignment_price == null || extra.consignment_price === "" ? undefined : Number(extra.consignment_price);
+          const currentPrice = typeof extra.consignment_price === "string" || typeof extra.consignment_price === "number" ? String(extra.consignment_price) : undefined;
           const choices = platformOptionValues(selectedPlatforms).filter((option) => {
             const takenByListing = activeListings.some((listing) => listing.platform === option.value && listing.eventId !== row.event?.id);
             const takenByDraft = Object.entries(operationDrafts ?? {}).some(([key, candidate]) => key !== row.key && candidate?.operation_type === "CONSIGNMENT" && platformValues(candidate.form_extra?.consignment_platforms).includes(String(option.value)));
             return !takenByListing && !takenByDraft;
           });
-          return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={choices} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber className="money-input" aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min={0} precision={2} suffix="元" value={Number.isFinite(currentPrice) ? currentPrice : null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
+          return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={choices} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber<string> stringMode className="money-input" aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min="0" precision={2} suffix="元" value={currentPrice || null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
         }
         const currentPlatforms = platformValues(extra.consignment_platforms);
         if (!row.event) {

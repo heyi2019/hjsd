@@ -938,6 +938,19 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(ordersApi.executionDetail).toHaveBeenCalledWith(21);
   });
 
+  it("上架提交保留大额寄售价精度", async () => {
+    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [] }] };
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail as never);
+    renderLight(<OrderConsignmentModal account={accounts[0] as never} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    const platform = await screen.findByRole("combobox", { name: "寄售平台" });
+    await waitFor(() => expect(platform).toBeEnabled());
+    await ui.click(platform);
+    await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
+    await ui.type(screen.getByRole("spinbutton", { name: "寄售价格" }), "9999999999999999.99");
+    await ui.click(screen.getByRole("button", { name: "确认上架" }));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ form_extra: expect.objectContaining({ consignment_price: "9999999999999999.99" }) })));
+  });
+
   it("寄售提交成功后无需等详情刷新即可通知页面关闭", async () => {
     const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [] }] };
     let finish!: (value: never) => void;

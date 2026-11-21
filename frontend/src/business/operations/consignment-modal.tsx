@@ -96,7 +96,7 @@ export function OrderConsignmentModal(props: {
     return () => { requestGeneration.invalidate(); employeesRequest.invalidate(); };
   }, [employeesRequest, form, open, props.account, props.orderId, requestGeneration]);
 
-  const submit = async (values: { platform_ids?: string; consignment_price?: number | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
+  const submit = async (values: { platform_ids?: string; consignment_price?: string | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const account = props.account;
     if (!account || !configReady) return;
     const listedAt = values.listed_at ?? dayjs();
@@ -105,7 +105,7 @@ export function OrderConsignmentModal(props: {
       setError({ message: "当前账号没有可关联的来源订单，无法登记寄售" });
       return;
     }
-    const price = typeof values.consignment_price === "number" ? values.consignment_price : undefined;
+    const price = values.consignment_price ?? undefined;
     const orderId = sourceOrderId;
     const submittedSession = session.current();
     await write.run(async () => {
@@ -195,10 +195,11 @@ export function OrderConsignmentModal(props: {
             )}
           </CfgItem>
           <CfgItem name="consignment_price" label="寄售价格">
-            <InputNumber
+            <InputNumber<string>
+              stringMode
               aria-label="寄售价格"
               className="money-input"
-              min={0}
+              min="0"
               precision={2}
               suffix="元"
               placeholder="本次挂牌价，选填"

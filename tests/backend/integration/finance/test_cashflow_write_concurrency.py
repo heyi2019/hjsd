@@ -15,11 +15,81 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.domain.users import User
 from app.funds.balances import pool_balance
-from app.funds.transfers import create_transfer
+from app.funds.transfers import create_transfer, repair_transfer
 from app.funds.cashflows import create_cashflow, delete_cashflow, reverse_cashflow, update_cashflow
 from app.settings.field_definitions.seeds import seed_foundation
 
 pytestmark = pytest.mark.db
+
+
+def test_concurrent_transfer_repairs_only_create_one_counterpart(v1_engine):
+    database = f"heijin_repair_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            session.add(User(username="pytest", display_name="测试", password_hash="unused"))
+            source = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            target = session.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+            target_id = target.id
+            session.add(Cashflow(flow_no="TEST-REPAIR-OUT", pool_id=source.id,
+                                 occurred_on=date(2026, 11, 1), direction="OUT", amount=100,
+                                 source_type="TRANSFER", source_id="TRF-REPAIR-TEST",
+                                 accounting_attribute="INTERNAL_TRANSFER", category="TRANSFER",
+                                 created_by="pytest", updated_by="pytest"))
+            session.commit()
+        reached, proceed = Event(), Event()
+
+        def competing_repair():
+            with factory() as session:
+                connection = session.connection()
+
+                def before(_conn, _cursor, statement, _parameters, _context, _many):
+                    sql = statement.lower()
+                    if "cashflow" in sql and "for update" in sql:
+                        reached.set()
+
+                def after(_conn, _cursor, statement, _parameters, _context, _many):
+                    sql = statement.lower()
+                    if "where cashflow.source_type =" in sql and not reached.is_set():
+                        reached.set()
+                        assert proceed.wait(10)
+
+                event.listen(connection, "before_cursor_execute", before)
+                event.listen(connection, "after_cursor_execute", after)
+                try:
+                    repair_transfer(session, "TRF-REPAIR-TEST", counterpart_pool_id=target_id,
+                                    actor="pytest", reason="补齐")
+                    session.commit()
+                    return "accepted"
+                except Validation:
+                    session.rollback()
+                    return "rejected"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            repair_transfer(first, "TRF-REPAIR-TEST", counterpart_pool_id=target_id,
+                            actor="pytest", reason="补齐")
+            future = executor.submit(competing_repair)
+            try:
+                assert reached.wait(10), "第二次修复未到达查询"
+                first.commit()
+            finally:
+                proceed.set()
+            assert future.result(timeout=10) == "rejected"
+        with factory() as session:
+            flows = session.scalars(select(Cashflow).where(Cashflow.source_id == "TRF-REPAIR-TEST")).all()
+            assert len(flows) == 2
+            assert sorted(flow.direction for flow in flows) == ["IN", "OUT"]
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
 
 
 @pytest.mark.parametrize("action", ["reverse", "edit", "delete"])

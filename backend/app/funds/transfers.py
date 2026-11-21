@@ -147,18 +147,14 @@ def repair_transfer(
         message="transfer_id 不能为空",
         type_message="transfer_id 必须为文本",
     )
-    rows = list(
-        session.scalars(
-            select(Cashflow)
-            .where(
-                Cashflow.source_type == CashflowSourceType.TRANSFER.value,
-                Cashflow.source_id == transfer,
-            )
-            .order_by(Cashflow.id)
-        ).all()
-    )
-    if not rows:
+    transfer_rows = select(Cashflow).where(
+        Cashflow.source_type == CashflowSourceType.TRANSFER.value,
+        Cashflow.source_id == transfer,
+    ).order_by(Cashflow.id)
+    # 锁住稳定的首条流水；等待后必须重新查询，才能看到其他事务刚补入的对端。
+    if session.scalars(transfer_rows.limit(1).with_for_update()).first() is None:
         raise NotFound(f"划转 {transfer} 不存在", details={"transfer_id": transfer})
+    rows = list(session.scalars(transfer_rows).all())
     if len(rows) == 2:
         raise Validation("该划转已完整，不能重复修复", details={"transfer_id": transfer})
     if len(rows) != 1:

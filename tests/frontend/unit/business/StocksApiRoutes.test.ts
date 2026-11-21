@@ -48,6 +48,8 @@ describe("stocksApi 路由", () => {
       expect.objectContaining({
         params: expect.objectContaining({ business_mode: "SELF", sort_desc: false }),
         responseType: "blob",
+        bypassCache: true,
+        timeout: 120_000,
       }),
     );
     expect(result).toEqual({ blob, failedDetailCount: 2 });

@@ -122,28 +122,33 @@ def build_inventory_ledger_csv(
     db: Any,
     user: CurrentUser,
 ) -> tuple[str, int]:
+    if len(pairs) != len(accounts):
+        raise ValueError("库存与账号数量不匹配")
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(INVENTORY_EXPORT_HEADERS)
     failed_details = 0
-    try:
-        with db.begin_nested():
-            details = load_order_execution_batch(db, [order.id for _, order in pairs], user)
-            if len(details) != len(pairs):
-                raise ValueError("订单详情数量不匹配")
-    except Exception:
-        details = []
-        for _, order in pairs:
-            try:
-                with db.begin_nested():
-                    detail = load_order_execution(db, order.id, user)
-                details.append(detail)
-            except Exception:
-                details.append(None)
-    for (account, order), account_out, detail in zip(pairs, accounts, details, strict=True):
-        if detail is None:
-            failed_details += 1
-        writer.writerow(_row(account_out, _detail_text(detail, order.id)))
+    for start in range(0, len(pairs), 500):
+        batch = pairs[start:start + 500]
+        try:
+            with db.begin_nested():
+                details = load_order_execution_batch(db, [order.id for _, order in batch], user)
+                if len(details) != len(batch):
+                    raise ValueError("订单详情数量不匹配")
+        except Exception:
+            details = []
+            for _, order in batch:
+                try:
+                    with db.begin_nested():
+                        detail = load_order_execution(db, order.id, user)
+                    details.append(detail)
+                except Exception:
+                    details.append(None)
+        for (_, order), account_out, detail in zip(batch, accounts[start:start + 500], details, strict=True):
+            if detail is None:
+                failed_details += 1
+            writer.writerow(_row(account_out, _detail_text(detail, order.id)))
+        del details, detail
     return f"\ufeff{output.getvalue()}", failed_details
 
 

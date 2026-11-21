@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import type { Account, InventoryStats } from "./types/accounts";
 import type { Order } from "./types/orders";
 
@@ -34,11 +34,14 @@ export const stocksApi = {
     age_gt_days?: number;
     sort_desc?: boolean;
   }): Promise<{ blob: Blob; failedDetailCount: number }> => {
-    const response = await api.get<Blob>("/stocks/inventory/ledger/export.csv", {
-      params: { ...params, _t: Date.now() },
+    const config: CacheAwareRequestConfig = {
+      params,
       paramsSerializer: { indexes: null },
       responseType: "blob",
-    });
+      bypassCache: true,
+      timeout: 120_000,
+    };
+    const response = await api.get<Blob>("/stocks/inventory/ledger/export.csv", config);
     return {
       blob: response.data,
       failedDetailCount: Number(response.headers["x-inventory-detail-failures"] ?? 0),

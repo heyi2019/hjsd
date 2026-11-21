@@ -13,6 +13,7 @@ from app.business.orders.events import post_event
 from app.business.shared.order_detail.view import execution
 from app.business.inventory.profile import create_account
 from app.business.inventory import collaboration
+from app.business.inventory import export as inventory_export
 from app.core.security import CurrentUser
 from app.domain.trade import Cashflow, Installment, InstallmentDisposition, RebateRecord
 from app.shared.audit import record_audit
@@ -32,6 +33,24 @@ def test_export_recovers_when_batch_loader_is_unavailable(seeded_client, headers
     assert response.headers["X-Inventory-Detail-Failures"] == "0"
     rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
     assert next(row for row in rows if row["订单号"] == order.order_no)["支出笔数"] == "1"
+
+
+def test_inventory_csv_limits_detail_memory_to_each_batch(seeded_db, monkeypatch):
+    account = SimpleNamespace(source_order_no="", business_mode="SELF", inventory_type="RECOVERY", game_type="",
+                              camp_account="", stock_no="KU", cost_amount=Decimal("0"), inventory_status="IN_STOCK",
+                              inventory_age_days=0, created_by="pytest", channel_region="", bound_phone="",
+                              has_secondary=None, account_description="", account_images=[], note="")
+    pairs = [(None, SimpleNamespace(id=i)) for i in range(1001)]
+    calls = []
+    def load_batch(_db, order_ids, _user):
+        calls.append(len(order_ids))
+        return [None] * len(order_ids)
+    monkeypatch.setattr(inventory_export, "load_order_execution_batch", load_batch)
+    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
+    csv_text, failed = inventory_export.build_inventory_ledger_csv(pairs, [account] * len(pairs), db=seeded_db, user=user)
+    assert calls == [500, 500, 1]
+    assert failed == 1001
+    assert len(list(csv.reader(io.StringIO(csv_text)))) == 1002
 
 
 def test_inventory_export_batches_order_detail_queries(seeded_client, headers, seeded_db):

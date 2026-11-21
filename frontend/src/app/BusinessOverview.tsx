@@ -228,7 +228,7 @@ export function BusinessAlerts({ onPendingProfitNotificationsClick, onProfitNoti
                     <span className="business-alert__title" title={item.message}>{item.message}</span>
                     <span className={item.read_at ? "business-alert__read" : "business-alert__unread"}>{item.read_at ? "已读" : "未读"}</span>
                     <span className="business-alert__details">{isProfit ? (detail
-                      ? `游戏类型 ${detail.game_type || "—"} · 成本 ${money(detail.cost_amount)} · 售出 ${money(detail.sale_amount)} · ${item.notification_type === "PROFIT_PENDING" ? "待分配利润" : "可分配利润"} ${money(detail.allocatable_profit)}`
+                      ? `成本 ${money(detail.cost_amount)} · 售出 ${money(detail.sale_amount)} · ${item.notification_type === "PROFIT_PENDING" ? "待分配利润" : "可分配利润"} ${money(detail.allocatable_profit)}`
                       : "订单详情暂不可用") : ""}</span>
                     <span className="business-alert__time">通知时间 {formatDateTimeMinute(item.created_at)}</span>
                   </button>

@@ -90,6 +90,6 @@ def test_every_json_api_route_declares_response_model(app):
     # → 155（订单库存下架：POST /orders/{order_id}/inventory-offsale）。
     # → 158（库存售出、库存分期售出、订单入口取消分期各新增一个端点）。
     # → 160（工作台分润通知批量详情和待配置订单定位）。
-    # 既有接口及客户选择接口。
     # 押金、对账分页各新增一个只读接口。
+    # 客户搜索选项接口提供受范围约束的最小字段结果。
     assert public_routes == 164

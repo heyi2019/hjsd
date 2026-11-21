@@ -212,6 +212,7 @@ describe("InstallmentsPanel：分期合约", () => {
     await screen.findByText("HS0001-INS01");
     await setAntdDateRange(document.body, user, "2026-10-01", "2026-10-31");
     await waitFor(() => expect(installmentListFixture).toHaveBeenLastCalledWith(expect.objectContaining({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" })));
+    expect(screen.getByRole("button", { name: "导出分期与回款数据" }).closest(".ui-filter-bar")).not.toBeNull();
     await user.click(screen.getByRole("button", { name: "导出分期与回款数据" }));
     await waitFor(() => expect(installmentsApi.exportCsv).toHaveBeenCalledWith({ status: "OVERDUE", contract_type: "STOCK_SALE", trade_date_from: "2026-10-01", trade_date_to: "2026-10-31" }));
   });

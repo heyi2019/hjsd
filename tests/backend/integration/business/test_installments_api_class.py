@@ -27,6 +27,18 @@ from app.business.shared.form_config.form_fields import create_order_form_field
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
 
+
+def test_sale_installment_plan_preview(seeded_client, headers):
+    response = seeded_client.post("/api/installments/plan", headers=headers, json={
+        "sale_amount": "1000.00", "down_payment": "100.00", "service_fee": "10.00", "periods": 3,
+    })
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert Decimal(result["base_amount"]) == Decimal("900.00")
+    assert Decimal(result["total_schedule_amount"]) == Decimal("910.00")
+    assert Decimal(result["per_period"]) == Decimal("303.34")
+    assert Decimal(result["last_period"]) == Decimal("303.32")
+
 def _account(seeded_db, game_account: str):
     from app.business.inventory.profile import create_account
 

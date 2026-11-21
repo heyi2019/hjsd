@@ -24,6 +24,7 @@ from app.settings.auth.session import (
 from app.domain.enums import AuditAction
 from app.business.installments import schemas
 from app.business.installments import create as inst_create
+from app.business.installments.create_details.plan import sale_installment_plan
 from app.business.installments import queries as inst_queries
 from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.orders.events import post_event as orders_post_event
@@ -95,7 +96,7 @@ def preview_sale_installment_plan(
 ) -> schemas.SaleInstallmentPlanOut:
     """计算库存售出的分期金额；前端只展示该服务端结果。"""
     return schemas.SaleInstallmentPlanOut.model_validate(
-        inst_create.sale_installment_plan(**payload.model_dump())
+        sale_installment_plan(**payload.model_dump())
     )
 
 @router.get("/installments/export.csv")

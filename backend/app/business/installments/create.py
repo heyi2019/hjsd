@@ -2,8 +2,7 @@
 
 建档只落合约与期次计划，金额与状态后续由还款/交付动作推进。
 
-实现已拆至 `installments/create_details/`（plan / link）；本文件保留
-`create_installment` 编排、整合出口与回收出售注册点，调用方无需改动。
+期次计算和回收出售关联分别由 `create_details/` 中的模块负责。
 """
 from __future__ import annotations
 
@@ -37,7 +36,6 @@ from app.business.installments.create_details.link import link_recovered_sale
 from app.business.installments.create_details.plan import (
     _assert_installment_amounts,
     _normalize_schedule,
-    sale_installment_plan,
 )
 
 #: 合约类型 → 允许的订单类型；未登记的类型不做该约束由调用方另行校验。
@@ -297,17 +295,9 @@ def create_installment(
     return installment
 
 
-# P0-A（2026-11-18）：非分期 SELL 完成后的回收处置联动经协作注册点注入，
-# 消灭 orders -> installments 反向依赖（backend/.importlinter 契约）。
-# 本模块由 api -> installments_router -> installments.router 链路必然加载。
+# 非分期 SELL 完成后，同一事务中关联最近的回收处置。
 from app.business.collaboration import register_post_sell_hook  # noqa: E402
 
 register_post_sell_hook(link_recovered_sale)
 
-__all__ = [
-    "create_installment",
-    "link_recovered_sale",
-    "sale_installment_plan",
-    "_assert_installment_amounts",
-    "_normalize_schedule",
-]
+__all__ = ["create_installment"]

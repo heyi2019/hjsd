@@ -83,14 +83,7 @@
 }
 .dashboard-page .ui-entry-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .dashboard-page .ui-entry-card {
-  min-height: 104px;
-  justify-content: center;
-  padding: var(--space-4) var(--space-5);
   border-radius: 20px;
-}
-.dashboard-page .ui-entry-card--primary {
-  background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 16%, var(--glass)), var(--glass));
-  box-shadow: var(--shadow-raised);
 }
 .dashboard-note {
   display: grid;
@@ -146,12 +139,10 @@
 .dashboard-entry-group--sell { --dashboard-accent: var(--color-primary); }
 .dashboard-entry-group--self-owned { --dashboard-accent: var(--color-success); }
 .dashboard-entry-group--distribution { --dashboard-accent: var(--color-warning); }
-.dashboard-entry-group--service { --dashboard-accent: var(--color-service); }
 
 /* 只有售出承担主推视觉；其余入口用留白承托业务色。 */
 .dashboard-entry-group--self-owned,
-.dashboard-entry-group--distribution,
-.dashboard-entry-group--service {
+.dashboard-entry-group--distribution {
   border-color: color-mix(in srgb, var(--dashboard-accent) 14%, var(--glass-border));
   background: linear-gradient(
     135deg,
@@ -292,9 +283,6 @@
     color-mix(in srgb, var(--color-primary) 4%, var(--glass))
   );
   box-shadow: var(--card-top-hi), var(--shadow-raised);
-}
-
-.dashboard-entry-group--sell .ui-entry-card--primary {
   border-color: color-mix(in srgb, var(--color-primary) 26%, var(--glass-border));
 }
 
@@ -315,8 +303,7 @@
 }
 
 .dashboard-entry-group--self-owned .ui-entry-card,
-.dashboard-entry-group--distribution .ui-entry-card,
-.dashboard-entry-group--service .ui-entry-card {
+.dashboard-entry-group--distribution .ui-entry-card {
   border-color: color-mix(in srgb, var(--dashboard-accent) 16%, var(--glass-border));
   background: linear-gradient(
     135deg,
@@ -327,10 +314,8 @@
 
 .dashboard-entry-group--self-owned .ui-entry-card__title,
 .dashboard-entry-group--distribution .ui-entry-card__title,
-.dashboard-entry-group--service .ui-entry-card__title,
 .dashboard-entry-group--self-owned .dashboard-entry-group__heading h2,
-.dashboard-entry-group--distribution .dashboard-entry-group__heading h2,
-.dashboard-entry-group--service .dashboard-entry-group__heading h2 {
+.dashboard-entry-group--distribution .dashboard-entry-group__heading h2 {
   color: var(--color-text-primary);
 }
 

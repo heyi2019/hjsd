@@ -393,7 +393,6 @@
   --accent-deep: color-mix(in srgb, var(--color-primary) 90%, #000); /* 蓝底白字实底达标 */
   --color-primary-text: color-mix(in srgb, var(--color-primary) 70%, #000);
   --color-info: #0a84ff;
-  --color-service: #7c3aed;
   --color-success: #14724b;
   --color-warning: #b45309;
   --color-error: #b23b3b;
@@ -574,7 +573,6 @@
   --color-error: #f87171;
   --danger-solid: #d0343a; /* 实底 danger 按钮底：error(#f87171) 白字仅 2.77，压深到 4.93 达标（error 文字色不变） */
   --color-info: #64a8ff;
-  --color-service: #a78bfa;
   /* 状态柔和色深色覆盖：由 --color-success / --color-error 派生，自动跟随主色、不新增字面量 */
   --status-success-border: color-mix(in srgb, var(--color-success) 50%, transparent);
   --status-success-soft: color-mix(in srgb, var(--color-success) 12%, transparent);

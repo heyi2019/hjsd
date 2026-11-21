@@ -30,19 +30,28 @@ beforeEach(() => {
   seedOrderFormFields();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
+  vi.mocked(notificationsApi.syncInventory).mockResolvedValue({ created: 0 });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
   vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids }));
 });
 
 describe("工作台消息", () => {
 it("消息分类展示最新、售出和库存", async () => {
-    renderLight(<BusinessAlerts />, { user: "admin" });
+    const view = renderLight(<BusinessAlerts />, { user: "admin" });
     await screen.findByText("暂无消息");
     for (const label of ["最新消息", "售出消息", "库存消息"]) expect(screen.getByRole("tab", { name: label })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "售出消息" }));
     await waitFor(() => expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ category: "sale" })));
     fireEvent.click(screen.getByRole("tab", { name: "库存消息" }));
     await waitFor(() => expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ category: "inventory" })));
+    expect(notificationsApi.syncInventory).toHaveBeenCalledTimes(1);
+    view.unmount();
+    vi.mocked(notificationsApi.syncInventory).mockClear().mockRejectedValueOnce(new Error("网络不可用"));
+    renderLight(<BusinessAlerts />, { user: "admin" });
+    expect(await screen.findByText("库存消息刷新失败。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    await waitFor(() => expect(screen.queryByText("库存消息刷新失败。")).not.toBeInTheDocument());
+    expect(notificationsApi.syncInventory).toHaveBeenCalledTimes(2);
   });
 it("未读消息逐页滚动加载且不自动标已读", async () => {
     const items = Array.from({ length: 11 }, (_, i) => ({ id: 11 - i, notification_type: "OTHER", title: "提醒", message: `通知 ${11 - i}`, entity_type: "other", entity_id: String(i), created_at: "2026-11-21T09:30:00", read_at: null }));

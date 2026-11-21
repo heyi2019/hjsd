@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, type CacheAwareRequestConfig } from "./client";
 import type { NotificationItem } from "./types/common";
 
 export interface ProfitNotificationDetail {
@@ -16,7 +16,10 @@ export interface ProfitNotificationDetail {
 }
 
 export const notificationsApi = {
-  list: (params: { limit: number; category: "latest" | "sale" | "inventory"; cursor?: string }) => api.get<{ items: NotificationItem[]; next_cursor: string | null }>("/notifications/inbox", { params }).then(r => r.data),
+  list: (params: { limit: number; category: "latest" | "sale" | "inventory"; cursor?: string }) => {
+    const config: CacheAwareRequestConfig = { params, bypassCache: true };
+    return api.get<{ items: NotificationItem[]; next_cursor: string | null }>("/notifications/inbox", config).then(r => r.data);
+  },
   syncInventory: () => api.post<{ created: number }>("/notifications/sync-inventory").then(r => r.data),
   pendingOrder: (notificationId?: number) => api.get<{ order_no: string | null; order_id: number | null }>("/notifications/pending-order", { params: notificationId === undefined ? undefined : { notification_id: notificationId } }).then(r => r.data),
   profitDetails: (ids: number[]) => api.get<ProfitNotificationDetail[]>("/notifications/profit-details", { params: { ids }, paramsSerializer: { indexes: null } }).then(r => r.data),

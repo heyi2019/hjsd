@@ -5,13 +5,13 @@ import { isProfitNotification, useWorkbenchMessages } from "./useWorkbenchMessag
 import "./messages.css";
 
 export function BusinessAlerts(props: Parameters<typeof useWorkbenchMessages>[0]) {
-  const { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, hasMore, scrollRef, loadMore, openNotification, ordered } = useWorkbenchMessages(props);
+  const { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, hasMore, scrollRef, loadMore, openNotification, ordered } = useWorkbenchMessages(props);
   return (
     <section aria-label="我的消息" className="business-alerts--expanded">
       <Card className="glass" title="我的消息">
         <Tabs activeKey={category} onChange={(value) => setCategory(value as "latest" | "sale" | "inventory")} items={[{ key: "latest", label: "最新消息" }, { key: "sale", label: "售出消息" }, { key: "inventory", label: "库存消息" }]} />
         <div ref={scrollRef} className="business-alerts__scroll" onScroll={(event) => { const el = event.currentTarget; if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) void loadMore(); }}>
-        {inventorySyncError && category !== "sale" ? <div><Typography.Text type="warning">库存消息刷新失败。</Typography.Text> <button type="button" onClick={() => setReload((n) => n + 1)}>重试</button></div> : null}
+        {inventorySyncError && category !== "sale" ? <div><Typography.Text type="warning">库存消息刷新失败。</Typography.Text> <button type="button" onClick={retryInventory}>重试</button></div> : null}
         {notificationError ? <div><Typography.Text type="warning">{notificationError}</Typography.Text> <button type="button" onClick={() => { if (retryItem) void openNotification(retryItem); else if (notifications.length) void loadMore(); else setReload((n) => n + 1); }}>重试</button></div> : null}
         {ordered.length ? (
           <List

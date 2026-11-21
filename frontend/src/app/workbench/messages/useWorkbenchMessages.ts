@@ -25,6 +25,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const cursor = useRef<{ next?: string; done: boolean; generation: number; loading: boolean }>({ done: false, generation: 0, loading: false });
   const scrollRef = useRef<HTMLDivElement>(null);
   const busy = useRef(new Set<number>());
+  const inventorySync = useRef<Promise<unknown> | null>(null);
   const loadMore = async () => {
     const state = cursor.current;
     if (!active || state.loading || state.done) return;
@@ -54,6 +55,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     }
   };
   useEffect(() => { setSelected(null); }, [category, username]);
+  useEffect(() => { inventorySync.current = null; }, [active, username]);
   useEffect(() => {
     if (!active) return;
     cursor.current = { done: false, generation: cursor.current.generation + 1, loading: true };
@@ -68,7 +70,8 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     setInventorySyncError(false);
     setNotificationLoading(true);
     void (async () => {
-      try { await notificationsApi.syncInventory(); } catch { if (cursor.current.generation === generation) setInventorySyncError(true); }
+      inventorySync.current ??= notificationsApi.syncInventory();
+      try { await inventorySync.current; } catch { if (cursor.current.generation === generation) setInventorySyncError(true); }
       if (active && cursor.current.generation === generation) { cursor.current.loading = false; void loadMore(); }
     })();
     return () => { cursor.current.generation += 1; };
@@ -106,5 +109,6 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     }
   };
   const ordered = dataOwner === username ? notifications : [];
-  return { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, hasMore, scrollRef, loadMore, openNotification, ordered };
+  const retryInventory = () => { inventorySync.current = null; setReload((n) => n + 1); };
+  return { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, hasMore, scrollRef, loadMore, openNotification, ordered };
 }

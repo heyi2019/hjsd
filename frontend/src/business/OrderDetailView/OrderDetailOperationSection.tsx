@@ -10,6 +10,7 @@ import type { Account } from "../../shared/api/types/accounts";
 import type { OrderEventDraft, OrderOperationDraft, OrderOperationKey, OrderOperationRow } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
 import { useOptionSet } from "../../shared/lib/optionSets";
+import { money } from "../../shared/lib/format";
 import { OrderSectionHeading, OPERATION_KEY_BY_TYPE, OPERATION_TYPE_BY_KEY, type OrderDetailMeta } from "./OrderDetail.shared";
 import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
 import { currentDevUser } from "../../shared/api/client";
@@ -43,7 +44,7 @@ export function resolveOperationEventContent(
     if (price !== undefined && price !== null && price !== "") {
       const numericPrice = Number(price);
       const priceText = Number.isFinite(numericPrice)
-        ? numericPrice.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        ? money(typeof price === "string" ? price : numericPrice)
         : String(price);
       return platform ? `${platform} / 寄售价 ¥${priceText}` : `寄售价 ¥${priceText}`;
     }

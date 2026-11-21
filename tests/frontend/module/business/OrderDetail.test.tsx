@@ -111,6 +111,14 @@ describe("OrderDetail", () => {
     })).toBe("盼之");
   });
 
+  it("运营明细中的大额寄售价保留分位", () => {
+    expect(resolveOperationEventContent("consignment", "-", {
+      event_type: "OPERATE",
+      operation_type: "CONSIGNMENT",
+      form_extra: { consignment_platforms: ["千寻"], consignment_price: "9999999999999999.99" },
+    })).toBe("千寻 / 寄售价 ¥9,999,999,999,999,999.99");
+  });
+
   it("运营明细展示平台下架原因", () => {
     const unlist = { id: 9, event_type: "OPERATE", operation_type: "UNLIST", amount: "0", occurred_at: "2026-10-02T11:00:00", reason: "平台停售", form_extra: { consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" } } as never;
     renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} operationEvents={{ unlist: [unlist] }} />);

@@ -20,7 +20,7 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField
 from app.domain.users import User
 from app.settings.lists.export import build_list_csv
-from app.business.export_fields import _event_platform, _order_detail_export_fields
+from app.business.orders.export_fields import _event_platform, _order_detail_export_fields
 
 
 def _seed_select_field(db, *, field_key: str = "trade_role") -> OrderFormField:
@@ -477,7 +477,7 @@ def test_order_exports_have_no_total_limit(seeded_client, headers, monkeypatch):
     def spy(db, **kwargs):
         seen.append(kwargs.get("limit"))
         return list_orders(db, **kwargs)
-    monkeypatch.setattr("app.business.export_router.orders_list_orders", spy)
+    monkeypatch.setattr("app.business.orders.export_router.orders_list_orders", spy)
     for suffix in ("csv", "xlsx"):
         response = seeded_client.get(f"/api/orders/export.{suffix}", headers=headers)
         assert response.status_code == 200, response.text

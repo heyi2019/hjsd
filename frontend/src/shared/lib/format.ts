@@ -3,6 +3,17 @@
 export function money(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "-";
   const text = String(value);
+  // 小数字符串以整数分处理，避免大额 DECIMAL 转为 Number 时丢失精度。
+  if (typeof value === "string") {
+    const match = text.trim().match(/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
+    if (match) {
+      const fraction = match[3] ?? match[4] ?? "";
+      let cents = BigInt(match[2] ?? "0") * 100n + BigInt((fraction + "00").slice(0, 2));
+      if (fraction.length > 2 && fraction[2] >= "5") cents += 1n;
+      const integer = (cents / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      return `${match[1] === "-" ? "-" : ""}${integer}.${(cents % 100n).toString().padStart(2, "0")}`;
+    }
+  }
   const num = Number(text);
   if (Number.isNaN(num)) return text;
   return num.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

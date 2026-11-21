@@ -13,7 +13,7 @@ from app.domain.trade import Account, Order
 from app.business.stocks.profile import update_account_profile
 
 from .schemas import ExecutionEditRequest
-from .cashflows import apply_cashflow_edits
+from .cashflows import apply_cashflow_edits, lock_edit_pools, prepare_cashflow_event_edits
 from .events import apply_event_edits, apply_operation_event_creates, validate_event_edits
 from .orders import apply_order_edits
 from .parties import apply_party_edits
@@ -37,6 +37,8 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
     if len({item.order_id for item in payload.orders}) != len(payload.orders):
         raise Validation("同一订单不能重复修改")
 
+    payload = prepare_cashflow_event_edits(db, order_id, payload, user)
+    lock_edit_pools(db, order_id, payload, user)
     event_changes, cost_delta = validate_event_edits(db, account, order_id, payload, user)
     if payload.profile is not None:
         profile = payload.profile.model_dump(exclude_unset=True)
@@ -51,6 +53,8 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
         )
     apply_event_edits(db, event_changes, user.username)
     apply_operation_event_creates(db, order_id, payload.new_events, user.username, user)
+    if payload.cashflows:
+        db.flush()
     apply_cashflow_edits(db, account.id, order, payload.cashflows, user)
     apply_order_edits(db, account.id, order_id, payload.orders, user)
     apply_party_edits(db, account.id, order, payload.parties, user)

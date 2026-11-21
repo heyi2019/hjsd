@@ -615,11 +615,148 @@ def test_order_detail_edit_updates_cashflow_amount_and_pool(seeded_client, seede
     edited = seeded_db.get(Cashflow, flow.id)
     assert edited.amount == Decimal("88.50")
     assert edited.pool_id == target_pool.id
+    action = seeded_db.scalar(select(OrderEvent).where(OrderEvent.event_no == edited.source_id))
+    assert action.amount == Decimal("88.50")
+    assert seeded_db.get(Account, account.id).cost_amount == Decimal("88.50")
     detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
     assert detail.status_code == 200
     shown = detail.json()["detail_view"]["finance_rows"][0]
     assert shown["amount"] == "88.50"
     assert shown["pool_id"] == target_pool.id
+
+
+@pytest.mark.parametrize("target", ["original", "reversal", "rebate"])
+def test_order_detail_rejects_editing_protected_rebate_amount(seeded_client, seeded_db, headers, target):
+    from app.funds.cashflows import reverse_cashflow
+    from app.funds.rebates import create_rebate
+
+    day = date(2026, 10, 1)
+    account = create_account(seeded_db, game_account="edit-reversed-rebate", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+    rebate = create_rebate(seeded_db, source_order_id=order.id, rebate_type="BUY", amount="100", collected_on=day, actor="pytest")
+    action = seeded_db.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+    reversal = None if target == "rebate" else reverse_cashflow(seeded_db, flow.id, reversed_on=day, actor="pytest", reason="错录")
+    flow_id = flow.id
+    reversal_id = reversal.id if reversal is not None else None
+    flow_no = reversal.flow_no if target == "reversal" else flow.flow_no
+    seeded_db.commit()
+
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers,
+                                   json={"events": [], "cashflows": [{"flow_no": flow_no, "amount": "200"}]})
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Cashflow, flow_id).amount == Decimal("100")
+    if reversal_id is not None:
+        assert seeded_db.get(Cashflow, reversal_id).amount == Decimal("100")
+
+
+def test_order_detail_cashflow_amount_cannot_bypass_reconciliation(seeded_client, seeded_db, headers):
+    from app.funds.reconciliation import create_reconciliation
+
+    day = date(2026, 10, 1)
+    account = create_account(seeded_db, game_account="edit-reconciled-flow", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+    action, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=day, actor="pytest")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+    create_reconciliation(seeded_db, pool_id=flow.pool_id, reconciled_on=day, account_label="已核对",
+                          statement_balance="0", reason="核对", actor="admin")
+    action_id, flow_id, flow_no = action.id, flow.id, flow.flow_no
+    seeded_db.commit()
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers,
+                                   json={"events": [], "cashflows": [{"flow_no": flow_no, "amount": "200"}]})
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, action_id).amount == Decimal("100")
+    assert seeded_db.get(Cashflow, flow_id).amount == Decimal("100")
+
+
+def test_order_detail_cannot_move_deposit_flow_to_another_pool(seeded_client, seeded_db, headers):
+    from app.domain.trade import Deposit
+    from app.funds.deposits.writes import create_deposit
+
+    day = date(2026, 10, 1)
+    account = create_account(seeded_db, game_account="edit-deposit-pool", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    target = seeded_db.scalar(select(Pool).where(Pool.id != pool.id, Pool.status == "ACTIVE").order_by(Pool.id))
+    deposit = create_deposit(seeded_db, pool_id=pool.id, source_order_id=order.id, amount="100", paid_on=day, actor="admin")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "DEPOSIT", Cashflow.source_id == str(deposit.id)))
+    deposit_id, flow_id, flow_no, pool_id = deposit.id, flow.id, flow.flow_no, pool.id
+    seeded_db.commit()
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers,
+                                   json={"events": [], "cashflows": [{"flow_no": flow_no, "pool_id": target.id}]})
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Deposit, deposit_id).pool_id == pool_id
+    assert seeded_db.get(Cashflow, flow_id).pool_id == pool_id
+
+
+@pytest.mark.parametrize("reconciled", [False, True])
+def test_order_detail_manual_cashflow_respects_reconciliation(seeded_client, seeded_db, headers, reconciled):
+    from app.funds.cashflows import create_cashflow
+    from app.funds.reconciliation import create_reconciliation
+
+    day = date(2026, 10, 1)
+    account = create_account(seeded_db, game_account=f"edit-manual-flow-{reconciled}", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    flow = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=day, direction="IN", category="OTHER", amount="100", order_id=order.id, actor="pytest")
+    if reconciled:
+        create_reconciliation(seeded_db, pool_id=pool.id, reconciled_on=day, account_label="已核对",
+                              statement_balance="0", reason="核对", actor="admin")
+    flow_id, flow_no = flow.id, flow.flow_no
+    seeded_db.commit()
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers,
+                                   json={"events": [], "cashflows": [{"flow_no": flow_no, "amount": "200"}]})
+    assert response.status_code == (422 if reconciled else 200), response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Cashflow, flow_id).amount == (Decimal("100") if reconciled else Decimal("200"))
+
+
+@pytest.mark.parametrize("original_day,new_day", [(1, 4), (4, 1)])
+def test_event_date_cannot_move_across_reconciliation(seeded_client, seeded_db, headers, original_day, new_day):
+    from app.funds.reconciliation import create_reconciliation
+
+    account = create_account(seeded_db, game_account=f"edit-date-reconciliation-{original_day}", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    action, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 10, original_day), actor="pytest")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+    create_reconciliation(seeded_db, pool_id=flow.pool_id, reconciled_on=date(2026, 10, 3), account_label="已核对",
+                          statement_balance="0", reason="核对", actor="admin")
+    event_id, flow_id = action.id, flow.id
+    seeded_db.commit()
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [
+        {"id": event_id, "expected_amount": "100", "amount": "100", "occurred_at": f"2026-10-{new_day:02d}T12:00:00"},
+    ]})
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, event_id).occurred_on == date(2026, 10, original_day)
+    assert seeded_db.get(Cashflow, flow_id).occurred_on == date(2026, 10, original_day)
+
+
+@pytest.mark.parametrize("entry", ["event", "cashflow"])
+def test_order_detail_rebate_date_edit_syncs_all_records(seeded_client, seeded_db, headers, entry):
+    from app.domain.trade import RebateRecord
+    from app.funds.rebates import create_rebate
+
+    day = date(2026, 10, 1)
+    account = create_account(seeded_db, game_account=f"edit-rebate-date-{entry}", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+    rebate = create_rebate(seeded_db, source_order_id=order.id, rebate_type="BUY", amount="100", collected_on=day, actor="pytest")
+    action = seeded_db.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+    rebate_id, event_id, flow_id = rebate.id, action.id, flow.id
+    seeded_db.commit()
+    when = "2026-10-02T12:00:00"
+    payload = ({"events": [{"id": event_id, "expected_amount": "100", "amount": "100", "occurred_at": when}]}
+               if entry == "event" else {"events": [], "cashflows": [{"flow_no": flow.flow_no, "occurred_at": when}]})
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json=payload)
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(RebateRecord, rebate_id).collected_on == date(2026, 10, 2)
+    assert seeded_db.get(OrderEvent, event_id).occurred_on == date(2026, 10, 2)
+    assert seeded_db.get(Cashflow, flow_id).occurred_on == date(2026, 10, 2)
 
 
 def test_batch_cashflow_edits_reuse_locked_order_and_keep_event_fallback(seeded_client, seeded_db, headers):

@@ -28,6 +28,174 @@ from app.funds.rebates import create_rebate, update_rebate
 pytestmark = pytest.mark.db
 
 
+def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
+    from app.business.order_detail.editing.editor import edit_execution_detail
+    from app.business.order_detail.editing.schemas import ExecutionEditRequest
+    from app.core.security import CurrentUser
+
+    database = f"heijin_rebate_date_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        day = date(2026, 11, 1)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            account = create_account(session, game_account="rebate-date-race", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+            order = create_order(session, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+            rebate = create_rebate(session, source_order_id=order.id, rebate_type="BUY", amount="100", collected_on=day, actor="pytest")
+            action = session.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
+            flow = session.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+            order_id, rebate_id, event_id, flow_id = order.id, rebate.id, action.id, flow.id
+            session.commit()
+        reached = Event()
+
+        def edit_date():
+            with factory() as session:
+                def before(_conn, _cursor, statement, _parameters, _context, _many):
+                    if "from pools" in statement.lower() and "for no key update" in statement.lower():
+                        reached.set()
+                event.listen(session.connection(), "before_cursor_execute", before)
+                user = CurrentUser(id=1, username="pytest", roles=("ADMIN",), owner_scope="ALL")
+                payload = ExecutionEditRequest.model_validate({"events": [{"id": event_id, "expected_amount": "100", "amount": "100", "occurred_at": "2026-11-02T12:00:00"}]})
+                edit_execution_detail(session, order_id, payload, user)
+                session.commit()
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            update_rebate(first, rebate_id, note="新备注", actor="pytest")
+            future = executor.submit(edit_date)
+            assert reached.wait(10), "订单编辑未等待资金账户锁"
+            first.commit()
+            future.result(timeout=10)
+        with factory() as session:
+            rebate = session.get(RebateRecord, rebate_id)
+            action = session.get(OrderEvent, event_id)
+            flow = session.get(Cashflow, flow_id)
+            assert rebate.note == action.note == "新备注"
+            assert rebate.collected_on == action.occurred_on == flow.occurred_on == date(2026, 11, 2)
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
+
+
+@pytest.mark.parametrize("first_action", ["edit", "reconcile"])
+@pytest.mark.parametrize("edit_kind", ["order", "rebate"])
+def test_reconciliation_and_amount_edit_serialize(v1_engine, first_action, edit_kind):
+    from app.business.events import post_event
+    from app.business.order_detail.editing.editor import edit_execution_detail
+    from app.business.order_detail.editing.schemas import ExecutionEditRequest
+    from app.core.security import CurrentUser
+    from app.funds.reconciliation import _system_balance_as_of
+
+    database = f"heijin_recon_edit_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        day = date(2026, 11, 1)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            session.add(User(username="pytest", display_name="测试", password_hash="unused"))
+            session.flush()
+            account = create_account(session, game_account="reconciliation-edit-race", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+            order = create_order(session, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+            if edit_kind == "order":
+                action, _ = post_event(session, order.id, event_type="BUY", amount="100", occurred_on=day, actor="pytest")
+                rebate_id = None
+            else:
+                rebate = create_rebate(session, source_order_id=order.id, rebate_type="BUY", amount="100", collected_on=day, actor="pytest")
+                rebate_id = rebate.id
+                action = session.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
+            flow = session.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+            order_id, event_id, pool_id = order.id, action.id, flow.pool_id
+            session.commit()
+
+        user = CurrentUser(id=1, username="pytest", roles=("ADMIN",), owner_scope="ALL")
+        payload = ExecutionEditRequest.model_validate({"events": [{"id": event_id, "expected_amount": "100", "amount": "200"}]})
+        reached, proceed, first_locked_pool = Event(), Event(), Event()
+
+        def action(session, name):
+            if name == "edit":
+                if edit_kind == "order":
+                    edit_execution_detail(session, order_id, payload, user)
+                else:
+                    update_rebate(session, rebate_id, amount="200", actor="pytest", user=user)
+            else:
+                create_reconciliation(session, pool_id=pool_id, reconciled_on=day, account_label="并发账户",
+                                      statement_balance="0", reason="核对", actor="pytest")
+
+        def second_action():
+            with factory() as session:
+                def before(_conn, _cursor, statement, _parameters, _context, _many):
+                    sql = statement.lower()
+                    if "from pools" in sql and "for no key update" in sql and first_locked_pool.is_set():
+                        reached.set()
+                def after(_conn, _cursor, statement, _parameters, _context, _many):
+                    sql = statement.lower()
+                    legacy_snapshot = first_action == "edit" and "from cashflow" in sql and "sum(" in sql
+                    legacy_guard = first_action == "reconcile" and (
+                        "from reconciliations" in sql or
+                        (edit_kind == "rebate" and "from cashflow" in sql and "for update" in sql)
+                    )
+                    if not first_locked_pool.is_set() and not reached.is_set() and (legacy_snapshot or legacy_guard):
+                        reached.set()
+                        assert proceed.wait(10)
+                event.listen(session.connection(), "before_cursor_execute", before)
+                event.listen(session.connection(), "after_cursor_execute", after)
+                try:
+                    action(session, "reconcile" if first_action == "edit" else "edit")
+                    session.commit()
+                    return "accepted"
+                except Validation:
+                    session.rollback()
+                    return "rejected"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            def first_after(_conn, _cursor, statement, _parameters, _context, _many):
+                sql = statement.lower()
+                if "from pools" in sql and "for no key update" in sql:
+                    first_locked_pool.set()
+            event.listen(first.connection(), "after_cursor_execute", first_after)
+            action(first, first_action)
+            # 对账本身始终加池锁；编辑只有修复后才加相同的锁。
+            if first_action == "reconcile":
+                first_locked_pool.clear()
+                # 第二个编辑若使用池锁会先报告等待；旧实现会报告已过对账检查。
+                def editing_before(_conn, _cursor, statement, _parameters, _context, _many):
+                    if "from pools" in statement.lower() and "for no key update" in statement.lower():
+                        reached.set()
+                # 通过下方连接监听统一捕获，不改变事务时序。
+                event.listen(engine, "before_cursor_execute", editing_before)
+            future = executor.submit(second_action)
+            try:
+                assert reached.wait(10), "第二个操作未到达资金账户锁或对账检查"
+                first.commit()
+            finally:
+                proceed.set()
+                if first_action == "reconcile":
+                    event.remove(engine, "before_cursor_execute", editing_before)
+            assert future.result(timeout=10) == ("accepted" if first_action == "edit" else "rejected")
+
+        with factory() as session:
+            recon = session.scalar(select(Reconciliation).where(Reconciliation.pool_id == pool_id))
+            expected = 200 if first_action == "edit" else 100
+            assert recon.system_balance == (expected if edit_kind == "rebate" else -expected)
+            assert _system_balance_as_of(session, pool_id, day) == recon.system_balance
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
+
+
 @pytest.mark.parametrize("first_action", ["reverse", "edit"])
 def test_rebate_edit_and_reversal_serialize(v1_engine, first_action):
     database = f"heijin_rebate_reverse_test_{uuid4().hex}"
@@ -130,7 +298,8 @@ def test_concurrent_rebate_edits_keep_record_event_and_flow_consistent(v1_engine
             assert preloaded.amount == 100
             def before(_conn, _cursor, statement, _parameters, _context, _many):
                 sql = statement.lower()
-                if ("from rebate_records" in sql and "for update" in sql) or "from order_events" in sql:
+                if (("from rebate_records" in sql and "for update" in sql) or "from order_events" in sql
+                        or ("from pools" in sql and "for no key update" in sql)):
                     if not reached.is_set():
                         reached.set()
                         assert proceed.wait(10)

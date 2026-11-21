@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import exists, select
+from sqlalchemy import and_, exists, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -82,8 +82,8 @@ def validate_event_edits(
     order_id: int,
     payload: ExecutionEditRequest,
     user: CurrentUser,
-) -> tuple[list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]], Decimal]:
-    changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]] = []
+) -> tuple[list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem, RebateRecord | None]], Decimal]:
+    changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem, RebateRecord | None]] = []
     cost_delta = Decimal("0")
     requested_event_ids = {item.id for item in payload.events}
     draft_ids_by_platform: dict[str, set[int]] = {}
@@ -93,6 +93,16 @@ def validate_event_edits(
             for value in proposed:
                 if isinstance(value, str) and value.strip():
                     draft_ids_by_platform.setdefault(value.strip(), set()).add(item.id)
+    dated_ids = [item.id for item in payload.events if item.occurred_at is not None]
+    rebates = {}
+    if dated_ids:
+        rows = db.scalars(select(RebateRecord).join(OrderEvent, and_(
+            OrderEvent.order_id == RebateRecord.source_order_id,
+            OrderEvent.source_type == CashflowSourceType.REBATE.value,
+            OrderEvent.source_id == RebateRecord.rebate_no,
+        )).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "REBATE", OrderEvent.id.in_(dated_ids))
+          .order_by(RebateRecord.id).with_for_update(of=RebateRecord).execution_options(populate_existing=True)).all()
+        rebates = {record.rebate_no: record for record in rows}
     requested_operator_ids = {
         operator_id
         for item in payload.events
@@ -102,7 +112,7 @@ def validate_event_edits(
         select(User.id).where(User.id.in_(requested_operator_ids), User.is_active.is_(True))
     ).all()) if requested_operator_ids else set()
     for item in payload.events:
-        event = db.scalar(select(OrderEvent).where(OrderEvent.id == item.id).with_for_update())
+        event = db.scalar(select(OrderEvent).where(OrderEvent.id == item.id).with_for_update().execution_options(populate_existing=True))
         order = get_order(db, event.order_id, user) if event else None
         if event is None or order is None or order.id != order_id or order.account_id != account.id or not event.is_posted:
             raise NotFound("执行记录不存在")
@@ -148,17 +158,20 @@ def validate_event_edits(
         flow = db.scalar(select(Cashflow).where(
             Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
             Cashflow.source_id == event.event_no,
-        ).with_for_update())
+        ).with_for_update().execution_options(populate_existing=True))
         if flow is not None and not user.can_see_pool(flow.pool_id):
             raise NotFound("关联资金流水不存在")
-        if item.amount == Decimal(str(event.amount)):
-            changes.append((event, flow, item))
+        rebate = rebates.get(event.source_id) if event.source_type == CashflowSourceType.REBATE.value else None
+        amount_changed = item.amount != Decimal(str(event.amount))
+        date_changed = flow is not None and item.occurred_at is not None and item.occurred_at.date() != flow.occurred_on
+        if not amount_changed and not date_changed:
+            changes.append((event, flow, item, rebate))
             continue
-        if event.event_type not in {"BUY", "SELL"} or item.amount <= 0:
+        if amount_changed and (event.event_type not in {"BUY", "SELL"} or item.amount <= 0):
             raise Validation("该类型执行记录暂不支持修改金额")
         if flow is None:
             raise NotFound("关联资金流水不存在")
-        if Decimal(str(flow.amount)) != Decimal(str(event.amount)):
+        if amount_changed and Decimal(str(flow.amount)) != Decimal(str(event.amount)):
             raise Validation("执行记录与关联流水金额不一致，请先核对")
         if event.offset_event_id is not None or flow.source_type == CashflowSourceType.REVERSAL.value:
             raise Validation("已冲销或被冲销的记录不能直接修改")
@@ -171,23 +184,23 @@ def validate_event_edits(
         )).one()
         if event_reversed or flow_reversed:
             raise Validation("已冲销或被冲销的记录不能直接修改")
-        if has_installment:
+        if amount_changed and has_installment:
             raise Validation("关联分期的记录不能直接修改，请先处理分期")
-        if has_rebate:
+        if amount_changed and has_rebate:
             raise Validation("关联返点的记录不能直接修改，请先核对返点")
-        # 对账创建不锁订单或原流水，继续在其他检查完成后读取，避免扩大漏检窗口。
-        if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on)) is not None:
+        earliest_date = min(flow.occurred_on, item.occurred_at.date()) if date_changed else flow.occurred_on
+        if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= earliest_date)) is not None:
             raise Validation("资金账户已有后续对账记录，不能直接修改")
-        if event.event_type == "BUY":
+        if amount_changed and event.event_type == "BUY":
             cost_delta += item.amount - Decimal(str(event.amount))
-        changes.append((event, flow, item))
+        changes.append((event, flow, item, rebate))
     if Decimal(str(account.cost_amount)) + cost_delta < 0:
         raise Validation("修改后库存成本不能为负数")
     return changes, cost_delta
 
 
-def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem]], actor: str) -> None:
-    for event, flow, item in changes:
+def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | None, ExecutionEditItem, RebateRecord | None]], actor: str) -> None:
+    for event, flow, item, rebate in changes:
         occurred_at = event.posted_at or event.created_at
         before = {
             "amount": str(event.amount),
@@ -215,6 +228,13 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
             if flow is not None:
                 flow.occurred_on = occurred_at.date()
                 flow.created_at = occurred_at
+            if rebate is not None and rebate.collected_on != occurred_at.date():
+                old_date = rebate.collected_on
+                rebate.collected_on = occurred_at.date()
+                rebate.updated_by = actor
+                record_audit(db, action="REBATE_UPDATE", entity_type="rebate_record", entity_id=rebate.rebate_no,
+                             actor=actor, before={"collected_on": old_date.isoformat()},
+                             after={"collected_on": rebate.collected_on.isoformat()})
         if item.form_extra is not None:
             old_extra = event.form_extra or {}
             old_platforms = old_extra.get("consignment_platforms") or []

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
 from app.shared.business_numbering import rebate_no as order_rebate_no
-from app.core.errors import ErrorCode, NotFound, Validation
+from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.core.security import CurrentUser
 from app.shared.scope import owner_scope_filter
 from app.domain.enums import (
@@ -19,7 +19,8 @@ from app.domain.enums import (
     OrderStatus,
     RebateType,
 )
-from app.domain.trade import Cashflow, OrderEvent, RebateRecord
+from app.domain.foundation import Pool
+from app.domain.trade import Cashflow, OrderEvent, RebateRecord, Reconciliation
 from app.settings.field_definitions.pools import require_default_pool
 from app.shared.order_access import get_order
 from app.shared.operation_operators import validate_optional_operator_ids
@@ -212,6 +213,19 @@ def update_rebate(
     form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
+    # 与订单详情编辑和对账统一锁顺序：账户 → 返点 → 事件 → 流水。
+    visible = get_rebate(session, rebate_id, user=user)
+    prior_flow = session.execute(select(Cashflow.id, Cashflow.pool_id).join(
+        OrderEvent, OrderEvent.event_no == Cashflow.source_id,
+    ).where(
+        OrderEvent.order_id == visible.source_order_id,
+        OrderEvent.event_type == "REBATE",
+        OrderEvent.source_type == CashflowSourceType.REBATE.value,
+        OrderEvent.source_id == visible.rebate_no,
+        Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
+    )).first()
+    if prior_flow is not None:
+        session.scalars(select(Pool.id).where(Pool.id == prior_flow.pool_id).with_for_update(key_share=True)).one()
     record = get_rebate(session, rebate_id, user=user, for_update=True)
     action_event = _rebate_action_event(session, record)
     flow = None
@@ -220,14 +234,24 @@ def update_rebate(
             Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
             Cashflow.source_id == action_event.event_no,
         ).with_for_update().execution_options(populate_existing=True))
+        if flow is not None and (prior_flow is None or flow.id != prior_flow.id or flow.pool_id != prior_flow.pool_id):
+            raise Conflict("返点关联资金账户已变化，请刷新后重试")
         if flow is not None and session.scalar(select(Cashflow.id).where(
             Cashflow.source_type == CashflowSourceType.REVERSAL.value,
             Cashflow.source_id == flow.flow_no,
         )) is not None:
             raise Validation("已冲销的返点不能编辑", details={"rebate_record_id": rebate_id})
+    new_amount = _positive(amount, field="amount") if amount is not None else record.amount
+    new_date = collected_on if collected_on is not None else record.collected_on
+    if flow is not None and (flow.amount != new_amount or flow.occurred_on != new_date):
+        earliest_date = min(flow.occurred_on, new_date)
+        if session.scalar(select(Reconciliation.id).where(
+            Reconciliation.pool_id == flow.pool_id,
+            Reconciliation.reconciled_on >= earliest_date,
+        )) is not None:
+            raise Validation("资金账户已有后续对账记录，不能直接修改")
     before = {"amount": str(record.amount), "collected_on": str(record.collected_on), "note": record.note}
     if amount is not None:
-        new_amount = _positive(amount, field="amount")
         record.amount = new_amount
     if collected_on is not None:
         record.collected_on = collected_on

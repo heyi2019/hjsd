@@ -12,6 +12,7 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.shared.order_access import get_order
+from app.shared.scope import owner_scope_filter
 from app.shared.order_amounts import order_profit_flow_by_order
 from app.business.inventory.profile import get_account
 from app.business.inventory.router_output import _account_outputs
@@ -121,6 +122,15 @@ def _assemble_order_execution_detail(
     )
 
 
+def _visible_order_accounts(db: Session, order_ids: list[int], user: CurrentUser) -> dict[int, tuple[Order, Account]]:
+    # 可见订单本身就是账号可见范围的依据，批量查询避免每条额外检查账号。
+    stmt = select(Order, Account).join(Account, Account.id == Order.account_id).where(Order.id.in_(order_ids))
+    scope = owner_scope_filter(Order.owner_id, user, db)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    return {order.id: (order, account) for order, account in db.execute(stmt).all()}
+
+
 def load_order_execution_details_for_export(
     db: Session, order_ids: list[int], user: CurrentUser,
 ) -> list[AccountExecutionDetailOut | None]:
@@ -133,26 +143,20 @@ def load_order_execution_details_for_export(
             for start in range(0, len(order_ids), 500)
             for item in load_order_execution_details_for_export(db, order_ids[start:start + 500], user)
         ]
-    failed_index = None
     try:
         # 任一查询失败时只回滚保存点，不污染调用方事务。
         with db.begin_nested():
             visible: list[Order] = []
             accounts: list[Account] = []
             validated_rows: list[tuple[Order, Account] | None] = []
-            for index, order_id in enumerate(order_ids):
-                try:
-                    order = get_order(db, order_id, user)
-                    if order.account_id is None:
-                        validated_rows.append(None)
-                        continue
-                    account = get_account(db, order.account_id, user)
+            pairs = _visible_order_accounts(db, order_ids, user)
+            for order_id in order_ids:
+                pair = pairs.get(order_id)
+                validated_rows.append(pair)
+                if pair is not None:
+                    order, account = pair
                     visible.append(order)
                     accounts.append(account)
-                    validated_rows.append((order, account))
-                except Exception:
-                    failed_index = index
-                    raise
             ids = [order.id for order in visible]
             relations = load_relations(db, visible)
             context = load_event_context(db, ids)
@@ -217,10 +221,7 @@ def load_order_execution_details_for_export(
     except Exception:
         # 批量阶段异常只回退到原逐行读取；每行保存点隔离真实 SQL 错误。
         results = []
-        for index, order_id in enumerate(order_ids):
-            if index == failed_index:
-                results.append(None)
-                continue
+        for order_id in order_ids:
             try:
                 with db.begin_nested():
                     detail = load_order_execution_detail(db, order_id, user)

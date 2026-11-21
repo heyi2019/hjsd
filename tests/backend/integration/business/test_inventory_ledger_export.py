@@ -61,6 +61,28 @@ def test_inventory_export_batches_order_detail_queries(seeded_client, headers, s
     assert len(audits) <= 1
 
 
+def test_restricted_inventory_batch_does_not_query_account_scope_per_row(seeded_db):
+    orders = []
+    for i in range(5):
+        account = create_account(seeded_db, game_account=f"inventory-scope-batch-{i}", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+        order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id, owner_id=1)
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 10, 1), actor="pytest")
+        orders.append(order)
+    statements = []
+    def capture(_conn, _cursor, statement, _parameters, _context, _many):
+        sql = " ".join(statement.lower().split())
+        if sql.startswith("select") and "from stocks" in sql and "where stocks.id =" in sql:
+            statements.append(sql)
+    user = CurrentUser.build(id=1, username="restricted", roles=["EMPLOYEE"], owner_scope="SELF")
+    sqlalchemy_event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        details = execution.load_order_execution_details_for_export(seeded_db, [order.id for order in orders], user)
+    finally:
+        sqlalchemy_event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+    assert all(detail is not None for detail in details)
+    assert len(statements) <= 1
+
+
 def test_batch_detail_matches_single_order_and_keeps_bad_debt_and_permissions(seeded_db):
     orders, accounts = [], []
     for i in range(2):
@@ -140,8 +162,9 @@ def test_batch_detail_reuses_single_order_loader_for_duplicate_event_cashflows(s
 
 def test_inventory_batch_loader_splits_501_orders_without_changing_order(seeded_db, monkeypatch):
     calls = []
-    monkeypatch.setattr(execution, "get_order", lambda db, order_id, user: SimpleNamespace(id=order_id, account_id=order_id))
-    monkeypatch.setattr(execution, "get_account", lambda db, account_id, user: SimpleNamespace(id=account_id))
+    monkeypatch.setattr(execution, "_visible_order_accounts", lambda db, ids, user: {
+        item: (SimpleNamespace(id=item, account_id=item), SimpleNamespace(id=item)) for item in ids
+    })
     monkeypatch.setattr(execution, "load_relations", lambda db, orders: SimpleNamespace(order_extra_values={}))
     def load_context(db, ids):
         calls.append(len(ids))
@@ -221,23 +244,17 @@ def test_batch_only_assembly_failure_retries_original_single_order(seeded_db, mo
     assert seeded_db.execute(text("SELECT 1")).scalar_one() == 1
 
 
-def test_batch_does_not_retry_failed_permission_check(seeded_db, monkeypatch):
+def test_batch_does_not_retry_invisible_order(seeded_db, monkeypatch):
     account = create_account(seeded_db, game_account="inventory-permission-fail-once", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
-    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
-    admin = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
-    original = execution.get_order
-    calls = 0
-
-    def fail_once(*args):
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            raise RuntimeError("模拟单行权限读取失败")
-        return original(*args)
-
-    monkeypatch.setattr(execution, "get_order", fail_once)
-    assert execution.load_order_execution_details_for_export(seeded_db, [order.id], admin) == [None]
-    assert calls == 1
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id, owner_id=2)
+    restricted = CurrentUser.build(id=1, username="restricted", roles=["EMPLOYEE"], owner_scope="SELF")
+    calls = []
+    def reject_fallback(*_args):
+        calls.append(True)
+        raise AssertionError("不可见订单不得走逐条回退")
+    monkeypatch.setattr(execution, "get_order", reject_fallback)
+    assert execution.load_order_execution_details_for_export(seeded_db, [order.id], restricted) == [None]
+    assert calls == []
 
 
 def test_batch_permission_sql_failure_does_not_lose_other_rows(seeded_db, monkeypatch):
@@ -247,6 +264,10 @@ def test_batch_permission_sql_failure_does_not_lose_other_rows(seeded_db, monkey
         orders.append(create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id))
     admin = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
     original = execution.get_order
+
+    def fail_batch(db, _order_ids, _user):
+        db.execute(text("SELECT 1/0"))
+    monkeypatch.setattr(execution, "_visible_order_accounts", fail_batch)
 
     def fail_one(db, order_id, user):
         if order_id == orders[1].id:

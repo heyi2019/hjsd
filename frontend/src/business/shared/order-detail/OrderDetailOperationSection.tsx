@@ -12,7 +12,7 @@ import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
 import { useOptionSet } from "../../../shared/lib/optionSets";
 import { money } from "../../../shared/lib/format";
 import { OrderSectionHeading, OPERATION_KEY_BY_TYPE, OPERATION_TYPE_BY_KEY, type OrderDetailMeta } from "./OrderDetail.shared";
-import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
+import { defaultOperatorUserIds } from "./editing/editor-utils";
 import { currentDevUser } from "../../../shared/api/client";
 import { activeConsignmentListings } from "../operations/consignment-logic";
 import "../../../shared/ui/AdaptiveFormGrid/MoneyInput.css";

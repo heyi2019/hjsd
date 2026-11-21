@@ -7,7 +7,7 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
 import { useLedgerInlineEdit } from "@/business/orders/useLedgerInlineEdit";
-import { defaultOperatorUserIds } from "@/business/shared/order-detail/editing/use-order-detail-editor";
+import { defaultOperatorUserIds } from "@/business/shared/order-detail/editing/editor-utils";
 import { CashflowModal, type CashflowTarget } from "@/finance/cashflow";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";

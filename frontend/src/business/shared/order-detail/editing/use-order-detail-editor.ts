@@ -329,7 +329,3 @@ export function useOrderDetailEditor(params: {
     saveInline,
   };
 }
-
-/** 类型与纯函数出口：保持拆分前 use-order-detail-editor 的全部导出符号不变。 */
-export type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
-export { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";

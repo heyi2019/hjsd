@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildEventEdits, buildFinanceEdits, buildOrderEdits } from "@/business/shared/order-detail/editing/execution-edit-payload";
-import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/shared/order-detail/editing/use-order-detail-editor";
+import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/shared/order-detail/editing/editor-utils";
 import { resolveExecutionPlatform } from "@/business/shared/order-detail/OrderDetail.shared";
 import { mergeLedgerOrderWithDetail } from "@/business/orders/useLedgerInlineEdit";
 import { buildFinanceSelectOptions } from "@/business/shared/order-detail/finance-options";

@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { useMemo } from "react";
 import type { ColumnsType } from "antd/es/table";
 import type { AccountExecutionEvent } from "../../../shared/api/types/account-execution";
-import type { OrderDraft } from "./editing/use-order-detail-editor";
+import type { OrderDraft } from "./editing/editor-types";
 import { DataTable, DateField, MoneyText, Select } from "../../../shared/ui";
 import { OrderDetailMoneyInput } from "./OrderDetailMoneyInput";
 import {
@@ -16,7 +16,7 @@ import {
   type OrderExecutionCategory,
   type OrderExecutionRow,
 } from "./OrderDetail.shared";
-import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
+import { defaultOperatorUserIds } from "./editing/editor-utils";
 import { currentDevUser } from "../../../shared/api/client";
 
 const CATEGORY_RANK: Record<OrderExecutionCategory, number> = {

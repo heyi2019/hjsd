@@ -25,9 +25,9 @@ import {
   PARTY_ROLE_LABEL,
   OPERATION_TYPE_BY_KEY,
 } from "./OrderDetail.shared";
-import type { FinanceDraft } from "./editing/use-order-detail-editor";
-import type { OrderDraft } from "./editing/use-order-detail-editor";
-import type { PartyAddition } from "./editing/use-order-detail-editor";
+import type { FinanceDraft } from "./editing/editor-types";
+import type { OrderDraft } from "./editing/editor-types";
+import type { PartyAddition } from "./editing/editor-types";
 
 function renderOrderParties(
   parties: OrderPartyLink[],

@@ -7,8 +7,8 @@ import { OrderDetailMoneyInput } from "./OrderDetailMoneyInput";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import type { Pool } from "../../../shared/api/types/finance";
 import type { OrderFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
-import type { FinanceDraft, OrderDraft } from "./editing/use-order-detail-editor";
-import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
+import type { FinanceDraft, OrderDraft } from "./editing/editor-types";
+import { defaultOperatorUserIds } from "./editing/editor-utils";
 import { currentDevUser } from "../../../shared/api/client";
 import { buildFinanceSelectOptions } from "./finance-options";
 

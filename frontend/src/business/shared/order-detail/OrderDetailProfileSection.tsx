@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../../shared/api/types/account-execution";
 import type { Account } from "../../../shared/api/types/accounts";
 import type { OrderFormField } from "../../../shared/api/types/forms";
-import type { OrderDraft } from "./editing/use-order-detail-editor";
+import type { OrderDraft } from "./editing/editor-types";
 import {
   OrderSectionHeading,
   type OrderEmployeeOption,

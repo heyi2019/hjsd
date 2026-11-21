@@ -3,8 +3,30 @@ import { buildEventEdits, buildFinanceEdits, buildOrderEdits } from "@/business/
 import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/OrderDetailView/editing/use-order-detail-editor";
 import { resolveExecutionPlatform } from "@/business/OrderDetailView/OrderDetail.shared";
 import { mergeLedgerOrderWithDetail } from "@/business/orderpage/useLedgerInlineEdit";
+import { buildFinanceSelectOptions } from "@/business/OrderDetailView/finance-options";
 
 describe("详情编辑保存载荷", () => {
+  it("资金明细选项保持停用当前账户的位置并复用相同账户候选", () => {
+    let reads = 0;
+    const pools = [
+      { id: 1, name: "经营", get status() { reads += 1; return "ACTIVE"; } },
+      { id: 2, name: "停用账户", get status() { reads += 1; return "INACTIVE"; } },
+      { id: 3, name: "备用", get status() { reads += 1; return "ACTIVE"; } },
+    ];
+    const employees = [{ id: 7, display_name: "员工甲", is_active: true }, { id: 8, display_name: "离职员工", is_active: false }];
+    const options = buildFinanceSelectOptions(employees, pools);
+    expect(options.employees).toEqual([{ value: 7, label: "员工甲", disabled: false }, { value: 8, label: "离职员工", disabled: true }]);
+    expect(options.poolsFor(2)).toEqual([{ value: 1, label: "经营", disabled: false }, { value: 2, label: "停用账户", disabled: true }, { value: 3, label: "备用", disabled: false }]);
+    expect(options.poolsFor(99)).toEqual([{ value: 1, label: "经营", disabled: false }, { value: 3, label: "备用", disabled: false }]);
+    for (let i = 0; i < 50; i += 1) options.poolsFor(2);
+    expect(reads).toBeLessThanOrEqual(6);
+    const duplicates = buildFinanceSelectOptions([], [
+      { id: 2, name: "停用一", status: "INACTIVE" },
+      { id: 3, name: "经营", status: "ACTIVE" },
+      { id: 2, name: "停用二", status: "INACTIVE" },
+    ]);
+    expect(duplicates.poolsFor(2).map((item) => item.label)).toEqual(["停用一", "经营", "停用二"]);
+  });
   it("批量资金明细按草稿顺序匹配，保持首条同号记录和修改字段", () => {
     let reads = 0;
     const rows = Array.from({ length: 200 }, (_, index) => ({

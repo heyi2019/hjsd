@@ -987,6 +987,23 @@ describe("OrderDetail", () => {
     expect(onFinanceEdit).toHaveBeenCalledWith("CF0037", { pool_id: 2 });
   });
 
+  it("编辑资金明细保留当前停用账户且不允许选择其他停用账户", async () => {
+    renderApp(<OrderDetailFinanceSection editing rows={[{
+      key: "CF-STOP", flowNo: "CF-STOP", type: "回收成本", direction: "支出", amount: "100.00",
+      occurredAt: "-", operator: "-", poolId: 2, poolName: "停用账户", note: "-",
+    } as never]} orderExtras={[]} expenseCount={1} incomeCount={0} totalExpense="100.00" totalIncome="0"
+      pools={[
+        { id: 1, code: "A", name: "经营账户", pool_type: "INVEST", status: "ACTIVE" },
+        { id: 2, code: "B", name: "停用账户", pool_type: "INVEST", status: "INACTIVE" },
+        { id: 3, code: "C", name: "其他停用账户", pool_type: "INVEST", status: "INACTIVE" },
+      ]} />);
+    await userEvent.click(screen.getByRole("combobox", { name: "编辑资金明细资金账户 CF-STOP" }));
+    const stopped = await screen.findByText("停用账户", { selector: ".ant-select-item-option-content" });
+    expect(stopped.closest(".ant-select-item-option")).toHaveClass("ant-select-item-option-disabled");
+    expect(screen.getByText("经营账户", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.queryByText("其他停用账户", { selector: ".ant-select-item-option-content" })).toBeNull();
+  });
+
   it("没有事件记录时操作明细备注仍可编辑", async () => {
     const detail = {
       account,

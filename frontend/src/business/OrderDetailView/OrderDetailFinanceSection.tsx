@@ -10,6 +10,7 @@ import type { OrderFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
 import type { FinanceDraft, OrderDraft } from "./editing/use-order-detail-editor";
 import { defaultOperatorUserIds } from "./editing/use-order-detail-editor";
 import { currentDevUser } from "../../shared/api/client";
+import { buildFinanceSelectOptions } from "./finance-options";
 
 const FINANCE_SECTION_TITLE = "费用与资金补充信息";
 
@@ -45,6 +46,7 @@ function editableFinanceColumns(
   pools: Pool[],
   defaultOperatorIds: number[],
 ): ColumnsType<OrderFinanceRow> {
+  const options = buildFinanceSelectOptions(employees, pools);
   return FINANCE_COLUMNS.map((column) => {
     if (column.key === "occurredAt") {
       return {
@@ -83,7 +85,7 @@ function editableFinanceColumns(
             optionFilterProp="label"
             aria-label={`编辑资金明细操作人 ${row.flowNo}`}
             value={(drafts?.[row.flowNo]?.operator_user_ids ?? row.operatorUserIds ?? []).length ? (drafts?.[row.flowNo]?.operator_user_ids ?? row.operatorUserIds ?? []) : defaultOperatorIds}
-            options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))}
+            options={options.employees}
             placeholder="默认当前员工，可多选"
             onChange={(ids) => {
               const currentIds = (drafts?.[row.flowNo]?.operator_user_ids ?? row.operatorUserIds ?? []).length ? (drafts?.[row.flowNo]?.operator_user_ids ?? row.operatorUserIds ?? []) : defaultOperatorIds;
@@ -105,19 +107,12 @@ function editableFinanceColumns(
         render: (_value: string, row: OrderFinanceRow) => {
           if (row.poolId == null) return row.poolName;
           const currentPoolId = drafts?.[row.flowNo]?.pool_id ?? row.poolId;
-          const currentPool = pools.find((pool) => pool.id === currentPoolId);
-          const options = pools
-            .filter((pool) => pool.status === "ACTIVE" || pool.id === currentPoolId)
-            .map((pool) => ({ value: pool.id, label: pool.name, disabled: pool.status !== "ACTIVE" }));
-          if (currentPool && !options.some((option) => option.value === currentPool.id)) {
-            options.unshift({ value: currentPool.id, label: currentPool.name, disabled: true });
-          }
           return (
             <Select
               className="order-finance-pool-select"
               aria-label={`编辑资金明细资金账户 ${row.flowNo}`}
               value={currentPoolId}
-              options={options}
+              options={options.poolsFor(currentPoolId)}
               onChange={(poolId) => onEdit?.(row.flowNo, { pool_id: poolId as number })}
             />
           );

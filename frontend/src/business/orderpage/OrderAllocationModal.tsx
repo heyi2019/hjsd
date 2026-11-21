@@ -19,6 +19,7 @@ import { EmployeeSelectControl } from "../ResponsibleEmployeeSelect";
 import type { OrdersPageController } from "./useOrdersPageController";
 import {
   ALLOCATION_TYPE_LABEL,
+  buildAllocationOptionGroups,
   type ActionAllocationCandidates,
   type AllocationFormRow,
   type AllocationType,
@@ -45,18 +46,6 @@ type AllocationFormValues = {
 
 type AllocationEmployeeOption = AllocationController["employeeOptions"][number];
 
-function optionsFor(
-  kind: AllocationType | undefined,
-  candidates: ActionAllocationCandidates,
-  employeeOptions: AllocationEmployeeOption[],
-) {
-  if (kind === "BUY" || kind === "SELL") {
-    const candidateIds = new Set(candidates[kind]);
-    return employeeOptions.filter((option) => typeof option.value === "number" && candidateIds.has(option.value));
-  }
-  return employeeOptions.filter((option) => option.value !== "COMPANY");
-}
-
 function AllocationFields({
   allocationCandidates,
   allocationForm,
@@ -73,6 +62,7 @@ function AllocationFields({
   watchedRows: AllocationFormRow[];
 }) {
   const conversionVersion = useKeyedLatestRequest<number>();
+  const optionGroups = buildAllocationOptionGroups(allocationCandidates, employeeOptions);
   const invalidateConversion = conversionVersion.invalidate;
   const convertValue = (row: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string, target: "allocation_rate" | "allocation_amount") => {
     const version = conversionVersion.start(row);
@@ -133,7 +123,7 @@ function AllocationFields({
                     <EmployeeSelectControl
                       mode="multiple"
                       placeholder="选择动作操作人"
-                      options={optionsFor(kind, allocationCandidates, employeeOptions)}
+                      options={kind === "BUY" || kind === "SELL" ? optionGroups[kind] : optionGroups.other}
                     />
                   </Form.Item>
                 )}

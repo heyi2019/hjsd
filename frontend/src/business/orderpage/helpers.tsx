@@ -60,6 +60,22 @@ export type AllocationFormRow = {
 
 export type ActionAllocationCandidates = Record<AllocationType, number[]>;
 
+export function buildAllocationOptionGroups<T extends { value: number | "COMPANY" }>(
+  candidates: ActionAllocationCandidates,
+  options: T[],
+): { BUY: T[]; SELL: T[]; other: T[] } {
+  const buyIds = new Set(candidates.BUY);
+  const sellIds = new Set(candidates.SELL);
+  const groups: { BUY: T[]; SELL: T[]; other: T[] } = { BUY: [], SELL: [], other: [] };
+  for (const option of options) {
+    const value = option.value;
+    if (typeof value === "number" && buyIds.has(value)) groups.BUY.push(option);
+    if (typeof value === "number" && sellIds.has(value)) groups.SELL.push(option);
+    if (value !== "COMPANY") groups.other.push(option);
+  }
+  return groups;
+}
+
 /** 正整数 ID 去重：所有来源统一走这里，避免各写一遍。 */
 function ids(value: unknown): number[] {
   if (!Array.isArray(value)) return [];

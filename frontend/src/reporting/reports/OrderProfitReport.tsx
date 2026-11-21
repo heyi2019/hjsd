@@ -52,6 +52,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
          columns={arrangeOrderProfit(columns)}
          rows={sortedRows}
          loading={loading}
+         resetKey={JSON.stringify([params.from, params.to, sortDesc])}
          page={1}
          pageSize={10}
          total={data?.items.length ?? 0}

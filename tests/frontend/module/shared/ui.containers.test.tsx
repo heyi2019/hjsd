@@ -401,6 +401,18 @@ describe("DataTable：两种分页模式", () => {
     expect(onPageChange).not.toHaveBeenCalled();
   });
 
+  it("排序条件变化时前端分页回到首页", async () => {
+    const onPageChange = vi.fn();
+    const { rerender } = render(
+      <DataTable columns={tableColumns} rows={tableRows} page={1} pageSize={10} total={12} onPageChange={onPageChange} resetKey="desc" />,
+    );
+    await ui.click(document.querySelector(".ant-pagination-next") as Element);
+    expect(await screen.findByText("第11行")).toBeInTheDocument();
+    rerender(<DataTable columns={tableColumns} rows={[...tableRows].reverse()} page={1} pageSize={10} total={12} onPageChange={onPageChange} resetKey="asc" />);
+    expect(await screen.findByText("第3行")).toBeInTheDocument();
+    expect(screen.queryByText("第1行")).toBeNull();
+  });
+
   it("rowKey 缺省取 id；自定义 rowKey 生效", () => {
     const { container } = render(
       <DataTable

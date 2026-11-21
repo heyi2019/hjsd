@@ -48,6 +48,7 @@ export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; 
          columns={arrangeBusinessPnl(columns)}
          rows={data?.items ?? []}
          loading={loading}
+         resetKey={JSON.stringify([params.from, params.to])}
          page={1}
          pageSize={10}
          total={data?.items.length ?? 0}

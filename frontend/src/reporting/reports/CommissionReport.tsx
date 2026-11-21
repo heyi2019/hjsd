@@ -80,6 +80,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          columns={arrangeCommission(columns)}
          rows={orderRows}
          loading={loading}
+         resetKey={JSON.stringify([params.from, params.to, mine, selectedUserId, sortDesc])}
          page={1}
          pageSize={10}
          total={data?.total.order_count ?? 0}

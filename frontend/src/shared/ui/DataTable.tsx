@@ -21,6 +21,8 @@ export function DataTable<T>(props: {
   /** true=受控服务端分页（调用方自管 page/pageSize 并向后端取数）；
    *  缺省=前端分页（调用方一次加载全量 rows，DataTable 内部自管翻页）。 */
   controlledPaging?: boolean;
+  /** 前端分页的筛选或时序变化时，重置到第一页；页大小保持不变。 */
+  resetKey?: string | number | boolean;
   rowKey?: string | ((row: T) => string);
   emptyText?: string;
   /** 需要展开行（如分期期次明细）时透传，其余场景不必传。 */
@@ -71,6 +73,10 @@ export function DataTable<T>(props: {
       setInnerPage(props.page);
     }
   }, [controlled, props.page]);
+
+  useEffect(() => {
+    if (!controlled && props.resetKey !== undefined) setInnerPage(1);
+  }, [controlled, props.resetKey]);
 
   if (props.loading) {
     return (

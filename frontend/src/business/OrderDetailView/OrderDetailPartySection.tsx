@@ -2,7 +2,7 @@ import { Descriptions, Input, Space } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { OrderDraft } from "./editing/use-order-detail-editor";
 import type { PartyAddition } from "./editing/use-order-detail-editor";
-import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
+import type { AccountExecutionCustomer, AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Counterparty } from "../../shared/api/types/customers";
 import type { CustomerOption } from "../../shared/api/customers.api";
 import { customersApi, counterpartiesApi } from "../../shared/api/customers.api";
@@ -15,6 +15,22 @@ import {
   OrderSectionHeading,
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
+
+export function buildCustomerOptions(existing: Pick<AccountExecutionCustomer, "id" | "display_name">[], customers: CustomerOption[]) {
+  const customerIds = new Set(customers.map((item) => item.id).filter((id) => !Number.isNaN(id)));
+  const seen = new Set<number>();
+  const oldOptions = existing.flatMap((item) => {
+    if (Number.isNaN(item.id) || seen.has(item.id)) return [];
+    seen.add(item.id);
+    return customerIds.has(item.id) ? [] : [{ value: item.id, label: item.display_name }];
+  });
+  return [...oldOptions, ...customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` }))];
+}
+
+export function mergeCustomerSearch(current: CustomerOption[], rows: CustomerOption[], selected: Set<number>) {
+  const rowIds = new Set(rows.map((row) => row.id).filter((id) => !Number.isNaN(id)));
+  return [...current.filter((item) => selected.has(item.id) && !rowIds.has(item.id)), ...rows];
+}
 
 /** 板块6：参与方信息 = 参与方链接（客户 / 合作方）+ PARTICIPANT 自定义字段。复用既有渲染（meta.orderParties 与 orderExtras）。 */
 export function OrderDetailPartySection({
@@ -54,6 +70,7 @@ export function OrderDetailPartySection({
   const [selectedCounterpartyIds, setSelectedCounterpartyIds] = useState<number[]>([]);
   const [newCustomerNames, setNewCustomerNames] = useState<Record<string, string>>({});
   const [newCounterpartyName, setNewCounterpartyName] = useState("");
+  const customerOptions = useMemo(() => buildCustomerOptions(order?.customers ?? [], customers), [order?.customers, customers]);
   const customerCreate = useAsyncAction();
   const counterpartyCreate = useAsyncAction();
   const session = useRequestSession(editing ? meta.orderId : null);
@@ -89,7 +106,7 @@ export function OrderDetailPartySection({
       void customersApi.options(keyword).then((rows) => {
         if (request !== customerSearchToken.current) return;
         const selected = new Set(Object.values(selectedCustomers).flat());
-        setCustomers((current) => [...current.filter((item) => selected.has(item.id) && !rows.some((row) => row.id === item.id)), ...rows]);
+        setCustomers((current) => mergeCustomerSearch(current, rows, selected));
         setCustomersError(null);
       }).catch((error) => { if (request === customerSearchToken.current) setCustomersError(normalizeError(error)); });
     }, 300);
@@ -207,10 +224,7 @@ export function OrderDetailPartySection({
                   searchValue={newCustomerNames[role] ?? ""}
                   onSearch={(value) => { setNewCustomerNames((current) => ({ ...current, [role]: value })); searchCustomers(value); }}
                   popupRender={(menu) => <>{menu}{newCustomerNames[role]?.trim() ? <div className="order-detail__party-create" onMouseDown={(event) => event.preventDefault()}><PermissionButton permission="customer.create" disabled={!customersReady} loading={customerCreate.pending} type="link" onClick={() => void addCustomer(role)}>{`新建${label}：${newCustomerNames[role].trim()}`}</PermissionButton></div> : null}</>}
-                  options={[
-                    ...(order?.customers ?? []).filter((item, index, all) => all.findIndex((other) => other.id === item.id) === index && !customers.some((customer) => customer.id === item.id)).map((item) => ({ value: item.id, label: item.display_name })),
-                    ...customers.map((item) => ({ value: item.id, label: `${item.customer_no} · ${item.display_name}` })),
-                  ]}
+                  options={customerOptions}
                   onChange={(ids: number[]) => {
                     setSelectedCustomers((current) => ({ ...current, [role]: ids }));
                     setNewCustomerNames((current) => ({ ...current, [role]: "" }));

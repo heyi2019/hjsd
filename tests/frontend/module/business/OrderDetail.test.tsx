@@ -9,6 +9,7 @@ import { OrderDetailOperationSection, resolveOperationEventContent } from "@/bus
 import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
 import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
+import { buildCustomerOptions, mergeCustomerSearch } from "@/business/OrderDetailView/OrderDetailPartySection";
 import type { OrderDetailMeta } from "@/business/OrderDetailView/OrderDetail.shared";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
@@ -57,6 +58,21 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("参与方候选按首条去重并保持现有客户的显示顺序", () => {
+    expect(buildCustomerOptions([{ id: 1, display_name: "原客户" }, { id: 1, display_name: "重复" }, { id: 2, display_name: "旧名" }],
+      [{ id: 2, customer_no: "C2", display_name: "新名" }])).toEqual([{ value: 1, label: "原客户" }, { value: 2, label: "C2 · 新名" }]);
+  });
+
+  it("搜索结果保留已选客户，同时避免批量交叉扫描", () => {
+    let reads = 0;
+    const current = Array.from({ length: 200 }, (_, i) => ({ id: i, customer_no: `C${i}`, display_name: `旧${i}` }));
+    const rows = Array.from({ length: 200 }, (_, i) => ({ get id() { reads += 1; return i + 100; }, customer_no: `C${i + 100}`, display_name: `新${i + 100}` }));
+    const result = mergeCustomerSearch(current, rows, new Set(current.map((item) => item.id)));
+    expect(result.length).toBe(300);
+    expect(result[0].id).toBe(0);
+    expect(result[100].id).toBe(100);
+    expect(reads).toBeLessThanOrEqual(400);
+  });
   it("详情编辑金额超过后端整数位数上限时在字段旁提示", () => {
     const { rerender } = renderLight(<OrderDetailMoneyInput label="金额" value="10000000000000000.00" onChange={vi.fn()} />);
     expect(screen.getByLabelText("金额")).toHaveAttribute("aria-invalid", "true");

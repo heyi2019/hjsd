@@ -28,6 +28,11 @@ describe("订单台账冲销 helpers", () => {
       .toEqual({ ok: false, error: "冲销金额不能超过该动作剩余可冲金额 ¥500.00" });
   });
 
+  it("大额冲销超过剩余一分时拒绝", () => {
+    expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "9999999999999999.99" }, remaining: "9999999999999999.98" }))
+      .toEqual({ ok: false, error: "冲销金额不能超过该动作剩余可冲金额 ¥9999999999999999.98" });
+  });
+
   it("恰好等于剩余金额时放行", () => {
     expect(resolveCancelAmount({ scope: "ORDERCANC", values: { cancel_amount: "500.00" }, remaining }))
       .toEqual({ ok: true, amount: "500.00" });

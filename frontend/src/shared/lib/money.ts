@@ -52,3 +52,20 @@ export function sumMoney(values: Array<unknown>): string {
   const absolute = total < 0n ? -total : total;
   return `${total < 0n ? "-" : ""}${absolute / 100n}.${String(absolute % 100n).padStart(2, "0")}`;
 }
+
+/** 比较非负十进制金额；格式无效时返回 null。 */
+export function compareMoney(left: string, right: string): number | null {
+  const parts = (value: string) => {
+    const match = value.trim().match(/^\+?(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
+    return match ? { integer: (match[1] ?? "0").replace(/^0+/, "") || "0", fraction: (match[2] ?? match[3] ?? "").replace(/0+$/, "") } : null;
+  };
+  const a = parts(left);
+  const b = parts(right);
+  if (!a || !b) return null;
+  if (a.integer.length !== b.integer.length) return a.integer.length > b.integer.length ? 1 : -1;
+  if (a.integer !== b.integer) return a.integer > b.integer ? 1 : -1;
+  const width = Math.max(a.fraction.length, b.fraction.length);
+  const leftFraction = a.fraction.padEnd(width, "0");
+  const rightFraction = b.fraction.padEnd(width, "0");
+  return leftFraction === rightFraction ? 0 : leftFraction > rightFraction ? 1 : -1;
+}

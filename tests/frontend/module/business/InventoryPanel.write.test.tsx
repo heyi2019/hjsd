@@ -681,6 +681,22 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.getByTestId("action-error")).toHaveTextContent("无错误");
   });
 
+  it("库存退款大额超过剩余一分时提示并阻止提交", async () => {
+    const amount = "9999999999999999.98";
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: accounts[0], orders: [{ order_id: 21, events: [{ id: 101, event_type: "BUY", amount, cancellable_amount: amount, portion: "PRINCIPAL", is_posted: true }] }] } as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "取消" }));
+    const modal = await screen.findByRole("dialog", { name: /取消入库登记/ });
+    const input = within(modal).getByLabelText("退回金额");
+    await ui.clear(input);
+    await ui.type(input, "9999999999999999.99");
+    await ui.type(within(modal).getByLabelText("取消原因"), "测试退款");
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    expect(await within(modal).findByText("退回金额不能超过 ¥9,999,999,999,999,999.98")).toBeInTheDocument();
+    expect(ordersApi.inventoryOffsale).not.toHaveBeenCalled();
+  });
+
   it("连续取消不同库存订单时，旧详情不能覆盖订单和退款金额", async () => {
     let finishFirst!: (detail: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     const first = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { finishFirst = resolve; });

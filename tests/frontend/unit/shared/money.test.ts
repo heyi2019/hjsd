@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compareMoney,
   fromCents,
   sumCents,
   sumMoney,
@@ -7,6 +8,12 @@ import {
 } from "@/shared/lib/money";
 
 describe("shared/lib/money：前端金额一律按整数分运算", () => {
+  it("金额比较保留任意精度并识别等值格式", () => {
+    expect(compareMoney("001.2", "1.20")).toBe(0);
+    expect(compareMoney(".5", "0.49")).toBe(1);
+    expect(compareMoney("9999999999999999.98", "9999999999999999.99")).toBe(-1);
+    expect(compareMoney("abc", "1")).toBeNull();
+  });
   it("toCents 精确到分，不产生浮点尾差", () => {
     expect(toCents("12.34")).toBe(1234);
     expect(toCents(0.1)).toBe(10);

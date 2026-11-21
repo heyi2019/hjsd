@@ -1,5 +1,6 @@
 import type { Order } from "../../shared/api/types/orders";
 import { money } from "../../shared/lib/format";
+import { compareMoney } from "../../shared/lib/money";
 
 export async function resolveCancellationOperators(
   selected: number[] | undefined,
@@ -149,7 +150,7 @@ const CANCEL_AMOUNT_FIELD: Record<CancelFormScope, "cancel_amount" | "refund_amo
 
 /**
  * 冲销/退款金额的确定与校验。
- * 规则：留空 → 全额（取剩余可冲金额）；必须为正数；不得超过剩余（1e-9 容差）。
+ * 规则：留空 → 全额（取剩余可冲金额）；必须为正数；不得超过剩余。
  * 余额唯一来源是后端的 `event.cancellable_amount`，前端不重算。
  */
 export function resolveCancelAmount(params: {
@@ -161,10 +162,12 @@ export function resolveCancelAmount(params: {
   const field = CANCEL_AMOUNT_FIELD[scope];
   const raw = values[field] ?? values.amount;
   const amount = (raw ?? "").trim() || remaining;
-  if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+  const positive = compareMoney(amount, "0");
+  const comparison = compareMoney(amount, remaining);
+  if (positive === null || positive <= 0 || comparison === null) {
     return { ok: false, error: "请输入有效的冲销金额" };
   }
-  if (Number(amount) > Number(remaining) + 1e-9) {
+  if (comparison > 0) {
     return { ok: false, error: `冲销金额不能超过该动作剩余可冲金额 ¥${remaining}` };
   }
   return { ok: true, amount };

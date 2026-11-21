@@ -12,6 +12,7 @@ import {
 } from "../../shared/ui";
 import { CfgItem, CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
 import { money } from "../../shared/lib/format";
+import { compareMoney } from "../../shared/lib/money";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 
 export type InventoryCancellationOffset = {
@@ -65,7 +66,6 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
   onCancel: () => void;
   onFinish: (values: T) => void | Promise<void>;
 }) {
-  const maximum = Number(props.amount);
   const refundAmount = Form.useWatch("amount", props.form);
   const amountLabel = props.amountLabel ?? "退回金额";
   const accountLabel = props.accountLabel ?? "收款账户";
@@ -121,9 +121,11 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
               rules={[
                 { required: true, message: `请输入${amountLabel}` },
                 { validator: async (_, value) => {
-                  const amount = Number(value);
-                  if (!Number.isFinite(amount) || (props.allowZeroRefund ? amount < 0 : amount <= 0)) throw new Error(`请输入${props.allowZeroRefund ? "不小于" : "大于"} 0 的${amountLabel}`);
-                  if (amount > maximum) throw new Error(`${amountLabel}不能超过 ¥${money(props.amount)}`);
+                  const amount = String(value ?? "");
+                  const positive = compareMoney(amount, "0");
+                  const comparison = compareMoney(amount, props.amount);
+                  if (positive === null || (props.allowZeroRefund ? positive < 0 : positive <= 0) || comparison === null) throw new Error(`请输入${props.allowZeroRefund ? "不小于" : "大于"} 0 的${amountLabel}`);
+                  if (comparison > 0) throw new Error(`${amountLabel}不能超过 ¥${money(props.amount)}`);
                 } },
               ]}
             >

@@ -1,5 +1,3 @@
-@import "../BusinessLedger.css";
-
 /* 订单台账与库存中心共用同一套列表密度。 */
 .orders-ledger-panel .orders-ledger-card .ant-input,
 .orders-ledger-panel .orders-ledger-card .ant-picker,

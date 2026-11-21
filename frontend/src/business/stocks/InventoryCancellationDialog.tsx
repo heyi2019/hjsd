@@ -15,6 +15,7 @@ import { money } from "../../shared/lib/format";
 import { compareMoney } from "../../shared/lib/money";
 import { moneyRules } from "../../shared/lib/validators";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
+import "./InventoryCancellationDialog.css";
 
 export type InventoryCancellationOffset = {
   value: number;

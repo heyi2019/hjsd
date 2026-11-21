@@ -1,5 +1,3 @@
-@import "../BusinessLedger.css";
-
 /* 取消交易的金额和收款账户始终保持同一行，避免紧凑弹窗误触发窄屏规则。 */
 .adaptive-form-grid.inventory-void-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));

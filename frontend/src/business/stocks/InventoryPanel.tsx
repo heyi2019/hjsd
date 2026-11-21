@@ -3,7 +3,6 @@ import type { BusinessCenterEntryTab } from "../businessCenter";
 import type { ReactNode } from "react";
 import { InventoryView } from "./InventoryPanel/InventoryView";
 import { useInventoryController } from "./InventoryPanel/useInventoryController";
-import "./InventoryPanel.css";
 
 export function InventoryPanel({ refreshKey = 0, active = true, initialAgeGtDays, onNavigate, createAction }: {
   refreshKey?: number;

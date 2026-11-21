@@ -11,6 +11,7 @@ import type { OrdersPageController } from "./useOrdersPageController";
 import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
 import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
 import { ToolbarMultiSelect } from "../../shared/ui/ToolbarMultiSelect";
+import "../BusinessLedger.css";
 import "./OrdersLedgerPanel.css";
 import type { ReactNode } from "react";
 import { indexEmployeeNames } from "../employee-names";

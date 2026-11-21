@@ -8,6 +8,7 @@ import type { InventoryController } from "./useInventoryController";
 import { ToolbarMultiSelect } from "../../../shared/ui/ToolbarMultiSelect";
 import type { ReactNode } from "react";
 import { indexEmployeeNames } from "../../employee-names";
+import "../../BusinessLedger.css";
 
 export function InventoryLedger({ controller, createAction }: { controller: InventoryController; createAction?: ReactNode }) {
   const {

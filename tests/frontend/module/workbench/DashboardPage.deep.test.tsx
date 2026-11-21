@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { dashboardApi } from "@/shared/api/dashboard.api";
-import { notificationsApi } from "@/shared/api/misc.api";
+import { notificationsApi } from "@/shared/api/notifications.api";
 import { dashboardSummary } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
@@ -12,6 +12,7 @@ vi.mock("@/shared/api/dashboard.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/notifications.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");

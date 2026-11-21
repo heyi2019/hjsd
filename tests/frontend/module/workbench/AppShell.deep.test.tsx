@@ -1,7 +1,8 @@
 import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
 import { depositsApi } from "@/shared/api/deposits.api";
 import { installmentsApi } from "@/shared/api/installments.api";
-import { attachmentsApi, gameTypesApi, notificationsApi, sequencesApi } from "@/shared/api/misc.api";
+import { attachmentsApi, gameTypesApi, sequencesApi } from "@/shared/api/misc.api";
+import { notificationsApi } from "@/shared/api/notifications.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi, teamsApi, usersApi } from "@/shared/api/org.api";
@@ -26,6 +27,7 @@ vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/deposits.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/notifications.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");

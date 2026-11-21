@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card } from "antd";
 import { normalizeError } from "../shared/api/client";
-import { notificationsApi } from "../shared/api/misc.api";
+import { notificationsApi } from "../shared/api/notifications.api";
 import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateBusinessModal";

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from "../../../shared/api/misc.api";
+import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from "../../../shared/api/notifications.api";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { useSession } from "../../../shared/state/session";
 

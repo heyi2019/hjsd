@@ -53,7 +53,7 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
     apply_operation_event_creates(db, order_id, payload.new_events, user.username, user)
     apply_cashflow_edits(db, account.id, order, payload.cashflows, user)
     apply_order_edits(db, account.id, order_id, payload.orders, user)
-    apply_party_edits(db, account.id, order_id, payload.parties, user)
+    apply_party_edits(db, account.id, order, payload.parties, user)
 
     account.cost_amount = Decimal(str(account.cost_amount)) + cost_delta
     if event_changes:

@@ -15,6 +15,64 @@ from app.business.create import create_order
 from app.business.events import post_event
 from app.business.form_fields import create_order_form_field
 from app.core.database import get_db
+from app.customers.customers import create_customer
+from app.domain.parties import OrderCustomerRole
+
+
+def test_batch_party_edits_reuse_locked_order(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="party-batch-lock", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    customers = [create_customer(seeded_db, display_name=f"参与方{index}", actor="pytest") for index in range(2)]
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id,
+                         customer_roles=[(customer.id, "SELLER") for customer in customers])
+    seeded_db.commit()
+    locks = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        sql = " ".join(statement.lower().split())
+        if sql.startswith("select") and "from orders" in sql and "for update" in sql:
+            locks.append(sql)
+
+    sqlalchemy_event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [], "parties": [
+            {"order_id": order.id, "entity_type": "customer", "entity_id": customer.id, "role": "SELLER", "operation": "remove"}
+            for customer in customers
+        ]})
+    finally:
+        sqlalchemy_event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+    assert response.status_code == 200, response.text
+    assert len(locks) == 1
+    assert seeded_db.scalars(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order.id)).all() == []
+
+
+def test_party_batch_rejects_other_order_and_rolls_back(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="party-batch-rollback", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    other_account = create_account(seeded_db, game_account="party-batch-foreign", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    customer = create_customer(seeded_db, display_name="参与方回滚", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id, customer_roles=[(customer.id, "SELLER")])
+    other = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=other_account.id)
+    order_id, other_id, customer_id = order.id, other.id, customer.id
+    seeded_db.commit()
+
+    def transactional_db():
+        try:
+            yield seeded_db
+            seeded_db.commit()
+        except Exception:
+            seeded_db.rollback()
+            raise
+
+    seeded_client.app.dependency_overrides[get_db] = transactional_db
+    try:
+        response = seeded_client.patch(f"/api/orders/{order_id}/execution-edit", headers=headers, json={"events": [], "parties": [
+            {"order_id": order_id, "entity_type": "customer", "entity_id": customer_id, "role": "SELLER", "operation": "remove"},
+            {"order_id": other_id, "entity_type": "customer", "entity_id": customer_id, "role": "SELLER", "operation": "remove"},
+        ]})
+    finally:
+        seeded_client.app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 404, response.text
+    seeded_db.expire_all()
+    assert seeded_db.scalar(select(OrderCustomerRole.id).where(OrderCustomerRole.order_id == order_id, OrderCustomerRole.customer_id == customer_id)) is not None
 
 
 def test_execution_edit_enforces_required_account_custom_fields(seeded_client, seeded_db, headers):

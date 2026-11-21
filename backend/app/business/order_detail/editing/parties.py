@@ -14,13 +14,15 @@ from .schemas import ExecutionPartyEditItem
 def apply_party_edits(
     db: Session,
     account_id: int,
-    target_order_id: int,
+    target_order: Order,
     items: list[ExecutionPartyEditItem],
     user: CurrentUser,
 ) -> None:
     for item in items:
-        order = db.scalar(select(Order).where(Order.id == item.order_id).with_for_update())
-        if order is None or order.id != target_order_id or order.account_id != account_id:
+        order = target_order if item.order_id == target_order.id else db.scalar(
+            select(Order).where(Order.id == item.order_id).with_for_update()
+        )
+        if order is None or order.id != target_order.id or order.account_id != account_id:
             raise NotFound("订单不存在")
         if item.operation == "remove":
             model = OrderCustomerRole if item.entity_type == "customer" else OrderCounterpartyRole

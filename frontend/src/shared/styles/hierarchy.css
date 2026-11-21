@@ -60,10 +60,10 @@
 @media (min-width: 961px) {
   .sidebar.glass {
     position: sticky;
-    top: var(--space-4);
+    top: 0;
     align-self: start;
-    height: calc(100vh - var(--space-6));
-    max-height: calc(100vh - var(--space-6));
+    height: 100vh;
+    max-height: 100vh;
     overflow: hidden;
   }
 }

@@ -3,7 +3,7 @@
   align-items: center;
 }
 
-.audit-filter-field {
+.audit-filter-bar > .audit-filter-field {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -28,14 +28,4 @@
   flex: 0 1 var(--control-date-width);
   width: var(--control-date-width);
   max-width: var(--control-date-width);
-}
-
-@media (max-width: 640px) {
-  .audit-filter-bar > .audit-filter-select,
-  .audit-filter-bar > .audit-filter-field,
-  .audit-filter-bar > .audit-filter-date {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: none;
-  }
 }

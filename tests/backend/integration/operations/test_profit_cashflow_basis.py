@@ -233,7 +233,7 @@ def test_allocation_amount_boundary_uses_cashflow_profit(seeded_db):
 
 
 def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
-    """按比例分润：报表 profit_base = 资金明细利润 × 比例。"""
+    """按比例分润：报表按资金明细利润先扣公司比例，再按原人员比例分配。"""
     order_id = _order_with_events(seeded_db)
     _add_flow(seeded_db, order_id, "OUT", "200")
     policy_allocations.set_allocations(
@@ -247,8 +247,53 @@ def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
     report = r3_commission_reconciliation(seeded_db)
     entries = [row for group in report["order_groups"] for row in group["orders"]]
     assert sorted(row["profit_base"] for row in entries) == [
-        Decimal("150.00"), Decimal("150.00"),
+        Decimal("90.00"), Decimal("90.00"), Decimal("120.00"),
     ]
+
+
+def test_company_rate_settings_recalculate_existing_order_without_rewriting_allocations(seeded_client, seeded_db):
+    from app.domain.trade import OrderProfitAllocation
+    order_id = _order_with_events(seeded_db)
+    _add_flow(seeded_db, order_id, "OUT", "200")
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
+        {"user_id": 2, "role": "OWNER", "allocation_rate": "50"},
+    ])
+    headers = {"X-Dev-User": "admin"}
+    defaults = seeded_client.get("/api/profit-allocation/company-settings", headers=headers)
+    assert defaults.status_code == 200
+    assert defaults.json() == {"profit_rate": "40.00", "loss_rate": "50.00"}
+    saved = seeded_client.put("/api/profit-allocation/company-settings", json={"profit_rate": "25", "loss_rate": "50"}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    report = r3_commission_reconciliation(seeded_db)
+    group = next(row for row in report["order_groups"] if row["order_id"] == order_id)
+    amounts = {row["user_id"]: row["profit_base"] for row in group["orders"]}
+    assert amounts == {None: Decimal("75.00"), 1: Decimal("112.50"), 2: Decimal("112.50")}
+    stored = seeded_db.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order_id).order_by(OrderProfitAllocation.id)).all()
+    assert [row.allocation_rate for row in stored] == [Decimal("50.00"), Decimal("50.00"), Decimal("40.00")]
+    view = seeded_client.get(f"/api/orders/{order_id}/profit-allocations", headers=headers).json()
+    assert view["company_rate"] == "25.00"
+    assert sorted(Decimal(row["allocation_amount"]) for row in view["items"]) == [Decimal("75.00"), Decimal("112.50"), Decimal("112.50")]
+    # 100% 后改回，人员原权重仍保留；设置只改变计算口径。
+    for rate in ("100", "25"):
+        assert seeded_client.put("/api/profit-allocation/company-settings", json={"profit_rate": rate, "loss_rate": "50"}, headers=headers).status_code == 200
+    report = r3_commission_reconciliation(seeded_db)
+    group = next(row for row in report["order_groups"] if row["order_id"] == order_id)
+    assert {row["user_id"]: row["profit_base"] for row in group["orders"]} == amounts
+
+    # 亏损和固定金额按原金额占比计算，分配尾差到分。
+    from app.funds.profit_allocation.calculation import effective_distribution
+    fixed = [OrderProfitAllocation(id=10, order_id=999, user_id=1, role="OWNER", allocation_amount=Decimal("-20"), allocation_rate=0),
+             OrderProfitAllocation(id=11, order_id=999, user_id=2, role="OWNER", allocation_amount=Decimal("-10"), allocation_rate=0)]
+    _, effective, _ = effective_distribution(fixed, Decimal("-100.01"), Decimal("50"))
+    assert effective == {-999: Decimal("-50.00"), 10: Decimal("-10.00"), 11: Decimal("-5.00")}
+    # 通用词典接口不能绕过公司分润的校验和权限。
+    assert seeded_client.put("/api/option-sets/COMPANY_PROFIT_SHARE", json={"options": [{"value": "profit_rate", "label": "999"}]}, headers=headers).status_code == 422
+    assert seeded_client.delete("/api/option-sets/COMPANY_PROFIT_SHARE", headers=headers).status_code == 422
+    from app.domain.foundation import AuditLog
+    assert seeded_db.scalar(select(AuditLog.id).where(AuditLog.entity_type == "company_profit_settings")) is not None
+    assert seeded_client.put("/api/profit-allocation/company-settings", json={"profit_rate": "101", "loss_rate": "50"}, headers=headers).status_code == 422
+    assert seeded_client.put("/api/profit-allocation/company-settings", json={"profit_rate": "30", "loss_rate": "50"}, headers={"X-Dev-User": "viewer"}).status_code == 403
 
 
 def test_api_order_profit_uses_cashflow_basis(seeded_client, seeded_db, headers):
@@ -351,7 +396,7 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
 
 
 def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
-    """R3 提成基数 = 200（含返点收入、坏账支出），50% 分成为 100。"""
+    """R3 利润含返点收入、坏账支出，扣公司分润后按人员占比分配。"""
     order_id = _order_with_events(seeded_db)
     _add_rebate(seeded_db, order_id, "100")
     _add_bad_debt(seeded_db, order_id, "400")
@@ -371,7 +416,7 @@ def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
         if row["order_id"] == order_id
     ]
     assert sorted(row["profit_base"] for row in entries) == [
-        Decimal("100.00"), Decimal("100.00"),
+        Decimal("60.00"), Decimal("60.00"), Decimal("80.00"),
     ]
 
 

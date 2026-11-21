@@ -1,0 +1,29 @@
+.company-profit-settings__form {
+  max-width: 560px;
+}
+
+.company-profit-settings__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 200px));
+  gap: 16px;
+}
+
+.company-profit-settings__fields .ant-input-number-affix-wrapper {
+  width: 100%;
+}
+
+.company-profit-settings__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 480px) {
+  .company-profit-settings__fields {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+.company-profit-settings__actions .ant-btn {
+  min-width: 108px;
+}

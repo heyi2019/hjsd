@@ -8,6 +8,8 @@ import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { SequencesPanel } from "@/settings/panels/SequencesPanel";
 import { BusinessReminderSettingsPanel } from "@/settings/panels/BusinessReminderSettingsPanel";
 import { BusinessPeriodSettingsPanel } from "@/settings/panels/BusinessPeriodSettingsPanel";
+import { CompanyProfitSettingsPanel } from "@/settings/panels/CompanyProfitSettingsPanel";
+import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
 import { OptionDictionarySection } from "@/settings/panels/IntermediaryPlatformSettingsPanel";
 
 vi.mock("@/shared/api/cashflows.api");
@@ -197,6 +199,23 @@ describe("OptionDictionarySection", () => {
     await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("TEST_DICT", {
       options: [{ value: "原选项", label: "原选项" }, { value: "新选项", label: "新选项" }],
     }));
+  });
+});
+
+describe("CompanyProfitSettingsPanel", () => {
+  it("读取并保存盈利和亏损的公司分润比例", async () => {
+    vi.clearAllMocks();
+    vi.mocked(profitAllocationApi.companySettings).mockResolvedValue({ profit_rate: "40.00", loss_rate: "50.00" });
+    vi.mocked(profitAllocationApi.updateCompanySettings).mockResolvedValue({ profit_rate: "35.00", loss_rate: "45.00" });
+    renderLight(<CompanyProfitSettingsPanel />, { user: "admin" });
+    const profit = await screen.findByRole("spinbutton", { name: "盈利时公司比例" });
+    const loss = screen.getByRole("spinbutton", { name: "亏损时公司比例" });
+    await waitFor(() => expect(profit).toHaveValue("40.00"));
+    expect(loss).toHaveValue("50.00");
+    fireEvent.change(profit, { target: { value: "35" } });
+    fireEvent.change(loss, { target: { value: "45" } });
+    await act(async () => { fireEvent.submit(profit.closest("form")!); });
+    await waitFor(() => expect(profitAllocationApi.updateCompanySettings).toHaveBeenCalledWith({ profit_rate: "35", loss_rate: "45" }));
   });
 });
 

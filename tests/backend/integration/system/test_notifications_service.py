@@ -553,7 +553,7 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     assert report.status_code == 200, report.text
     groups = report.json()["order_groups"]
     assert [row["order_id"] for row in groups] == [order.id]
-    assert [Decimal(row["profit_base"]) for row in groups[0]["orders"]] == [Decimal("180.00"), Decimal("120.00")]
+    assert [Decimal(row["profit_base"]) for row in groups[0]["orders"]] == [Decimal("108.00"), Decimal("72.00"), Decimal("120.00")]
     denied_other = seeded_client.get("/api/reports/commission", params={"notification_id": other.id}, headers={"X-Dev-User": "admin"})
     assert denied_other.status_code == 404
     employee = seeded_db.get(User, 2)

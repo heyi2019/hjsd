@@ -124,6 +124,14 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     optionSetCodes: ["BUSINESS_PERIOD"],
   },
   {
+    key: "company-profit",
+    label: "公司分润",
+    summary: "设置盈利及亏损时公司的分润比例",
+    group: "BUSINESS",
+    permission: "policy.manage",
+    entityTypes: ["company_profit_settings"],
+  },
+  {
     key: "organization",
     label: "人员与团队",
     summary: "用户账号、角色权限、团队与资金可见范围",

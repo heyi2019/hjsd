@@ -19,7 +19,9 @@ from app.domain.trade import (
 from app.domain.users import User
 
 from app.core.money import to_money_or_zero
-from app.funds.profit_allocation.calculation import allocation_bases
+from app.funds.profit_allocation.calculation import effective_distribution
+from app.funds.profit_allocation.company_settings import get_company_settings
+from app.funds.profit_allocation.terms import company_rate_for_order
 from ._shared import (
     ZERO,
     _apply_order_scope,
@@ -72,11 +74,19 @@ def _commission_rows_and_bases(
     allocations_by_order: dict[int, list[OrderProfitAllocation]] = defaultdict(list)
     for allocation, order in rows:
         allocations_by_order[order.id].append(allocation)
-    base_by_allocation = {
-        allocation_id: amount
-        for order_id, allocations in allocations_by_order.items()
-        for allocation_id, amount in allocation_bases(allocations, per_order_profit[order_id]).items()
-    }
+    settings = get_company_settings(session)
+    orders = {order.id: order for _, order in rows}
+    projected_rows = []
+    base_by_allocation = {}
+    for order_id, allocations in allocations_by_order.items():
+        order = orders[order_id]
+        profit = per_order_profit[order_id]
+        effective_rows, amounts, rates = effective_distribution(allocations, profit, company_rate_for_order(order, profit, settings))
+        for allocation in effective_rows:
+            # 独立的瞬态对象避免对持久化的历史配置造成隐式写入。
+            projected_rows.append((OrderProfitAllocation(id=allocation.id, order_id=allocation.order_id, user_id=allocation.user_id, role=allocation.role, allocation_type=allocation.allocation_type, allocation_rate=rates[allocation.id], allocation_amount=amounts[allocation.id]), order))
+        base_by_allocation.update(amounts)
+    rows = projected_rows
     return rows, base_by_allocation
 
 

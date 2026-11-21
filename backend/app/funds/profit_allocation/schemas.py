@@ -32,6 +32,16 @@ class ProfitAllocationConvertOut(BaseModel):
     value: Decimal | None
 
 
+class CompanyProfitSettingsIn(RequestModel):
+    profit_rate: Decimal = Field(ge=0, le=100, decimal_places=2)
+    loss_rate: Decimal = Field(ge=0, le=100, decimal_places=2)
+
+
+class CompanyProfitSettingsOut(BaseModel):
+    profit_rate: Decimal
+    loss_rate: Decimal
+
+
 class ProfitAllocationOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

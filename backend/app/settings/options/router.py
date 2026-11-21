@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.errors import AppError, ErrorCode, Validation
 from app.shared.business_period import PERIOD_CONFIG_CODE
+from app.funds.profit_allocation.company_settings import COMPANY_PROFIT_CODE
 from app.core.security import (
     PERM_OPTION_SET_MANAGE,
     CurrentUser,
@@ -74,6 +75,8 @@ def create_option_set(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = _write_access,
 ) -> schemas.OptionSetOut:
+    if payload.code == COMPANY_PROFIT_CODE:
+        raise Validation("请通过公司分润设置修改")
     if db.scalars(select(OptionSet).where(OptionSet.code == payload.code)).first():
         raise AppError(ErrorCode.VALIDATION_ERROR, "选项词典 code 已存在", details={"code": payload.code})
     row = OptionSet(
@@ -106,6 +109,8 @@ def update_option_set(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = _write_access,
 ) -> schemas.OptionSetOut:
+    if code == COMPANY_PROFIT_CODE:
+        raise Validation("请通过公司分润设置修改")
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="选项词典不存在")
@@ -174,6 +179,8 @@ def delete_option_set(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = _write_access,
 ) -> Response:
+    if code == COMPANY_PROFIT_CODE:
+        raise Validation("公司分润设置不可删除")
     if code == PERIOD_CONFIG_CODE:
         raise Validation("当期设置不可删除")
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()

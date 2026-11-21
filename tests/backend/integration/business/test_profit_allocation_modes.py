@@ -177,7 +177,7 @@ def test_person_mode_allows_same_user_in_two_roles(seeded_db):
         ],
     )
 
-    assert [row["role"] for row in rows] == ["SALES", "SERVICE"]
+    assert [row["role"] for row in rows if row["user_id"] is not None] == ["SALES", "SERVICE"]
 
     with pytest.raises(Validation, match="同一角色下不可重复分润"):
         policy_allocations.set_allocations(
@@ -200,10 +200,11 @@ def test_person_mode_accepts_one_name_with_full_rate(seeded_db):
         items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
     )
 
-    assert len(rows) == 1
+    assert len(rows) == 2
+    assert rows[1]["allocation_rate"] == "40.00"
     assert rows[0]["allocation_rate"] == "100.00"
     assert rows[0]["allocation_amount"] == "0.00"
-    assert rows[0]["total_rate"] == "100.00"
+    assert rows[0]["total_rate"] == "140.00"
 
 
 def test_person_mode_rate_must_total_one_hundred_without_amount(seeded_db):
@@ -233,8 +234,8 @@ def test_person_mode_accepts_amount_only(seeded_db):
         ],
     )
 
-    assert [row["allocation_amount"] for row in rows] == ["300.00", "200.00"]
-    assert all(row["allocation_rate"] == "0.00" for row in rows)
+    assert [row["allocation_amount"] for row in rows if row["user_id"] is not None] == ["300.00", "200.00"]
+    assert all(row["allocation_rate"] == "0.00" for row in rows if row["user_id"] is not None)
     assert rows[0]["total_amount"] == "500.00"
 
 
@@ -284,7 +285,7 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
         {"user_id": 2, "role": "OWNER", "allocation_rate": "10"},
     ])
     small_group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == small_order)
-    assert small_group["profit_base"] == Decimal("0.02")
+    assert small_group["profit_base"] == Decimal("0.04")
 
 
 def test_person_mode_amount_requires_positive_profit(seeded_db):
@@ -367,7 +368,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
     report = r3_commission_reconciliation(seeded_db)
     rows = [row for group in report["order_groups"] for row in group["orders"]]
 
-    assert [row["profit_base"] for row in rows] == [Decimal("120.00")]
+    assert {row["user_id"]: row["profit_base"] for row in rows} == {1: Decimal("120.00"), None: Decimal("200.00")}
 
     for buy, sell, expected in (("100", "100.05", Decimal("0.05")), ("100.05", "100", Decimal("-0.05"))):
         small_order = _order_with_profit(seeded_db, buy=buy, sell=sell)
@@ -382,9 +383,11 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
         assert sum((row["profit_base"] for row in group["orders"]), Decimal("0")) == expected
         sign = Decimal("1") if expected > 0 else Decimal("-1")
         assert {row["user_id"]: row["profit_base"] for row in group["orders"]} == {
-            1: sign * Decimal("0.02"), 2: sign * Decimal("0.01"), 3: sign * Decimal("0.02"),
+            1: sign * Decimal("0.01"), 2: sign * Decimal("0.01"), 3: sign * Decimal("0.01"), None: sign * Decimal("0.02"),
         }
         for detail in group["orders"]:
+            if detail["user_id"] is None:
+                continue
             personal = r3_commission_reconciliation(seeded_db, user_id=detail["user_id"])
             personal_group = next(item for item in personal["order_groups"] if item["order_id"] == small_order)
             assert personal_group["profit_base"] == detail["profit_base"]
@@ -405,12 +408,12 @@ def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
         items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],
     )
 
-    assert [row["allocation_amount"] for row in rows] == ["-300.00"]
-    assert all(row["allocation_rate"] == "0.00" for row in rows)
+    assert [row["allocation_amount"] for row in rows if row["user_id"] is not None] == ["-300.00"]
+    assert all(row["allocation_rate"] == "0.00" for row in rows if row["user_id"] is not None)
 
     report = r3_commission_reconciliation(seeded_db)
     entries = [row for group in report["order_groups"] for row in group["orders"]]
-    assert [row["profit_base"] for row in entries] == [Decimal("-300.00")]
+    assert {row["user_id"]: row["profit_base"] for row in entries} == {1: Decimal("-250.00"), None: Decimal("-250.00")}
 
 
 def test_person_mode_rejects_positive_amount_on_loss_order(seeded_db):

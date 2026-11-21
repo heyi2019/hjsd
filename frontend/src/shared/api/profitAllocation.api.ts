@@ -3,6 +3,9 @@ import type { ProfitAllocationList } from "./types/profitAllocation";
 
 /** 订单利润分润配置接口：只保存利润归属配置，不创建资金流水。 */
 export const profitAllocationApi = {
+  companySettings: () => api.get<{ profit_rate: string; loss_rate: string }>("/profit-allocation/company-settings").then((r) => r.data),
+  updateCompanySettings: (payload: { profit_rate: string; loss_rate: string }) =>
+    api.put<{ profit_rate: string; loss_rate: string }>("/profit-allocation/company-settings", payload).then((r) => r.data),
   allocations: (orderId: number) =>
     api.get<ProfitAllocationList>(`/orders/${orderId}/profit-allocations`).then((r) => r.data),
   convert: (orderId: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string) =>

@@ -15,7 +15,8 @@ from app.domain.trade import Order, OrderProfitAllocation
 from app.domain.users import User
 
 from .listing import collect_allocations
-from .terms import validate_amount_directions
+from .terms import validate_amount_directions, order_profit_of, company_rate_for_order
+from .company_settings import get_company_settings
 
 
 def set_person_allocations(
@@ -145,6 +146,16 @@ def set_person_allocations(
         )
         session.add(row)
         created.append(row)
+    # 按人录入也保存当时的公司比例，供以后调整比例时保留原分配口径。
+    profit = order_profit_of(session, order)
+    company_rate = company_rate_for_order(order, profit, get_company_settings(session))
+    company = next((row for row in created if row.user_id is None), None)
+    if company is None:
+        company = OrderProfitAllocation(order_id=order.id, user_id=None, role="OWNER", allocation_type=None)
+        session.add(company)
+        created.append(company)
+    company.allocation_rate = company_rate
+    company.allocation_amount = Decimal("0")
     session.flush()
     record_audit(
         session,

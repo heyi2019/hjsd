@@ -15,6 +15,7 @@ from app.core.security import CurrentUser
 from app.domain.trade import Order
 
 from ._shared import _scoped_order
+from .company_settings import CompanyProfitSettings, get_company_settings
 
 DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
 DEFAULT_LOSS_COMPANY_RATE = Decimal("50")
@@ -26,9 +27,9 @@ def validate_amount_directions(amounts: list[Decimal], profit: Decimal) -> None:
         raise Validation("每笔分润金额方向必须与订单利润一致")
 
 
-def company_rate_for_order(order: Order, order_profit: Decimal) -> Decimal:
-    """公司分润比例：盈利/亏损使用默认配置（规则域已下线，原快照全为空转）。"""
-    raw = DEFAULT_LOSS_COMPANY_RATE if order_profit < 0 else DEFAULT_PROFIT_COMPANY_RATE
+def company_rate_for_order(order: Order, order_profit: Decimal, settings: CompanyProfitSettings) -> Decimal:
+    """公司分润比例按订单盈亏读取当前配置。"""
+    raw = settings.loss_rate if order_profit < 0 else settings.profit_rate
     rate = to_money(raw or 0)
     if rate < 0 or rate > 100:
         raise Validation("公司分润比例必须在 0% 到 100% 之间", details={"company_rate": str(rate)})
@@ -53,7 +54,7 @@ def allocation_terms(session: Session, order_id: int, user: CurrentUser | None =
     """返回订单总利润、公司比例与扣除公司后的可分配利润。"""
     order = _scoped_order(session, order_id, user)
     order_profit = order_profit_of(session, order)
-    company_rate = company_rate_for_order(order, order_profit)
+    company_rate = company_rate_for_order(order, order_profit, get_company_settings(session))
     return {
         "order_profit": order_profit,
         "company_rate": company_rate,
@@ -72,7 +73,7 @@ def convert_action_allocation(
     """Convert a grouped action share using the server's canonical order profit.
 
     比例分母与落库/对账统一为**订单总利润**：四项（买号/售出/运营/公司）合计
-    100%、公司占其中 40%/50%，故每一项的 rate 本就是相对总利润的百分比。
+    100%、公司占其中的配置比例，故每一项的 rate 本就是相对总利润的百分比。
     换算若改用「可分配利润（扣公司后）」做基数，同一比例会算出偏小的金额
     （如利润 1000、公司 40%、BUY 20% → 换算 120 但对账 200），前端展示与
     实际应付对不上，故此处必须用 order_profit_of 的原值。

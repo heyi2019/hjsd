@@ -35,9 +35,12 @@ from app.domain.notifications import Notification
 from app.funds.profit_allocation.schemas import ProfitAllocationItem
 
 from ._shared import _scoped_order
+from .company_settings import get_company_settings
+from .calculation import effective_distribution
+from app.domain.trade import OrderProfitAllocation
 from .action import set_action_allocations
 from .action_rows import expand_action_form_rows
-from .listing import collect_allocations, list_allocations as _list_allocations
+from .listing import collect_allocations
 from .listing import summarize_allocations_by_type
 from .person import set_person_allocations
 from .terms import (
@@ -116,7 +119,7 @@ def set_allocations(
                 normalized_items = expand_action_form_rows(
                     typed,
                     order_profit=order_profit,
-                    company_rate=company_rate_for_order(order, order_profit),
+                    company_rate=company_rate_for_order(order, order_profit, get_company_settings(session)),
                 )
             result = set_action_allocations(
                 session, order, items=normalized_items, actor=actor
@@ -147,13 +150,19 @@ def get_allocations_view(
 
     HTTP 层只负责把结果映射到响应契约；查询、口径与汇总的编排都在此主体服务。
     """
-    items = _list_allocations(session, order_id, user=user)
-    return {
-        "items": items,
-        "total": len(items),
-        "totals_by_type": summarize_allocations_by_type(items),
-        **allocation_terms(session, order_id, user=user),
-    }
+    order = _scoped_order(session, order_id, user)
+    terms = allocation_terms(session, order_id, user=user)
+    stored = list(session.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id).order_by(OrderProfitAllocation.id)).all())
+    rows, amounts, rates = effective_distribution(stored, terms["order_profit"], terms["company_rate"])
+    zero_profit = terms["order_profit"] == 0
+    items = [{"id": row.id, "order_id": order.id, "user_id": row.user_id, "role": row.role,
+              "allocation_type": row.allocation_type, "allocation_rate": str(rates[row.id] if zero_profit else 0),
+              "allocation_amount": str(amounts[row.id]), "total_rate": "0", "total_amount": "0"} for row in rows]
+    total_rate = sum((rates[row.id] for row in rows), 0) if zero_profit else 0
+    total_amount = sum(amounts.values(), 0)
+    for item in items:
+        item.update(total_rate=str(total_rate), total_amount=str(total_amount))
+    return {"items": items, "total": len(items), "totals_by_type": summarize_allocations_by_type(items), **terms}
 
 
 def convert_value(

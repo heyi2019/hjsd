@@ -97,7 +97,7 @@
 }
 
 /* danger 次级按钮（白底红字变体）：深色下 antd 派生红对暗底仅 2.48，用 error 令牌（浅/深 error 令牌，见 --color-error）（A11Y E3） */
-:where(.ant-btn-dangerous:not(.ant-btn-primary)) {
+:where(.ant-btn-dangerous:not(.ant-btn-primary):not(:disabled):not(.ant-btn-disabled)) {
   color: var(--color-error) !important;
 }
 

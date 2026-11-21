@@ -58,6 +58,7 @@ export function useOrderActionModals({
   const [orderOffsaleTarget, setOrderOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[]; orderId: number } | null>(null);
   /** 扣除公司配置比例后的可分配利润，负数表示可分配的亏损分担额。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
+  const [allocationOrderProfit, setAllocationOrderProfit] = useState<string>("0");
   /** 按操作分配时的动作执行人候选，来自建单/售出操作人和运营信息中的操作人。 */
   const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
@@ -103,6 +104,7 @@ export function useOrderActionModals({
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);
       setAllocationProfit(result.allocatable_profit ?? result.order_profit ?? "0");
+      setAllocationOrderProfit(result.order_profit ?? "0");
       setAllocationOpen(true);
     } catch (error) {
       if (actionRequest.isCurrent(session)) appMessage.error(normalizeError(error).message);
@@ -281,6 +283,7 @@ export function useOrderActionModals({
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
+    allocationOrderProfit,
     closeAllocations,
     getAllocationSession,
     setAllocationProfit,

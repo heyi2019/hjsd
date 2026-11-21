@@ -572,6 +572,33 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(within(second).getByLabelText("分润备注")).toHaveValue(""));
   });
 
+  it("零利润订单未修改金额时保存，保留已有人员分润比例", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      order_profit: "0.00", allocatable_profit: "0.00",
+      totals_by_type: { BUY: { allocation_amount: "0.00", allocation_rate: "60.00" } },
+    }));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    await clickModalOk(modal);
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
+      expect.objectContaining({ allocation_type: "BUY", allocation_rate: "60.00", allocation_amount: null }),
+    ]), expect.any(Object)));
+  });
+
+  it("公司比例为 100% 但订单有利润时，仍按金额提交", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      order_profit: "500.00", allocatable_profit: "0.00", company_rate: "100.00",
+      totals_by_type: { BUY: { allocation_amount: "0.00", allocation_rate: "0.00" } },
+    }));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    await clickModalOk(await modalOf(/分润 · HS-2026-0001/));
+    await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
+      expect.objectContaining({ allocation_type: "BUY", allocation_rate: null, allocation_amount: "0.00" }),
+    ]), expect.any(Object)));
+  });
+
   it("打开分润配置直接展示后端汇总金额与比例，不逐行换算", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
       totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "20.00" } },

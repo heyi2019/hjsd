@@ -35,6 +35,7 @@ type AllocationController = Pick<OrdersPageController,
   | "allocationIsLoss"
   | "allocationOpen"
   | "allocationProfit"
+  | "allocationOrderProfit"
   | "employeeOptions"
   | "load"
   | "loadLedgerDetail"
@@ -170,6 +171,7 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
+    allocationOrderProfit,
     employeeOptions,
     load,
     loadLedgerDetail,
@@ -203,15 +205,16 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
             .filter((item) => item.allocation_type === "OPERATION")
             .flatMap((item) => item.employee_ids ?? []))],
         };
-        // 前端只 submit 金额：比例框已改为只读展示（由金额经 convert 反算），
-        // 不再是输入口径。落库与对账都走金额，避免「展示比例」与「存库比例」两套口径并存。
-        // 公司行金额留空，由后端按公司固定比例自动补金额参与合计校验。
+        // 零利润时金额不能表达原人员权重；未修改金额则保留已有比例。
+        const preserveRates = Number(allocationOrderProfit) === 0
+          && rows.some((item) => Number(item.allocation_rate || 0) !== 0)
+          && !rows.some((_, index) => allocationForm.isFieldTouched(["allocations", index, "allocation_amount"]));
         const payloadRows = rows.map((item) => ({
           allocation_type: item.allocation_type,
           employee_ids: item.employee_ids ?? [],
           role: item.role ?? "OWNER",
-          allocation_rate: null,
-          allocation_amount: item.allocation_type === "COMPANY"
+          allocation_rate: preserveRates ? (item.allocation_rate?.trim() || "0") : null,
+          allocation_amount: preserveRates || item.allocation_type === "COMPANY"
             ? null
             : (item.allocation_amount?.trim() ? item.allocation_amount : null),
         }));

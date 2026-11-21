@@ -114,6 +114,24 @@ def test_allocation_view_returns_grouped_rates_for_display(seeded_db, buy, sell,
     assert view["totals_by_type"]["SELL"]["allocation_rate"] == Decimal(sell_rate)
 
 
+def test_zero_profit_grouped_rates_survive_resaving(seeded_db):
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1000")
+    seeded_db.get(Order, order_id).form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "20"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "40"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0"},
+        {"allocation_type": "COMPANY", "role": "OWNER", "allocation_rate": "40"},
+    ]
+    policy_allocations.set_allocations(seeded_db, order_id, items=items)
+    before = policy_allocations.get_allocations_view(seeded_db, order_id)["totals_by_type"]
+    for item in items:
+        item["allocation_rate"] = str(before[item["allocation_type"]]["allocation_rate"])
+        item["allocation_amount"] = None
+    policy_allocations.set_allocations(seeded_db, order_id, items=items)
+    assert policy_allocations.get_allocations_view(seeded_db, order_id)["totals_by_type"] == before
+
+
 def test_convert_on_loss_order_keeps_negative_direction(seeded_db):
     """亏损单换算同样以总利润为基数，方向随利润为负。"""
     order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")  # 利润 -500

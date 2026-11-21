@@ -25,6 +25,29 @@ const order = (overrides: Partial<AccountExecutionOrder> = {}) => ({
 } as unknown as AccountExecutionOrder);
 
 describe("代挂寄售记录口径", () => {
+  it("大量上架记录只需线性检查事件，仍保留上架顺序", () => {
+    let typeReads = 0;
+    const events = Array.from({ length: 200 }, (_, index) => ({
+      ...event({ id: index + 1, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: [`平台${index}`] } }),
+      get event_type() { typeReads += 1; return "OPERATE" as const; },
+    }));
+    const result = consignmentListings([order({ events })]);
+    expect(result).toHaveLength(200);
+    expect(result[0].platform).toBe("平台0");
+    expect(result[199].platform).toBe("平台199");
+    expect(typeReads).toBeLessThanOrEqual(800);
+  });
+
+  it("系统下架与逐平台下架只影响所关联上架，取消订单不展示", () => {
+    const events = [
+      event({ id: 7, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["甲", "乙"] } }),
+      event({ id: 8, operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["甲", "乙"] } }),
+      event({ id: 9, is_posted: false, operation_type: "UNLIST", form_extra: { consignment_event_id: "7", platform_unlist_scope: "SYSTEM" } }),
+      event({ id: 10, operation_type: "UNLIST", form_extra: { consignment_event_id: 8, consignment_platforms: [" 甲 "] } }),
+    ];
+    expect(consignmentListings([order({ events })]).map((item) => item.id)).toEqual(["1:8:乙"]);
+    expect(consignmentListings([order({ events, status: "CANCELLED" })])).toEqual([]);
+  });
   it("没有寄售运营事件时不是寄售上架记录", () => {
     const initial = order();
     expect(consignmentPlatform(initial)).toBeNull();

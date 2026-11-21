@@ -36,21 +36,15 @@ function eventExtra(event: AccountExecutionEvent): Record<string, unknown> {
   return event.form_extra ?? {};
 }
 
-function eventIsUnlisted(order: AccountExecutionOrder, listingEvent: AccountExecutionEvent, platform: string): boolean {
-  return (order.events ?? []).some((event) => (
-    event.event_type === "OPERATE"
-    && event.operation_type === "UNLIST"
-    && String(eventExtra(event).consignment_event_id ?? "") === String(listingEvent.id)
-    && (eventExtra(event).platform_unlist_scope === "SYSTEM" || platformValues(eventExtra(event).consignment_platforms).includes(platform))
-  ));
-}
+type UnlistedPlatforms = { all: boolean; platforms: Set<string> };
 
-function eventListings(order: AccountExecutionOrder, event: AccountExecutionEvent): ConsignmentListing[] {
+function eventListings(order: AccountExecutionOrder, event: AccountExecutionEvent, unlisted: Map<string, UnlistedPlatforms>): ConsignmentListing[] {
   const platforms = eventPlatforms(event);
   if (!platforms.length || order.status === "CANCELLED") return [];
   const extra = eventExtra(event);
+  const removed = unlisted.get(String(event.id));
   return platforms
-    .filter((platform) => !eventIsUnlisted(order, event, platform))
+    .filter((platform) => !removed?.all && !removed?.platforms.has(platform))
     .map((platform) => ({
       id: `${order.order_id}:${event.id}:${platform}`,
       orderId: order.order_id,
@@ -64,9 +58,20 @@ function eventListings(order: AccountExecutionOrder, event: AccountExecutionEven
 
 /** 返回当前仍在平台上的寄售记录。 */
 export function activeConsignmentListings(order: AccountExecutionOrder): ConsignmentListing[] {
-  const listings = (order.events ?? [])
+  const events = order.events ?? [];
+  const unlisted = new Map<string, UnlistedPlatforms>();
+  for (const event of events) {
+    if (event.event_type !== "OPERATE" || event.operation_type !== "UNLIST") continue;
+    const extra = eventExtra(event);
+    const key = String(extra.consignment_event_id ?? "");
+    const removed = unlisted.get(key) ?? { all: false, platforms: new Set<string>() };
+    if (extra.platform_unlist_scope === "SYSTEM") removed.all = true;
+    else for (const platform of platformValues(extra.consignment_platforms)) removed.platforms.add(platform);
+    unlisted.set(key, removed);
+  }
+  const listings = events
     .filter((event) => event.event_type === "OPERATE" && event.operation_type === "CONSIGNMENT")
-    .flatMap((event) => eventListings(order, event));
+    .flatMap((event) => eventListings(order, event, unlisted));
   return listings;
 }
 

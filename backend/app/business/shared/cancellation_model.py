@@ -31,7 +31,7 @@ from app.domain.enums import (
 from app.domain.trade import Account, Order, OrderEvent
 from app.shared.form_field_rules import validate_form_extra
 
-from .._common import _required_text
+from .validation import _required_text
 from app.shared.order_access import get_order
 
 

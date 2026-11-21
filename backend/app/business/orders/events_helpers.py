@@ -30,7 +30,7 @@ from app.domain.trade import Account, Installment, Order, OrderEvent
 from app.shared.operation_operators import validate_optional_operator_ids
 from app.shared.form_field_rules import validate_form_extra
 
-from .._common import _required_bool
+from ..shared.validation import _required_bool
 from ..shared.cancellation_model import (
     get_cancellation_offset as _get_offset_event,
     opposite_cancellation_direction as _opposite_direction,

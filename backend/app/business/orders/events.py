@@ -23,7 +23,7 @@ from app.domain.enums import (
     EventType,
 )
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
-from .._common import _non_negative_money, _positive_money
+from ..shared.validation import _non_negative_money, _positive_money
 from ..shared.listing_state import active_listings, validate_unique_platforms
 from ..shared.cancellation_model import opposite_cancellation_direction as _opposite_direction
 from .events_helpers import (

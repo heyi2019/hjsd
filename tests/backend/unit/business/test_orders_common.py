@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from app.core.errors import Validation
-from app.business._common import _non_negative_money
+from app.business.shared.validation import _non_negative_money
 
 
 def test_non_negative_money_rejects_negative_value():

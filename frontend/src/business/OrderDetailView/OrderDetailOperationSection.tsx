@@ -198,6 +198,7 @@ function editableOperationColumns(
   const isPlatformTaken = buildOperationPlatformUsage(activeListings, operationDrafts ?? {});
   const unlistingOptions = buildUnlistingOptions(activeListings);
   const platformOptionValues = createOperationPlatformOptions(platformOptions);
+  const employeeOptions = employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }));
   const platformValues = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
   const eventExtra = (row: OrderOperationRow, draft?: OrderEventDraft) => draft?.form_extra !== undefined ? (draft.form_extra ?? {}) : (row.event?.form_extra ?? {});
   const operationType = (row: OrderOperationRow) => OPERATION_TYPE_BY_KEY[row.operationKey ?? "consignment"];
@@ -248,7 +249,7 @@ function editableOperationColumns(
         const draft = row.event ? drafts?.[row.event.id] : operationDrafts?.[row.key];
         const storedIds = draft?.operator_user_ids ?? row.event?.operator_user_ids ?? [];
         const operatorIds = storedIds.length ? storedIds : defaultOperatorIds;
-        return <Select mode="multiple" showSearch optionFilterProp="label" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={operatorIds} options={employees.map((employee) => ({ value: employee.id, label: employee.display_name, disabled: !employee.is_active }))} onChange={(ids) => updateOperation(row, { operator_user_ids: ids.length ? ids : operatorIds })} />;
+        return <Select mode="multiple" showSearch optionFilterProp="label" aria-label={`编辑${row.action}操作人${row.ariaLabelSuffix ?? ""}`} value={operatorIds} options={employeeOptions} onChange={(ids) => updateOperation(row, { operator_user_ids: ids.length ? ids : operatorIds })} />;
       },
     },
     {

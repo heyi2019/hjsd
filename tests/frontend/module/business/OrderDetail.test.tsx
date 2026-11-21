@@ -66,6 +66,23 @@ describe("OrderDetail", () => {
     expect(groupCustomerIdsByRole(customers)).toEqual({ SELLER: [2, 1], BUYER: [1, 2] });
     expect(groupCustomerIdsByRole([])).toEqual({});
   });
+
+  it("运营编辑各行共用员工选项，员工更新后显示最新姓名", async () => {
+    let reads = 0;
+    const employees = Array.from({ length: 100 }, (_, index) => ({
+      get id() { reads += 1; return index + 1; }, username: `user${index}`, display_name: `员工${index + 1}`, is_active: true,
+    }));
+    const { rerender } = renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} editing employees={employees} operatorUsername="none" />);
+    await settleFieldConfig();
+    reads = 0;
+    rerender(<OrderDetailOperationSection meta={emptyMeta} account={account} editing employees={employees} operatorUsername="none" operationDrafts={{}} />);
+    expect(reads).toBeLessThanOrEqual(200);
+    rerender(<OrderDetailOperationSection meta={emptyMeta} account={account} editing operatorUsername="none"
+      employees={[{ id: 101, username: "new", display_name: "最新员工", is_active: true }, { id: 102, username: "inactive", display_name: "停用员工", is_active: false }]} />);
+    await userEvent.click(screen.getByRole("combobox", { name: "编辑描述操作人" }));
+    expect(await screen.findByText("最新员工", { selector: ".ant-select-item-option-content" })).toBeInTheDocument();
+    expect(screen.getByText("停用员工", { selector: ".ant-select-item-option-content" }).closest(".ant-select-item-option")).toHaveClass("ant-select-item-option-disabled");
+  });
   it("参与方选择增删保留原顺序且不重复扫描", () => {
     expect(getPartySelectionDelta([1, 1, 2], [2, 3, 3])).toEqual({ added: [3, 3], removed: [1, 1] });
     let reads = 0;

@@ -107,7 +107,7 @@
    实测对比度仅 3.24:1，低于 WCAG AA 正文 4.5:1；而白字对渐变最浅段 #0c68d9
    为 5.25:1、最深段 #0757c7 为 6.57:1，均通过。
    tabs 指示条只有色块无文字，不参与 color 覆盖。 */
-:where(.ant-btn-primary, .ant-btn-color-primary) {
+:where(.ant-btn-primary:not(:disabled):not(.ant-btn-disabled), .ant-btn-color-primary:not(:disabled):not(.ant-btn-disabled)) {
   background: var(--accent-grad) !important;
   color: var(--on-accent) !important;
 }

@@ -180,8 +180,9 @@ def get_rebate(
     rebate_id: int,
     *,
     user: CurrentUser | None = None,
+    for_update: bool = False,
 ) -> RebateRecord:
-    record = session.get(RebateRecord, rebate_id)
+    record = session.get(RebateRecord, rebate_id, with_for_update=for_update, populate_existing=for_update)
     if record is None:
         raise NotFound("返点记录不存在", details={"rebate_record_id": rebate_id})
     if user is not None:
@@ -211,7 +212,19 @@ def update_rebate(
     form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
-    record = get_rebate(session, rebate_id, user=user)
+    record = get_rebate(session, rebate_id, user=user, for_update=True)
+    action_event = _rebate_action_event(session, record)
+    flow = None
+    if action_event is not None:
+        flow = session.scalar(select(Cashflow).where(
+            Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
+            Cashflow.source_id == action_event.event_no,
+        ).with_for_update().execution_options(populate_existing=True))
+        if flow is not None and session.scalar(select(Cashflow.id).where(
+            Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+            Cashflow.source_id == flow.flow_no,
+        )) is not None:
+            raise Validation("已冲销的返点不能编辑", details={"rebate_record_id": rebate_id})
     before = {"amount": str(record.amount), "collected_on": str(record.collected_on), "note": record.note}
     if amount is not None:
         new_amount = _positive(amount, field="amount")
@@ -224,16 +237,11 @@ def update_rebate(
         record.operator_user_ids = validate_optional_operator_ids(session, operator_user_ids)
     if form_extra is not None:
         record.form_extra = validate_form_extra(session, order_type_code="INVREBATE", values=form_extra) or None
-    action_event = _rebate_action_event(session, record)
     if action_event is not None:
         action_event.amount = record.amount
         action_event.occurred_on = record.collected_on
         action_event.note = record.note
         action_event.updated_by = actor
-        flow = session.scalar(select(Cashflow).where(
-            Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
-            Cashflow.source_id == action_event.event_no,
-        ))
         if flow is not None:
             flow.amount = record.amount
             flow.occurred_on = record.collected_on
@@ -256,7 +264,7 @@ def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent |
             OrderEvent.event_type == "REBATE",
             OrderEvent.source_type == CashflowSourceType.REBATE.value,
             OrderEvent.source_id == record.rebate_no,
-        )
+        ).with_for_update().execution_options(populate_existing=True)
     )
 
 

@@ -12,7 +12,7 @@ from app.core.errors import AppError, Validation
 from app.domain.base import Base
 from app.domain.enums import AccountingAttribute, Direction
 from app.domain.foundation import AuditLog, Pool
-from app.domain.trade import BalanceSnapshot, Cashflow, Deposit, Reconciliation
+from app.domain.trade import BalanceSnapshot, Cashflow, Deposit, OrderEvent, RebateRecord, Reconciliation
 from app.domain.users import User
 from app.funds.balances import pool_balance
 from app.funds.transfers import create_transfer, repair_transfer
@@ -21,8 +21,146 @@ from app.funds.deposits.writes import create_deposit, update_deposit, delete_dep
 from app.funds.reconciliation import create_reconciliation, resolve_reconciliation
 from app.funds.cashflows import create_cashflow, delete_cashflow, reverse_cashflow, update_cashflow
 from app.settings.field_definitions.seeds import seed_foundation
+from app.business.create import create_order
+from app.business.stocks.profile import create_account
+from app.funds.rebates import create_rebate, update_rebate
 
 pytestmark = pytest.mark.db
+
+
+@pytest.mark.parametrize("first_action", ["reverse", "edit"])
+def test_rebate_edit_and_reversal_serialize(v1_engine, first_action):
+    database = f"heijin_rebate_reverse_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        day = date(2026, 11, 1)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            account = create_account(session, game_account="rebate-reversal", business_mode="SELF",
+                                     inventory_type="RECOVERY", actor="pytest")
+            order = create_order(session, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+            rebate = create_rebate(session, source_order_id=order.id, rebate_type="BUY", amount="100",
+                                   collected_on=day, actor="pytest")
+            action = session.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
+            flow = session.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+            rebate_id, event_id, flow_id, flow_no = rebate.id, action.id, flow.id, flow.flow_no
+            session.commit()
+
+        reached, proceed = Event(), Event()
+        def run_action(session, action_name):
+            if action_name == "reverse":
+                reverse_cashflow(session, flow_id, reversed_on=day, actor="pytest", reason="错录")
+            else:
+                update_rebate(session, rebate_id, amount="200", actor="pytest")
+
+        def second_action():
+            with factory() as session:
+                def before(_conn, _cursor, statement, _parameters, _context, _many):
+                    sql = statement.lower()
+                    if "from cashflow" in sql and "for update" in sql:
+                        reached.set()
+                def after(_conn, _cursor, statement, _parameters, _context, _many):
+                    sql = statement.lower()
+                    if "from cashflow" in sql and "for update" not in sql and not reached.is_set():
+                        reached.set()
+                        assert proceed.wait(10)
+                event.listen(session.connection(), "before_cursor_execute", before)
+                event.listen(session.connection(), "after_cursor_execute", after)
+                try:
+                    run_action(session, "edit" if first_action == "reverse" else "reverse")
+                    session.commit()
+                    return "accepted"
+                except Validation:
+                    session.rollback()
+                    return "rejected"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            run_action(first, first_action)
+            future = executor.submit(second_action)
+            try:
+                assert reached.wait(10), "第二个操作未到达流水查询"
+                first.commit()
+            finally:
+                proceed.set()
+            assert future.result(timeout=10) == ("rejected" if first_action == "reverse" else "accepted")
+
+        with factory() as session:
+            rebate = session.get(RebateRecord, rebate_id)
+            action = session.get(OrderEvent, event_id)
+            flow = session.get(Cashflow, flow_id)
+            reversal = session.scalar(select(Cashflow).where(Cashflow.source_type == "REVERSAL", Cashflow.source_id == flow_no))
+            expected = 100 if first_action == "reverse" else 200
+            assert [rebate.amount, action.amount, flow.amount, reversal.amount] == [expected] * 4
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
+
+
+def test_concurrent_rebate_edits_keep_record_event_and_flow_consistent(v1_engine):
+    database = f"heijin_rebate_concurrency_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        day = date(2026, 11, 1)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            account = create_account(session, game_account="rebate-concurrent", business_mode="SELF",
+                                     inventory_type="RECOVERY", actor="pytest")
+            order = create_order(session, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
+            rebate = create_rebate(session, source_order_id=order.id, rebate_type="BUY", amount="100",
+                                   collected_on=day, actor="pytest")
+            rebate_id, rebate_no = rebate.id, rebate.rebate_no
+            session.commit()
+
+        reached, proceed = Event(), Event()
+        with factory() as second:
+            # 模拟路由或其他调用方提前读取返点记录。
+            preloaded = second.get(RebateRecord, rebate_id)
+            assert preloaded.amount == 100
+            def before(_conn, _cursor, statement, _parameters, _context, _many):
+                sql = statement.lower()
+                if ("from rebate_records" in sql and "for update" in sql) or "from order_events" in sql:
+                    if not reached.is_set():
+                        reached.set()
+                        assert proceed.wait(10)
+            event.listen(second.connection(), "before_cursor_execute", before)
+
+            def edit_date():
+                update_rebate(second, rebate_id, collected_on=date(2026, 11, 2), actor="second")
+                second.commit()
+
+            with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+                update_rebate(first, rebate_id, amount="200", actor="first")
+                future = executor.submit(edit_date)
+                try:
+                    assert reached.wait(10), "第二次编辑未到达返点或事件查询"
+                    first.commit()
+                finally:
+                    proceed.set()
+                future.result(timeout=10)
+
+        with factory() as session:
+            rebate = session.get(RebateRecord, rebate_id)
+            action = session.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate_no))
+            flow = session.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
+            assert [rebate.amount, action.amount, flow.amount] == [200, 200, 200]
+            assert [rebate.collected_on, action.occurred_on, flow.occurred_on] == [date(2026, 11, 2)] * 3
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
 
 
 @pytest.mark.parametrize("same_account", [True, False])

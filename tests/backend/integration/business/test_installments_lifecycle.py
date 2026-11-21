@@ -13,10 +13,12 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Installment, InstallmentSchedule, Order
+from app.domain.foundation import AuditLog
 from app.business.installments import _shared as inst__shared
 from app.business.installments import create as inst_create
 from app.business.installments import queries as inst_queries
 from app.business.installments import recovery as inst_recovery
+from app.business.installments.settlement import settle_early
 from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.installments.repayments.pay import _pick_schedule as inst_pick
 from app.business.installments.repayments.waive import waive_schedule as inst_waive
@@ -99,6 +101,17 @@ class TestGetAndListInstallments:
 
 
 class TestPayGuards:
+    def test_payment_and_early_settlement_record_distinct_audit_actions(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, down_payment="100", periods=1, per_period="300")
+        inst_pay(seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY, period_no=0, actor="cashier")
+        settle_early(seeded_db, contract.id, paid_on=TODAY, actor="cashier")
+        actions = list(seeded_db.scalars(select(AuditLog.action).where(
+            AuditLog.entity_type == "installment", AuditLog.entity_id == contract.inst_no,
+            AuditLog.actor == "cashier",
+        ).order_by(AuditLog.id)))
+        assert actions == ["INSTALLMENT_PAYMENT", "INSTALLMENT_PAYMENT", "INSTALLMENT_EARLY_SETTLE"]
+
     def test_payment_failure_does_not_mutate_contract_or_schedule(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(

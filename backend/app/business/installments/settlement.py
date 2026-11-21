@@ -110,7 +110,7 @@ def settle_early(
     session.flush()
     record_audit(
         session,
-        action=AuditAction.INSTALLMENT_PAYMENT,
+        action=AuditAction.INSTALLMENT_EARLY_SETTLE,
         entity_type="installment",
         entity_id=installment.inst_no,
         actor=actor,

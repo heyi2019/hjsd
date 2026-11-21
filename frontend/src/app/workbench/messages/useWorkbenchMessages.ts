@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { notificationsApi, type ProfitNotificationDetail as ProfitDetail } from "../../../shared/api/notifications.api";
+import { notificationsApi } from "../../../shared/api/notifications.api";
+import { useNotificationDetails } from "./useNotificationDetails";
+import { useInventoryNotificationSync } from "./useInventoryNotificationSync";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { useSession } from "../../../shared/state/session";
 
@@ -14,20 +16,17 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const [dataOwner, setDataOwner] = useState(username);
   const [selected, setSelected] = useState<NotificationItem | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [notificationDetails, setNotificationDetails] = useState<Record<number, ProfitDetail>>({});
-  const [failedDetails, setFailedDetails] = useState<number[]>([]);
-  const [detailsRetrying, setDetailsRetrying] = useState(false);
   const [notificationError, setNotificationError] = useState<string | null>(null);
-  const [inventorySyncError, setInventorySyncError] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(true);
   const [category, setCategory] = useState<"latest" | "sale" | "inventory">("latest");
   const [retryItem, setRetryItem] = useState<NotificationItem | null>(null);
   const [reload, setReload] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const cursor = useRef<{ next?: string; done: boolean; generation: number; loading: boolean }>({ done: false, generation: 0, loading: false });
+  const detailState = useNotificationDetails((generation) => cursor.current.generation === generation);
   const scrollRef = useRef<HTMLDivElement>(null);
   const busy = useRef(new Set<number>());
-  const inventorySync = useRef<Promise<unknown> | null>(null);
+  const inventorySync = useInventoryNotificationSync({ active, username, category, selected, loading: notificationLoading, notificationCount: notifications.length, busy, scrollRef, onRefresh: () => setReload((n) => n + 1) });
   const loadMore = async () => {
     const state = cursor.current;
     if (!active || state.loading || state.done) return;
@@ -38,17 +37,9 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       const page = await notificationsApi.list({ limit: PAGE_SIZE, category, ...(state.next ? { cursor: state.next } : {}) });
       if (cursor.current.generation !== generation) return;
       const ids = page.items.filter(isProfitNotification).map((item) => item.id);
-      let details: ProfitDetail[] = [];
-      if (ids.length) {
-        try { details = await notificationsApi.profitDetails(ids); }
-        catch {
-          if (cursor.current.generation === generation) setFailedDetails((current) => [...new Set([...current, ...ids])]);
-        }
-      }
-      if (cursor.current.generation !== generation) return;
       if (page.next_cursor && page.next_cursor === state.next) throw new Error("消息分页游标异常");
-      setNotificationDetails((current) => ({ ...current, ...Object.fromEntries(details.map((item) => [item.notification_id, item])) }));
       setNotifications((current) => [...current, ...page.items]);
+      void detailState.load(ids, generation);
       state.next = page.next_cursor ?? undefined;
       state.done = !page.next_cursor;
       setHasMore(!state.done);
@@ -60,27 +51,21 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     }
   };
   useEffect(() => { setSelected(null); }, [category, username]);
-  useEffect(() => { inventorySync.current = null; }, [active, username]);
   useEffect(() => {
     if (!active) return;
     cursor.current = { done: false, generation: cursor.current.generation + 1, loading: true };
     const generation = cursor.current.generation;
     setDataOwner(username);
     setNotifications([]);
-    setNotificationDetails({});
-    setFailedDetails([]);
-    setDetailsRetrying(false);
+    detailState.reset();
     setNotificationError(null);
     setRetryItem(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     setHasMore(true);
-    setInventorySyncError(false);
     setNotificationLoading(true);
-    void (async () => {
-      inventorySync.current ??= notificationsApi.syncInventory();
-      try { await inventorySync.current; } catch { if (cursor.current.generation === generation) setInventorySyncError(true); }
-      if (active && cursor.current.generation === generation) { cursor.current.loading = false; void loadMore(); }
-    })();
+    inventorySync.start();
+    cursor.current.loading = false;
+    void loadMore();
     return () => { cursor.current.generation += 1; };
     // 加载由 active 和用户重试触发；滚动时使用当前游标。
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -96,7 +81,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     if (!active) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "hidden" || notificationLoading || selected || busy.current.size || (scrollRef.current?.scrollTop ?? 0) > 0) return;
-      if (category !== "sale") inventorySync.current = null;
+      if (category !== "sale") inventorySync.invalidate();
       setReload((n) => n + 1);
     }, 5 * 60_000);
     return () => window.clearInterval(timer);
@@ -140,24 +125,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     }
   };
   const ordered = dataOwner === username ? notifications : [];
-  const retryDetails = async () => {
-    if (detailsRetrying || !failedDetails.length) return;
-    const generation = cursor.current.generation;
-    setDetailsRetrying(true);
-    try {
-      for (let offset = 0; offset < failedDetails.length; offset += PAGE_SIZE) {
-        const ids = failedDetails.slice(offset, offset + PAGE_SIZE);
-        const details = await notificationsApi.profitDetails(ids);
-        if (cursor.current.generation !== generation) return;
-        setNotificationDetails((current) => ({ ...current, ...Object.fromEntries(details.map((item) => [item.notification_id, item])) }));
-        setFailedDetails((current) => current.filter((id) => !ids.includes(id)));
-      }
-    } catch {
-      // 保留未恢复的条目，允许再次重试。
-    } finally {
-      if (cursor.current.generation === generation) setDetailsRetrying(false);
-    }
-  };
-  const retryInventory = () => { inventorySync.current = null; setReload((n) => n + 1); };
-  return { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, failedDetails, detailsRetrying, retryDetails, hasMore, scrollRef, loadMore, openNotification, ordered };
+  const retryDetails = () => detailState.retry(cursor.current.generation);
+  const retryInventory = inventorySync.retry;
+  return { username, dataOwner, selected, setSelected, notifications, notificationDetails: detailState.details, pendingDetails: detailState.pending, notificationError, inventorySyncError: inventorySync.error, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, failedDetails: detailState.failed, detailsRetrying: detailState.retrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedInventory: inventorySync.refreshWhenSafe, openNotification, ordered };
 }

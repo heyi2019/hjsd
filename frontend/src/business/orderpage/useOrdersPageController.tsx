@@ -91,7 +91,8 @@ export function useOrdersPageController(params: {
 
   const allocationDeepLinkOpened = useRef<number | null>(null);
   useEffect(() => {
-    if (!active || activeTab !== "ledger" || !initialAllocationOrderId || allocationDeepLinkOpened.current === initialAllocationOrderId) return;
+    if (!initialAllocationOrderId) { allocationDeepLinkOpened.current = null; return; }
+    if (!active || activeTab !== "ledger" || allocationDeepLinkOpened.current === initialAllocationOrderId) return;
     const target = orders.find((order) => order.id === initialAllocationOrderId);
     if (!target) return;
     allocationDeepLinkOpened.current = initialAllocationOrderId;

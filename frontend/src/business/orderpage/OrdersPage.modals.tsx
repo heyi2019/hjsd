@@ -9,12 +9,12 @@ import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancell
 import { AllocationModal } from "./OrderAllocationModal";
 import { CreateBusinessModalWrapper, OrderAccountActionModals } from "./OrderActionModals";
 
-export function OrderModals({ controller }: { controller: OrdersPageController }) {
+export function OrderModals({ controller, onNavigate }: { controller: OrdersPageController; onNavigate?: (key: string) => void }) {
   return (
     <>
       <SharedCancellationDialog controller={controller} />
       <CancelTransactionModal controller={controller} />
-      <AllocationModal controller={controller} />
+      <AllocationModal controller={controller} onNavigate={onNavigate} />
       <CashflowModal
         target={controller.cashflowTarget}
         pools={controller.cashflowPools}

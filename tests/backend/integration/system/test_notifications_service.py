@@ -180,6 +180,31 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
         assert not any(row["id"] == item["id"] for row in response.json()["items"])
 
 
+def test_inventory_sync_batches_numbers_and_is_idempotent(seeded_db):
+    from app.dashboard.notifications.inventory import sync_inventory_notifications_for_user
+    for i in range(4):
+        order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1, account_snapshot={"game_account": f"aging-batch-{i}"})
+        _buy(seeded_db, order)
+        seeded_db.get(Account, order.account_id).inventory_entry_at = datetime(2020, 1, 1)
+    seeded_db.flush()
+    statements = []
+    def record_sql(_conn, _cursor, statement, _parameters, _context, _executemany):
+        if statement.lstrip().upper().startswith("UPDATE DOCUMENT_SEQUENCES"):
+            statements.append(statement)
+    connection = seeded_db.connection()
+    event.listen(connection, "before_cursor_execute", record_sql)
+    try:
+        user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
+        assert sync_inventory_notifications_for_user(seeded_db, user) == 4
+        assert sync_inventory_notifications_for_user(seeded_db, user) == 0
+    finally:
+        event.remove(connection, "before_cursor_execute", record_sql)
+    rows = seeded_db.scalars(select(Notification).where(Notification.recipient_user_id == 1, Notification.notification_type == "INVENTORY_AGING")).all()
+    assert len(rows) == 4
+    assert len({row.notification_no for row in rows}) == 4
+    assert len(statements) == 1
+
+
 def test_mark_read_not_found(seeded_db):
     assert notification_service.mark_read_batch(seeded_db, [999999], recipient_user_id=2, actor="pytest") == []
 

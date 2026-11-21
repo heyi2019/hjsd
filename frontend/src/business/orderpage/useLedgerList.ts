@@ -17,6 +17,7 @@ type Opt = { value: string; label: string };
 
 export interface InitialLedgerFilters {
   status?: string;
+  keyword?: string;
   tradeDateFrom?: string;
   tradeDateTo?: string;
 }
@@ -30,6 +31,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const { active, initialMine, initialFilters } = params;
   const { username } = useSession();
   const initialStatus = initialFilters?.status;
+  const initialKeyword = initialFilters?.keyword;
   const initialTradeDateFrom = initialFilters?.tradeDateFrom;
   const initialTradeDateTo = initialFilters?.tradeDateTo;
   const [orders, setOrders] = useState<Order[]>([]);
@@ -97,7 +99,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     () => [{ value: "all", label: "全部游戏类型" }, ...gameTypes.map((value) => ({ value, label: value }))],
     [gameTypes],
   );
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(initialKeyword ?? "");
   const [searchRevision, setSearchRevision] = useState(0);
   const submitSearch = () => setSearchRevision((value) => value + 1);
 
@@ -138,12 +140,19 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     }
   }, [queryFilters, ledgerSortDesc, page, pageSize, requestSequence]);
 
-  const initialQueryKey = JSON.stringify([initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId]);
+  const initialQueryKey = JSON.stringify([initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, initialKeyword, myOperatorId]);
   const [initializedQueryKey, setInitializedQueryKey] = useState<string | null>(null);
   useEffect(() => {
     if (active) {
       setMineOrders(initialMine);
       setOrderStatusFilter(initialStatus ?? "all");
+      if (initialKeyword !== undefined) {
+        setKeyword(initialKeyword);
+        setOrderTypeFilter("all");
+        setBusinessModeFilter("all");
+        setGameTypeFilter("all");
+        setInventoryStatusFilter("all");
+      }
       setDateRange((previous) => {
         if (previous?.[0].format("YYYY-MM-DD") === initialTradeDateFrom && previous?.[1].format("YYYY-MM-DD") === initialTradeDateTo) return previous;
         return initialTradeDateFrom && initialTradeDateTo ? [dayjs(initialTradeDateFrom), dayjs(initialTradeDateTo)] : null;
@@ -154,7 +163,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
       setPage(1);
       setInitializedQueryKey(initialQueryKey);
     } else setInitializedQueryKey(null);
-  }, [active, initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, myOperatorId, initialQueryKey]);
+  }, [active, initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, initialKeyword, myOperatorId, initialQueryKey]);
 
   useEffect(() => {
     if (!active || !initialMine) {

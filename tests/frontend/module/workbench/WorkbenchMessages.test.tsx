@@ -5,6 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { BusinessAlerts } from "@/app/workbench/messages/BusinessAlerts";
 import { ProfitNotificationModal } from "@/app/workbench/messages/ProfitNotificationModal";
+import { OrderDetailDialog } from "@/business/OrderDetailView/OrderDetailDialog";
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { ordersApi } from "@/shared/api/orders.api";
@@ -14,7 +15,7 @@ import { appMessage } from "@/shared/ui/appFeedback";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { dashboardSummary } from "@fixtures/api-responses";
 
-vi.mock("@/business/OrderDetailView/OrderDetail", () => ({ OrderDetail: ({ contextOrderId }: { contextOrderId: number }) => <div>台账订单详情 {contextOrderId}</div> }));
+vi.mock("@/business/OrderDetailView/OrderDetail", () => ({ OrderDetail: ({ contextOrderId, onPartyClick }: { contextOrderId: number; onPartyClick?: (party: { entityType: "customer" | "counterparty"; id: number }) => void }) => <div>台账订单详情 {contextOrderId}<button onClick={() => onPartyClick?.({ entityType: "customer", id: 7 })}>客户详情</button><button onClick={() => onPartyClick?.({ entityType: "counterparty", id: 8 })}>合作方详情</button></div> }));
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/dashboard.api");
 vi.mock("@/shared/api/customers.api");
@@ -78,7 +79,8 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     vi.mocked(reportsApi.commission).mockResolvedValue({ order_groups: [{ order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "180.00", orders: [{ user_id: 1, user_name: "何一", order_id: 1, order_no: "HS1", profit_base: "180.00", rate: "60.00" }, { user_id: null, user_name: "公司", order_id: 1, order_no: "HS1", profit_base: "120.00", rate: "40.00" }] }], people: [], total: { order_count: 1, profit_base: "180.00" } });
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 7 }, orders: [] } as never);
     vi.mocked(employeesApi.list).mockResolvedValue([]);
-    renderLight(<DashboardPage />, { user: "admin" });
+    const navigate = vi.fn();
+    renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
     const button = await screen.findByRole("button", { name: /订单 HS1 分润/ });
     expect(within(button).getByText(/2026-11-20 08:30/)).toBeInTheDocument();
     fireEvent.click(button);
@@ -101,6 +103,45 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     fireEvent.click(screen.getByRole("button", { name: "查看订单详情" }));
     expect(await screen.findByText("台账订单详情 1")).toBeInTheDocument();
     expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true });
+    fireEvent.click(screen.getByRole("button", { name: "客户详情" }));
+    expect(navigate).toHaveBeenCalledWith("/customers?customer_id=7");
+  });
+
+it("消息不等待库存同步和金额摘要，并在摘要返回后更新", async () => {
+    let finishSync!: (result: { created: number }) => void;
+    let finishDetails!: (result: { notification_id: number; order_no: string; sale_amount: string; cost_amount: string; allocatable_profit: string }[]) => void;
+    vi.mocked(notificationsApi.syncInventory).mockImplementation(() => new Promise((resolve) => { finishSync = resolve; }));
+    vi.mocked(notificationsApi.profitDetails).mockImplementation(() => new Promise((resolve) => { finishDetails = resolve; }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 7, notification_type: "PROFIT_PENDING", title: "分润", message: "订单 HS7", entity_type: "order", entity_id: "HS7", created_at: "2026-11-20T08:30:00", read_at: null }], next_cursor: null });
+    renderLight(<BusinessAlerts />, { user: "admin" });
+    expect(await screen.findByRole("button", { name: /订单 HS7/ })).toBeInTheDocument();
+    await act(async () => { finishDetails([{ notification_id: 7, order_no: "HS7", sale_amount: "200", cost_amount: "100", allocatable_profit: "60" }]); finishSync({ created: 0 }); });
+    expect(await screen.findByText(/成本 100.00.*售出 200.00/)).toBeInTheDocument();
+  });
+
+it("库存同步新增提醒后更新列表", async () => {
+    let finishSync!: (result: { created: number }) => void;
+    vi.mocked(notificationsApi.syncInventory).mockImplementation(() => new Promise((resolve) => { finishSync = resolve; }));
+    vi.mocked(notificationsApi.list).mockResolvedValueOnce({ items: [], next_cursor: null }).mockResolvedValue({ items: [{ id: 9, notification_type: "INVENTORY_AGING", title: "库存提醒", message: "新库存提醒", entity_type: "account", entity_id: "9", read_at: null }], next_cursor: null });
+    renderLight(<BusinessAlerts />, { user: "admin" });
+    expect(await screen.findByText("暂无消息")).toBeInTheDocument();
+    await act(async () => { finishSync({ created: 1 }); });
+    expect(await screen.findByRole("button", { name: /新库存提醒/ })).toBeInTheDocument();
+    expect(notificationsApi.syncInventory).toHaveBeenCalledTimes(1);
+  });
+
+it("订单详情失败可重试并可打开客户和合作方", async () => {
+    const navigate = vi.fn();
+    vi.mocked(ordersApi.executionDetail).mockRejectedValueOnce(new Error("网络不可用")).mockResolvedValueOnce({ account: { id: 7 }, orders: [] } as never);
+    vi.mocked(employeesApi.list).mockResolvedValue([]);
+    renderLight(<OrderDetailDialog orderId={1} onClose={() => {}} onPartyNavigate={navigate} />, { user: "admin" });
+    expect(await screen.findByText("订单详情加载失败，可能没有查看权限。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    expect(await screen.findByText("台账订单详情 1")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "客户详情" }));
+    fireEvent.click(screen.getByRole("button", { name: "合作方详情" }));
+    expect(navigate).toHaveBeenCalledWith("/customers?customer_id=7");
+    expect(navigate).toHaveBeenCalledWith("/customers?counterparty_id=8");
   });
 
 it("分润详情加载失败后可重试且不改变已读状态", async () => {
@@ -228,7 +269,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
     expect(within(unread).getByText(/通知时间 2026-11-21 09:30/)).toBeInTheDocument();
     expect(within(read).getByText("已读")).toBeInTheDocument();
     fireEvent.click(unread);
-    await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43"));
+    await waitFor(() => expect(onDashboardNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43&keyword=TH0002"));
     expect(notificationsApi.pendingOrder).toHaveBeenCalledWith(2);
     expect(ordersApi.listPage).not.toHaveBeenCalled();
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2], "sale");

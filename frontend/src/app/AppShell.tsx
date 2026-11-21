@@ -79,6 +79,7 @@ export function AppShell() {
   const initialLedgerFilters: InitialLedgerFilters | undefined = active === "business" && rawBizTab === "ledger"
     ? {
       status: query.get("status") || undefined,
+      keyword: query.get("keyword") || undefined,
       tradeDateFrom: query.get("trade_date_from") || undefined,
       tradeDateTo: query.get("trade_date_to") || undefined,
     }

@@ -101,7 +101,7 @@ export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilte
           },
         ]}
       />
-      <OrderModals controller={controller} />
+      <OrderModals controller={controller} onNavigate={onNavigate} />
     </section>
   );
 }

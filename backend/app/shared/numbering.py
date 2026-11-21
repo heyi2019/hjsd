@@ -91,6 +91,25 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
     return f"{prefix}{allocated:0{padding}d}"
 
 
+def allocate_numbers(session: Session, key: str | SequenceKey, count: int) -> list[str]:
+    """在同一事务中一次分配连续编号；并发更新由序列行锁串行化。"""
+    if count < 0:
+        raise ValueError("编号数量不能为负数")
+    if count == 0:
+        return []
+    key_value = key.value if isinstance(key, SequenceKey) else key
+    config = session.execute(
+        update(DocumentSequence)
+        .where(DocumentSequence.sequence_key == key_value)
+        .values(current_value=DocumentSequence.current_value + count)
+        .returning(DocumentSequence.prefix, DocumentSequence.padding, DocumentSequence.current_value)
+    ).first()
+    if config is None:
+        raise Validation(f"编号序列 {key_value} 尚未初始化，请先执行基础种子", code=ErrorCode.VALIDATION_ERROR, details={"sequence_key": key_value})
+    prefix, padding, last = config
+    return [f"{prefix}{number:0{padding}d}" for number in range(last - count + 1, last + 1)]
+
+
 def format_next_number(
     *, sequence_key: str, prefix: str, padding: int, current_value: int
 ) -> str:
@@ -130,6 +149,7 @@ def allocate_flow_no(session: Session, direction: str) -> str:
 __all__ = [
     "allocate_flow_no",
     "allocate_number",
+    "allocate_numbers",
     "ensure_sequence",
     "format_next_number",
     "peek_number",

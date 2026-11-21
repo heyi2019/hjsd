@@ -1,4 +1,7 @@
-import { Alert, Form, Input, Typography } from "antd";
+import { Alert, Button, Form, Input } from "antd";
+import { useEffect, useState } from "react";
+import { OrderDetailDialog } from "../OrderDetailView/OrderDetailDialog";
+import "./OrderAllocationModal.css";
 import type { FormInstance } from "antd";
 import { CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
 import {
@@ -159,7 +162,7 @@ function AllocationFields({
   );
 }
 
-export function AllocationModal({ controller }: { controller: AllocationController }) {
+export function AllocationModal({ controller, onNavigate }: { controller: AllocationController; onNavigate?: (key: string) => void }) {
   const {
     actionOrder,
     allocationCandidates,
@@ -175,6 +178,8 @@ export function AllocationModal({ controller }: { controller: AllocationControll
   } = controller;
   const watchedRows = Form.useWatch<AllocationFormRow[]>("allocations", allocationForm) ?? [];
   const write = useAsyncAction();
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
+  useEffect(() => { setShowOrderDetail(false); }, [allocationOpen, actionOrder?.id]);
 
   const submitAllocations = async (values: AllocationFormValues) => {
     if (!actionOrder) return;
@@ -226,6 +231,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
   };
 
   return (
+    <>
     <BusinessActionModal
       title={actionOrder ? `分润 · ${actionOrder.order_no}` : "分润"}
       fieldCount={21}
@@ -249,15 +255,14 @@ export function AllocationModal({ controller }: { controller: AllocationControll
           type={allocationIsLoss ? "warning" : "info"}
           showIcon
           message={(
-            <span>
-              可分配利润：<MoneyText value={allocationProfit} tone="auto" strong />
-              {allocationIsLoss ? "（亏损）金额分润请填负数，表示该人分担的亏损额" : null}
+            <span className="allocation-profit-summary">
+              <span>可分配利润：<MoneyText value={allocationProfit} tone="auto" strong />
+                {allocationIsLoss ? "（亏损）金额分润请填负数，表示该人分担的亏损额" : null}
+              </span>
+              <Button htmlType="button" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button>
             </span>
           )}
         />
-        <Typography.Paragraph type="secondary">
-          按操作分配：买号、售出、运营三项可多选人员，公司份额由系统按固定口径自动计入。只需填写金额，比例按占总利润自动换算供参考；确认后由系统在该项人员中平分，并同步更新来源处操作人。
-        </Typography.Paragraph>
         <AllocationFields
           allocationCandidates={allocationCandidates}
           allocationForm={allocationForm}
@@ -271,5 +276,7 @@ export function AllocationModal({ controller }: { controller: AllocationControll
         </FieldConfigScope>
       </BusinessRegistrationForm>
     </BusinessActionModal>
+    {allocationOpen && actionOrder && showOrderDetail && <OrderDetailDialog orderId={actionOrder.id} onClose={() => setShowOrderDetail(false)} onPartyNavigate={onNavigate ? (path) => { closeAllocations(); onNavigate(path.replace(/^\//, "")); } : undefined} />}
+    </>
   );
 }

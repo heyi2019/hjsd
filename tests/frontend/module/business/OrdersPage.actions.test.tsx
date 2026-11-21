@@ -513,7 +513,13 @@ describe("OrdersPage：操作与筛选分支", () => {
     if (action === "分润配置") expect(profitAllocationApi.allocations).toHaveBeenCalledWith(1);
     else expect(poolsApi.list).toHaveBeenCalled();
     await act(async () => finish(order1));
-    expect(await modalOf(action === "分润配置" ? /分润 · HS-2026-0001/ : /资金收支 · HS-2026-0001/)).toBeVisible();
+    const modal = await modalOf(action === "分润配置" ? /分润 · HS-2026-0001/ : /资金收支 · HS-2026-0001/);
+    expect(modal).toBeVisible();
+    if (action === "分润配置") {
+      await ui.click(within(modal).getByRole("button", { name: "查看订单详情" }));
+      await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true }));
+      expect(await screen.findByText("订单详情")).toBeInTheDocument();
+    }
   });
 
   // 原两条（按姓名预填 / 展示订单总利润）同一份夹具、同一入口、纯只读，合并为一次挂载。

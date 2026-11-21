@@ -6,9 +6,9 @@ import type { CommissionOrderGroup } from "../../../shared/api/types/reporting";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../../../shared/lib/format";
 import { CommissionDetailsTable } from "../../../reporting/reports/CommissionDetailsTable";
-import { NotificationOrderDetailModal } from "./NotificationOrderDetailModal";
+import { OrderDetailDialog } from "../../../business/OrderDetailView/OrderDetailDialog";
 
-export function ProfitNotificationModal({ selected, summary, onClose }: { selected: NotificationItem; summary?: ProfitNotificationDetail; onClose: () => void }) {
+export function ProfitNotificationModal({ selected, summary, onClose, onPartyNavigate }: { selected: NotificationItem; summary?: ProfitNotificationDetail; onClose: () => void; onPartyNavigate?: (path: string) => void }) {
   const [result, setResult] = useState<{ id: number; loading: boolean; error: boolean; detail: CommissionOrderGroup | null }>({ id: selected.id, loading: true, error: false, detail: null });
   const [attempt, setAttempt] = useState(0);
   const [showOrderDetail, setShowOrderDetail] = useState(false);
@@ -40,7 +40,7 @@ export function ProfitNotificationModal({ selected, summary, onClose }: { select
           <Typography.Title level={5}>分润明细</Typography.Title>
           <CommissionDetailsTable row={{ ...detail, orders: detail.orders.filter((item) => item.user_id != null) }} />
           <div className="dashboard-notification-detail__actions"><Button type="primary" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button></div>
-          {showOrderDetail && <NotificationOrderDetailModal orderId={detail.order_id} onClose={() => setShowOrderDetail(false)} />}
+          {showOrderDetail && <OrderDetailDialog orderId={detail.order_id} onClose={() => setShowOrderDetail(false)} onPartyNavigate={onPartyNavigate} />}
         </section>
       )}
     </Modal>

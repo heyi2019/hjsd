@@ -36,15 +36,15 @@ function renderOrderParties(
   if (!parties.length) return "-";
   return <span>{parties.map((party, index) => (
     <span key={`${party.entityType}:${party.id}:${party.role}`}>
-      <Typography.Link
+      {onPartyClick ? <Typography.Link
         href="#"
         onClick={(event) => {
           event.preventDefault();
-          onPartyClick?.(party);
+          onPartyClick(party);
         }}
       >
         {party.entityType === "customer" ? "客户" : "合作方"}_{PARTY_ROLE_LABEL[party.role] ?? party.role}：{party.display_name}
-      </Typography.Link>
+      </Typography.Link> : <span>{party.entityType === "customer" ? "客户" : "合作方"}_{PARTY_ROLE_LABEL[party.role] ?? party.role}：{party.display_name}</span>}
       {index < parties.length - 1 ? "、" : null}
     </span>
   ))}</span>;

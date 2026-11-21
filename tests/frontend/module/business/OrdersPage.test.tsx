@@ -482,6 +482,16 @@ describe("OrdersPage：四类订单台账", () => {
     ));
   });
 
+  it("分润订单深链自动搜索订单并在切换目标时更新", async () => {
+    setupLedgerApi();
+    const view = renderLight(<OrdersPage initialTab="ledger" initialLedgerFilters={{ keyword: "TH-2026-0002" }} />);
+    await waitFor(() => expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "TH-2026-0002", offset: 0 })));
+    expect(screen.getByPlaceholderText(/搜索订单/)).toHaveValue("TH-2026-0002");
+    view.rerender(<OrdersPage initialTab="ledger" initialLedgerFilters={{ keyword: "HS-2026-0001" }} />);
+    await waitFor(() => expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "HS-2026-0001", offset: 0 })));
+    expect(screen.getByPlaceholderText(/搜索订单/)).toHaveValue("HS-2026-0001");
+  });
+
   it("我的订单深链展示当前入库和售出操作人", async () => {
     renderLight(<OrdersPage initialTab="ledger" initialMine />, { user: "admin" });
 

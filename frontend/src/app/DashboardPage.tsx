@@ -38,7 +38,7 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
         appMessage.warning(`未找到订单 ${target.order_no}`);
         return;
       }
-      onDashboardNavigate(`/business/ledger?allocation_order_id=${target.order_id}`);
+      onDashboardNavigate(`/business/ledger?allocation_order_id=${target.order_id}&keyword=${encodeURIComponent(target.order_no)}`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -126,6 +126,7 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
         />
         </Card>
         <BusinessAlerts
+          onPartyNavigate={onDashboardNavigate}
           onPendingProfitNotificationsClick={(notificationId) => void openPendingProfitAllocation(notificationId)}
           onProfitNotificationsRead={() => void loadSummary()}
           active={active}

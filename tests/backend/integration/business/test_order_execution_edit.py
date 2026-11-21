@@ -564,6 +564,89 @@ def test_order_detail_edit_updates_cashflow_amount_and_pool(seeded_client, seede
     assert shown["pool_id"] == target_pool.id
 
 
+def test_batch_cashflow_edits_reuse_locked_order_and_keep_event_fallback(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="cashflow-batch-query", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("200"), occurred_on=date(2026, 10, 1), actor="pytest")
+    flows = [seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == event.event_no, Cashflow.source_type == "ORDER_EVENT")) for event in (buy, sell)]
+    assert all(flow is not None for flow in flows)
+    flows[1].order_id = None  # 历史事件流水依赖 source_id 回查订单。
+    seeded_db.commit()
+    order_queries = []
+
+    def capture(_conn, _cursor, statement, _parameters, _context, _executemany):
+        sql = " ".join(statement.lower().split())
+        if sql.startswith("select") and "from orders" in sql and "and orders.account_id =" in sql:
+            order_queries.append(sql)
+
+    sqlalchemy_event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
+            "events": [], "cashflows": [{"flow_no": flows[0].flow_no, "note": "甲"}, {"flow_no": flows[1].flow_no, "note": "乙"}],
+        })
+    finally:
+        sqlalchemy_event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+    assert response.status_code == 200, response.text
+    assert len(order_queries) == 0
+    seeded_db.expire_all()
+    assert [seeded_db.get(Cashflow, flow.id).note for flow in flows] == ["甲", "乙"]
+
+
+def test_cashflow_batch_cross_order_rejects_and_rolls_back_prior_edit(seeded_client, seeded_db, headers):
+    first = create_account(seeded_db, game_account="cashflow-batch-first", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    other = create_account(seeded_db, game_account="cashflow-batch-other", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=first.id)
+    other_order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=other.id)
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    post_event(seeded_db, other_order.id, event_type="BUY", amount=Decimal("200"), occurred_on=date(2026, 10, 1), actor="pytest")
+    flows = [seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == item.id)) for item in (order, other_order)]
+    assert all(flow is not None for flow in flows)
+    ids = [flow.id for flow in flows]
+    flow_nos = [flow.flow_no for flow in flows]
+    seeded_db.commit()
+
+    def transactional_db():
+        try:
+            yield seeded_db
+            seeded_db.commit()
+        except Exception:
+            seeded_db.rollback()
+            raise
+
+    seeded_client.app.dependency_overrides[get_db] = transactional_db
+    try:
+        response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
+            "events": [], "cashflows": [{"flow_no": flow_nos[0], "amount": "120"}, {"flow_no": flow_nos[1], "amount": "220"}],
+        })
+    finally:
+        seeded_client.app.dependency_overrides.pop(get_db, None)
+    assert response.status_code == 404, response.text
+    seeded_db.expire_all()
+    assert [seeded_db.get(Cashflow, flow_id).amount for flow_id in ids] == [Decimal("100"), Decimal("200")]
+    assert seeded_db.scalar(select(AuditLog.id).where(AuditLog.entity_type == "inventory_cashflow_edit", AuditLog.entity_id == flow_nos[0])) is None
+
+
+def test_cashflow_edit_rejects_invisible_pool(seeded_client, seeded_db):
+    from app.business.routers.order_execution_router import edit_order_detail
+    from app.core.security import CurrentUser, PERM_ORDER_UPDATE
+
+    account = create_account(seeded_db, game_account="cashflow-hidden-pool", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id, owner_id=1)
+    post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id))
+    seeded_db.commit()
+    user = CurrentUser(id=1, username="restricted", permissions=frozenset({PERM_ORDER_UPDATE}), owner_scope="SELF", pool_ids=frozenset())
+    seeded_client.app.dependency_overrides[edit_order_detail.dependency] = lambda: user
+    try:
+        response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", json={"events": [], "cashflows": [{"flow_no": flow.flow_no, "amount": "120"}]})
+    finally:
+        seeded_client.app.dependency_overrides.pop(edit_order_detail.dependency, None)
+    assert response.status_code == 404, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Cashflow, flow.id).amount == Decimal("100")
+
+
 def test_edit_execution_operator_can_clear_all_selected_users(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="clear-event-operators", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

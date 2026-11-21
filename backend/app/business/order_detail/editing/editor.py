@@ -51,7 +51,7 @@ def edit_execution_detail(db: Session, order_id: int, payload: ExecutionEditRequ
         )
     apply_event_edits(db, event_changes, user.username)
     apply_operation_event_creates(db, order_id, payload.new_events, user.username, user)
-    apply_cashflow_edits(db, account.id, order_id, payload.cashflows, user)
+    apply_cashflow_edits(db, account.id, order, payload.cashflows, user)
     apply_order_edits(db, account.id, order_id, payload.orders, user)
     apply_party_edits(db, account.id, order_id, payload.parties, user)
 

@@ -13,7 +13,7 @@ from app.settings.field_definitions.pools import assert_pool_usable
 from .schemas import ExecutionCashflowEditItem
 
 
-def apply_cashflow_edits(db: Session, account_id: int, target_order_id: int, items: list[ExecutionCashflowEditItem], user: CurrentUser) -> None:
+def apply_cashflow_edits(db: Session, account_id: int, target_order: Order, items: list[ExecutionCashflowEditItem], user: CurrentUser) -> None:
     requested_operator_ids = {
         operator_id
         for item in items
@@ -30,7 +30,8 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order_id: int, ite
         flow_order_id = flow.order_id
         if flow_order_id is None and flow.source_type == CashflowSourceType.ORDER_EVENT.value:
             flow_order_id = db.scalar(select(OrderEvent.order_id).where(OrderEvent.event_no == flow.source_id))
-        if flow_order_id is None or flow_order_id != target_order_id or db.scalar(select(Order.id).where(Order.id == flow_order_id, Order.account_id == account_id)) is None:
+        # 编排入口已锁定目标订单与账号，复用该事务中的订单，不逐条重新查询。
+        if flow_order_id is None or flow_order_id != target_order.id or target_order.account_id != account_id:
             raise NotFound("资金明细不存在")
         before = {
             "pool_id": flow.pool_id,

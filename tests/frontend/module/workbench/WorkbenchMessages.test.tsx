@@ -29,7 +29,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
-  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
   vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids }));
 });
@@ -46,20 +46,20 @@ it("消息分类展示最新、售出和库存", async () => {
   });
 it("未读消息逐页滚动加载且不自动标已读", async () => {
     const items = Array.from({ length: 11 }, (_, i) => ({ id: 11 - i, notification_type: "OTHER", title: "提醒", message: `通知 ${11 - i}`, entity_type: "other", entity_id: String(i), created_at: "2026-11-21T09:30:00", read_at: null }));
-    vi.mocked(notificationsApi.list).mockImplementation(async (params) => ({ items: params.before_id ? items.slice(10) : items.slice(0, 10), total: 11, unread_total: 11 }));
+    vi.mocked(notificationsApi.list).mockImplementation(async (params) => ({ items: params.cursor ? items.slice(10) : items.slice(0, 10), next_cursor: params.cursor ? null : "page-2" }));
     renderLight(<DashboardPage />, { user: "admin" });
     await screen.findByRole("button", { name: /通知 11/ });
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
     const scroll = document.querySelector(".business-alerts__scroll")!;
     fireEvent.scroll(scroll);
     expect(await screen.findByRole("button", { name: /^通知 1 未读.*通知时间/ })).toBeInTheDocument();
-    expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ before_id: 2, unread_only: true }));
+    expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ cursor: "page-2", category: "latest" }));
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
   });
 
 it("点击分润通知只标记当前消息并展示详情", async () => {
     const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `订单 HS${id} 分润`, entity_type: "order", entity_id: `HS${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
-    vi.mocked(notificationsApi.list).mockResolvedValue({ items, total: 2, unread_total: 2 });
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
     vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, order_type: "HS", sale_amount: "300.00", stock_no: "KU0007", inventory_entry_at: "2026-11-10", removed_at: null, recovery_operator: "回收人员" })));
     renderLight(<DashboardPage />, { user: "admin" });
     const button = await screen.findByRole("button", { name: /订单 HS1 分润/ });
@@ -72,7 +72,7 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
   });
 
 it("标记已读失败时保留未读并可重试", async () => {
-    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "提醒", message: "测试消息", entity_type: "other", entity_id: "x", read_at: null }], total: 1, unread_total: 1 });
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "提醒", message: "测试消息", entity_type: "other", entity_id: "x", read_at: null }], next_cursor: null });
     vi.mocked(notificationsApi.markReadBatch).mockRejectedValueOnce(new Error("网络不可用"));
     renderLight(<DashboardPage />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: /测试消息/ }));
@@ -84,7 +84,7 @@ it("标记已读失败时保留未读并可重试", async () => {
   });
 
 it("已读消息可再次打开而不重复标记", async () => {
-    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 8, title: "提醒", message: "已读旧消息", entity_type: "other", entity_id: "x", created_at: "2026-11-20T08:00:00", read_at: "2026-11-20" }, { id: 2, title: "提醒", message: "已读新消息", entity_type: "other", entity_id: "y", created_at: "2026-11-21T08:00:00", read_at: "2026-11-21" }], total: 2, unread_total: 0 });
+    vi.mocked(notificationsApi.list).mockImplementation(async ({ category }) => ({ items: category === "latest" ? [] : [{ id: 2, title: "提醒", message: "已读新消息", entity_type: "other", entity_id: "y", created_at: "2026-11-21T08:00:00", read_at: "2026-11-21" }, { id: 8, title: "提醒", message: "已读旧消息", entity_type: "other", entity_id: "x", created_at: "2026-11-20T08:00:00", read_at: "2026-11-20" }], next_cursor: null }));
     renderLight(<DashboardPage />, { user: "admin" });
     await screen.findByText("暂无消息");
     expect(screen.queryByRole("button", { name: /已读新消息/ })).toBeNull();
@@ -102,9 +102,10 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
       alerts: [{ type: "pending_profit", message: "分润待配置 1 条" }],
     }));
     vi.mocked(notificationsApi.pendingOrder).mockResolvedValue({ order_no: "TH0002", order_id: 43 });
-    vi.mocked(notificationsApi.list).mockImplementation(async (params) => ({ items: params.read_only
-      ? [{ id: 3, title: "订单分润待配置", message: "订单 HS0001 待配置分润", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "HS0001", read_at: "2026-11-20T10:00:00" }]
-      : [{ id: 2, title: "订单分润待配置", message: "订单 TH0002 待配置分润", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "TH0002", created_at: "2026-11-21T09:30:00", read_at: null }], total: 1, unread_total: 1 }));
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [
+      { id: 2, title: "订单分润待配置", message: "订单 TH0002 待配置分润", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "TH0002", created_at: "2026-11-21T09:30:00", read_at: null },
+      { id: 3, title: "订单分润待配置", message: "订单 HS0001 待配置分润", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "HS0001", read_at: "2026-11-20T10:00:00" },
+    ], next_cursor: null });
     vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [2] });
     vi.mocked(notificationsApi.profitDetails).mockResolvedValue([{ notification_id: 2, order_no: "TH0002", order_type: "TH", game_type: "王者荣耀", cost_amount: "100.00", sale_amount: "200.00", allocatable_profit: "60.00", stock_no: null, inventory_entry_at: "2026-11-20", removed_at: null, recovery_operator: null }]);
 
@@ -129,7 +130,7 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
 it("待配置通知订单不可见时提示且不跳转", async () => {
     const navigate = vi.fn();
     const warning = vi.spyOn(appMessage, "warning").mockImplementation(() => undefined as never);
-    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "待配置", message: "订单 HS-MISSING", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "HS-MISSING", read_at: null }], total: 1, unread_total: 1 });
+    vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "待配置", message: "订单 HS-MISSING", notification_type: "PROFIT_PENDING", entity_type: "order", entity_id: "HS-MISSING", read_at: null }], next_cursor: null });
     vi.mocked(notificationsApi.pendingOrder).mockResolvedValue({ order_no: "HS-MISSING", order_id: null });
     renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: /订单 HS-MISSING/ }));

@@ -27,7 +27,7 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
-  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
 });
 

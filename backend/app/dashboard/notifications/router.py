@@ -105,6 +105,18 @@ def profit_notification_details(
     return profit_details_for_notifications(db, notifications, user)
 
 
+@router.get("/notifications/inbox", response_model=schemas.NotificationInboxOut)
+def notification_inbox(
+    category: str = Query(default="latest", pattern="^(latest|sale|inventory)$"),
+    cursor: str | None = Query(default=None, max_length=1024),
+    limit: int = Query(default=10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> schemas.NotificationInboxOut:
+    items, next_cursor = service.inbox_page(db, recipient_user_id=user.id, category=category, cursor=cursor, limit=limit)
+    return schemas.NotificationInboxOut(items=[schemas.NotificationOut.model_validate(item) for item in items], next_cursor=next_cursor)
+
+
 @router.get("/notifications", response_model=schemas.NotificationListOut)
 def list_my_notifications(
     unread_only: bool = Query(default=False),

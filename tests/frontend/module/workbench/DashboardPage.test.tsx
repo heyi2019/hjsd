@@ -32,7 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
-  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
   vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids }));
 });

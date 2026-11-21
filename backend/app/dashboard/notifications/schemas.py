@@ -30,6 +30,11 @@ class NotificationListOut(BaseModel):
     unread_total: int
 
 
+class NotificationInboxOut(BaseModel):
+    items: list[NotificationOut]
+    next_cursor: str | None
+
+
 class ProfitNotificationDetailOut(BaseModel):
     notification_id: int
     order_no: str

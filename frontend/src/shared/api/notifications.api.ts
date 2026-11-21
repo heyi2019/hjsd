@@ -16,7 +16,7 @@ export interface ProfitNotificationDetail {
 }
 
 export const notificationsApi = {
-  list: (params: { limit: number; before_id?: number; before_created_at?: string; sort_by_time?: boolean; entity_type?: string; unread_only?: boolean; read_only?: boolean; notification_type?: string; category?: "sale" | "inventory" }) => api.get<{ items: NotificationItem[]; total: number; unread_total: number }>("/notifications", { params }).then(r => r.data),
+  list: (params: { limit: number; category: "latest" | "sale" | "inventory"; cursor?: string }) => api.get<{ items: NotificationItem[]; next_cursor: string | null }>("/notifications/inbox", { params }).then(r => r.data),
   syncInventory: () => api.post<{ created: number }>("/notifications/sync-inventory").then(r => r.data),
   pendingOrder: (notificationId?: number) => api.get<{ order_no: string | null; order_id: number | null }>("/notifications/pending-order", { params: notificationId === undefined ? undefined : { notification_id: notificationId } }).then(r => r.data),
   profitDetails: (ids: number[]) => api.get<ProfitNotificationDetail[]>("/notifications/profit-details", { params: { ids }, paramsSerializer: { indexes: null } }).then(r => r.data),

@@ -22,48 +22,30 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const [retryItem, setRetryItem] = useState<NotificationItem | null>(null);
   const [reload, setReload] = useState(0);
   const [hasMore, setHasMore] = useState(true);
-  const cursor = useRef<{ phase: "unread" | "read" | "done"; before?: number; beforeTime?: string; generation: number; loading: boolean }>({ phase: "unread", generation: 0, loading: false });
+  const cursor = useRef<{ next?: string; done: boolean; generation: number; loading: boolean }>({ done: false, generation: 0, loading: false });
   const scrollRef = useRef<HTMLDivElement>(null);
   const busy = useRef(new Set<number>());
   const loadMore = async () => {
     const state = cursor.current;
-    if (!active || state.loading || state.phase === "done") return;
+    if (!active || state.loading || state.done) return;
     state.loading = true;
     const generation = state.generation;
     setNotificationLoading(true);
     try {
-      let phase = state.phase;
-      let before = state.before;
-      const categoryParam = category === "latest" ? {} : { category };
-      let page = await notificationsApi.list({ limit: PAGE_SIZE, sort_by_time: true, ...categoryParam, ...(phase === "unread" ? { unread_only: true } : { read_only: true }), ...(before ? { before_id: before, before_created_at: state.beforeTime } : {}) });
+      const page = await notificationsApi.list({ limit: PAGE_SIZE, category, ...(state.next ? { cursor: state.next } : {}) });
       if (cursor.current.generation !== generation) return;
-      if (phase === "unread" && !page.items.length) {
-        if (category === "latest") { state.phase = "done"; setHasMore(false); return; }
-        phase = "read";
-        before = undefined;
-        page = await notificationsApi.list({ limit: PAGE_SIZE, sort_by_time: true, read_only: true, ...categoryParam });
-        if (cursor.current.generation !== generation) return;
-      }
       const ids = page.items.filter(isProfitNotification).map((item) => item.id);
       let details: ProfitDetail[] = [];
       if (ids.length) {
-        try { details = await notificationsApi.profitDetails(ids); } catch { /* 保留消息并显示详情不可用 */ }
+        try { details = await notificationsApi.profitDetails(ids); } catch { /* 消息仍可展示 */ }
       }
       if (cursor.current.generation !== generation) return;
+      if (page.next_cursor && page.next_cursor === state.next) throw new Error("消息分页游标异常");
       setNotificationDetails((current) => ({ ...current, ...Object.fromEntries(details.map((item) => [item.notification_id, item])) }));
-      setNotifications((current) => [...current, ...page.items.filter((item) => !current.some((old) => old.id === item.id))]);
-      if (page.items.length < PAGE_SIZE) {
-        state.phase = phase === "unread" && category !== "latest" ? "read" : "done";
-        state.before = undefined;
-        state.beforeTime = undefined;
-      } else {
-        const last = page.items[page.items.length - 1];
-        if (!last.created_at || (before === last.id && state.beforeTime === last.created_at)) throw new Error("消息分页游标异常");
-        state.phase = phase;
-        state.before = last.id;
-        state.beforeTime = last.created_at;
-      }
-      setHasMore(state.phase !== "done");
+      setNotifications((current) => [...current, ...page.items]);
+      state.next = page.next_cursor ?? undefined;
+      state.done = !page.next_cursor;
+      setHasMore(!state.done);
       setNotificationError(null);
     } catch {
       if (cursor.current.generation === generation) setNotificationError("消息加载失败，请重试。");
@@ -71,12 +53,12 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       if (cursor.current.generation === generation) { state.loading = false; setNotificationLoading(false); }
     }
   };
+  useEffect(() => { setSelected(null); }, [category, username]);
   useEffect(() => {
     if (!active) return;
-    cursor.current = { phase: "unread", generation: cursor.current.generation + 1, loading: true };
+    cursor.current = { done: false, generation: cursor.current.generation + 1, loading: true };
     const generation = cursor.current.generation;
     setDataOwner(username);
-    setSelected(null);
     setNotifications([]);
     setNotificationDetails({});
     setNotificationError(null);
@@ -109,7 +91,8 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
         const result = await notificationsApi.markReadBatch([item.id]);
         if (cursor.current.generation !== generation) return;
         if (!result.read_ids.includes(item.id)) throw new Error("标记已读失败，请重试。");
-        setNotifications((current) => current.map((entry) => entry.id === item.id ? { ...entry, read_at: new Date().toISOString() } : entry));
+        if (category === "latest") setNotifications((current) => current.filter((entry) => entry.id !== item.id));
+        else setReload((n) => n + 1);
         onProfitNotificationsRead?.();
       }
       setNotificationError(null);
@@ -122,6 +105,6 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
       busy.current.delete(item.id);
     }
   };
-  const ordered = dataOwner === username ? notifications.filter((item) => category !== "latest" || !item.read_at).sort((a, b) => Number(Boolean(a.read_at)) - Number(Boolean(b.read_at)) || (b.created_at ?? "").localeCompare(a.created_at ?? "") || b.id - a.id) : [];
+  const ordered = dataOwner === username ? notifications : [];
   return { username, dataOwner, selected, setSelected, notifications, notificationDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, hasMore, scrollRef, loadMore, openNotification, ordered };
 }

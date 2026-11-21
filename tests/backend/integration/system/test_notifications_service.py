@@ -58,7 +58,7 @@ def test_create_notification_rejects_blank_entity(seeded_db):
         )
 
 
-def test_list_notifications_unread_only_filters(seeded_db):
+def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
     a = _make_unread(seeded_db, entity_id="A")
     b = _make_unread(seeded_db, entity_id="B")
     notification_service.mark_read_batch(seeded_db, [a.id], recipient_user_id=2, actor="pytest")
@@ -72,6 +72,22 @@ def test_list_notifications_unread_only_filters(seeded_db):
     )
     assert all_total == 2
     assert len(all_rows) == 2
+    first = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="FIRST")
+    second = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_ALLOCATED", entity_id="SECOND")
+    third = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="THIRD")
+    notification_service.mark_read_batch(seeded_db, [second.id], recipient_user_id=1, actor="pytest")
+    headers = {"X-Dev-User": "admin"}
+    page = seeded_client.get("/api/notifications/inbox", params={"category": "sale", "limit": 2}, headers=headers)
+    assert page.status_code == 200
+    result = page.json()
+    assert [item["id"] for item in result["items"]] == [third.id, first.id]
+    assert result["next_cursor"]
+    notification_service.mark_read_batch(seeded_db, [third.id], recipient_user_id=1, actor="pytest")
+    page = seeded_client.get("/api/notifications/inbox", params={"category": "sale", "limit": 2, "cursor": result["next_cursor"]}, headers=headers)
+    assert [item["id"] for item in page.json()["items"]] == [second.id]
+    assert page.json()["next_cursor"] is None
+    latest = seeded_client.get("/api/notifications/inbox", params={"category": "latest"}, headers=headers)
+    assert [item["id"] for item in latest.json()["items"]] == [first.id]
 
 
 def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seeded_db):

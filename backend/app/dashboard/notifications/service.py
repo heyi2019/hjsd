@@ -2,19 +2,61 @@
 from __future__ import annotations
 
 from datetime import datetime
+import base64
+import json
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.shared.numbering import allocate_number
-from app.core.time import now_second
 from app.domain.enums import SequenceKey
 from app.domain.notifications import Notification
 
 PROFIT_PENDING = "PROFIT_PENDING"
 PROFIT_ALLOCATED = "PROFIT_ALLOCATED"
 INVENTORY_AGING = "INVENTORY_AGING"
+
+
+def inbox_page(session: Session, *, recipient_user_id: int, category: str, cursor: str | None, limit: int) -> tuple[list[Notification], str | None]:
+    """按未读优先和通知时间分页；同一轮分页不重复返回期间刚读过的消息。"""
+    snapshot = datetime.now()
+    phase = "unread"
+    before_time = None
+    before_id = None
+    if cursor:
+        try:
+            payload = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
+            if payload["category"] != category or payload["phase"] not in ("unread", "read"):
+                raise ValueError()
+            snapshot = datetime.fromisoformat(payload["snapshot"])
+            before_time = datetime.fromisoformat(payload["time"])
+            before_id = int(payload["id"])
+            phase = payload["phase"]
+            if snapshot.tzinfo or before_time.tzinfo or before_id < 1:
+                raise ValueError()
+        except (ValueError, KeyError, TypeError, UnicodeError, json.JSONDecodeError) as exc:
+            raise Validation("通知分页游标无效") from exc
+    base = select(Notification).where(Notification.recipient_user_id == recipient_user_id)
+    if category == "sale":
+        base = base.where(Notification.notification_type.in_([PROFIT_PENDING, PROFIT_ALLOCATED]))
+    elif category == "inventory":
+        base = base.where(Notification.notification_type == INVENTORY_AGING)
+    rows: list[Notification] = []
+    for current in (["unread"] if category == "latest" else ["unread", "read"]):
+        if phase == "read" and current == "unread":
+            continue
+        stmt = base.where(Notification.read_at.is_(None) if current == "unread" else Notification.read_at <= snapshot)
+        if before_time is not None and current == phase:
+            stmt = stmt.where(or_(Notification.created_at < before_time, and_(Notification.created_at == before_time, Notification.id < before_id)))
+        rows.extend(session.scalars(stmt.order_by(Notification.created_at.desc(), Notification.id.desc()).limit(limit + 1 - len(rows))).all())
+        if len(rows) > limit:
+            break
+    if len(rows) <= limit:
+        return rows, None
+    last = rows[limit - 1]
+    data = {"category": category, "phase": "unread" if last.read_at is None else "read", "time": last.created_at.isoformat(), "id": last.id, "snapshot": snapshot.isoformat()}
+    return rows[:limit], base64.urlsafe_b64encode(json.dumps(data).encode()).decode()
 
 
 def create_notification(
@@ -182,7 +224,7 @@ def mark_read_batch(
         session.execute(update(Notification).where(
             Notification.id.in_(ids), Notification.recipient_user_id == recipient_user_id,
             Notification.read_at.is_(None),
-        ).values(read_at=now_second(), updated_by=actor))
+        ).values(read_at=datetime.now(), updated_by=actor))
         session.flush()
     return ids
 

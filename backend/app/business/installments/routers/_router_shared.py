@@ -6,9 +6,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.trade import Order
-from app.funds.installments import schemas
-from app.funds.installments import queries as inst_queries
-from app.funds.installments import action_availability as actions
+from app.business.installments import schemas
+from app.business.installments import queries as inst_queries
+from app.business.installments import action_availability as actions
 from app.shared.form_values import get_extra_values_bulk
 from app.shared.operation_operators import (
     list_operation_operators_bulk,

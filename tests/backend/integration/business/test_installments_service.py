@@ -45,11 +45,11 @@ from app.domain.enums import (
     InstallmentContractType,
     InstallmentStatus)
 from app.domain.trade import Cashflow, OrderEvent
-from app.funds.installments import create as inst_create
-from app.funds.installments import recovery as inst_recovery
-from app.funds.installments.repayments.pay import pay as inst_pay
-from app.funds.installments.repayments.cancel import cancel_installment as inst_cancel
-from app.funds.installments.repayments.waive import waive_schedule as inst_waive
+from app.business.installments import create as inst_create
+from app.business.installments import recovery as inst_recovery
+from app.business.installments.repayments.pay import pay as inst_pay
+from app.business.installments.repayments.cancel import cancel_installment as inst_cancel
+from app.business.installments.repayments.waive import waive_schedule as inst_waive
 from app.business.create import create_order
 from app.business.events import post_event
 

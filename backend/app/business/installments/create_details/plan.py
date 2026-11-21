@@ -5,8 +5,8 @@ from typing import Any
 from decimal import Decimal, ROUND_CEILING, ROUND_HALF_UP
 from pydantic import ValidationError as PydanticValidationError
 from app.core.errors import Validation
-from app.funds.installments.schemas import ScheduleCreate
-from app.funds.installments._shared import _non_negative
+from app.business.installments.schemas import ScheduleCreate
+from app.business.installments._shared import _non_negative
 
 def sale_installment_plan(
     *,

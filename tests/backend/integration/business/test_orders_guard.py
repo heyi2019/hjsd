@@ -18,9 +18,9 @@ from app.core.security import CurrentUser
 from app.domain.enums import Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Installment, Order, OrderEvent
-from app.funds.installments import create as inst_create
-from app.funds.installments import recovery as inst_recovery
-from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.installments import create as inst_create
+from app.business.installments import recovery as inst_recovery
+from app.business.installments.repayments.pay import pay as inst_pay
 from app.business import events
 from app.business._shared import _audit_value
 from app.business.cancellation_model import get_cancellation_offset as _get_offset_event

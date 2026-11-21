@@ -22,7 +22,7 @@ from app.domain.enums import (
 from app.domain.foundation import AuditLog
 from app.domain.parties import (
     OrderCounterpartyRole)
-from app.funds.installments import create as inst_create
+from app.business.installments import create as inst_create
 from app.business.create import create_order
 from app.customers.counterparties import (
     create_counterparty,

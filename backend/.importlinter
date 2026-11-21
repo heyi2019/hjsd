@@ -10,7 +10,7 @@
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
 #   L3  业务域     与前端 6 导航 key 一一对应：workbench（含 notifications）/ business（含
-#                  stocks）/ customers / funds（含 installments、profit_allocation）/
+#                  stocks、installments）/ customers / funds（含 profit_allocation）/
 #                  operations / settings（含 field_definitions、options、lists、auth、
 #                  audit、attachments）。依赖 L0+L1+L2。
 #
@@ -58,7 +58,7 @@
 # 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
 #
 #   operations / workbench → 各业务域（只读聚合层）
-#   funds（含两子模块）    → business
+#   funds                  → business
 #   business → customers / settings
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。

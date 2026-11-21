@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Dropdown, Tabs } from "antd";
 import { InventoryPanel } from "./inventory/InventoryPanel";
-import { InstallmentsPanel } from "../finance/installments/InstallmentsPanel";
+import { InstallmentsPanel } from "./installments/InstallmentsPanel";
 import { ErrorBanner, PermissionButton } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { installmentsApi } from "../shared/api/installments.api";

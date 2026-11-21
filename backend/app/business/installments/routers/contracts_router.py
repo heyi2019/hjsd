@@ -22,10 +22,10 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.funds.installments import schemas
-from app.funds.installments import create as inst_create
-from app.funds.installments import queries as inst_queries
-from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.installments import schemas
+from app.business.installments import create as inst_create
+from app.business.installments import queries as inst_queries
+from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.events import post_event as orders_post_event
 from app.business.sale import apply_sale_details, sale_form_context
 from app.settings.lists import service as list_columns_service

@@ -17,9 +17,9 @@ from app.domain.trade import Cashflow, Account, Order, OrderFormField
 from app.domain.foundation import Pool
 from app.domain.parties import Customer, OrderCustomerRole
 from app.core.database import get_db
-from app.funds.installments import create as inst_create
-from app.funds.installments import recovery as inst_recovery
-from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.installments import create as inst_create
+from app.business.installments import recovery as inst_recovery
+from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.create import create_order
 from app.business.events import post_event
 from app.business.form_fields import create_order_form_field

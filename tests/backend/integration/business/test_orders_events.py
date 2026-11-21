@@ -12,9 +12,9 @@ from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AccountStatus, EventType
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.funds.installments import create as inst_create
-from app.funds.installments import recovery as inst_recovery
-from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.installments import create as inst_create
+from app.business.installments import recovery as inst_recovery
+from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.create import create_order
 from app.business.events import post_event
 from app.customers.customers import create_customer, set_customer_status

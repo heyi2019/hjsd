@@ -208,7 +208,7 @@ def create_order(
         # 初始费用是支出资金明细；业务事件只记录
         # BUY/SELL/DELIVER/OPERATE 等业务事实。账号成本仍由这笔订单支出明细累计。
         pool_id = cost.pool_id or require_default_pool(db).id
-        from app.business.collaboration import create_cost_flow
+        from app.business.collaboration import create_cashflow
 
         # 初始成本流水由 finance 域经 collaboration 注册点提供挂账器，
         # orders 不再反向 import finance.cashflows（backend/.importlinter 契约）。
@@ -218,7 +218,7 @@ def create_order(
             "HS": AccountingAttribute.SELF_DIRECT_COST.value,
             "TH": AccountingAttribute.TH_DIRECT_COST.value,
         }.get(order.order_type, AccountingAttribute.OTHER_EXPENSE.value)
-        create_cost_flow(
+        create_cashflow(
             db,
             pool_id=pool_id,
             occurred_on=cost.occurred_on,

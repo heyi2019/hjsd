@@ -23,9 +23,9 @@ from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
 from app.business import events
 from app.business.create import create_order
-from app.funds.installments.create import create_installment
-from app.funds.installments.recovery import deliver
-from app.funds.installments.repayments.pay import pay
+from app.business.installments.create import create_installment
+from app.business.installments.recovery import deliver
+from app.business.installments.repayments.pay import pay
 
 TODAY = date(2026, 10, 7)
 

@@ -35,7 +35,7 @@ from app.settings.field_definitions.schemas import (
     PoolStatusUpdate,
     PoolUpdate,
 )
-from app.funds.installments.schemas import (
+from app.business.installments.schemas import (
     DefaultIn,
     DeliverIn,
     EarlySettlementIn,

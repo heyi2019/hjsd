@@ -15,11 +15,11 @@ from app.core.errors import AppError
 from app.domain.base import Base
 from app.domain.trade import Cashflow, Installment
 from app.domain.users import User
-from app.funds.installments.create import create_installment
-from app.funds.installments.repayments.cancel import cancel_installment
-from app.funds.installments.repayments.pay import pay
-from app.funds.installments.repayments.waive import waive_schedule
-from app.funds.installments.recovery import mark_overdue, recover_account
+from app.business.installments.create import create_installment
+from app.business.installments.repayments.cancel import cancel_installment
+from app.business.installments.repayments.pay import pay
+from app.business.installments.repayments.waive import waive_schedule
+from app.business.installments.recovery import mark_overdue, recover_account
 from app.settings.field_definitions.seeds import seed_foundation
 
 pytestmark = pytest.mark.db

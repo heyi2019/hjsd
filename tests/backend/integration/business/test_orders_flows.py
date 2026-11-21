@@ -11,9 +11,9 @@ from app.domain.enums import AccountStatus, Direction, OrderStatus
 from app.domain.foundation import Pool
 from app.settings.field_definitions.order_types import get_order_type_by_code
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent
-from app.funds.installments import create as inst_create
-from app.funds.installments import recovery as inst_recovery
-from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.installments import create as inst_create
+from app.business.installments import recovery as inst_recovery
+from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.create import create_order
 from app.business.events import post_event
 from app.customers.counterparties import create_counterparty

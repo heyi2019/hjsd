@@ -23,9 +23,9 @@ from app.funds.deposits.writes import create_deposit
 from app.funds.deposits.lifecycle import return_deposit
 from app.funds.rebates import create_rebate
 from app.shared.installment_amounts import total_receivable
-from app.funds.installments import create as inst_create
-from app.funds.installments import recovery as inst_recovery
-from app.funds.installments.repayments.pay import pay as inst_pay
+from app.business.installments import create as inst_create
+from app.business.installments import recovery as inst_recovery
+from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.create import create_order
 from app.business.events import post_event
 from app.funds.balances import pool_balance

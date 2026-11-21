@@ -18,12 +18,12 @@ from app.domain.enums import (
     InstallmentStatus,
     ScheduleStatus)
 from app.domain.trade import Cashflow, Installment, InstallmentSchedule
-from app.funds.installments import _shared as inst__shared
+from app.business.installments import _shared as inst__shared
 from app.shared.installment_amounts import total_receivable
-from app.funds.installments import create as inst_create
-from app.funds.installments import queries as inst_queries
-from app.funds.installments.repayments.pay import pay as inst_pay
-from app.funds.installments.repayments.cancel import cancel_installment as inst_cancel
+from app.business.installments import create as inst_create
+from app.business.installments import queries as inst_queries
+from app.business.installments.repayments.pay import pay as inst_pay
+from app.business.installments.repayments.cancel import cancel_installment as inst_cancel
 from app.business.create import create_order
 from app.business.events import post_event
 
@@ -207,7 +207,7 @@ def test_installment_payment_is_cashflow_only(seeded_db):
 
 
 def test_settle_early_keeps_submitted_form_extra(seeded_db):
-    from app.funds.installments.settlement import settle_early
+    from app.business.installments.settlement import settle_early
     order = _order(seeded_db)
     contract = _contract(seeded_db, order.id, principal="100", down_payment="0", periods=1, per_period="100")
     result = settle_early(seeded_db, contract.id, paid_on=TODAY, actor="pytest", form_extra={"settlement_reference": "结清备注"})
@@ -417,7 +417,7 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
 # —— available_actions 下发契约 ——
 def test_available_actions_match_business_rules():
     """后端纯函数按合约状态和处置记录生成可执行动作。"""
-    from app.funds.installments import action_availability as av
+    from app.business.installments import action_availability as av
 
     def legacy_inst(status, disps):
         acts = []
@@ -518,7 +518,7 @@ def test_cancelled_installment_schedules_cannot_be_waived_or_extended(seeded_cli
 
 
 def test_recovered_installment_schedules_cannot_be_waived_or_extended(seeded_client, seeded_db, headers):
-    from app.funds.installments.recovery import recover_account
+    from app.business.installments.recovery import recover_account
     account = _account(seeded_db, "recovered-schedule-actions")
     order = _order(seeded_db, order_type="HS", account_id=account.id)
     _buy(seeded_db, order.id, "100")

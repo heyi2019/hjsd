@@ -8,7 +8,7 @@ from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowSourceType
-from app.funds.cashflows import reverse_cashflow
+from app.business.collaboration import reverse_cashflow
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Conflict, ErrorCode, NotFound

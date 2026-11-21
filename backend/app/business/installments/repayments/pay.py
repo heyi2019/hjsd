@@ -8,7 +8,7 @@ from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowSourceType, Direction
 from app.domain.cashflow_attributes import accounting_attribute_for_order_event
-from app.funds.cashflows import create_cashflow
+from app.business.collaboration import create_cashflow
 from app.business.events_rules import _resolve_pool
 from sqlalchemy import select
 from sqlalchemy.orm import Session

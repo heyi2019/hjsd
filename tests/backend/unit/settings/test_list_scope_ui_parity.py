@@ -39,8 +39,8 @@ PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     "INVENTORY": "business/inventory/InventoryPanel/useInventoryColumns.tsx",
     # 列数组拆到 contractColumns 工厂，useListViewColumns 锚点仍在 controller —— 两文件分离。
     "INSTALLMENT": (
-        "finance/installments/useContractTableController.tsx",
-        "finance/installments/contractColumns.tsx",
+        "business/installments/useContractTableController.tsx",
+        "business/installments/contractColumns.tsx",
     ),
     "CUSTOMER": "customer-center/useCustomerController.tsx",
     "COUNTERPARTY": "customer-center/CounterpartyPanel.tsx",

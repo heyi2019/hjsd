@@ -1,16 +1,12 @@
 """orders 域的跨域协作注册点（composition root 回调注册表）。
 
-背景（2026-11-18 P0-A）：orders 是最上游域，禁止反向依赖 finance /
-installments（backend/.importlinter 契约）。但两处业务行为天然横跨
-域边界、且必须与订单写入同事务完成——
+业务域不能反向依赖资金域，但以下操作需要在同一事务中协作：
 
-1. 订单创建时的「初始成本挂账」：orders/router 内联调用 finance 的
-   create_cashflow 写一条支出流水；
+1. 订单初始成本和分期回款的资金流水创建、冲销由资金域执行；
 2. 非分期 SELL 完成后的「回收处置联动」：orders/events 调用 installments 的
    link_recovered_sale 关联最近一次未转售回收。
 
-解决方案是回调注册：orders 在本模块定义注册点（orders 不 import 任何下游域）；
-下游域在**自己模块底部**调用 register_* 完成注册（下游 -> orders 是合法方向）。
+解决方案是回调注册：业务域定义注册点，资金域注册流水操作。
 
 加载链保证注册生效：
 - 生产：api import finance_router / installments_router
@@ -26,19 +22,21 @@ from typing import Any
 # SELL 完成后的联动钩子：签名 (session, order, *, occurred_on, actor, note)
 _post_sell_hooks: list[Callable[..., Any]] = []
 
-# 初始成本挂账器：签名与 finance.cashflows.create_cashflow 一致（kwargs 转发）
-_cost_flow_creator: Callable[..., Any] | None = None
+# 资金流水创建和冲销由资金域提供，调用与业务操作处于同一事务。
+_cashflow_creator: Callable[..., Any] | None = None
+_cashflow_reverser: Callable[..., Any] | None = None
 
 
 def register_post_sell_hook(hook: Callable[..., Any]) -> None:
-    """注册 SELL 完成联动钩子（由 installments 等下游域调用）。"""
+    """注册 SELL 完成联动钩子。"""
     _post_sell_hooks.append(hook)
 
 
-def register_cost_flow_creator(creator: Callable[..., Any]) -> None:
-    """注册初始成本挂账器（由 finance 域调用，传 finance.cashflows.create_cashflow）。"""
-    global _cost_flow_creator
-    _cost_flow_creator = creator
+def register_cashflow_operations(creator: Callable[..., Any], reverser: Callable[..., Any]) -> None:
+    """由资金域注册流水创建与冲销操作。"""
+    global _cashflow_creator, _cashflow_reverser
+    _cashflow_creator = creator
+    _cashflow_reverser = reverser
 
 
 def run_post_sell_hooks(
@@ -54,21 +52,29 @@ def run_post_sell_hooks(
         hook(session, order, occurred_on=occurred_on, actor=actor, note=note)
 
 
-def create_cost_flow(*args: Any, **kwargs: Any) -> Any:
-    """创建订单初始成本流水（转发给 finance 注册的挂账器）。
+def create_cashflow(*args: Any, **kwargs: Any) -> Any:
+    """创建业务资金流水（转发给资金域）。
 
     未注册即抛错：成本流水是账务写入，静默跳过会造成丢账，必须 fail-fast。
     """
-    if _cost_flow_creator is None:
+    if _cashflow_creator is None:
         raise RuntimeError(
-            "初始成本挂账器未注册：finance.cashflows 未被加载（注册点 app.business.collaboration）"
+            "资金流水创建器未注册：funds.cashflows 未被加载（注册点 app.business.collaboration）"
         )
-    return _cost_flow_creator(*args, **kwargs)
+    return _cashflow_creator(*args, **kwargs)
+
+
+def reverse_cashflow(*args: Any, **kwargs: Any) -> Any:
+    """冲销业务资金流水（转发给资金域）。"""
+    if _cashflow_reverser is None:
+        raise RuntimeError("资金流水冲销器未注册：funds.cashflows 未被加载（注册点 app.business.collaboration）")
+    return _cashflow_reverser(*args, **kwargs)
 
 
 __all__ = [
-    "create_cost_flow",
-    "register_cost_flow_creator",
+    "create_cashflow",
+    "reverse_cashflow",
+    "register_cashflow_operations",
     "register_post_sell_hook",
     "run_post_sell_hooks",
 ]

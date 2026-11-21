@@ -434,7 +434,7 @@
   min-width: 0 !important;
 }
 
-:where(:is(.ant-input, .ant-input-number, .ant-picker, .ant-input-affix-wrapper):not([class*="-status-error"]):not([class*="-status-warning"]):hover, .ant-select:not([class*="-status-error"]):not([class*="-status-warning"]) .ant-select-selector:hover) {
+:where(:is(.ant-input, .ant-input-number, .ant-picker, .ant-input-affix-wrapper):not(:disabled):not([class*="-disabled"]):not([class*="-status-error"]):not([class*="-status-warning"]):hover, .ant-select:not(.ant-select-disabled):not([class*="-status-error"]):not([class*="-status-warning"]) .ant-select-selector:hover) {
   border-color: var(--brand-border) !important;
 }
 

@@ -88,7 +88,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
          expandable={{
            expandRowByClick: true,
            expandedRowRender: (row) => (
-             <div className="commission-detail-container">
+             <div className="ui-table-wrap commission-detail-container">
                <table className="commission-detail-table">
                  <thead><tr><th>分润人员</th><th>分润基数</th><th>费率</th></tr></thead>
                  <tbody>

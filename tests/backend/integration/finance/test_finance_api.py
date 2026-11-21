@@ -66,6 +66,28 @@ def test_finance_lists_batch_operation_operators(seeded_client, seeded_db, heade
     if kind == "reconciliation":
         assert any(op["operation_key"] == "RESOLVE" and op["operator_user_ids"] == [2] for op in outputs[records[0].id])
     assert len(operator_queries) == 1
+    endpoint = "deposits" if kind == "deposit" else "reconciliations"
+    first = seeded_client.get(f"/api/{endpoint}/page", headers=headers, params={"limit": 2, "offset": 0})
+    second = seeded_client.get(f"/api/{endpoint}/page", headers=headers, params={"limit": 2, "offset": 2})
+    assert first.status_code == second.status_code == 200
+    assert first.json()["total"] == second.json()["total"] == 3
+    assert len(first.json()["items"]) == 2
+    assert len(second.json()["items"]) == 1
+    assert {row["id"] for row in first.json()["items"] + second.json()["items"]} == set(outputs)
+    for row in first.json()["items"] + second.json()["items"]:
+        assert row["operation_operators"] == outputs[row["id"]]
+    from app.funds.routers import deposits_router, reconciliation_router
+    dependency = (deposits_router if kind == "deposit" else reconciliation_router).read_access.dependency
+    scoped = CurrentUser(id=1, username="admin", roles=(), permissions=frozenset(),
+                         pool_ids=frozenset(), owner_scope="SELF")
+    seeded_client.app.dependency_overrides[dependency] = lambda: scoped
+    try:
+        hidden = seeded_client.get(f"/api/{endpoint}/page", headers=headers, params={"pool_id": pool.id})
+        assert hidden.status_code == 200
+        assert hidden.json()["items"] == []
+        assert hidden.json()["total"] == 0
+    finally:
+        seeded_client.app.dependency_overrides.pop(dependency, None)
 
 
 def _pool(seeded_db, code: str) -> Pool:

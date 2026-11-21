@@ -223,6 +223,9 @@ def test_export_has_no_row_cap_and_respects_date_range(seeded_client, seeded_db,
     assert totals_queries == []
     assert all(f"导出测试{index}" in response.text for index in range(3))
     assert "范围外流水" in response.text
+    ascending = seeded_client.get("/api/cashflows/export.csv", headers=headers, params={"sort_desc": False})
+    assert ascending.status_code == 200, ascending.text
+    assert ascending.text.index("导出测试0") < ascending.text.index("范围外流水")
     csv_rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))
     assert len(csv_rows) == 5
     assert sum(row[0] == "行类型" for row in csv_rows) == 1

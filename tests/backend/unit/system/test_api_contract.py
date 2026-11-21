@@ -91,4 +91,5 @@ def test_every_json_api_route_declares_response_model(app):
     # → 158（库存售出、库存分期售出、订单入口取消分期各新增一个端点）。
     # → 160（工作台分润通知批量详情和待配置订单定位）。
     # 既有接口及客户选择接口。
-    assert public_routes == 162
+    # 押金、对账分页各新增一个只读接口。
+    assert public_routes == 164

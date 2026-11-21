@@ -48,6 +48,7 @@ export const cashflowsApi = {
     category?: string;
     created_by?: string;
     keyword?: string;
+    sort_desc?: boolean;
   }) =>
     api
       .get<Blob>("/cashflows/export.csv", {

@@ -2,6 +2,8 @@ import { api } from "./client";
 import type { Cashflow, Deposit } from "./types/finance";
 
 export const depositsApi = {
+  page: (params: { limit: number; offset: number }) =>
+    api.get<{ items: Deposit[]; total: number; limit: number; offset: number }>("/deposits/page", { params }).then((r) => r.data),
   list: (params?: { pool_id?: number }) =>
     api.get<Deposit[]>("/deposits", { params }).then((r) => r.data),
   create: (payload: Partial<Deposit> & { pool_id: number; amount: string; paid_on: string }) =>

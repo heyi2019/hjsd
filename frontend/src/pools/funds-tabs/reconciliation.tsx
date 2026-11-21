@@ -49,13 +49,14 @@ export function ReconciliationTab({ ctrl }: { ctrl: FundsPageController }) {
       <DataTable<Reconciliation>
         columns={arrangeReconciliationColumns(reconciliationColumns)}
         rows={reconciliationUnavailable ? [] : reconciliations}
-        page={1}
-        pageSize={10}
-        total={reconciliationUnavailable ? 0 : reconciliations.length}
+        controlledPaging
+        page={ctrl.reconciliationsPaging.page}
+        pageSize={ctrl.reconciliationsPaging.pageSize}
+        total={reconciliationUnavailable ? 0 : ctrl.reconciliationsPaging.total}
         emptyText={reconciliationUnavailable ? "资金对账数据不可用，请点击重新加载" : "暂无对账记录"}
         loading={reconciliationsLoading}
         pagination={reconciliationsError ? false : undefined}
-        onPageChange={() => undefined}
+        onPageChange={ctrl.setReconciliationsPage}
       />
     </Card>
   );

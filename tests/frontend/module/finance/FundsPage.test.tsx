@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FundsPage } from "@/pools/FundsPage";
 import { useFundsResources } from "@/pools/useFundsResources";
+import { useDepositResources } from "@/pools/useDepositResources";
+import { useReconciliationResources } from "@/pools/useReconciliationResources";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
@@ -67,6 +69,15 @@ const cashflows = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(depositsApi.page).mockImplementation(async ({ limit, offset }) => {
+    const items = await depositsApi.list();
+    return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
+  });
+  vi.mocked(reconciliationsApi.page).mockImplementation(async ({ limit, offset }) => {
+    const items = await reconciliationsApi.list();
+    return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
+  });
+
   vi.mocked(listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。
@@ -98,6 +109,51 @@ function PeriodReadyProbe() {
 }
 
 describe("FundsPage：资金账户卡片", () => {
+  it("末页记录减少后押金和对账回到有效页", async () => {
+    let total = 11;
+    const reconciliation = { id: 1, pool_id: 1, reconciled_on: "2026-10-01", account_label: "账户", system_balance: "0", statement_balance: "0", difference: "0", status: "OPEN" };
+    vi.mocked(depositsApi.page).mockImplementation(async ({ limit, offset }) => ({
+      items: offset < total ? [deposits[0]] : [], total, limit, offset,
+    }));
+    vi.mocked(reconciliationsApi.page).mockImplementation(async ({ limit, offset }) => ({
+      items: offset < total ? [reconciliation] : [], total, limit, offset,
+    }));
+    const { result } = renderHook(() => ({ deposits: useDepositResources(), reconciliations: useReconciliationResources() }));
+    await act(async () => { await Promise.all([result.current.deposits.loadDeposits(), result.current.reconciliations.loadReconciliations()]); });
+    act(() => { result.current.deposits.setDepositsPage(2, 10); result.current.reconciliations.setReconciliationsPage(2, 10); });
+    await waitFor(() => expect(result.current.deposits.depositsReady && result.current.reconciliations.reconciliationsReady).toBe(true));
+    total = 10;
+    await act(async () => { await Promise.all([result.current.deposits.loadDeposits(), result.current.reconciliations.loadReconciliations()]); });
+    expect(result.current.deposits.depositsPaging.page).toBe(1);
+    expect(result.current.reconciliations.reconciliationsPaging.page).toBe(1);
+    expect(result.current.deposits.deposits).toHaveLength(1);
+    expect(result.current.reconciliations.reconciliations).toHaveLength(1);
+  });
+  it("押金和对账翻页读取服务端下一页", async () => {
+    const first = Array.from({ length: 10 }, (_, index) => ({ ...deposits[0], id: 100 + index }));
+    const second = { ...deposits[0], id: 200, counterparty_id: 888 };
+    vi.mocked(depositsApi.page).mockImplementation(async ({ limit, offset }) => ({
+      items: offset ? [second] : first, total: 11, limit, offset,
+    }));
+    const reconciliation = { id: 1, pool_id: 1, reconciled_on: "2026-10-01", account_label: "第一页账户", system_balance: "0", statement_balance: "0", difference: "0", status: "OPEN" };
+    vi.mocked(reconciliationsApi.page).mockImplementation(async ({ limit, offset }) => ({
+      items: offset ? [{ ...reconciliation, id: 99, account_label: "第二页账户" }] : Array.from({ length: 10 }, (_, index) => ({ ...reconciliation, id: index + 1 })),
+      total: 11, limit, offset,
+    }));
+    renderLight(<FundsPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("tab", { name: "押金" }));
+    await screen.findAllByText("#99");
+    const next = document.querySelector(".ant-pagination-next");
+    expect(next).not.toBeNull();
+    await ui.click(next!);
+    expect(await screen.findByText("#888")).toBeInTheDocument();
+    await ui.click(screen.getByRole("tab", { name: "对账" }));
+    await screen.findAllByText("第一页账户");
+    const reconciliationNext = screen.getByRole("tabpanel").querySelector(".ant-pagination-next");
+    expect(reconciliationNext).not.toBeNull();
+    await ui.click(reconciliationNext!);
+    expect(await screen.findByText("第二页账户")).toBeInTheDocument();
+  });
   it.each(["新增", "编辑", "删除"])("工作室收支%s后刷新资金明细和账户余额", async (action) => {
     let changed = false;
     vi.mocked(optionSetsApi.get).mockImplementation(async (code) => ({ code, options: code === "STUDIO_EXPENSE_ITEM" ? [{ value: "房租", label: "房租" }] : code === "BUSINESS_PERIOD" ? [{ value: "start_day", label: "16" }] : [] }) as never);
@@ -787,11 +843,12 @@ describe("FundsPage：资金流水", () => {
     await ui.click(screen.getByRole("button", { name: "上期" }));
     const previous = previousReportPeriod();
     await ui.type(screen.getByLabelText("流水搜索"), "SELL");
+    await ui.click(screen.getByRole("button", { name: "最旧在前" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "导出" })).toBeEnabled());
     expect(screen.getByRole("button", { name: "导出" })).toHaveClass("ui-export-button");
     await ui.click(screen.getByRole("button", { name: "导出" }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.exportCsv)).toHaveBeenCalledWith(
-      expect.objectContaining({ keyword: "SELL", occurred_from: previous.from, occurred_to: previous.to }),
+      expect.objectContaining({ keyword: "SELL", occurred_from: previous.from, occurred_to: previous.to, sort_desc: false }),
     ));
   });
 

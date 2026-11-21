@@ -17,8 +17,6 @@ const FLOW_DIRECTION_OPTIONS = [
 /** 资金流水查询域：筛选、服务端汇总、导出和列表状态集中在这里。 */
 export function useCashflowResources(active: boolean, periodState: PeriodState) {
   const [cashflowSortDesc, setCashflowSortDesc] = useState(true);
-  const cashflowSortRef = useRef(cashflowSortDesc);
-  cashflowSortRef.current = cashflowSortDesc;
   const [cashflows, setCashflows] = useState<Cashflow[]>([]);
   const [cashflowTotal, setCashflowTotal] = useState(0);
   const [cashflowTotals, setCashflowTotals] = useState({ income: "0.00", expense: "0.00" });
@@ -49,22 +47,19 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     setPaging({ filterKey, page: pageSize === cashflowPageSize ? page : 1, pageSize });
   };
 
-  const cashflowFromRef = useRef(cashflowFrom);
-  cashflowFromRef.current = cashflowFrom;
-  const cashflowToRef = useRef(cashflowTo);
-  cashflowToRef.current = cashflowTo;
-  const cashflowPoolIdRef = useRef(cashflowPoolId);
-  cashflowPoolIdRef.current = cashflowPoolId;
-  const cashflowDirectionRef = useRef(cashflowDirection);
-  cashflowDirectionRef.current = cashflowDirection;
-  const cashflowLedgerTypeRef = useRef(cashflowLedgerType);
-  cashflowLedgerTypeRef.current = cashflowLedgerType;
-  const cashflowAttributeRef = useRef(cashflowAttribute);
-  cashflowAttributeRef.current = cashflowAttribute;
-  const cashflowCategoryRef = useRef(cashflowCategory);
-  cashflowCategoryRef.current = cashflowCategory;
-  const cashflowKeywordRef = useRef(cashflowKeyword);
-  cashflowKeywordRef.current = cashflowKeyword;
+  const filters = {
+    occurred_from: cashflowFrom || undefined,
+    occurred_to: cashflowTo || undefined,
+    pool_id: cashflowPoolId,
+    direction: cashflowDirection || undefined,
+    ledger_type: cashflowLedgerType || undefined,
+    accounting_attribute: cashflowAttribute || undefined,
+    category: cashflowCategory.trim() || undefined,
+    keyword: cashflowKeyword.trim() || undefined,
+    sort_desc: cashflowSortDesc,
+  };
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
   const cashflowListRequestRef = useRef(0);
 
   const fetchCashflows = useCallback(async () => {
@@ -75,15 +70,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     const requestedPage = pagingRef.current;
     try {
       const result = await cashflowsApi.list({
-        occurred_from: cashflowFromRef.current || undefined,
-        occurred_to: cashflowToRef.current || undefined,
-        pool_id: cashflowPoolIdRef.current ?? undefined,
-        direction: cashflowDirectionRef.current || undefined,
-        ledger_type: cashflowLedgerTypeRef.current || undefined,
-        accounting_attribute: cashflowAttributeRef.current || undefined,
-        category: cashflowCategoryRef.current.trim() || undefined,
-        keyword: cashflowKeywordRef.current.trim() || undefined,
-        sort_desc: cashflowSortRef.current,
+        ...filtersRef.current,
         limit: requestedPage.pageSize,
         offset: (requestedPage.page - 1) * requestedPage.pageSize,
       });
@@ -149,16 +136,7 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
     setCashflowExporting(true);
     try {
       downloadBlob(
-        await cashflowsApi.exportCsv({
-          occurred_from: cashflowFromRef.current || undefined,
-          occurred_to: cashflowToRef.current || undefined,
-          pool_id: cashflowPoolIdRef.current ?? undefined,
-          direction: cashflowDirectionRef.current || undefined,
-          ledger_type: cashflowLedgerTypeRef.current || undefined,
-          accounting_attribute: cashflowAttributeRef.current || undefined,
-          category: cashflowCategoryRef.current.trim() || undefined,
-          keyword: cashflowKeywordRef.current.trim() || undefined,
-        }),
+        await cashflowsApi.exportCsv(filtersRef.current),
         `资金流水-${today()}.csv`,
       );
     } catch (err) {

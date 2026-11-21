@@ -99,12 +99,13 @@ export function DepositSection({ ctrl }: { ctrl: FundsPageController }) {
       <DataTable<Deposit>
         columns={arrangeDepositColumns(depositColumns)}
         rows={depositsUnavailable ? [] : deposits}
-        page={1}
-        pageSize={10}
-        total={depositsUnavailable ? 0 : deposits.length}
+        controlledPaging
+        page={ctrl.depositsPaging.page}
+        pageSize={ctrl.depositsPaging.pageSize}
+        total={depositsUnavailable ? 0 : ctrl.depositsPaging.total}
         emptyText={depositsError ? "押金数据不可用，请点击重新加载" : "暂无押金占用"}
         loading={depositsLoading}
-        onPageChange={() => undefined}
+        onPageChange={ctrl.setDepositsPage}
       />
     </Card>
   );

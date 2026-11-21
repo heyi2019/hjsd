@@ -198,7 +198,9 @@ describe("StudioExpensePanel：工作室支出", () => {
     await screen.findByText("房租");
 
     expect(screen.getByRole("button", { name: /记一笔/ })).toBeInTheDocument();
-    expect(document.querySelector(".studio-expense-filters")?.querySelector("button")).toBeNull();
+    const filters = document.querySelector<HTMLElement>(".studio-expense-filters");
+    expect(filters).not.toBeNull();
+    expect(within(filters!).queryByRole("button", { name: /记一笔/ })).not.toBeInTheDocument();
   });
 
   it("工作室支出筛选区不显示查询按钮", async () => {

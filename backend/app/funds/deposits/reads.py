@@ -20,17 +20,21 @@ def list_deposits(
     pool_id: int | None = None,
     pool_ids: Iterable[int] | None = None,
     user: CurrentUser | None = None,
-) -> list[Deposit]:
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[Deposit] | tuple[list[Deposit], int]:
     stmt = select(Deposit)
     if pool_id is not None:
         if not _can_see_pool(user, pool_id):
-            return []
+            return ([], 0) if limit is not None else []
         stmt = stmt.where(Deposit.pool_id == pool_id)
     elif pool_ids is not None:
         stmt = stmt.where(Deposit.pool_id.in_(_visible_pool_ids(user, pool_ids)))
     elif not _is_scope_all(user):
         stmt = stmt.where(Deposit.pool_id.in_(sorted(user.pool_ids)))  # type: ignore[union-attr]
-    return list(session.scalars(stmt.order_by(Deposit.id)).all())
+    total = (session.scalar(select(func.count()).select_from(stmt.subquery())) or 0) if limit is not None else None
+    items = list(session.scalars(stmt.order_by(Deposit.id).limit(limit).offset(offset)).all())
+    return (items, total) if limit is not None else items
 
 
 def deposit_held_total(

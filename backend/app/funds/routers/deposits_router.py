@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.schemas import PageOut
 from app.core.errors import NotFound
 from app.core.security import (
     PERM_DEPOSIT_POST,
@@ -33,6 +34,20 @@ from ..router_output import _actor, _cashflow_out, _deposit_out
 router = APIRouter(tags=["商户押金"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
+
+@router.get("/deposits/page", response_model=PageOut[schemas.DepositOut])
+def page_deposits(
+    pool_id: int | None = Query(default=None),
+    limit: int = Query(default=10, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_access,
+) -> PageOut[schemas.DepositOut]:
+    items, total = finance_list_deposits(db, pool_id=pool_id, user=user, limit=limit, offset=offset)
+    operators = list_operation_operators_bulk(db, entity_type="deposit", entity_ids=[item.id for item in items])
+    rows = [_deposit_out(item, db, operation_operators=operators.get(str(item.id), [])) for item in items]
+    return PageOut(items=rows, total=total, limit=limit, offset=offset)
+
 
 @router.get("/deposits", response_model=list[schemas.DepositOut])
 def list_deposits(

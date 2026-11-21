@@ -47,6 +47,18 @@ post_rebate = require_permissions(PERM_ORDER_EVENT_POST)
 CASHFLOW_EXPORT_BATCH_SIZE = 2000
 
 
+def _cashflow_filters(values: dict, *, pool_ids: list[int] | None = None) -> dict:
+    """列表、合计和导出使用同一套过滤字段及标准化规则。"""
+    keys = ("pool_id", "order_id", "direction", "occurred_from", "occurred_to",
+            "ledger_type", "accounting_attribute", "category", "created_by", "keyword", "user")
+    filters = {key: values[key] for key in keys}
+    for key in ("ledger_type", "accounting_attribute", "category"):
+        value = filters[key]
+        filters[key] = value.strip().upper() if value else None
+    filters["pool_ids"] = pool_ids
+    return filters
+
+
 @router.get("/cashflows/studio-summary", response_model=schemas.StudioSummaryOut)
 def studio_summary(
     pool_ids: str | None = Query(
@@ -125,22 +137,7 @@ def list_cashflows(
             return empty
         pool_ids = sorted(user.pool_ids)
 
-    filters = {
-        "pool_id": pool_id,
-        "pool_ids": pool_ids,
-        "order_id": order_id,
-        "direction": direction,
-        "occurred_from": occurred_from,
-        "occurred_to": occurred_to,
-        "ledger_type": ledger_type.strip().upper() if ledger_type else None,
-        "accounting_attribute": (
-            accounting_attribute.strip().upper() if accounting_attribute else None
-        ),
-        "category": category.strip().upper() if category else None,
-        "created_by": created_by,
-        "keyword": keyword,
-        "user": user,
-    }
+    filters = _cashflow_filters(locals(), pool_ids=pool_ids)
     items, total = finance_list_cashflows(db, limit=limit, offset=offset, sort_desc=sort_desc, **filters)
     # 合计与明细同条件、同源：前端不再对当页求和，超 limit 也不会少算。
     total_in, total_out = cashflow_totals(db, **filters)
@@ -175,21 +172,7 @@ def list_cashflow_totals(
         if not user.pool_ids:
             return schemas.CashflowTotalsOut()
         pool_ids = sorted(user.pool_ids)
-    total_in, total_out = cashflow_totals(
-        db,
-        pool_id=pool_id,
-        pool_ids=pool_ids,
-        order_id=order_id,
-        direction=direction,
-        occurred_from=occurred_from,
-        occurred_to=occurred_to,
-        ledger_type=ledger_type.strip().upper() if ledger_type else None,
-        accounting_attribute=accounting_attribute.strip().upper() if accounting_attribute else None,
-        category=category.strip().upper() if category else None,
-        created_by=created_by,
-        keyword=keyword,
-        user=user,
-    )
+    total_in, total_out = cashflow_totals(db, **_cashflow_filters(locals(), pool_ids=pool_ids))
     return schemas.CashflowTotalsOut(total_in=total_in, total_out=total_out)
 
 
@@ -205,6 +188,7 @@ def export_cashflows_csv(
     category: str | None = Query(default=None),
     created_by: str | None = Query(default=None),
     keyword: str | None = Query(default=None),
+    sort_desc: bool = Query(default=True),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> Response:
@@ -212,25 +196,13 @@ def export_cashflows_csv(
         user.can_see_pool(pool_id) if pool_id is not None
         else user.is_admin or user.owner_scope == "ALL" or bool(user.pool_ids)
     )
-    filters = {
-        "pool_id": pool_id,
-        "order_id": order_id,
-        "direction": direction,
-        "occurred_from": occurred_from,
-        "occurred_to": occurred_to,
-        "ledger_type": ledger_type.strip().upper() if ledger_type else None,
-        "accounting_attribute": accounting_attribute.strip().upper() if accounting_attribute else None,
-        "category": category.strip().upper() if category else None,
-        "created_by": created_by,
-        "keyword": keyword,
-        "user": user,
-    }
+    filters = _cashflow_filters(locals())
     output = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
     offset = 0
     try:
         while True:
             items, total = finance_list_cashflows(
-                db, limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, **filters,
+                db, limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, sort_desc=sort_desc, **filters,
             ) if can_read else ([], 0)
             rows = [item.model_dump() for item in _cashflow_outputs(db, items)]
             pool_ids = {row["pool_id"] for row in rows}

@@ -217,11 +217,13 @@ def list_reconciliations(
     pool_id: int | None = None,
     pool_ids: Iterable[int] | None = None,
     user: CurrentUser | None = None,
-) -> list[Reconciliation]:
+    limit: int | None = None,
+    offset: int = 0,
+) -> list[Reconciliation] | tuple[list[Reconciliation], int]:
     stmt = select(Reconciliation)
     if pool_id is not None:
         if user is not None and not user.can_see_pool(pool_id):
-            return []
+            return ([], 0) if limit is not None else []
         stmt = stmt.where(Reconciliation.pool_id == pool_id)
     elif pool_ids is not None:
         visible_pool_ids = list(pool_ids)
@@ -230,13 +232,11 @@ def list_reconciliations(
         stmt = stmt.where(Reconciliation.pool_id.in_(visible_pool_ids))
     elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
         stmt = stmt.where(Reconciliation.pool_id.in_(sorted(user.pool_ids)))
-    return list(
-        session.scalars(
-            stmt.order_by(
-                Reconciliation.reconciled_on.desc(), Reconciliation.id.desc()
-            )
-        ).all()
-    )
+    total = (session.scalar(select(func.count()).select_from(stmt.subquery())) or 0) if limit is not None else None
+    items = list(session.scalars(
+        stmt.order_by(Reconciliation.reconciled_on.desc(), Reconciliation.id.desc()).limit(limit).offset(offset)
+    ).all())
+    return (items, total) if limit is not None else items
 
 
 def resolve_reconciliation(

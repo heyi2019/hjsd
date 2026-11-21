@@ -65,6 +65,15 @@ const cashflows = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(depositsApi.page).mockImplementation(async ({ limit, offset }) => {
+    const items = await depositsApi.list();
+    return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
+  });
+  vi.mocked(reconciliationsApi.page).mockImplementation(async ({ limit, offset }) => {
+    const items = await reconciliationsApi.list();
+    return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
+  });
+
   vi.mocked(listColumnsApi.all).mockResolvedValue([]);
   vi.mocked(poolsApi.list).mockResolvedValue(pools);
   // 余额与汇总一次批量取回（服务端 Decimal 聚合），合计按两池同额计。

@@ -69,6 +69,13 @@ it("HS 费用卡片：保留主金额、资金账户和支出入口", () => {
   expect(screen.getByText("资金账户", { exact: true })).toBeInTheDocument();
 });
 
+it("回收资金明细的大额支出合计保留分位", async () => {
+  renderLight(<Form initialValues={{ recovery_price: "9999999999999999.98", expense_items: [{ amount: "0.01" }] }}>
+    <FieldConfigContext.Provider value={{}}><RecoveryFeeSection pools={pools} /></FieldConfigContext.Provider>
+  </Form>);
+  expect(await screen.findByText("9,999,999,999,999,999.99")).toBeInTheDocument();
+});
+
 it("HS 费用卡片：增加支出入口锚定在蓝色主金额卡片内", () => {
   renderHs({});
   const card = document.querySelector(".finance-card-with-expense-action");

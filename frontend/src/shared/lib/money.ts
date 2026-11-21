@@ -32,7 +32,23 @@ export function sumCents(values: Array<unknown>): number {
   }, 0);
 }
 
-/** 多笔金额（元）求和，返回 2 位小数字符串。 */
+/** 多笔金额（元）求和，返回 2 位小数字符串；字符串金额不经过浮点数。 */
 export function sumMoney(values: Array<unknown>): string {
-  return fromCents(sumCents(values));
+  const total = values.reduce<bigint>((sum, value) => {
+    if (typeof value !== "string" && typeof value !== "number") return sum;
+    const match = String(value).trim().match(/^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))$/);
+    if (!match) {
+      const cents = toCents(value);
+      return Number.isSafeInteger(cents) ? sum + BigInt(cents) : sum;
+    }
+    const fraction = match[3] ?? match[4] ?? "";
+    let cents = BigInt(match[2] ?? "0") * 100n + BigInt((fraction + "00").slice(0, 2));
+    const roundUp = match[1] === "-"
+      ? fraction[2] > "5" || (fraction[2] === "5" && /[1-9]/.test(fraction.slice(3)))
+      : fraction[2] >= "5";
+    if (roundUp) cents += 1n;
+    return sum + (match[1] === "-" ? -cents : cents);
+  }, 0n);
+  const absolute = total < 0n ? -total : total;
+  return `${total < 0n ? "-" : ""}${absolute / 100n}.${String(absolute % 100n).padStart(2, "0")}`;
 }

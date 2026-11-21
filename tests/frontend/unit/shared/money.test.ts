@@ -27,6 +27,11 @@ describe("shared/lib/money：前端金额一律按整数分运算", () => {
     expect(sumCents(["8888.88", "0.01", "0.01"])).toBe(888890);
   });
 
+  it("大额输入和支出合计保留分位精度", () => {
+    expect(sumMoney(["9999999999999999.98", "0.01"])).toBe("9999999999999999.99");
+    expect(sumMoney(["90071992547409.91", "0.01"])).toBe("90071992547409.92");
+  });
+
   it("sumCents：空值与非法值按 0 计（表单里空着等于没填）", () => {
     expect(sumMoney([null, undefined, "", "abc", "10"])).toBe("10.00");
     expect(sumMoney([])).toBe("0.00");

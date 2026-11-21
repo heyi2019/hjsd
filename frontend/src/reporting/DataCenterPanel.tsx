@@ -28,6 +28,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
   const summary = summaryReport.data;
 
   const orderCardsUnavailable = summary === null;
+  const unavailableValue = loading ? "加载中" : loadError ? "不可用" : "—";
   const openOrders = (inProgress = false) => {
     const params = new URLSearchParams();
     if (from) params.set("trade_date_from", from);
@@ -47,14 +48,14 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       <EntryRow>
         <EntryCard
           title="订单总数"
-          value={summary === null ? "不可用" : String(summary.order_count)}
+          value={summary === null ? unavailableValue : String(summary.order_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
           onClick={() => openOrders()}
         />
         <EntryCard
           title="进行中"
-          value={summary === null ? "不可用" : String(summary.active_order_count)}
+          value={summary === null ? unavailableValue : String(summary.active_order_count)}
           description="点击进入业务中心 · 订单台账"
           disabled={orderCardsUnavailable}
           onClick={() => openOrders(true)}

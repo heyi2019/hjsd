@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
+import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { antdRangeValues, setAntdDateRange } from "@fixtures/antdRange";
@@ -75,6 +76,17 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
+  it("数据中心加载中不显示数据不可用，失败后才显示不可用", async () => {
+    let fail!: (reason: Error) => void;
+    vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((_resolve, reject) => { fail = reject; }));
+    renderLight(<DataCenterPanel />, { user: "admin" });
+    const card = screen.getByRole("button", { name: /订单总数/ });
+    expect(card).toHaveTextContent("加载中");
+    expect(card).toHaveAttribute("aria-disabled", "true");
+    await act(async () => fail(new Error("数据加载失败")));
+    await waitFor(() => expect(card).toHaveTextContent("不可用"));
+  });
+
   it("切换日期后旧报表请求晚返回时不会覆盖新结果", async () => {
     let finishOld!: (value: string) => void;
     let finishNew!: (value: string) => void;

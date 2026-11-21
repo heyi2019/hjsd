@@ -13,6 +13,7 @@ import {
 import { CfgItem, CustomFieldSections, FieldConfigScope } from "../ConfigurableField";
 import { money } from "../../shared/lib/format";
 import { compareMoney } from "../../shared/lib/money";
+import { moneyRules } from "../../shared/lib/validators";
 import { ResponsibleEmployeeSelect } from "../ResponsibleEmployeeSelect";
 
 export type InventoryCancellationOffset = {
@@ -120,6 +121,7 @@ export function InventoryCancellationDialog<T extends InventoryCancellationValue
               initialValue={props.amount}
               rules={[
                 { required: true, message: `请输入${amountLabel}` },
+                ...moneyRules(amountLabel),
                 { validator: async (_, value) => {
                   const amount = String(value ?? "");
                   const positive = compareMoney(amount, "0");

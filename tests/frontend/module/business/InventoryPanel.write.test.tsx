@@ -681,6 +681,19 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.getByTestId("action-error")).toHaveTextContent("无错误");
   });
 
+  it("库存退款金额拒绝超过两位小数", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: accounts[0], orders: [{ order_id: 21, events: [{ id: 101, event_type: "BUY", amount: "100.00", cancellable_amount: "100.00", portion: "PRINCIPAL", is_posted: true }] }] } as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "取消" }));
+    const modal = await screen.findByRole("dialog", { name: /取消入库登记/ });
+    fireEvent.change(within(modal).getByLabelText("退回金额"), { target: { value: "1.234" } });
+    await ui.type(within(modal).getByLabelText("取消原因"), "测试退款");
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    expect(await within(modal).findByText("退回金额必须是数字，最多两位小数")).toBeInTheDocument();
+    expect(ordersApi.inventoryOffsale).not.toHaveBeenCalled();
+  });
+
   it("库存退款大额超过剩余一分时提示并阻止提交", async () => {
     const amount = "9999999999999999.98";
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: accounts[0], orders: [{ order_id: 21, events: [{ id: 101, event_type: "BUY", amount, cancellable_amount: amount, portion: "PRINCIPAL", is_posted: true }] }] } as never);

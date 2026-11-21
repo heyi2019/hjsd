@@ -26,9 +26,9 @@ from app.settings.lists.file_response import CSV_MEDIA_TYPE, XLSX_MEDIA_TYPE, fi
 from app.settings.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
 from app.business.queries import list_orders as orders_list_orders
 from app.business.router_output import (
-    _order_detail_output,
     _order_list_payload,
 )
+from app.business.router_outputs.detail import _order_details_output
 from app.business.export_fields import (
     CASHFLOW_EXPORT_COLUMNS,
     DETAIL_COLUMNS_MOVED_TO_SHEETS,
@@ -109,8 +109,9 @@ def export_orders_csv(
         **_detail_value_labels(db),
     }
     names = user_name_map(db)
-    for row, order in zip(rows, orders, strict=True):
-        detail = _order_detail_output(db, order, _user).model_dump(mode="json")
+    details = _order_details_output(db, orders, _user)
+    for row, order, detail_output in zip(rows, orders, details, strict=True):
+        detail = detail_output.model_dump(mode="json")
         row.update(_order_detail_export_fields(detail, value_labels, names))
         # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
         row["party"] = " · ".join(
@@ -201,8 +202,9 @@ def export_orders_xlsx(
     cashflow_rows: list[dict[str, object]] = []
     rebate_rows: list[dict[str, object]] = []
     pool_names = _pool_name_map(db)
-    for row, order in zip(rows, orders, strict=True):
-        detail = _order_detail_output(db, order, _user).model_dump(mode="json")
+    details = _order_details_output(db, orders, _user)
+    for row, order, detail_output in zip(rows, orders, details, strict=True):
+        detail = detail_output.model_dump(mode="json")
         order_no = row.get("order_no")
         detail_rows.append(
             {"order_no": order_no, **_order_detail_export_fields(detail, value_labels, names)}

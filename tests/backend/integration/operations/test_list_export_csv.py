@@ -12,7 +12,8 @@ import io
 from datetime import date
 
 import openpyxl
-from sqlalchemy import select
+import pytest
+from sqlalchemy import event as sqlalchemy_event, select
 
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
@@ -83,6 +84,31 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
     assert "游戏/产品类型" in header
     assert "操作" not in header  # UI 列不导出
     assert "HS9801" in body  # 明细行带订单号
+
+
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_orders_export_batches_detail_queries(seeded_client, headers, seeded_db, extension):
+    for i in range(5):
+        _seed_order(seeded_db, order_no=f"HS-BATCH-{i}")
+    statements = []
+
+    def capture(_conn, _cursor, statement, _params, _context, _many):
+        sql = " ".join(statement.lower().split())
+        if sql.startswith("select") and any(f"from {name}" in sql for name in ("order_events", "cashflows", "rebate_records", "installments", "attachments", "audit_logs")):
+            statements.append(sql)
+
+    sqlalchemy_event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        response = seeded_client.get(f"/api/orders/export.{extension}", headers=headers)
+    finally:
+        sqlalchemy_event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+    assert response.status_code == 200, response.text
+    if extension == "csv":
+        assert all(f"HS-BATCH-{i}" in response.text for i in range(5))
+    else:
+        values = list(openpyxl.load_workbook(io.BytesIO(response.content), read_only=True).worksheets[0].values)
+        assert all(any(f"HS-BATCH-{i}" in row for row in values) for i in range(5))
+    assert len(statements) <= 12
 
 
 def test_orders_export_mine_only_includes_my_orders(seeded_client, headers, seeded_db):

@@ -16,7 +16,9 @@ from app.funds.installments import create as inst_create
 from app.funds.rebates import create_rebate
 from app.business.create import create_order
 from app.business.events import post_event
-from app.domain.trade import Cashflow
+from app.business.router_outputs.detail import _order_detail_output, _order_details_output
+from app.domain.trade import Cashflow, Installment, InstallmentSchedule
+from app.domain.attachments import Attachment
 
 D = date(2026, 10, 4)
 
@@ -51,6 +53,23 @@ def _scoped_user() -> CurrentUser:
 
 
 class TestOrdersApi:
+
+    def test_batch_details_match_individual_detail_with_and_without_finance_permission(self, seeded_db):
+        first, second = _order(seeded_db), _order(seeded_db)
+        post_event(seeded_db, first.id, event_type="BUY", amount="100.00", occurred_on=D, actor="pytest", operator_user_ids=[9])
+        post_event(seeded_db, second.id, event_type="BUY", amount="200.00", occurred_on=D, actor="pytest", operator_user_ids=[1])
+        installment = Installment(inst_no="PARITY-INSTALLMENT", order_id=first.id, contract_type="STOCK_SALE", periods=1, created_by="pytest", updated_by="pytest")
+        seeded_db.add(installment)
+        seeded_db.flush()
+        seeded_db.add(InstallmentSchedule(installment_id=installment.id, period_no=1, due_on=D))
+        seeded_db.add(Attachment(attachment_no="PARITY-ATTACH", entity_type="order", entity_id=second.order_no,
+                                 file_name="a.png", storage_key="parity-test", content_type="image/png", size_bytes=1, sha256="a" * 64))
+        seeded_db.flush()
+        for roles in (["ADMIN"], ["EMPLOYEE"], ["VIEWER"]):
+            user = CurrentUser.build(id=1, username="pytest", roles=roles)
+            expected = [_order_detail_output(seeded_db, order, user).model_dump(mode="json") for order in (first, second)]
+            actual = [item.model_dump(mode="json") for item in _order_details_output(seeded_db, [first, second], user)]
+            assert actual == expected
 
     def test_order_role_payload_requires_the_matching_participant_id(
         self, seeded_client, headers

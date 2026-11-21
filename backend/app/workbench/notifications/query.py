@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.domain.notifications import Notification
-from app.dashboard.notifications.service import INVENTORY_AGING, PROFIT_ALLOCATED, PROFIT_PENDING
+from app.workbench.notifications.service import INVENTORY_AGING, PROFIT_ALLOCATED, PROFIT_PENDING
 from app.core.security import CurrentUser, PERM_FINANCE_READ, PERM_ORDER_CREATE
 from app.domain.trade import Account
 

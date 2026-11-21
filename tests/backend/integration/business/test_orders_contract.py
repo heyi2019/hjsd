@@ -89,7 +89,7 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
 
 
 def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, headers, monkeypatch):
-    from app.dashboard import service as dashboard_service
+    from app.workbench import service as dashboard_service
 
     settings = {"inventory_aging_days": 14, "profit_notifications_enabled": True, "overdue_installments_enabled": False}
     monkeypatch.setattr(dashboard_service, "_reminder_config", lambda db: settings)
@@ -117,7 +117,7 @@ def test_workbench_personal_earnings_uses_commission_profit_base(
     seeded_client, headers, monkeypatch
 ):
     monkeypatch.setattr(
-        "app.dashboard.service.personal_commission_total",
+        "app.workbench.service.personal_commission_total",
         lambda *args, **kwargs: Decimal("123.45"),
     )
 
@@ -134,13 +134,13 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, 
         def today(cls):
             return cls(2026, 11, 20)
 
-    monkeypatch.setattr("app.dashboard.service.date", FixedDate)
+    monkeypatch.setattr("app.workbench.service.date", FixedDate)
 
     def fake_order_status_counts(session, **kwargs):
         calls.append(kwargs)
         return {"COMPLETED": 1}
 
-    monkeypatch.setattr("app.dashboard.service.order_status_counts", fake_order_status_counts)
+    monkeypatch.setattr("app.workbench.service.order_status_counts", fake_order_status_counts)
 
     response = seeded_client.get("/api/dashboard/summary", headers=headers)
 

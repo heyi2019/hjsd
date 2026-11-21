@@ -24,7 +24,7 @@ from app.settings.field_definitions.router import router as foundation_router
 from app.business.stocks.router import router as stocks_router
 from app.settings.audit.router import router as audit_router
 from app.funds.profit_allocation.router import router as profit_allocation_router
-from app.dashboard.notifications.router import router as notifications_router
+from app.workbench.notifications.router import router as notifications_router
 from app.operations.router import router as reporting_router
 from app.funds.router import router as finance_router
 from app.funds.installments.router import router as installments_router
@@ -35,7 +35,7 @@ from app.customers.router import router as parties_router
 from app.settings.auth.router import router as auth_router, admin_router as users_router, teams_router
 from app.settings.attachments.router import router as attachments_router
 from app.settings.options.router import router as options_router
-from app.dashboard.router import router as workbench_router
+from app.workbench.router import router as workbench_router
 from app.settings.lists.router import router as lists_router
 
 

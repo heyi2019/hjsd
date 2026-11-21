@@ -133,7 +133,7 @@ def set_allocations(
             order.form_extra = original_form_extra
         raise
     # 分润配置保存完成 → 通知利润接收人（幂等，重复保存不重复打扰）。
-    from app.dashboard.notifications.triggers import notify_profit_recipients
+    from app.workbench.notifications.triggers import notify_profit_recipients
 
     notify_profit_recipients(session, order, actor=actor,
                              new_revision=pending_sale or previous_allocations != snapshot(result))

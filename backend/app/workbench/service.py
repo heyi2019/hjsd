@@ -15,7 +15,7 @@ from app.core.security import (
 )
 from app.domain.options import OptionSet
 from app.domain.enums import InstallmentContractType
-from app.dashboard.notifications import service as notification_service
+from app.workbench.notifications import service as notification_service
 from app.business.queries import order_customer_count, order_status_counts
 from app.operations.r3_commission import personal_commission_total
 from app.business.stocks.inventory import dashboard_inventory_summary

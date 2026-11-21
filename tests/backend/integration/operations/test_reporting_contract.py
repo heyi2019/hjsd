@@ -199,7 +199,7 @@ def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db
 class TestR3Commission:
     def test_personal_commission_total_reuses_rounding_without_detail_queries(self, seeded_db):
         from sqlalchemy import event
-        from app.dashboard.service import dashboard_summary
+        from app.workbench.service import dashboard_summary
 
         for sale in ("100.01", "90.00"):
             order = _order(seeded_db)
@@ -304,7 +304,7 @@ class TestR3Commission:
         assert data["total"]["profit_base"] == Decimal("90.00")
         assert r3_commission_reconciliation(seeded_db, user=user)["total"]["order_count"] == 0
         assert r3_commission_reconciliation(seeded_db, user=user, mine=True, user_id=8)["total"]["order_count"] == 0
-        from app.dashboard.service import dashboard_summary
+        from app.workbench.service import dashboard_summary
         assert dashboard_summary(seeded_db, user=user)["personal_earnings"] == Decimal("90.00")
 
     def test_all_people_commission_can_be_filtered_back_to_one_person(self, seeded_db, seeded_client, headers):

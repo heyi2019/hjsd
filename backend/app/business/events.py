@@ -330,7 +330,7 @@ def post_event(
 
     # 每次售出完成后提醒本次 SELL 执行人检查分润。
     if event_type == EventType.SELL.value and not installment_sale:
-        from app.dashboard.notifications.triggers import notify_seller_to_allocate
+        from app.workbench.notifications.triggers import notify_seller_to_allocate
 
         notify_seller_to_allocate(session, order, event, actor=actor, new_sale=True)
 

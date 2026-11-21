@@ -19,9 +19,9 @@ from app.domain.notifications import Notification
 from app.domain.trade import Order
 from app.domain.users import User
 from app.shared.scope import owner_scope_filter
-from app.dashboard.notifications.profit_details import profit_details_for_notifications
-from app.dashboard.notifications import query, schemas, service
-from app.dashboard.notifications.inventory import sync_inventory_notifications_for_user
+from app.workbench.notifications.profit_details import profit_details_for_notifications
+from app.workbench.notifications import query, schemas, service
+from app.workbench.notifications.inventory import sync_inventory_notifications_for_user
 
 router = APIRouter(tags=["SYS-01-04 系统通知"])
 

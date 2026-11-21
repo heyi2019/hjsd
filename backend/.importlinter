@@ -9,7 +9,7 @@
 #                  表单作用域清单）。依赖 L0。
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
-#   L3  业务域     与前端 6 导航 key 一一对应：dashboard（含 notifications）/ business（含
+#   L3  业务域     与前端 6 导航 key 一一对应：workbench（含 notifications）/ business（含
 #                  stocks）/ customers / funds（含 installments、profit_allocation）/
 #                  operations / settings（含 field_definitions、options、lists、auth、
 #                  audit、attachments）。依赖 L0+L1+L2。
@@ -57,7 +57,7 @@
 # ─────────────────────────────────────────────────────────────────────────
 # 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
 #
-#   operations / dashboard → 各业务域（只读聚合层）
+#   operations / workbench → 各业务域（只读聚合层）
 #   funds（含两子模块）    → business
 #   business → customers / settings
 #
@@ -88,7 +88,7 @@ forbidden_modules =
     app.funds
     app.settings
     app.operations
-    app.dashboard
+    app.workbench
 
 # ── 业务域之间的既成禁止边（2026-11-18 P0-A 归位成果，保持不放松）────────
 [importlinter:contract:business-not-import-funds]

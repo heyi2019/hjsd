@@ -13,7 +13,7 @@ from app.domain.trade import Account, Order
 from app.domain.enums import SequenceKey
 from app.shared.numbering import allocate_numbers
 from app.domain.users import User
-from app.dashboard.notifications import service
+from app.workbench.notifications import service
 
 
 def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int:
@@ -21,7 +21,7 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
         return 0
     from app.business.stocks.inventory import _inventory_ledger_scope
-    from app.dashboard.service import _reminder_config
+    from app.workbench.service import _reminder_config
 
     # 与同用户同步/已读操作串行，同时允许通知插入时的外键 KEY SHARE，避免与编号锁死锁。
     db.scalar(select(User.id).where(User.id == user.id).with_for_update(key_share=True))

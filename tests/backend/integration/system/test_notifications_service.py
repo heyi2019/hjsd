@@ -17,9 +17,9 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
-from app.dashboard.notifications import query as notification_query
-from app.dashboard.notifications import triggers
-from app.dashboard.notifications import service as notification_service
+from app.workbench.notifications import query as notification_query
+from app.workbench.notifications import triggers
+from app.workbench.notifications import service as notification_service
 from app.business.create import create_order
 from app.business.events import post_event
 from app.funds.profit_allocation import service as policy_allocations
@@ -173,7 +173,7 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
 
 
 def test_inventory_sync_batches_numbers_and_is_idempotent(seeded_db):
-    from app.dashboard.notifications.inventory import sync_inventory_notifications_for_user
+    from app.workbench.notifications.inventory import sync_inventory_notifications_for_user
     for i in range(4):
         order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1, account_snapshot={"game_account": f"aging-batch-{i}"})
         _buy(seeded_db, order)
@@ -200,7 +200,7 @@ def test_inventory_sync_batches_numbers_and_is_idempotent(seeded_db):
 def test_inventory_sync_and_profit_notice_do_not_deadlock(v1_engine):
     from uuid import uuid4
     from sqlalchemy import create_engine, text
-    from app.dashboard.notifications.inventory import sync_inventory_notifications_for_user
+    from app.workbench.notifications.inventory import sync_inventory_notifications_for_user
     from app.domain.base import Base
     from app.settings.field_definitions.seeds import seed_foundation
 
@@ -322,8 +322,8 @@ def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_clie
 
 
 def test_concurrent_read_returns_position_after_previous_commit(seeded_db):
-    from app.dashboard.notifications.router import mark_notifications_read
-    from app.dashboard.notifications.schemas import NotificationReadRequest
+    from app.workbench.notifications.router import mark_notifications_read
+    from app.workbench.notifications.schemas import NotificationReadRequest
 
     older = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="old")
     newer = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="new")

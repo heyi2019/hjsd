@@ -180,7 +180,7 @@ def test_new_unlisting_requires_valid_active_listing_and_stores_event_id(seeded_
 
 
 def test_detail_unlisting_normalizes_platform_before_saving(seeded_client, seeded_db, headers):
-    from app.business.listing_state import active_listings
+    from app.business.shared.listing_state import active_listings
     account = create_account(seeded_db, game_account="whitespace-platform-unlisting", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
@@ -227,7 +227,7 @@ def test_edit_listing_cannot_change_to_another_active_platform(seeded_client, se
 
 @pytest.mark.parametrize("new_type", ["DESCRIPTION", "UNLIST", None])
 def test_existing_listing_operation_type_cannot_be_changed(seeded_client, seeded_db, headers, new_type):
-    from app.business.listing_state import active_listings
+    from app.business.shared.listing_state import active_listings
     account = create_account(seeded_db, game_account="edit-operation-type", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
@@ -256,7 +256,7 @@ def test_linked_unlisting_target_cannot_be_changed(seeded_client, seeded_db, hea
 
 
 def test_unlinked_unlisting_cannot_gain_listing_association(seeded_client, seeded_db, headers):
-    from app.business.listing_state import active_listings
+    from app.business.shared.listing_state import active_listings
     account = create_account(seeded_db, game_account="edit-unlinked-unlisting", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": ["平台甲"]})
@@ -1077,7 +1077,7 @@ def test_edit_single_listed_platform_updates_linked_unlist(seeded_client, seeded
 
 def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, seeded_db, headers):
     from app.business.shared.operations.consignment import platform_unlist_consignment
-    from app.business.listing_state import active_listings
+    from app.business.shared.listing_state import active_listings
     account = create_account(seeded_db, game_account="edit-whitespace-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     listing, _ = post_event(seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", occurred_on=date(2026, 10, 1), actor="pytest", form_extra={"consignment_platforms": [" 旧平台 "]})

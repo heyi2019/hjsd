@@ -24,8 +24,8 @@ from app.domain.enums import (
 )
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from .._common import _non_negative_money, _positive_money
-from ..listing_state import active_listings, validate_unique_platforms
-from ..cancellation_model import opposite_cancellation_direction as _opposite_direction
+from ..shared.listing_state import active_listings, validate_unique_platforms
+from ..shared.cancellation_model import opposite_cancellation_direction as _opposite_direction
 from .events_helpers import (
     _assert_event_context,
     _auto_link_recovered_installment_sale,

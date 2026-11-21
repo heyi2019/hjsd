@@ -17,7 +17,7 @@ from app.domain.enums import AccountStatus
 from app.domain.trade import Account
 from app.domain.notifications import Notification
 from app.domain.users import User
-from app.business.cancellation_model import cancel_order
+from app.business.shared.cancellation_model import cancel_order
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.orders.queries import list_orders, order_status_counts

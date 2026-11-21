@@ -143,7 +143,7 @@ class TestEventRules:
         assert event.amount == 0
 
     def test_cancelled_order_rejects_new_event(self, seeded_db):
-        from app.business.cancellation_model import cancel_order
+        from app.business.shared.cancellation_model import cancel_order
 
         order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
         cancel_order(seeded_db, order.id, actor="pytest", reason="撤销空订单")

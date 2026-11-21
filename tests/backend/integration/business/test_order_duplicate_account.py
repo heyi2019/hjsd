@@ -11,7 +11,7 @@ import pytest
 
 from app.core.errors import ErrorCode, Validation
 from app.domain.trade import Account
-from app.business.cancellation_model import cancel_order
+from app.business.shared.cancellation_model import cancel_order
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 

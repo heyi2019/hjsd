@@ -16,7 +16,7 @@ from app.domain.foundation import Pool
 from app.settings.field_definitions.order_types import get_order_type_by_code
 from app.settings.field_definitions.pools import require_default_pool
 from .._common import _required_text
-from ..cancellation_model import (
+from ..shared.cancellation_model import (
     apply_cancellation_account_effect,
     get_cancellation_offset,
 )

@@ -12,7 +12,7 @@ from app.business.shared.operations.consignment import register_consignment
 from app.business.orders import events
 from app.business.orders.create import create_order
 from app.business.orders.events import _opposite_direction, post_event
-from app.business.listing_state import active_listings
+from app.business.shared.listing_state import active_listings
 
 
 TODAY = date(2026, 10, 17)

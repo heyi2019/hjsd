@@ -15,7 +15,7 @@ from app.core.errors import Conflict, ErrorCode, NotFound
 from app.core.money import to_money
 from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, ORDER_TRANSITIONS, transition
-from app.business.cancellation_model import apply_installment_cancellation_account_effect
+from app.business.shared.cancellation_model import apply_installment_cancellation_account_effect
 from app.domain.enums import AuditAction, InstallmentStatus
 from app.domain.trade import Order, Cashflow
 from .._shared import _merge_form_extra, _required_text, get_installment

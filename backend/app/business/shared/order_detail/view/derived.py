@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from app.core.money import to_money
-from app.business.delivery_fields import SELL_DELIVERY_FIELDS
+from app.business.shared.delivery_fields import SELL_DELIVERY_FIELDS
 
 from .schemas import (
     DetailExecutionRowOut,

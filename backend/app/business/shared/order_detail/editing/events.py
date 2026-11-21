@@ -15,7 +15,7 @@ from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.shared.order_access import get_order
 from app.business.orders.events import post_event
-from app.business.listing_state import active_listings, validate_unique_platforms
+from app.business.shared.listing_state import active_listings, validate_unique_platforms
 
 from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem
 

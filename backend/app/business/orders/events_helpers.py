@@ -31,12 +31,12 @@ from app.shared.operation_operators import validate_optional_operator_ids
 from app.shared.form_field_rules import validate_form_extra
 
 from .._common import _required_bool
-from ..cancellation_model import (
+from ..shared.cancellation_model import (
     get_cancellation_offset as _get_offset_event,
     opposite_cancellation_direction as _opposite_direction,
 )
 from .events_rules import _assert_pool_active, _resolve_pool
-from ..delivery_fields import DELIVERY_FIELDS
+from ..shared.delivery_fields import DELIVERY_FIELDS
 
 def _auto_link_recovered_installment_sale(
     session: Session,

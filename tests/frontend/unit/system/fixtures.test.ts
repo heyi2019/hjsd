@@ -118,7 +118,6 @@ describe("测试夹具隔离", () => {
       personal_earnings: "3.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },
-      alerts: [],
     });
     expect(customerSummary({ month_count: 2 })).toEqual({ month_count: 2, today_count: 0 });
     expect(customerDetail({ id: 1, customer_no: "CUS-0001", display_name: "张三", status: "ACTIVE" })).toEqual({

@@ -28,6 +28,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
+  vi.mocked(notificationsApi.syncReminders).mockResolvedValue({ created: 0 });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
 });
 
@@ -42,7 +43,7 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("没有订单权限时个人订单和客户数显示占位且不可跳转", async () => {
     const navigate = vi.fn();
-    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null, alerts: [{ type: "pending_profit", message: "分润待配置 7 条" }] }));
+    vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null }));
     renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
     await screen.findByRole("tab", { name: "最新消息" });
     await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalled());

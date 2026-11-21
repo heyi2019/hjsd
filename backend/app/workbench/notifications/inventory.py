@@ -21,11 +21,11 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
         return 0
     from app.business.stocks.inventory import _inventory_ledger_scope
-    from app.workbench.service import _reminder_config
+    from app.workbench.reminder_config import read_reminder_config
 
     # 与同用户同步/已读操作串行，同时允许通知插入时的外键 KEY SHARE，避免与编号锁死锁。
     db.scalar(select(User.id).where(User.id == user.id).with_for_update(key_share=True))
-    days = _reminder_config(db)["inventory_aging_days"]
+    days = read_reminder_config(db)["inventory_aging_days"]
     cutoff = datetime.combine(date.today() - timedelta(days=days), time.min)
     already_notified = exists(select(Notification.id).where(
         Notification.recipient_user_id == user.id,

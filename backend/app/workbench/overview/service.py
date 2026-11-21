@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import (
@@ -13,9 +12,8 @@ from app.core.security import (
     PERM_REPORT_READ,
     CurrentUser,
 )
-from app.domain.options import OptionSet
 from app.domain.enums import InstallmentContractType
-from app.workbench.notifications import service as notification_service
+from app.workbench.reminder_config import read_reminder_config
 from app.business.queries import order_customer_count, order_status_counts
 from app.operations.r3_commission import personal_commission_total
 from app.business.stocks.inventory import dashboard_inventory_summary
@@ -23,60 +21,12 @@ from app.funds.installments import queries as installment_queries
 from app.shared.business_period import business_period, period_start_day
 from app.core.errors import Validation
 
-REMINDER_CODE = "BUSINESS_OVERVIEW_REMINDERS"
-DEFAULT_REMINDERS = {
-    "inventory_aging_days": 7,
-    "profit_notifications_enabled": True,
-    "overdue_installments_enabled": True,
-}
-
-
-def _reminder_config(session: Session) -> dict[str, Any]:
-    row = session.scalar(select(OptionSet).where(OptionSet.code == REMINDER_CODE))
-    values = {item.get("value"): item.get("label") for item in (row.options if row else [])}
-    try:
-        aging_days = int(values.get("inventory_aging_days", DEFAULT_REMINDERS["inventory_aging_days"]))
-        if aging_days <= 0:
-            raise ValueError
-    except (TypeError, ValueError):
-        aging_days = DEFAULT_REMINDERS["inventory_aging_days"]
-
-    def enabled(key: str) -> bool:
-        value = values.get(key)
-        return DEFAULT_REMINDERS[key] if value is None else str(value).lower() not in {"0", "false", "off", "disabled"}
-
-    return {
-        "inventory_aging_days": aging_days,
-        "profit_notifications_enabled": enabled("profit_notifications_enabled"),
-        "overdue_installments_enabled": enabled("overdue_installments_enabled"),
-    }
-
-
-def _alerts(reminders: dict[str, Any], inventory: dict[str, Any] | None,
-            installments: dict[str, Any] | None, notifications: dict[str, int]) -> list[dict[str, str]]:
-    alerts: list[dict[str, str]] = []
-    aging = inventory["aging_count"] if inventory else 0
-    if aging:
-        alerts.append({"type": "inventory_aging", "message": f"库存订单入库超过 {reminders['inventory_aging_days']} 天 {aging} 个"})
-    if reminders["profit_notifications_enabled"]:
-        pending = notifications["pending_profit_count"]
-        allocated = notifications["allocated_profit_count"]
-        if pending:
-            alerts.append({"type": "pending_profit", "message": f"分润待配置 {pending} 条"})
-        if allocated:
-            alerts.append({"type": "allocated_profit", "message": f"获得分润通知 {allocated} 条"})
-    overdue = installments["overdue_count"] if installments else 0
-    if reminders["overdue_installments_enabled"] and overdue:
-        alerts.append({"type": "overdue_installment", "message": f"逾期合约 {overdue} 个"})
-    return alerts
-
-
 def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None, all_time: bool = False) -> dict[str, Any]:
     today = date.today()
     if (all_time and (from_date is not None or to_date is not None)) or (from_date is None) != (to_date is None) or (from_date is not None and to_date is not None and from_date > to_date):
         raise Validation("请选择有效的开始和结束日期")
     period_from, period_to = (None, None) if all_time else (from_date, to_date) if from_date is not None else business_period(today, period_start_day(session))
-    reminders = _reminder_config(session)
+    reminders = read_reminder_config(session)
     can_orders = user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ))
     can_reports = user.has(PERM_REPORT_READ)
 
@@ -131,7 +81,6 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
             user=user,
         )
 
-    notifications = notification_service.unread_profit_counts(session, recipient_user_id=user.id)
     return {
         "period": None if all_time else {"from": period_from, "to": period_to},
         "orders": orders,
@@ -140,5 +89,4 @@ def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | 
         "personal_earnings": personal_earnings,
         "inventory": inventory,
         "installments": installments,
-        "alerts": _alerts(reminders, inventory, installments, notifications),
     }

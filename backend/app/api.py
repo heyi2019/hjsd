@@ -35,7 +35,7 @@ from app.customers.router import router as parties_router
 from app.settings.auth.router import router as auth_router, admin_router as users_router, teams_router
 from app.settings.attachments.router import router as attachments_router
 from app.settings.options.router import router as options_router
-from app.workbench.router import router as workbench_router
+from app.workbench.overview.router import router as workbench_router
 from app.settings.lists.router import router as lists_router
 
 

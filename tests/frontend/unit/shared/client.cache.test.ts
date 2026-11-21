@@ -73,6 +73,7 @@ vi.mock("axios", () => {
 import axios from "axios";
 import { clearApiCache, setDevUser } from "@/shared/api/client";
 import { reportsApi } from "@/shared/api/reports.api";
+import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import "@/shared/state/referenceDataEvents";
 
@@ -115,7 +116,11 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     }
     const summary = await notificationsApi.profitDetails([1]);
     expect(await notificationsApi.profitDetails([1])).not.toBe(summary);
-    expect((axios as any).__getCallCount()).toBe(12);
+    const firstDashboard = await dashboardApi.summary(params);
+    expect(await dashboardApi.summary(params)).not.toBe(firstDashboard);
+    const [firstConcurrent, secondConcurrent] = await Promise.all([dashboardApi.summary(params), dashboardApi.summary(params)]);
+    expect(firstConcurrent).toBe(secondConcurrent);
+    expect((axios as any).__getCallCount()).toBe(15);
   });
 
   it("切换操作用户后不会复用上一用户的缓存", async () => {

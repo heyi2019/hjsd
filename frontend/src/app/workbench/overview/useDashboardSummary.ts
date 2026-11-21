@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { normalizeError } from "../shared/api/client";
-import { dashboardApi, type DashboardSummary } from "../shared/api/dashboard.api";
+import { normalizeError } from "../../../shared/api/client";
+import { dashboardApi, type DashboardSummary } from "../../../shared/api/dashboard.api";
 
 export function useDashboardSummary(active: boolean, selectedPeriod: { from: string; to: string } | null) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
@@ -36,5 +36,5 @@ export function useDashboardSummary(active: boolean, selectedPeriod: { from: str
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, selectedPeriod === null, selectedPeriod?.from, selectedPeriod?.to]);
 
-  return { summary, error, loading, alerts: summary?.alerts ?? [], loadSummary };
+  return { summary, error, loading, loadSummary };
 }

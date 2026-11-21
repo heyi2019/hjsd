@@ -10,22 +10,32 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
 from app.domain.notifications import Notification
-from app.workbench.notifications.service import INVENTORY_AGING, PROFIT_ALLOCATED, PROFIT_PENDING
+from app.workbench.notifications.service import INSTALLMENT_OVERDUE, INVENTORY_AGING, PROFIT_ALLOCATED, PROFIT_PENDING
 from app.core.security import CurrentUser, PERM_FINANCE_READ, PERM_ORDER_CREATE
-from app.domain.trade import Account
+from app.domain.trade import Account, Installment, InstallmentSchedule, Order
+from app.shared.scope import owner_scope_filter
 
 
 def visibility_filter(session: Session, user: CurrentUser):
-    """历史库存提醒仍需满足当前账号的数据范围。"""
-    other = Notification.notification_type != INVENTORY_AGING
+    """历史库存和合约提醒始终遵守当前用户的数据范围。"""
+    other = Notification.notification_type.notin_((INVENTORY_AGING, INSTALLMENT_OVERDUE))
     if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
         return other
     from app.business.stocks._common import scope_filter
-    visible = select(cast(Account.id, String))
-    scope = scope_filter(session, user)
-    if scope is not None:
-        visible = visible.where(scope)
-    return or_(other, and_(Notification.entity_type == "account", Notification.entity_id.in_(visible)))
+    visible_accounts = select(cast(Account.id, String))
+    account_scope = scope_filter(session, user)
+    if account_scope is not None:
+        visible_accounts = visible_accounts.where(account_scope)
+    visible_schedules = select(cast(InstallmentSchedule.id, String)).join(
+        Installment, Installment.id == InstallmentSchedule.installment_id,
+    ).join(Order, Order.id == Installment.order_id)
+    order_scope = owner_scope_filter(Order.owner_id, user, session)
+    if order_scope is not None:
+        visible_schedules = visible_schedules.where(order_scope)
+    return or_(other,
+        and_(Notification.notification_type == INVENTORY_AGING, Notification.entity_type == "account", Notification.entity_id.in_(visible_accounts)),
+        and_(Notification.notification_type == INSTALLMENT_OVERDUE, Notification.entity_type == "installment_schedule", Notification.entity_id.in_(visible_schedules)),
+    )
 
 
 def _notification_query(recipient_user_id: int, *, category: str | None = None, notification_type: str | None = None, entity_type: str | None = None):
@@ -34,6 +44,8 @@ def _notification_query(recipient_user_id: int, *, category: str | None = None, 
         stmt = stmt.where(Notification.notification_type.in_([PROFIT_PENDING, PROFIT_ALLOCATED]))
     elif category == "inventory":
         stmt = stmt.where(Notification.notification_type == INVENTORY_AGING)
+    elif category == "contract":
+        stmt = stmt.where(Notification.notification_type == INSTALLMENT_OVERDUE)
     if notification_type:
         stmt = stmt.where(Notification.notification_type == notification_type)
     if entity_type:

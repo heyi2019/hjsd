@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.domain.enums import OrderStatus
 from app.domain.trade import Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
+from app.workbench.reminder_config import read_reminder_config
 
 from .service import PROFIT_ALLOCATED, PROFIT_PENDING, create_notification, ensure_notification
 
@@ -34,7 +35,7 @@ def notify_seller_to_allocate(
     收件人优先取事件上的多操作人 `operator_user_ids`（前端售出表单的「操作人」），
     为空时回退到事件登记人 actor 对应的用户 id。
     """
-    if order.status != OrderStatus.COMPLETED.value:
+    if order.status != OrderStatus.COMPLETED.value or not read_reminder_config(session)["profit_notifications_enabled"]:
         return 0
     candidates = {
         int(uid)
@@ -74,7 +75,7 @@ def notify_profit_recipients(session: Session, order: Order, *, actor: str, new_
 
     仅在订单已 COMPLETED 时发送；分润配置入口本身也只接受已售订单。
     """
-    if order.status != OrderStatus.COMPLETED.value:
+    if order.status != OrderStatus.COMPLETED.value or not read_reminder_config(session)["profit_notifications_enabled"]:
         return 0
     rows = session.scalars(
         select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id)

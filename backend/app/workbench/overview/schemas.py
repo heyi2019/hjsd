@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,11 +29,6 @@ class DashboardInstallmentsOut(BaseModel):
     overdue_count: int
 
 
-class DashboardAlertOut(BaseModel):
-    type: Literal["inventory_aging", "pending_profit", "allocated_profit", "overdue_installment"]
-    message: str
-
-
 class DashboardSummaryOut(BaseModel):
     period: DashboardPeriodOut | None
     orders: DashboardOrdersOut | None
@@ -43,4 +37,3 @@ class DashboardSummaryOut(BaseModel):
     personal_earnings: Decimal | None
     inventory: DashboardInventoryOut | None
     installments: DashboardInstallmentsOut | None
-    alerts: list[DashboardAlertOut]

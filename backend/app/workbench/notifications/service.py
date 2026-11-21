@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -14,6 +14,7 @@ from app.domain.notifications import Notification
 PROFIT_PENDING = "PROFIT_PENDING"
 PROFIT_ALLOCATED = "PROFIT_ALLOCATED"
 INVENTORY_AGING = "INVENTORY_AGING"
+INSTALLMENT_OVERDUE = "INSTALLMENT_OVERDUE"
 
 
 def create_notification(
@@ -85,25 +86,6 @@ def ensure_notification(
     )
 
 
-def unread_profit_counts(session: Session, *, recipient_user_id: int) -> dict[str, int]:
-    """按分润阶段统计用户未读通知，不加载通知明细。"""
-    rows = session.execute(
-        select(Notification.notification_type, func.count(Notification.id))
-        .where(
-            Notification.recipient_user_id == recipient_user_id,
-            Notification.read_at.is_(None),
-            Notification.entity_type == "order",
-            Notification.notification_type.in_((PROFIT_PENDING, PROFIT_ALLOCATED)),
-        )
-        .group_by(Notification.notification_type)
-    ).all()
-    counts = {notification_type: int(total) for notification_type, total in rows}
-    return {
-        "pending_profit_count": counts.get(PROFIT_PENDING, 0),
-        "allocated_profit_count": counts.get(PROFIT_ALLOCATED, 0),
-    }
-
-
 def mark_read_batch(
     session: Session,
     notification_ids: list[int],
@@ -125,10 +107,10 @@ def mark_read_batch(
 
 __all__ = [
     "INVENTORY_AGING",
+    "INSTALLMENT_OVERDUE",
     "PROFIT_ALLOCATED",
     "PROFIT_PENDING",
     "create_notification",
     "ensure_notification",
     "mark_read_batch",
-    "unread_profit_counts",
 ]

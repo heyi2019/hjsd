@@ -1,9 +1,4 @@
-import { api } from "./client";
-
-export interface DashboardAlert {
-  type: "inventory_aging" | "pending_profit" | "allocated_profit" | "overdue_installment";
-  message: string;
-}
+import { api, type CacheAwareRequestConfig } from "./client";
 
 export interface DashboardSummary {
   period: { from: string; to: string } | null;
@@ -13,9 +8,8 @@ export interface DashboardSummary {
   personal_earnings: string | null;
   inventory: { account_count: number; aging_count: number; overdue_count: number } | null;
   installments: { total_count: number; overdue_count: number } | null;
-  alerts: DashboardAlert[];
 }
 
 export const dashboardApi = {
-  summary: (period: { from: string; to: string } | null) => api.get<DashboardSummary>("/dashboard/summary", { params: period === null ? { all_time: true } : period }).then((response) => response.data),
+  summary: (period: { from: string; to: string } | null) => api.get<DashboardSummary>("/dashboard/summary", { params: period === null ? { all_time: true } : period, refreshCache: true } as CacheAwareRequestConfig).then((response) => response.data),
 };

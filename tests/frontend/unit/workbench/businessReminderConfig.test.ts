@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_BUSINESS_REMINDER_CONFIG, parseBusinessReminderConfig } from "@/app/businessReminderConfig";
+import { DEFAULT_BUSINESS_REMINDER_CONFIG, parseBusinessReminderConfig } from "@/app/workbench/overview/businessReminderConfig";
 
 describe("业务提醒配置", () => {
   it("未配置时使用默认规则", () => {
@@ -16,6 +16,7 @@ describe("业务提醒配置", () => {
       profitNotificationsEnabled: false,
       overdueInstallmentsEnabled: true,
     });
+    expect(() => parseBusinessReminderConfig([{ value: "profit_notifications_enabled", label: "invalid" }])).toThrow("业务提醒开关配置无效");
   });
 
 });

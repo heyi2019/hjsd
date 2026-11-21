@@ -104,7 +104,6 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
 def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seeded_db):
     rows = [_make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=str(i)) for i in range(3)]
     other = _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", entity_type="other")
-    assert notification_service.unread_profit_counts(seeded_db, recipient_user_id=2)["allocated_profit_count"] == 3
     seeded_db.delete(other)
     seeded_db.flush()
     first, cursor = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="sale", cursor=None, limit=2)
@@ -154,14 +153,14 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     account = seeded_db.get(Account, visible.account_id)
     account.inventory_entry_at = datetime(2020, 1, 1)
     seeded_db.flush()
-    sync = seeded_client.post("/api/notifications/sync-inventory", headers=auth)
+    sync = seeded_client.post("/api/notifications/sync-reminders", headers=auth)
     assert sync.status_code == 200, sync.text
     rows = seeded_client.get("/api/notifications/inbox", params={"category": "inventory"}, headers=auth).json()["items"]
     item = next(row for row in rows if row["entity_id"] == str(account.id))
     assert visible.order_no in item["message"]
     assert "成本 500.00" in item["message"]
     assert seeded_client.post("/api/notifications/read", json={"ids": [item["id"]], "category": "inventory"}, headers=auth).status_code == 200
-    assert seeded_client.post("/api/notifications/sync-inventory", headers=auth).status_code == 200
+    assert seeded_client.post("/api/notifications/sync-reminders", headers=auth).status_code == 200
     read_rows = seeded_client.get("/api/notifications/inbox", params={"category": "inventory"}, headers=auth).json()["items"]
     assert len([row for row in read_rows if row["entity_id"] == str(account.id) and row["read_at"] is not None]) == 1
     visible.owner_id = 1

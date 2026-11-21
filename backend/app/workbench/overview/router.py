@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import CurrentUser
 from app.settings.auth.session import get_current_user
-from app.workbench import schemas, service
+from app.workbench.overview import schemas, service
 
 router = APIRouter(tags=["工作台"])
 

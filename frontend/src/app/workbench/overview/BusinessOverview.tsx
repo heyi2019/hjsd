@@ -1,4 +1,4 @@
-import { StatRow } from "../shared/ui";
+import { StatRow } from "../../../shared/ui";
 
 export function BusinessOverview({
   orderCount,

@@ -1,4 +1,4 @@
-import type { OptionItem } from "../shared/api/types/common";
+import type { OptionItem } from "../../../shared/api/types/common";
 
 export const BUSINESS_REMINDER_CONFIG_CODE = "BUSINESS_OVERVIEW_REMINDERS";
 
@@ -21,7 +21,8 @@ function positiveInteger(value: string | undefined, fallback: number): number {
 
 function enabled(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined) return fallback;
-  return !["0", "false", "off", "disabled"].includes(value.toLowerCase());
+  if (value !== "0" && value !== "1") throw new Error("业务提醒开关配置无效");
+  return value === "1";
 }
 
 export function parseBusinessReminderConfig(options?: OptionItem[] | null): BusinessReminderConfig {

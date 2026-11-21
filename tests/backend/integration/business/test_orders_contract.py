@@ -80,44 +80,18 @@ def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers)
         "personal_earnings",
         "inventory",
         "installments",
-        "alerts",
     }
     assert set(payload["period"]) == {"from", "to"}
-    assert isinstance(payload["alerts"], list)
     assert set(payload["orders"]) == {"total_count"}
     assert seeded_client.get("/api/stocks/dashboard-summary", headers=headers).status_code in {404, 405}
 
-
-def test_workbench_alerts_follow_backend_thresholds_and_switches(seeded_client, headers, monkeypatch):
-    from app.workbench import service as dashboard_service
-
-    settings = {"inventory_aging_days": 14, "profit_notifications_enabled": True, "overdue_installments_enabled": False}
-    monkeypatch.setattr(dashboard_service, "_reminder_config", lambda db: settings)
-    monkeypatch.setattr(dashboard_service, "dashboard_inventory_summary", lambda *args, **kwargs: {"account_count": 2, "aging_count": 2, "overdue_count": 0})
-    monkeypatch.setattr(dashboard_service.installment_queries, "installment_totals", lambda *args, **kwargs: {"total_count": 3, "overdue_count": 3})
-    monkeypatch.setattr(dashboard_service.notification_service, "unread_profit_counts", lambda *args, **kwargs: {"pending_profit_count": 1, "allocated_profit_count": 2})
-
-    response = seeded_client.get("/api/dashboard/summary", headers=headers)
-    assert response.status_code == 200, response.text
-    assert response.json()["alerts"] == [
-        {"type": "inventory_aging", "message": "库存订单入库超过 14 天 2 个"},
-        {"type": "pending_profit", "message": "分润待配置 1 条"},
-        {"type": "allocated_profit", "message": "获得分润通知 2 条"},
-    ]
-    settings["profit_notifications_enabled"] = False
-    settings["overdue_installments_enabled"] = True
-    response = seeded_client.get("/api/dashboard/summary", headers=headers)
-    assert response.json()["alerts"] == [
-        {"type": "inventory_aging", "message": "库存订单入库超过 14 天 2 个"},
-        {"type": "overdue_installment", "message": "逾期合约 3 个"},
-    ]
 
 
 def test_workbench_personal_earnings_uses_commission_profit_base(
     seeded_client, headers, monkeypatch
 ):
     monkeypatch.setattr(
-        "app.workbench.service.personal_commission_total",
+        "app.workbench.overview.service.personal_commission_total",
         lambda *args, **kwargs: Decimal("123.45"),
     )
 
@@ -134,13 +108,13 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, 
         def today(cls):
             return cls(2026, 11, 20)
 
-    monkeypatch.setattr("app.workbench.service.date", FixedDate)
+    monkeypatch.setattr("app.workbench.overview.service.date", FixedDate)
 
     def fake_order_status_counts(session, **kwargs):
         calls.append(kwargs)
         return {"COMPLETED": 1}
 
-    monkeypatch.setattr("app.workbench.service.order_status_counts", fake_order_status_counts)
+    monkeypatch.setattr("app.workbench.overview.service.order_status_counts", fake_order_status_counts)
 
     response = seeded_client.get("/api/dashboard/summary", headers=headers)
 

@@ -9,7 +9,7 @@ import {
   DEFAULT_BUSINESS_REMINDER_CONFIG,
   parseBusinessReminderConfig,
   type BusinessReminderConfig,
-} from "../../app/businessReminderConfig";
+} from "../../app/workbench/overview/businessReminderConfig";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
@@ -54,7 +54,7 @@ export function BusinessReminderSettingsPanel() {
     <section className="business-reminder-settings">
       <ErrorBanner error={error} onRetry={() => void reloadSection()} retrying={loading} />
       <Typography.Paragraph type="secondary">
-        控制工作台业务总览中的提醒规则。库存提醒按入库天数计算，分润和逾期合约提醒可单独关闭。
+        控制工作台消息提醒：库存按入库天数提醒，分润和逾期合约提醒可分别开启。
       </Typography.Paragraph>
       <BusinessRegistrationForm
         layout="horizontal"

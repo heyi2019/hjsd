@@ -205,7 +205,6 @@ export function dashboardSummary(overrides: Partial<DashboardSummary> = {}): Das
     personal_earnings: "0.00",
     inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
     installments: { total_count: 0, overdue_count: 0 },
-    alerts: [],
     ...overrides,
   };
 }

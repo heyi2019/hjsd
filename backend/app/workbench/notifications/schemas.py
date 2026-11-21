@@ -45,7 +45,7 @@ class PendingProfitOrderOut(BaseModel):
 
 class NotificationReadRequest(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=10)
-    category: Literal["latest", "sale", "inventory"]
+    category: Literal["latest", "sale", "inventory", "contract"]
 
 
 class NotificationReadOut(BaseModel):

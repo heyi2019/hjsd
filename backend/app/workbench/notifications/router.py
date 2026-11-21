@@ -22,16 +22,19 @@ from app.shared.scope import owner_scope_filter
 from app.workbench.notifications.profit_details import profit_details_for_notifications
 from app.workbench.notifications import query, schemas, service
 from app.workbench.notifications.inventory import sync_inventory_notifications_for_user
+from app.workbench.notifications.installments import sync_overdue_installment_notifications_for_user
 
 router = APIRouter(tags=["SYS-01-04 系统通知"])
 
 
-@router.post("/notifications/sync-inventory")
-def sync_inventory_notifications(
+@router.post("/notifications/sync-reminders")
+def sync_reminders(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ) -> dict[str, int]:
-    return {"created": sync_inventory_notifications_for_user(db, user)}
+    created = sync_inventory_notifications_for_user(db, user)
+    created += sync_overdue_installment_notifications_for_user(db, user)
+    return {"created": created}
 
 @router.get("/notifications/pending-order", response_model=schemas.PendingProfitOrderOut)
 def pending_profit_order(
@@ -79,7 +82,7 @@ def profit_notification_details(
 
 @router.get("/notifications/inbox", response_model=schemas.NotificationInboxOut)
 def notification_inbox(
-    category: str = Query(default="latest", pattern="^(latest|sale|inventory)$"),
+    category: str = Query(default="latest", pattern="^(latest|sale|inventory|contract)$"),
     cursor: str | None = Query(default=None, max_length=1024),
     limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
@@ -97,14 +100,19 @@ def mark_notifications_read(
 ) -> schemas.NotificationReadOut:
     # 同一接收人的并发已读操作按事务排序，保证返回的位置包含先提交的消息。
     db.scalar(select(User.id).where(User.id == user.id).with_for_update())
+    visible_ids = list(db.scalars(select(Notification.id).where(
+        Notification.id.in_(payload.ids),
+        Notification.recipient_user_id == user.id,
+        query.visibility_filter(db, user),
+    )))
     ids = service.mark_read_batch(
         db,
-        payload.ids,
+        visible_ids,
         recipient_user_id=user.id,
         actor=user.username,
     )
     read_at, next_read_id = (None, None)
-    if len(ids) == 1 and payload.category in ("sale", "inventory"):
+    if len(ids) == 1 and payload.category in ("sale", "inventory", "contract"):
         read_at, next_read_id = query.read_position(db, user=user, category=payload.category, notification_id=ids[0])
     return schemas.NotificationReadOut(read_ids=ids, read_at=read_at, next_read_id=next_read_id)
 

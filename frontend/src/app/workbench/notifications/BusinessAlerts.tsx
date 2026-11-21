@@ -5,13 +5,13 @@ import { isProfitNotification, useWorkbenchMessages } from "./useWorkbenchMessag
 import "./messages.css";
 
 export function BusinessAlerts(props: Parameters<typeof useWorkbenchMessages>[0] & { onPartyNavigate?: (path: string) => void }) {
-  const { username, dataOwner, selected, setSelected, notifications, notificationDetails, pendingDetails, notificationError, inventorySyncError, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, failedDetails, detailsRetrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedInventory, openNotification, ordered } = useWorkbenchMessages(props);
+  const { username, dataOwner, selected, setSelected, notifications, notificationDetails, pendingDetails, notificationError, reminderSyncError, notificationLoading, category, setCategory, retryItem, setReload, retryReminders, failedDetails, detailsRetrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedReminders, openNotification, ordered } = useWorkbenchMessages(props);
   return (
     <section aria-label="我的消息" className="business-alerts--expanded">
       <Card className="glass" title="我的消息">
-        <Tabs activeKey={category} onChange={(value) => setCategory(value as "latest" | "sale" | "inventory")} items={[{ key: "latest", label: "最新消息" }, { key: "sale", label: "售出消息" }, { key: "inventory", label: "库存消息" }]} />
-        <div ref={scrollRef} className="business-alerts__scroll" onScroll={(event) => { const el = event.currentTarget; if (el.scrollTop <= 0 && refreshSyncedInventory()) return; if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) void loadMore(); }}>
-        {inventorySyncError && category !== "sale" ? <div><Typography.Text type="warning">库存消息刷新失败。</Typography.Text> <button type="button" onClick={retryInventory}>重试</button></div> : null}
+        <Tabs activeKey={category} onChange={(value) => setCategory(value as "latest" | "sale" | "inventory" | "contract")} items={[{ key: "latest", label: "最新消息" }, { key: "sale", label: "售出消息" }, { key: "inventory", label: "库存消息" }, { key: "contract", label: "合约消息" }]} />
+        <div ref={scrollRef} className="business-alerts__scroll" onScroll={(event) => { const el = event.currentTarget; if (el.scrollTop <= 0 && refreshSyncedReminders()) return; if (el.scrollHeight - el.scrollTop - el.clientHeight < 40) void loadMore(); }}>
+        {reminderSyncError && category !== "sale" ? <div><Typography.Text type="warning">提醒同步失败。</Typography.Text> <button type="button" onClick={retryReminders}>重试</button></div> : null}
         {notificationError ? <div><Typography.Text type="warning">{notificationError}</Typography.Text> <button type="button" onClick={() => { if (retryItem) void openNotification(retryItem); else if (notifications.length) void loadMore(); else setReload((n) => n + 1); }}>重试</button></div> : null}
         {failedDetails.length ? <div><Typography.Text type="warning">分润详情加载失败。</Typography.Text> <button type="button" disabled={detailsRetrying} onClick={() => void retryDetails()}>重试分润详情</button></div> : null}
         {ordered.length ? (

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { notificationsApi } from "../../../shared/api/notifications.api";
 import { useNotificationDetails } from "./useNotificationDetails";
-import { useInventoryNotificationSync } from "./useInventoryNotificationSync";
+import { useReminderSync } from "./useReminderSync";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { useSession } from "../../../shared/state/session";
 
@@ -18,7 +18,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
   const [notificationLoading, setNotificationLoading] = useState(true);
-  const [category, setCategory] = useState<"latest" | "sale" | "inventory">("latest");
+  const [category, setCategory] = useState<"latest" | "sale" | "inventory" | "contract">("latest");
   const [retryItem, setRetryItem] = useState<NotificationItem | null>(null);
   const [reload, setReload] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -26,7 +26,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   const detailState = useNotificationDetails((generation) => cursor.current.generation === generation);
   const scrollRef = useRef<HTMLDivElement>(null);
   const busy = useRef(new Set<number>());
-  const inventorySync = useInventoryNotificationSync({ active, username, category, selected, loading: notificationLoading, notificationCount: notifications.length, busy, scrollRef, onRefresh: () => setReload((n) => n + 1) });
+  const reminderSync = useReminderSync({ active, username, category, selected, loading: notificationLoading, notificationCount: notifications.length, busy, scrollRef, onRefresh: () => setReload((n) => n + 1) });
   const loadMore = async () => {
     const state = cursor.current;
     if (!active || state.loading || state.done) return;
@@ -63,7 +63,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     setHasMore(true);
     setNotificationLoading(true);
-    inventorySync.start();
+    reminderSync.start();
     cursor.current.loading = false;
     void loadMore();
     return () => { cursor.current.generation += 1; };
@@ -81,7 +81,7 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
     if (!active) return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "hidden" || notificationLoading || selected || busy.current.size || (scrollRef.current?.scrollTop ?? 0) > 0) return;
-      if (category !== "sale") inventorySync.invalidate();
+      if (category !== "sale") reminderSync.invalidate();
       setReload((n) => n + 1);
     }, 5 * 60_000);
     return () => window.clearInterval(timer);
@@ -126,6 +126,6 @@ export function useWorkbenchMessages({ onPendingProfitNotificationsClick, onProf
   };
   const ordered = dataOwner === username ? notifications : [];
   const retryDetails = () => detailState.retry(cursor.current.generation);
-  const retryInventory = inventorySync.retry;
-  return { username, dataOwner, selected, setSelected, notifications, notificationDetails: detailState.details, pendingDetails: detailState.pending, notificationError, inventorySyncError: inventorySync.error, notificationLoading, category, setCategory, retryItem, setReload, retryInventory, failedDetails: detailState.failed, detailsRetrying: detailState.retrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedInventory: inventorySync.refreshWhenSafe, openNotification, ordered };
+  const retryReminders = reminderSync.retry;
+  return { username, dataOwner, selected, setSelected, notifications, notificationDetails: detailState.details, pendingDetails: detailState.pending, notificationError, reminderSyncError: reminderSync.error, notificationLoading, category, setCategory, retryItem, setReload, retryReminders, failedDetails: detailState.failed, detailsRetrying: detailState.retrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedReminders: reminderSync.refreshWhenSafe, openNotification, ordered };
 }

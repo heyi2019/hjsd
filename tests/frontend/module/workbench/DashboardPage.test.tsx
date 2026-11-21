@@ -33,6 +33,7 @@ beforeEach(() => {
   seedOrderFormFields();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
+  vi.mocked(notificationsApi.syncReminders).mockResolvedValue({ created: 0 });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
   vi.mocked(notificationsApi.markReadBatch).mockImplementation(async (ids) => ({ read_ids: ids, read_at: "2026-11-21T10:00:00", next_read_id: null }));
 });
@@ -69,11 +70,6 @@ it("工作台展示业务总览指标和业务提醒", async () => {
       orders: { total_count: 2 },
       inventory: { account_count: 1, aging_count: 1, overdue_count: 1 },
       installments: { total_count: 1, overdue_count: 1 },
-      alerts: [
-        { type: "inventory_aging", message: "库存订单入库超过 7 天 1 个" },
-        { type: "pending_profit", message: "分润待配置 1 条" },
-        { type: "allocated_profit", message: "获得分润通知 1 条" },
-      ],
     }));
 
     renderLight(<DashboardPage />, { user: "admin" });
@@ -144,7 +140,6 @@ it("订单请求完成时不产生未包裹 act 的异步更新警告", async ()
       personal_earnings: "0.00",
       inventory: { account_count: 0, aging_count: 0, overdue_count: 0 },
       installments: { total_count: 0, overdue_count: 0 },
-      alerts: [],
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 

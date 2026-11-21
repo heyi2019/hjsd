@@ -5,7 +5,7 @@ import type { NotificationItem } from "../../../shared/api/types/common";
 type Options = {
   active: boolean;
   username: string;
-  category: "latest" | "sale" | "inventory";
+  category: "latest" | "sale" | "inventory" | "contract";
   selected: NotificationItem | null;
   loading: boolean;
   notificationCount: number;
@@ -14,8 +14,8 @@ type Options = {
   onRefresh: () => void;
 };
 
-/** 库存同步独立于消息列表；有新提醒时，在用户空闲后刷新列表。 */
-export function useInventoryNotificationSync(options: Options) {
+/** 提醒同步独立于消息列表；有新提醒时，在用户空闲后刷新列表。 */
+export function useReminderSync(options: Options) {
   const [error, setError] = useState(false);
   const request = useRef<Promise<{ created: number }> | null>(null);
   const needsRefresh = useRef(false);
@@ -41,7 +41,7 @@ export function useInventoryNotificationSync(options: Options) {
     setError(false);
     if (!request.current) {
       const owner = current.current.username;
-      const pending = notificationsApi.syncInventory().then((result) => {
+      const pending = notificationsApi.syncReminders().then((result) => {
         if (result.created > 0 && request.current === pending && current.current.active && current.current.username === owner) {
           needsRefresh.current = true;
           refreshWhenSafe();

@@ -77,7 +77,7 @@ describe("InventoryPanel：删除二次确认", () => {
   it("非管理员看不到删除键", async () => {
     renderLight(<InventoryPanel />, { user: "operator" });
 
-    await screen.findByPlaceholderText("搜索游戏账号/产品 / 游戏/产品类型 / 渠道区服");
+    await screen.findByRole("searchbox", { name: "搜索库存账号" });
     expect(screen.queryByRole("button", { name: "删除" })).toBeNull();
   });
 

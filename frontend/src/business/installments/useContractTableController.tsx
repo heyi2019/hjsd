@@ -1,16 +1,14 @@
-import { Form } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../../shared/api/installments.api";
-import type { Installment, InstallmentTotals, Schedule } from "../../shared/api/types/installments";
+import type { Installment, InstallmentTotals } from "../../shared/api/types/installments";
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
-import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
-import { useRequestSession } from "../../shared/hooks/useLatestRequest";
 import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { useSession } from "../../shared/state/session";
 import type { Permission } from "../../shared/state/session";
 import { useContractActions } from "./useContractActions";
+import { useContractModalState } from "./useContractModalState";
 import { buildContractColumns } from "./contractColumns";
 
 export function useContractTableController(params: { contractType: string; reloadKey: number; active?: boolean; dateRange?: [string, string] | null; status?: string }) {
@@ -30,54 +28,18 @@ export function useContractTableController(params: { contractType: string; reloa
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
-  const [payTarget, setPayTarget] = useState<Installment | null>(null);
-  const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
-  const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
-  const [resaleTarget, setResaleTarget] = useState<Installment | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
-  const [settleTarget, setSettleTarget] = useState<Installment | null>(null);
-  const [defaultTarget, setDefaultTarget] = useState<Installment | null>(null);
-  const [waiveTarget, setWaiveTarget] = useState<Schedule | null>(null);
-  const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
-  const actionSession = useRequestSession(JSON.stringify([
-    active, payTarget?.id, deliverTarget?.id, recoverTarget?.id, resaleTarget?.id,
-    cancelTarget?.id, settleTarget?.id, defaultTarget?.id, waiveTarget?.id, extendTarget?.id,
-  ]));
+  const modal = useContractModalState(active);
+  const {
+    payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
+    setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
+    payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm, write,
+  } = modal;
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [listError, setListError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [totalsLoading, setTotalsLoading] = useState(true);
   const [totalsError, setTotalsError] = useState<{ message: string; code?: string } | null>(null);
   const [exporting, setExporting] = useState(false);
-  // 弹窗不会同时打开，故全部写操作共用一个 pending/error 即可覆盖。
-  const write = useAsyncAction();
-
-  // P2-274：各业务弹窗共享同一份 write.error，上一操作的失败提示会残留到其它弹窗。
-  // 只要「某个业务弹窗由关到开」（含从 A 弹窗切到 B 弹窗）就清空错误态，保证每个弹窗起始干净。
-  // 注意：不能把 write 放进依赖——useAsyncAction 每次渲染返回新对象，一旦放入，失败提示被
-  // setError 写出后，同一次重渲染就会再次触发 effect 把 error 清掉，反而吞掉失败提示
-  // （回归测试 收款提交失败 / P2-274 会因此失败）。write.clearError 本身是稳定引用，可安全调用。
-  const prevTargetsRef = useRef<Record<string, unknown>>({});
-  useEffect(() => {
-    const targets: Record<string, unknown> = {
-      payTarget, deliverTarget, recoverTarget, resaleTarget,
-      cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
-    };
-    const openedNew = Object.keys(targets).some((k) => targets[k] && !prevTargetsRef.current[k]);
-    if (openedNew) write.clearError();
-    prevTargetsRef.current = targets;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget]);
-  const [payForm] = Form.useForm();
-  const [deliverForm] = Form.useForm();
-  const [recoverForm] = Form.useForm();
-  const [resaleForm] = Form.useForm();
-  const [cancelForm] = Form.useForm();
-  const [settleForm] = Form.useForm();
-  const [defaultForm] = Form.useForm();
-  const [waiveForm] = Form.useForm();
-  const [extendForm] = Form.useForm();
-
   // 筛选条件/reloadKey 变化会重新触发 load；用请求序号丢弃过期响应，避免旧请求
   // 后到覆盖新筛选的列表与合计（与 useLedgerList 同一范式）。
   const listSeqRef = useRef(0);
@@ -154,11 +116,8 @@ export function useContractTableController(params: { contractType: string; reloa
     submitExtend, updateOperationOperators,
   } = useContractActions({
     active,
-    actionSession,
-    payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
-    setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
-    payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
-    write, load, setError, setResaleOrders, setExporting,
+    modal,
+    load, setError, setResaleOrders, setExporting,
     filters: { contract_type: contractType, status: status || undefined, trade_date_from: dateFrom || undefined, trade_date_to: dateTo || undefined },
   });
 

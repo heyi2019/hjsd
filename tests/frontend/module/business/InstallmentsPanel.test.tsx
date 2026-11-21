@@ -897,6 +897,23 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       expect(within(openModal("分期收款")).getByLabelText("本次实收")).toHaveValue("30");
     });
 
+    it("同一收款弹窗切换合约时清除上一单的错误", async () => {
+      installmentListFixture.mockResolvedValue(withBackendActions([
+        { ...baseInstallment }, { ...baseInstallment, id: 2, inst_no: "HS0002-INS01" },
+      ]));
+      vi.mocked(installmentsApi.pay).mockRejectedValueOnce(new Error("上一单失败"));
+      renderLight(<InstallmentsPanel />, { user: "admin" });
+      const first = (await screen.findByText("HS0001-INS01")).closest("tr")!;
+      const second = screen.getByText("HS0002-INS01").closest("tr")!;
+      await ui.click(within(first).getByRole("button", { name: /登记收款/ }));
+      const modal = openModal("分期收款");
+      await ui.type(within(modal).getByLabelText("本次实收"), "50");
+      await ui.click(within(modal).getByRole("button", { name: /确认收款/ }));
+      await within(modal).findByText(/上一单失败/);
+      await ui.click(within(second).getByRole("button", { name: /登记收款/ }));
+      expect(within(modal).queryByText(/上一单失败/)).not.toBeInTheDocument();
+    });
+
     it("上一笔收款失败时不在新合约弹窗显示旧错误", async () => {
       installmentListFixture.mockResolvedValue(withBackendActions([
         { ...baseInstallment }, { ...baseInstallment, id: 2, inst_no: "HS0002-INS01" },

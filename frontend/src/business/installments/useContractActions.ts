@@ -1,62 +1,33 @@
 /** 分期合约的写操作与导出。 */
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import type { FormInstance } from "antd";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { installmentsApi, type InstallmentListParams } from "../../shared/api/installments.api";
 import { ordersApi } from "../../shared/api/orders.api";
-import type { Installment, Schedule } from "../../shared/api/types/installments";
+import type { Installment } from "../../shared/api/types/installments";
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
 import { today } from "../../shared/lib/format";
 import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
-import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
-import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
+import type { useContractModalState } from "./useContractModalState";
 
 export function useContractActions(params: {
   active: boolean;
-  actionSession: LatestRequest;
-  payTarget: Installment | null;
-  deliverTarget: Installment | null;
-  recoverTarget: Installment | null;
-  resaleTarget: Installment | null;
-  cancelTarget: Installment | null;
-  settleTarget: Installment | null;
-  defaultTarget: Installment | null;
-  waiveTarget: Schedule | null;
-  extendTarget: Schedule | null;
-  setPayTarget: Dispatch<SetStateAction<Installment | null>>;
-  setDeliverTarget: Dispatch<SetStateAction<Installment | null>>;
-  setRecoverTarget: Dispatch<SetStateAction<Installment | null>>;
-  setResaleTarget: Dispatch<SetStateAction<Installment | null>>;
-  setCancelTarget: Dispatch<SetStateAction<Installment | null>>;
-  setSettleTarget: Dispatch<SetStateAction<Installment | null>>;
-  setDefaultTarget: Dispatch<SetStateAction<Installment | null>>;
-  setWaiveTarget: Dispatch<SetStateAction<Schedule | null>>;
-  setExtendTarget: Dispatch<SetStateAction<Schedule | null>>;
-  payForm: FormInstance;
-  deliverForm: FormInstance;
-  recoverForm: FormInstance;
-  resaleForm: FormInstance;
-  cancelForm: FormInstance;
-  settleForm: FormInstance;
-  defaultForm: FormInstance;
-  waiveForm: FormInstance;
-  extendForm: FormInstance;
-  write: ReturnType<typeof useAsyncAction>;
+  modal: ReturnType<typeof useContractModalState>;
   load: () => Promise<void>;
   setError: Dispatch<SetStateAction<{ message: string; code?: string } | null>>;
   setResaleOrders: Dispatch<SetStateAction<Order[]>>;
   setExporting: Dispatch<SetStateAction<boolean>>;
   filters: InstallmentListParams;
 }) {
+  const { active, modal, load, setError, setResaleOrders, setExporting, filters } = params;
   const {
     payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
     payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
-    write, load, setError, setResaleOrders, setExporting, filters, active, actionSession,
-  } = params;
+    write, actionSession,
+  } = modal;
   const resaleRequest = useRef(0);
   useEffect(() => () => { resaleRequest.current += 1; }, [active]);
 

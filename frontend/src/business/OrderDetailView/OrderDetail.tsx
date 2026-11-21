@@ -48,6 +48,21 @@ function renderOrderParties(
   ))}</span>;
 }
 
+export function groupOperationEvents(events: AccountExecutionEvent[]): Record<string, AccountExecutionEvent[]> {
+  const entries = Object.entries(OPERATION_TYPE_BY_KEY);
+  const groups: Record<string, AccountExecutionEvent[]> = Object.fromEntries(entries.map(([key]) => [key, []]));
+  const keyByType = new Map(entries.map(([key, type]) => [type, key]));
+  for (const event of events) {
+    if (event.event_type !== "OPERATE" || !event.operation_type) continue;
+    const key = keyByType.get(event.operation_type);
+    if (key) groups[key].push(event);
+  }
+  for (const rows of Object.values(groups)) {
+    rows.sort((left, right) => String(right.occurred_at ?? "").localeCompare(String(left.occurred_at ?? "")));
+  }
+  return groups;
+}
+
 export function OrderDetail({
   row,
   detail,
@@ -165,19 +180,14 @@ export function OrderDetail({
     operatorUserIds: row.operator_user_ids,
     event: row.event_id == null ? undefined : eventById.get(row.event_id),
   })), [detailView, eventById]);
-  const operationRows = (detailView?.operation_rows ?? []).map((operation) => ({
+  const operationRows = useMemo(() => (detailView?.operation_rows ?? []).map((operation) => ({
     ...operation,
     event: operation.event_id == null ? undefined : eventById.get(operation.event_id),
-  }));
-  const operationEvents = useMemo(() => {
-    const events = (scopedDetail?.orders ?? []).flatMap((order) => order.events);
-    return Object.fromEntries(Object.entries(OPERATION_TYPE_BY_KEY).map(([key, operationType]) => [
-      key,
-      events
-        .filter((event) => event.event_type === "OPERATE" && event.operation_type === operationType)
-        .sort((left, right) => String(right.occurred_at ?? "").localeCompare(String(left.occurred_at ?? ""))),
-    ])) as Record<string, AccountExecutionEvent[]>;
-  }, [scopedDetail]);
+  })), [detailView, eventById]);
+  const operationEvents = useMemo(
+    () => groupOperationEvents((scopedDetail?.orders ?? []).flatMap((order) => order.events)),
+    [scopedDetail],
+  );
   const operationRow = (key: string) => operationRows.find((item) => item.key === key);
 
   const meta = useMemo<OrderDetailMeta>(() => ({

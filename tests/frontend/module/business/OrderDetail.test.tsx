@@ -3,9 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";
 import type { Account } from "@/shared/api/types/accounts";
-import { OrderDetail } from "@/business/OrderDetailView/OrderDetail";
+import { groupOperationEvents, OrderDetail } from "@/business/OrderDetailView/OrderDetail";
 import { OrderDetailImageGallery } from "@/business/OrderDetailView/OrderDetailImageGallery";
-import { buildOperationPlatformUsage, OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
+import { buildOperationPlatformUsage, buildUnlistingOptions, OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
 import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
 import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
@@ -136,6 +136,45 @@ describe("OrderDetail", () => {
     rerender(<OrderDetail row={account} loading={false} editing={account} saving={false} />);
     expect(screen.getByLabelText("编辑渠道区服")).toBeEnabled();
     expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
+  });
+
+  it("运营事件分组只读取一遍并按时间倒序保留同时间先后", () => {
+    let reads = 0;
+    const events = Array.from({ length: 100 }, (_, index) => ({
+      id: index, get event_type() { reads += 1; return "OPERATE"; },
+      operation_type: index % 2 ? "UNLIST" : "CONSIGNMENT", occurred_at: index < 4 ? "2026-01-01" : "2026-02-01",
+    })) as never;
+    const groups = groupOperationEvents(events);
+    expect(groups.consignment.slice(-2).map((event) => event.id)).toEqual([0, 2]);
+    expect(groups.unlist.slice(-2).map((event) => event.id)).toEqual([1, 3]);
+    expect(reads).toBeLessThanOrEqual(200);
+  });
+
+  it("下架候选保留原顺序和同编号首条匹配", () => {
+    const first = { eventId: 7, platform: "甲", listedAt: "10:00" };
+    const duplicate = { eventId: 7, platform: "甲", listedAt: "11:00" };
+    const missing = { eventId: undefined, platform: "乙", listedAt: "12:00" };
+    const result = buildUnlistingOptions([first, duplicate, missing]);
+    expect(result.choices.map((item) => item.value)).toEqual(['[7,"甲"]', '[7,"甲"]']);
+    expect(result.byKey.get('[7,"甲"]')).toBe(first);
+    expect(result.byKey.get('[null,"乙"]')).toBe(missing);
+  });
+
+  it("编辑草稿重渲染时复用运营记录，详情快照变化时更新", async () => {
+    let reads = 0;
+    const operation = { key: "consignment", action: "上架平台", content: "平台甲", occurred_at: null, operator: "-", get event_id() { reads += 1; return null; } };
+    const detail = { account, orders: [{ order_id: 1, order_no: "HS1", order_type: "HS", events: [] }],
+      detail_view: { operation_rows: [operation], execution_rows: [], finance_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    const { rerender } = renderLight(<OrderDetail row={account} detail={detail} contextOrderId={1} loading={false} editing={account} financeDrafts={{}} />);
+    await settleFieldConfig();
+    const initialReads = reads;
+    expect(initialReads).toBeGreaterThan(0);
+    rerender(<OrderDetail row={account} detail={detail} contextOrderId={1} loading={false} editing={account} financeDrafts={{ CF: { flow_no: "CF", note: "更改", occurred_at: "" } }} />);
+    expect(reads).toBe(initialReads);
+    const nextDetail = { ...detail, detail_view: { ...detail.detail_view, operation_rows: [{ ...operation, content: "平台乙" }] } };
+    rerender(<OrderDetail row={account} detail={nextDetail} contextOrderId={1} loading={false} />);
+    expect(screen.getByText("平台乙")).toBeInTheDocument();
   });
   it("新增下架行选择具体上架事件并保存关联编号", async () => {
     const onOperationEdit = vi.fn();

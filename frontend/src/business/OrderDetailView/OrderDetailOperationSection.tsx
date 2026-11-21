@@ -30,6 +30,17 @@ function operationPlatforms(extra: Record<string, unknown>): string[] {
     : [];
 }
 
+export function buildUnlistingOptions<T extends { eventId?: number; platform: string; listedAt: string }>(listings: T[]) {
+  const choices: Array<{ value: string; label: string }> = [];
+  const byKey = new Map<string, T>();
+  for (const listing of listings) {
+    const key = JSON.stringify([listing.eventId, listing.platform]);
+    if (!byKey.has(key)) byKey.set(key, listing);
+    if (listing.eventId != null) choices.push({ value: key, label: `${listing.platform}（上架于 ${listing.listedAt}，事件 ${listing.eventId}）` });
+  }
+  return { choices, byKey };
+}
+
 export function buildOperationPlatformUsage(
   listings: Array<{ platform: string; eventId?: number }>,
   drafts: Partial<Record<string, Pick<OrderOperationDraft, "operation_type" | "form_extra">>>,
@@ -169,6 +180,7 @@ function editableOperationColumns(
   activeListings: ReturnType<typeof activeConsignmentListings>,
 ): ColumnsType<OrderOperationRow> {
   const isPlatformTaken = buildOperationPlatformUsage(activeListings, operationDrafts ?? {});
+  const unlistingOptions = buildUnlistingOptions(activeListings);
   const platformOptionValues = (current: string[], includeSystem = false) => {
     const options = [...platformOptions];
     if (includeSystem && !options.some((option) => option.value === "__SYSTEM__")) options.push({ value: "__SYSTEM__", label: "本系统" });
@@ -199,14 +211,13 @@ function editableOperationColumns(
         }
         const currentPlatforms = platformValues(extra.consignment_platforms);
         if (!row.event) {
-          const choices = activeListings.filter((listing) => listing.eventId != null).map((listing) => ({ value: JSON.stringify([listing.eventId, listing.platform]), label: `${listing.platform}（上架于 ${listing.listedAt}，事件 ${listing.eventId}）` }));
           const current = extra.platform_unlist_scope === "SYSTEM" ? "__SYSTEM__" : extra.consignment_event_id != null && currentPlatforms[0] ? JSON.stringify([extra.consignment_event_id, currentPlatforms[0]]) : undefined;
-          return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={current} options={choices} placeholder="选择已上架记录" notFoundContent="暂无已上架记录" onChange={(next) => {
+          return <Select aria-label={`编辑下架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={current} options={unlistingOptions.choices} placeholder="选择已上架记录" notFoundContent="暂无已上架记录" onChange={(next) => {
             const nextExtra = { ...extra };
             delete nextExtra.consignment_event_id;
             delete nextExtra.consignment_platforms;
             if (typeof next === "string") {
-              const listing = activeListings.find((item) => JSON.stringify([item.eventId, item.platform]) === next);
+              const listing = unlistingOptions.byKey.get(next);
               if (listing) { nextExtra.platform_unlist_scope = "PLATFORM"; nextExtra.consignment_event_id = listing.eventId; nextExtra.consignment_platforms = [listing.platform]; }
             } else delete nextExtra.platform_unlist_scope;
             updateExtra(row, nextExtra);

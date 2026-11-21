@@ -8,11 +8,13 @@ import { ProfitNotificationModal } from "@/app/workbench/messages/ProfitNotifica
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { ordersApi } from "@/shared/api/orders.api";
+import { employeesApi } from "@/shared/api/org.api";
 import { reportsApi } from "@/shared/api/reports.api";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { dashboardSummary } from "@fixtures/api-responses";
 
+vi.mock("@/business/OrderDetailView/OrderDetail", () => ({ OrderDetail: ({ contextOrderId }: { contextOrderId: number }) => <div>台账订单详情 {contextOrderId}</div> }));
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/dashboard.api");
 vi.mock("@/shared/api/customers.api");
@@ -74,6 +76,8 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
     vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, sale_amount: "300.00", cost_amount: "100.00", allocatable_profit: "150.00" })));
     vi.mocked(reportsApi.commission).mockResolvedValue({ order_groups: [{ order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "180.00", orders: [{ user_id: 1, user_name: "何一", order_id: 1, order_no: "HS1", profit_base: "180.00", rate: "60.00" }, { user_id: null, user_name: "公司", order_id: 1, order_no: "HS1", profit_base: "120.00", rate: "40.00" }] }], people: [], total: { order_count: 1, profit_base: "180.00" } });
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 7 }, orders: [] } as never);
+    vi.mocked(employeesApi.list).mockResolvedValue([]);
     renderLight(<DashboardPage />, { user: "admin" });
     const button = await screen.findByRole("button", { name: /订单 HS1 分润/ });
     expect(within(button).getByText(/2026-11-20 08:30/)).toBeInTheDocument();
@@ -82,6 +86,8 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1], "latest");
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalledWith([2], "latest");
     expect(await screen.findByText("分润明细")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "比例" })).toBeInTheDocument();
+    expect(screen.getByText("60.00%")).toBeInTheDocument();
     expect(reportsApi.commission).toHaveBeenCalledWith({ notification_id: 1 });
     expect(screen.getByText("出库日期")).toBeInTheDocument();
     expect(screen.getByText("售出金额")).toBeInTheDocument();
@@ -92,6 +98,9 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(screen.getByText("何一")).toBeInTheDocument();
     expect(screen.queryByText("公司")).not.toBeInTheDocument();
     expect(screen.getAllByText("180.00")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "查看订单详情" }));
+    expect(await screen.findByText("台账订单详情 1")).toBeInTheDocument();
+    expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true });
   });
 
 it("分润详情加载失败后可重试且不改变已读状态", async () => {

@@ -92,7 +92,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(document.querySelector(".commission-detail-container")).toBeInTheDocument();
     expect(screen.getByText("张三")).toBeInTheDocument();
     expect(screen.getByText("李四")).toBeInTheDocument();
-    expect(screen.getAllByText("0.10")).toHaveLength(2); // 展开明细的费率列
+    expect(screen.getAllByText("0.10%")).toHaveLength(2); // 展开明细的比例列
     expect(screen.getAllByText("分润合计")).toHaveLength(2); // StatRow label + table header
     expect(screen.queryByText("应付合计")).toBeNull();
     expect(screen.queryByText("已付合计")).toBeNull();

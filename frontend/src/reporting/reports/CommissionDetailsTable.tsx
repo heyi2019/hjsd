@@ -7,10 +7,10 @@ export function CommissionDetailsTable({ row, personName }: { row: CommissionOrd
   return (
     <div className="ui-table-wrap commission-detail-container">
       <table className="commission-detail-table">
-        <thead><tr><th>分润人员</th><th>分润基数</th><th>费率</th></tr></thead>
+        <thead><tr><th>分润人员</th><th>分润基数</th><th>比例</th></tr></thead>
         <tbody>{row.orders.map((detail, index) => (
           <tr key={`${row.order_id}-${detail.user_id ?? "company"}-${index}`}>
-            <td>{name(detail)}</td><td><MoneyText value={detail.profit_base} /></td><td>{detail.rate}</td>
+            <td>{name(detail)}</td><td><MoneyText value={detail.profit_base} /></td><td>{detail.rate}%</td>
           </tr>
         ))}</tbody>
       </table>

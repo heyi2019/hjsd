@@ -34,4 +34,16 @@
   outline-offset: 2px;
 }
 .dashboard-notification-detail__loading { display: grid; place-items: center; min-height: 8rem; }
-.dashboard-notification-detail__message { margin: var(--space-2) 0 0; }
+.dashboard-notification-detail__actions { display: flex; justify-content: flex-end; margin-top: var(--space-4); }
+.dashboard-notification-detail .commission-detail-container {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow: auto;
+}
+.dashboard-notification-detail .commission-detail-table { width: 100%; border-collapse: collapse; }
+.dashboard-notification-detail .commission-detail-table th,
+.dashboard-notification-detail .commission-detail-table td { padding: var(--space-3) var(--space-4); border-bottom: var(--border-w) solid var(--color-border); }
+.dashboard-notification-detail .commission-detail-table th { background: var(--soft); }
+.dashboard-notification-detail .commission-detail-table tr:last-child td { border-bottom: 0; }

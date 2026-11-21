@@ -6,10 +6,12 @@ import type { CommissionOrderGroup } from "../../../shared/api/types/reporting";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../../../shared/lib/format";
 import { CommissionDetailsTable } from "../../../reporting/reports/CommissionDetailsTable";
+import { NotificationOrderDetailModal } from "./NotificationOrderDetailModal";
 
 export function ProfitNotificationModal({ selected, summary, onClose }: { selected: NotificationItem; summary?: ProfitNotificationDetail; onClose: () => void }) {
   const [result, setResult] = useState<{ id: number; loading: boolean; error: boolean; detail: CommissionOrderGroup | null }>({ id: selected.id, loading: true, error: false, detail: null });
   const [attempt, setAttempt] = useState(0);
+  const [showOrderDetail, setShowOrderDetail] = useState(false);
   useEffect(() => {
     let cancelled = false;
     setResult({ id: selected.id, loading: true, error: false, detail: null });
@@ -37,7 +39,8 @@ export function ProfitNotificationModal({ selected, summary, onClose }: { select
           </Descriptions>
           <Typography.Title level={5}>分润明细</Typography.Title>
           <CommissionDetailsTable row={{ ...detail, orders: detail.orders.filter((item) => item.user_id != null) }} />
-          <Typography.Paragraph type="secondary" className="dashboard-notification-detail__message">{selected.message}</Typography.Paragraph>
+          <div className="dashboard-notification-detail__actions"><Button type="primary" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button></div>
+          {showOrderDetail && <NotificationOrderDetailModal orderId={detail.order_id} onClose={() => setShowOrderDetail(false)} />}
         </section>
       )}
     </Modal>

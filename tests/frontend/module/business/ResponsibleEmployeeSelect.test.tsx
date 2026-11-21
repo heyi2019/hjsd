@@ -20,7 +20,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 import * as client from "@/shared/api/client";
 import { employeesApi } from "@/shared/api/org.api";
 import { ResponsibleEmployeeSelect } from "@/business/ResponsibleEmployeeSelect";
-import { defaultOperatorUserIds } from "@/business/OrderDetailView/editing/use-order-detail-editor";
+import { defaultOperatorUserIds } from "@/business/shared/order-detail/editing/use-order-detail-editor";
 
 const employees = [
   { id: 3, username: "operator", display_name: "业务员", is_active: true },

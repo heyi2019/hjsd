@@ -11,7 +11,7 @@ import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../business/businessCenter";
-import type { InitialLedgerFilters } from "../business/orderpage/useLedgerList";
+import type { InitialLedgerFilters } from "../business/orders/useLedgerList";
 import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 

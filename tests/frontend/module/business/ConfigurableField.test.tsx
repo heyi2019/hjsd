@@ -12,7 +12,7 @@ import { Form, Input, Radio } from "antd";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { Select } from "@/shared/ui";
 import { renderLight } from "@fixtures/render";
-import { splitFormExtra } from "@/business/create/submit-helpers";
+import { splitFormExtra } from "@/business/shared/order-create/create/submit-helpers";
 import {
   CfgItem,
   CfgNestedItem,

@@ -1,0 +1,183 @@
+import { appMessage } from "../../../shared/ui/appFeedback";
+import { Form, Input, Space, Upload } from "antd";
+import type { UploadFile } from "antd/es/upload/interface";
+import dayjs from "dayjs";
+import { useEffect, useState } from "react";
+import { ordersApi } from "../../../shared/api/orders.api";
+import { employeesApi } from "../../../shared/api/org.api";
+import type { Account } from "../../../shared/api/types/accounts";
+import type { EmployeeOption } from "../../../shared/api/types/org";
+import { BusinessActionModal, BusinessRegistrationForm, InlineError } from "../../../shared/ui";
+import { ResponsibleEmployeeSelect } from "../../ResponsibleEmployeeSelect";
+import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
+import "./profile-modal.css";
+
+export type OrderProfileTarget = {
+  account: Account;
+  mode: "description" | "images";
+  /** 订单台账入口明确指定的业务订单；库存入口使用账号绑定的来源订单。 */
+  orderId?: number;
+};
+
+function readImageData(file: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error ?? new Error("图片读取失败"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function ProfileContext({ account }: { account: Account }) {
+  return (
+    <div className="order-profile-context" aria-label="账号上下文">
+      <div className="order-profile-context__item"><span>订单编号</span><strong>{account.source_order_no ?? "-"}</strong></div>
+      <div className="order-profile-context__item"><span>游戏类型</span><strong>{account.game_type ?? "-"}</strong></div>
+      <div className="order-profile-context__item"><span>游戏账号</span><strong>{account.game_account ?? "-"}</strong></div>
+    </div>
+  );
+}
+
+export function OrderProfileModal({
+  target,
+  onClose,
+  onSaved,
+  onError,
+  operationSource = "业务中心",
+}: {
+  target: OrderProfileTarget | null;
+  onClose: () => void;
+  onSaved: (account: Account, target: OrderProfileTarget) => void;
+  onError: (error: unknown) => void;
+  operationSource?: string;
+}) {
+  const [description, setDescription] = useState("");
+  const [images, setImages] = useState<UploadFile[]>([]);
+  const write = useAsyncAction();
+  const saving = write.pending;
+  const session = useRequestSession(target);
+  const employeesRequest = useLatestRequest();
+  const [validationError, setValidationError] = useState<{ message: string } | null>(null);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (!target) return;
+    const { account } = target;
+    setDescription(account.account_description ?? "");
+    setImages((account.account_images ?? []).slice(0, 9).map((url, index) => ({
+      uid: `${account.id}-${index}`,
+      name: `作图${index + 1}`,
+      status: "done",
+      url,
+    })));
+    setValidationError(null);
+    form.resetFields();
+    const request = employeesRequest.start();
+    void Promise.resolve(employeesApi.list())
+      .then((items) => { if (employeesRequest.isCurrent(request)) setEmployees((items ?? []).filter((item) => item.is_active)); })
+      .catch((error) => { if (employeesRequest.isCurrent(request)) onError(error); });
+    return employeesRequest.invalidate;
+  }, [employeesRequest, form, target]);
+
+  async function imageValues(): Promise<string[]> {
+    return (await Promise.all(images.slice(0, 9).map(async (file) => {
+      if (file.url) return file.url;
+      return file.originFileObj ? readImageData(file.originFileObj) : null;
+    }))).filter((item): item is string => Boolean(item));
+  }
+
+  async function save() {
+    const submittedTarget = target;
+    if (!submittedTarget) return;
+    const submittedSession = session.current();
+    await write.run(async () => {
+      setValidationError(null);
+      try {
+        const values = await form.validateFields();
+        const imagePayload = submittedTarget.mode === "images" ? await imageValues() : null;
+        if (submittedTarget.mode === "images" && !imagePayload?.length) {
+          if (session.isCurrent(submittedSession)) setValidationError({ message: "请至少添加一张图片" });
+          return;
+        }
+        const payload = submittedTarget.mode === "description"
+          ? { account_description: description }
+          : { account_images: imagePayload ?? [] };
+        const orderId = submittedTarget.orderId ?? submittedTarget.account.source_order_id;
+        if (!orderId) {
+          if (session.isCurrent(submittedSession)) setValidationError({ message: "当前账号没有来源订单，无法保存运营资料" });
+          return;
+        }
+        await ordersApi.updateExecution(orderId, {
+          profile: payload,
+          events: [],
+          new_events: [{
+            operation_type: submittedTarget.mode === "images" ? "IMAGE" : "DESCRIPTION",
+            occurred_at: dayjs().format("YYYY-MM-DDTHH:mm:ss"),
+            operator_user_ids: values.operator_user_ids ?? [],
+            note: `${operationSource}登记${submittedTarget.mode === "images" ? "作图" : "描述"}`,
+          }],
+        });
+        onSaved({ ...submittedTarget.account, ...payload }, submittedTarget);
+        if (session.isCurrent(submittedSession)) close();
+        appMessage.success("账号资料已保存");
+      } catch (error) {
+        if (session.isCurrent(submittedSession)) onError(error);
+        else appMessage.error(`${submittedTarget.account.source_order_no ?? `账号 ${submittedTarget.account.id}`}：保存失败`);
+      }
+    });
+  }
+
+  function close() {
+    session.invalidate();
+    onClose();
+  }
+
+  if (!target) return null;
+
+  return (
+    <BusinessActionModal size="compact"
+      open={Boolean(target)}
+      title={target.mode === "images" ? "作图" : "描述"}
+      okText="保存"
+      cancelText="取消"
+      confirmLoading={saving}
+      onCancel={close}
+      onOk={() => void save()}
+    >
+      <InlineError error={validationError} />
+      <BusinessRegistrationForm layout="horizontal" labelAlign="left" labelCol={{ flex: "108px" }} wrapperCol={{ flex: "auto" }} form={form}>
+        <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+      </BusinessRegistrationForm>
+      {target.mode === "images" ? (
+        <Space className="order-profile-description-editor" direction="vertical" size="middle">
+          <ProfileContext account={target.account} />
+          <Upload
+            listType="picture-card"
+            accept="image/*"
+            maxCount={9}
+            fileList={images}
+            beforeUpload={() => false}
+            onChange={({ fileList }) => setImages(fileList.slice(0, 9))}
+          >
+            <span aria-hidden="true">＋</span>
+            <div>添加图片</div>
+          </Upload>
+        </Space>
+      ) : (
+        <Space className="order-profile-description-editor" direction="vertical" size="middle">
+          <ProfileContext account={target.account} />
+          <Input.TextArea
+            rows={8}
+            maxLength={400}
+            showCount
+            value={description}
+            placeholder="补充账号等级、资源、限制等信息"
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </Space>
+      )}
+    </BusinessActionModal>
+  );
+}

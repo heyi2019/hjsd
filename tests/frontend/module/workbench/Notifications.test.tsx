@@ -5,7 +5,7 @@ import { renderLight } from "@fixtures/render";
 import { WorkbenchPage } from "@/app/WorkbenchPage";
 import { Notifications } from "@/app/workbench/notifications/Notifications";
 import { ProfitNotificationModal } from "@/app/workbench/notifications/ProfitNotificationModal";
-import { OrderDetailDialog } from "@/business/OrderDetailView/OrderDetailDialog";
+import { OrderDetailDialog } from "@/business/shared/order-detail/OrderDetailDialog";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { ordersApi } from "@/shared/api/orders.api";
@@ -16,7 +16,7 @@ import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { workbenchSummary } from "@fixtures/api-responses";
 import { useSession } from "@/shared/state/session";
 
-vi.mock("@/business/OrderDetailView/OrderDetail", () => ({ OrderDetail: ({ contextOrderId, onPartyClick }: { contextOrderId: number; onPartyClick?: (party: { entityType: "customer" | "counterparty"; id: number }) => void }) => <div>台账订单详情 {contextOrderId}<button onClick={() => onPartyClick?.({ entityType: "customer", id: 7 })}>客户详情</button><button onClick={() => onPartyClick?.({ entityType: "counterparty", id: 8 })}>合作方详情</button></div> }));
+vi.mock("@/business/shared/order-detail/OrderDetail", () => ({ OrderDetail: ({ contextOrderId, onPartyClick }: { contextOrderId: number; onPartyClick?: (party: { entityType: "customer" | "counterparty"; id: number }) => void }) => <div>台账订单详情 {contextOrderId}<button onClick={() => onPartyClick?.({ entityType: "customer", id: 7 })}>客户详情</button><button onClick={() => onPartyClick?.({ entityType: "counterparty", id: 8 })}>合作方详情</button></div> }));
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/workbench.api");
 vi.mock("@/shared/api/customers.api");

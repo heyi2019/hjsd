@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { InventoryPanel } from "@/business/stocks/InventoryPanel";
+import { InventoryPanel } from "@/business/inventory/InventoryPanel";
 import { ordersApi } from "@/shared/api/orders.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { setupInventoryPanelMocks } from "@fixtures/InventoryPanel.test.fixtures";

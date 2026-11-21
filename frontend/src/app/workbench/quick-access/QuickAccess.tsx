@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CreateBusinessModal, type BusinessOrderType } from "../../../business/CreateBusinessModal";
+import { CreateBusinessModal, type BusinessOrderType } from "../../../business/shared/order-create/CreateBusinessModal";
 import type { BusinessCenterEntryTab } from "../../../business/businessCenter";
 import { EntryCard, EntryRow, PermissionGate } from "../../../shared/ui";
 

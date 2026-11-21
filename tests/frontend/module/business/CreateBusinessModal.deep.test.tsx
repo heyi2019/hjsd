@@ -2,7 +2,7 @@ import { screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { CreateBusinessModal } from "@/business/CreateBusinessModal";
+import { CreateBusinessModal } from "@/business/shared/order-create/CreateBusinessModal";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";

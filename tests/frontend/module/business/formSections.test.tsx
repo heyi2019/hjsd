@@ -7,7 +7,7 @@ import { Button, Form, type FormInstance } from "antd";
 import { renderLight } from "@fixtures/render";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { CustomerSourceFields } from "@/business/CustomerSourceInput";
-import { FinanceExpenseItems } from "@/business/finance/FinanceExpenseItems";
+import { FinanceExpenseItems } from "@/business/shared/order-create/finance/FinanceExpenseItems";
 import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 
 vi.mock("@/shared/api/options.api");

@@ -34,7 +34,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 // 订单台账测试不覆盖库存面板本身；库存面板有独立回归，主页面测试用轻量桩避免重复挂载整套库存依赖。
-vi.mock("@/business/stocks/InventoryPanel", () => ({
+vi.mock("@/business/inventory/InventoryPanel", () => ({
   InventoryPanel: ({ active = true, createAction }: { active?: boolean; createAction?: import("react").ReactNode }) => active ? <div data-testid="inventory-panel-test-stub"><div className="ant-card-head">库存中心{createAction}</div></div> : null,
 }));
 

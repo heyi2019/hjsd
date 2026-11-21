@@ -1,18 +1,18 @@
 /** 业务中心：库存中心、订单台账与分期回款。 */
 import { useState } from "react";
 import { Dropdown, Tabs } from "antd";
-import { InventoryPanel } from "./stocks/InventoryPanel";
+import { InventoryPanel } from "./inventory/InventoryPanel";
 import { InstallmentsPanel } from "../finance/installments/InstallmentsPanel";
 import { ErrorBanner, PermissionButton } from "../shared/ui";
 import { appMessage } from "../shared/ui/appFeedback";
 import { installmentsApi } from "../shared/api/installments.api";
 import { normalizeError } from "../shared/api/client";
-import type { BusinessOrderType } from "./CreateBusinessModal";
-import { BUSINESS_CREATE_ITEMS } from "./orderpage/helpers";
-import { OrdersLedgerPanel } from "./orderpage/OrdersLedgerPanel";
-import { OrderModals } from "./orderpage/OrdersPage.modals";
-import { useOrdersPageController } from "./orderpage/useOrdersPageController";
-import type { InitialLedgerFilters } from "./orderpage/useLedgerList";
+import type { BusinessOrderType } from "./shared/order-create/CreateBusinessModal";
+import { BUSINESS_CREATE_ITEMS } from "./orders/helpers";
+import { OrdersLedgerPanel } from "./orders/OrdersLedgerPanel";
+import { OrderModals } from "./orders/OrdersPage.modals";
+import { useOrdersPageController } from "./orders/useOrdersPageController";
+import type { InitialLedgerFilters } from "./orders/useLedgerList";
 import type { BusinessCenterEntryTab, BusinessCenterTab } from "./businessCenter";
 
 export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilters, initialAllocationOrderId, initialInstallmentStatus, initialInventoryAgeGtDays, active = true, onNavigate }: {

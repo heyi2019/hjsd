@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
-import { useLedgerInlineEdit } from "@/business/orderpage/useLedgerInlineEdit";
+import { useLedgerInlineEdit } from "@/business/orders/useLedgerInlineEdit";
 import { CashflowModal, type CashflowTarget } from "@/finance/cashflow";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
@@ -45,7 +45,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");;
 
 // 操作流只验证订单台账与分期入口；库存面板由 InventoryPanel 专项测试覆盖。
-vi.mock("@/business/stocks/InventoryPanel", () => ({
+vi.mock("@/business/inventory/InventoryPanel", () => ({
   InventoryPanel: ({ active = true, createAction }: { active?: boolean; createAction?: import("react").ReactNode }) => active ? <div data-testid="inventory-panel-test-stub"><div className="ant-card-head">库存中心{createAction}</div></div> : null,
 }));
 
@@ -61,7 +61,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => {
 // 订单页的台账编排与分期入口保留真实组件；库存面板本身由独立专项覆盖。
 
 // CreateBusinessModal 用桩替换：暴露 open/onClose/onCreated 三个口，用于覆盖回调分支。
-vi.mock("@/business/CreateBusinessModal", () => ({
+vi.mock("@/business/shared/order-create/CreateBusinessModal", () => ({
   CreateBusinessModal: (props: {
     open: boolean;
     onClose: () => void;

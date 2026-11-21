@@ -4,7 +4,7 @@ import {
   buildActionAllocationRows,
   filterBusinessOrders,
   formatOrderAmount,
-} from "@/business/orderpage/helpers";
+} from "@/business/orders/helpers";
 
 const order = (overrides: Partial<Order> = {}): Order => ({
   id: 1,

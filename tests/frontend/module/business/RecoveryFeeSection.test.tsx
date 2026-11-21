@@ -7,7 +7,7 @@ import type { Pool } from "@/shared/api/types/finance";
 import type { OrderFormField } from "@/shared/api/types/forms";
 import { renderLight } from "@fixtures/render";
 import { FieldConfigContext, type FieldConfigMap } from "@/business/ConfigurableField";
-import { RecoveryFeeSection } from "@/business/recovery/RecoveryFeeSection";
+import { RecoveryFeeSection } from "@/business/shared/order-create/recovery/RecoveryFeeSection";
 
 const makeField = (over: Partial<OrderFormField> = {}): OrderFormField => ({
   id: 1,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCounterpartyInput, buildCustomerInput, buildOrderNote, resolveCustomerSource, splitFormExtra } from "@/business/create/submit-helpers";
+import { buildCounterpartyInput, buildCustomerInput, buildOrderNote, resolveCustomerSource, splitFormExtra } from "@/business/shared/order-create/create/submit-helpers";
 import type { FieldConfigMap } from "@/business/ConfigurableField";
 
 const config: FieldConfigMap = {

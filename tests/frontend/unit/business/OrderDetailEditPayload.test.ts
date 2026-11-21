@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildEventEdits, buildFinanceEdits, buildOrderEdits } from "@/business/OrderDetailView/editing/execution-edit-payload";
-import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/OrderDetailView/editing/use-order-detail-editor";
-import { resolveExecutionPlatform } from "@/business/OrderDetailView/OrderDetail.shared";
-import { mergeLedgerOrderWithDetail } from "@/business/orderpage/useLedgerInlineEdit";
-import { buildFinanceSelectOptions } from "@/business/OrderDetailView/finance-options";
+import { buildEventEdits, buildFinanceEdits, buildOrderEdits } from "@/business/shared/order-detail/editing/execution-edit-payload";
+import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/shared/order-detail/editing/use-order-detail-editor";
+import { resolveExecutionPlatform } from "@/business/shared/order-detail/OrderDetail.shared";
+import { mergeLedgerOrderWithDetail } from "@/business/orders/useLedgerInlineEdit";
+import { buildFinanceSelectOptions } from "@/business/shared/order-detail/finance-options";
 
 describe("详情编辑保存载荷", () => {
   it("资金明细选项保持停用当前账户的位置并复用相同账户候选", () => {

@@ -2,7 +2,7 @@ import { createContext, type ReactNode } from "react";
 import { screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { CreateBusinessModal } from "@/business/CreateBusinessModal";
+import { CreateBusinessModal } from "@/business/shared/order-create/CreateBusinessModal";
 import { gameTypesApi } from "@/shared/api/misc.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
@@ -22,17 +22,17 @@ vi.mock("@/business/ConfigurableField", () => ({
   useOrderFormSectionLabels: () => ({ labels: {} }),
 }));
 
-vi.mock("@/business/recovery/RecoveryAccountSection", () => ({
+vi.mock("@/business/shared/order-create/recovery/RecoveryAccountSection", () => ({
   RecoveryAccountSection: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/business/recovery/RecoveryCustomerSection", () => ({
   RecoveryCustomerSection: () => null,
 }));
-vi.mock("@/business/recovery/RecoveryFeeSection", () => ({
+vi.mock("@/business/shared/order-create/recovery/RecoveryFeeSection", () => ({
   RecoveryFeeSection: () => null,
 }));
-vi.mock("@/business/th/ThOrderSection", () => ({ ThOrderSection: () => null }));
-vi.mock("@/business/dg/DgOrderSection", () => ({ DgOrderSection: () => null }));
+vi.mock("@/business/shared/order-create/th/ThOrderSection", () => ({ ThOrderSection: () => null }));
+vi.mock("@/business/shared/order-create/dg/DgOrderSection", () => ({ DgOrderSection: () => null }));
 
 vi.mock("@/shared/ui", async () => {
   const actual = await vi.importActual<typeof import("@/shared/ui")>("@/shared/ui");

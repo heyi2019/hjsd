@@ -6,7 +6,7 @@ import type { CommissionOrderGroup } from "../../../shared/api/types/reporting";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../../../shared/lib/format";
 import { CommissionDetailsTable } from "../../../reporting/reports/CommissionDetailsTable";
-import { OrderDetailDialog } from "../../../business/OrderDetailView/OrderDetailDialog";
+import { OrderDetailDialog } from "../../../business/shared/order-detail/OrderDetailDialog";
 
 export function ProfitNotificationModal({ selected, summary, onClose, onPartyNavigate }: { selected: NotificationItem; summary?: ProfitNotificationDetail; onClose: () => void; onPartyNavigate?: (path: string) => void }) {
   const [result, setResult] = useState<{ id: number; loading: boolean; error: boolean; detail: CommissionOrderGroup | null }>({ id: selected.id, loading: true, error: false, detail: null });

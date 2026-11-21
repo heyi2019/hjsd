@@ -293,11 +293,7 @@
   --font-body-m: 400 1rem/1.6 var(--font-sans); /* Body · 17 */
   --font-body-s: 400 0.8824rem/1.5 var(--font-sans); /* Subheadline · 15 */
   --font-caption: 400 0.7647rem/1.5 var(--font-sans); /* Footnote · 13 */
-  /* Caption 2 · 11（2026-10-04 补齐）。ui-components.css:63/94 的 .ui-stat__hint 与
-     .ui-drawer-hint 引用 var(--font-caption-2)，但本文件从未定义该名 —— var() 引用
-     不存在的自定义属性时整条 font 简写作废、静默回落浏览器默认（实测 13px，
-     恰与父级继承值撞车而看不出异常），真正的 Caption 2 11px 从未生效。
-     注意别与 --font-nav-caption（导航专用，同为 11px 但 700 字重）混用。 */
+  /* 辅助说明使用 Caption 2；导航说明另用加粗的 --font-nav-caption。 */
   --font-caption-2: 400 0.7059rem/1.4 var(--font-sans); /* Caption 2 · 12 */
   --font-table-header: 600 0.7647rem/1.4 var(--font-sans); /* Footnote · 13 */
   /* 长度型字号：专供 fontSize/font-size 场景。--font-body-s/--font-caption 等是 font 简写

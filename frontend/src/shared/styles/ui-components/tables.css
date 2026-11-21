@@ -29,45 +29,6 @@
   box-shadow: var(--shadow-soft);
 }
 
-/* 内联表：详情页/卡片内嵌的只读小表（无分页、不独立成卡）。
- * 原本「订单详情 · 金额表」与「订单详情 · 执行表」各自复制了同一套边框、表头底色、
- * 悬停态与列截断规则，改一处要同步两处，深色模式更要验两遍。收敛到此变体：
- * 变体只管「长什么样」，页面级布局补偿（如向卡片边缘出血的负边距）仍留在页面 CSS。
- * 选择器带 .ui-table-wrap 提升特异性：feedback.css 的 overflow-x:auto 在 tables.css 之后加载，
- * 单类名会被它覆盖，导致内联表意外出现横滚条。 */
-.ui-table-wrap.ui-datatable--inline {
-  box-sizing: border-box;
-  margin-top: 0;
-  border: var(--border-w) solid color-mix(in srgb, var(--color-text-secondary) 42%, var(--color-border));
-  border-radius: var(--radius-sm);
-  overflow: clip;
-}
-.ui-datatable--inline .ant-table {
-  width: 100% !important;
-  min-width: 0 !important;
-  table-layout: fixed;
-}
-.ui-datatable--inline .ant-table-content { overflow-x: clip !important; }
-.ui-datatable--inline .ant-table-container { border: 0; border-radius: 0; overflow: hidden; }
-.ui-datatable--inline th,
-.ui-datatable--inline td { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.ui-datatable--inline .ant-table-thead > tr > th {
-  background: color-mix(in srgb, var(--soft) 68%, transparent);
-  color: var(--color-text-secondary);
-  font-weight: 650;
-  white-space: nowrap;
-}
-.ui-datatable--inline .ant-table-tbody > tr > td {
-  background: color-mix(in srgb, var(--glass) 84%, transparent);
-  white-space: nowrap;
-}
-.ui-datatable--inline .ant-table-thead > tr > th.ant-table-cell-fix-left { background: color-mix(in srgb, var(--soft) 68%, transparent); }
-.ui-datatable--inline .ant-table-tbody > tr > td.ant-table-cell-fix-left { background: color-mix(in srgb, var(--glass) 84%, transparent); }
-.ui-datatable--inline .ant-table-tbody > tr:hover > td { background: color-mix(in srgb, var(--color-primary) 7%, var(--glass)); }
-/* 密度修饰：紧邻 caption-2 标签（如订单详情运营信息）的内联表降一档字号。 */
-.ui-datatable--inline--caption .ant-table-thead > tr > th,
-.ui-datatable--inline--caption .ant-table-tbody > tr > td { font-size: var(--fs-caption-2); }
-
 /* 抽屉 footer 是唯一操作区：保持底部可见，避免长表单滚动后失去提交路径。 */
 .form-drawer .ant-drawer-footer {
   padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));

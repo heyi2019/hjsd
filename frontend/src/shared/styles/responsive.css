@@ -123,17 +123,6 @@
   }
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
-  /* 报表导出日期区间：两枚原生 date 输入并排会溢出右边缘（实测 375px 下第二个被切），
-     改为「起始日期独占一行 / 至 + 结束日期同行」的两行栅格。 */
-  .ui-filter-bar__range {
-    display: grid !important;
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: var(--space-1) var(--space-2);
-    width: 100%;
-  }
-  .ui-filter-bar__range > .ant-space-item:first-child { grid-column: 1 / -1; }
-  .ui-filter-bar__range .ui-control-width-date { width: 100%; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
   .ant-table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
   /* 单一滚动容器 = .ant-table-content（antd 默认已是 overflow-x:auto 的那层）：

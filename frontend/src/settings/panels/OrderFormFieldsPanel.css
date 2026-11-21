@@ -11,10 +11,6 @@
   box-shadow: var(--e1);
 }
 
-.order-form-fields__container .ui-toolbar-spaced {
-  margin-top: 0;
-}
-
 /* 筛选工具栏按“标签 + 控件”成组排布，避免 Space 的 flex-shrink 把中文标签压成竖排。 */
 .order-form-fields__toolbar {
   display: grid;

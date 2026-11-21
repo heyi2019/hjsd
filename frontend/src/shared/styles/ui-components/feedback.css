@@ -56,8 +56,7 @@
 @media (prefers-contrast: more), (forced-colors: active) {
   .glass,
   .ui-stat,
-  .ui-entry-card,
-  .ui-table-empty {
+  .ui-entry-card {
     border-color: var(--color-text-secondary);
     box-shadow: none;
     backdrop-filter: none;

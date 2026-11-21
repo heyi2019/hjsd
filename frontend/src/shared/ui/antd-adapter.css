@@ -426,18 +426,18 @@
 }
 
 /* 统一表单规范：左标签右填写（排除 inline 筛选栏/工具栏，避免破坏横向排列） */
-:where(.ant-form:not(.ant-form-inline):not(.ui-filter-bar):not(.ui-form-spaced):not(.ui-toolbar-spaced)) .ant-form-item-row {
+:where(.ant-form:not(.ant-form-inline):not(.ui-filter-bar):not(.ui-form-spaced)) .ant-form-item-row {
   flex-direction: row !important;
   align-items: flex-start !important;
 }
-:where(.ant-form:not(.ant-form-inline):not(.ui-filter-bar):not(.ui-form-spaced):not(.ui-toolbar-spaced)) .ant-form-item-label {
+:where(.ant-form:not(.ant-form-inline):not(.ui-filter-bar):not(.ui-form-spaced)) .ant-form-item-label {
   flex: 0 0 108px !important;
   max-width: 108px !important;
   overflow: hidden !important;
   text-align: left !important;
   padding-right: var(--space-2) !important;
 }
-:where(.ant-form:not(.ant-form-inline):not(.ui-filter-bar):not(.ui-form-spaced):not(.ui-toolbar-spaced)) .ant-form-item-control {
+:where(.ant-form:not(.ant-form-inline):not(.ui-filter-bar):not(.ui-form-spaced)) .ant-form-item-control {
   flex: 1 1 auto !important;
   min-width: 0 !important;
 }

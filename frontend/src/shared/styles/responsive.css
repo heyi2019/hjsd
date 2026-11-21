@@ -124,9 +124,7 @@
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
-  .customer-list-filters > *,
-  .counterparty-filter-bar > *,
-  .inventory-filters > * { flex: 0 1 auto; max-width: 100%; }
+  .ui-filter-bar.ant-space > * { flex: 0 1 auto; max-width: 100%; }
   .customer-list-filters > :first-child,
   .counterparty-filter-bar > :first-child,
   .inventory-filters > :first-child { flex: 1 1 100%; }

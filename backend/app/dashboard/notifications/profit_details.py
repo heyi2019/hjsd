@@ -8,12 +8,14 @@ from app.business.order_detail.view.assembler import build_order_outputs
 from app.business.order_detail.view.derived import build_detail_view
 from app.business.order_detail.view.events import load_event_context
 from app.business.router_outputs._shared import _sale_amount
+from app.business.router_outputs.list_payload import _order_list_payload
 from app.business.stocks._common import scope_filter as account_scope_filter
 from app.core.security import CurrentUser
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.shared.scope import owner_scope_filter
+from app.funds.profit_allocation.terms import allocatable_profit_for, company_rate_for_order
 from .schemas import ProfitNotificationDetailOut
 
 
@@ -35,6 +37,7 @@ def profit_details_for_notifications(
     if not pairs:
         return []
     orders = [order for order, _ in pairs]
+    payload_by_id = {item["id"]: item for item in _order_list_payload(db, orders, accounts=[account for _, account in pairs])}
     account_by_order = {order.id: account for order, account in pairs}
     extra_values = {order.id: dict(order.form_extra or {}) for order in orders}
     responsible_ids = {
@@ -62,11 +65,16 @@ def profit_details_for_notifications(
         if order is None:
             continue
         account = account_by_order[order.order_id]
+        payload = payload_by_id[order.order_id]
+        source_order = next(item for item in orders if item.id == order.order_id)
+        profit = payload["profit_base"]
         view = build_detail_view([order])
         recovery = next((row for row in view.execution_rows if row.category == "INBOUND"), None)
         results.append(ProfitNotificationDetailOut(
             notification_id=notification.id, order_no=order.order_no, order_type=order.order_type,
             sale_amount=_sale_amount(order.order_type, order.events), stock_no=account.stock_no,
+            game_type=payload["account_game_type"], cost_amount=payload["cost_amount"],
+            allocatable_profit=allocatable_profit_for(profit, company_rate_for_order(source_order, profit)),
             inventory_entry_at=account.inventory_entry_at, removed_at=view.lifecycle.removed_at,
             recovery_operator=recovery.operator if recovery else None,
         ))

@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from pydantic import ValidationError as PydanticValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -91,10 +91,15 @@ def set_allocations(
         return frozenset((row["user_id"], row["role"], row["allocation_type"], row["allocation_rate"], row["allocation_amount"]) for row in rows)
 
     previous_allocations = snapshot(collect_allocations(session, order))
-    pending_sale = session.scalar(select(Notification.id).where(
+    pending_id = session.scalar(select(func.max(Notification.id)).where(
         Notification.notification_type == "PROFIT_PENDING", Notification.entity_type == "order",
-        Notification.entity_id == order.order_no, Notification.read_at.is_(None),
-    ).limit(1)) is not None
+        Notification.entity_id == order.order_no,
+    )) or 0
+    allocated_id = session.scalar(select(func.max(Notification.id)).where(
+        Notification.notification_type == "PROFIT_ALLOCATED", Notification.entity_type == "order",
+        Notification.entity_id == order.order_no,
+    )) or 0
+    pending_sale = pending_id > allocated_id
 
     checked_extra = validate_form_extra(session, order_type_code="ALLOCATION", values=form_extra)
     original_form_extra = order.form_extra
@@ -125,9 +130,8 @@ def set_allocations(
             order.form_extra = original_form_extra
         raise
     # 分润配置保存完成 → 通知利润接收人（幂等，重复保存不重复打扰）。
-    from app.dashboard.notifications.triggers import close_pending_profit_for_order, notify_profit_recipients
+    from app.dashboard.notifications.triggers import notify_profit_recipients
 
-    close_pending_profit_for_order(session, order, actor=actor)
     notify_profit_recipients(session, order, actor=actor,
                              new_revision=pending_sale or previous_allocations != snapshot(result))
     return result

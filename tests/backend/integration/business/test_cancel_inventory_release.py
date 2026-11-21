@@ -197,7 +197,7 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     assert response.status_code == 201, response.text
     seeded_db.flush()
     pending = seeded_db.scalar(select(Notification).where(Notification.recipient_user_id == previous_operator.id, Notification.notification_type == "PROFIT_PENDING", Notification.entity_id == order.order_no))
-    assert pending.read_at is not None
+    assert pending.read_at is None
     assert seeded_db.get(Account, order.account_id).status == "WAITING"
     assert order.status == "ACTIVE"
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == -50

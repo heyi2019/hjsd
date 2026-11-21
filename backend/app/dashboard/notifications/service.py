@@ -1,7 +1,9 @@
 """系统通知服务：只负责提醒的生成、查询和已读状态。"""
 from __future__ import annotations
 
-from sqlalchemy import func, select, update
+from datetime import datetime
+
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -12,6 +14,7 @@ from app.domain.notifications import Notification
 
 PROFIT_PENDING = "PROFIT_PENDING"
 PROFIT_ALLOCATED = "PROFIT_ALLOCATED"
+INVENTORY_AGING = "INVENTORY_AGING"
 
 
 def create_notification(
@@ -88,11 +91,17 @@ def list_notifications(
     *,
     recipient_user_id: int,
     unread_only: bool = False,
+    read_only: bool = False,
+    category: str | None = None,
     notification_type: str | None = None,
     entity_type: str | None = None,
     before_id: int | None = None,
+    before_created_at: datetime | None = None,
+    sort_by_time: bool = False,
     limit: int = 50,
 ) -> tuple[list[Notification], int]:
+    if sort_by_time and (before_id is None) != (before_created_at is None):
+        raise Validation("通知时间分页需要同时提供时间和编号")
     stmt = select(Notification).where(Notification.recipient_user_id == recipient_user_id)
     count_stmt = select(func.count(Notification.id)).where(
         Notification.recipient_user_id == recipient_user_id
@@ -100,18 +109,29 @@ def list_notifications(
     if notification_type:
         stmt = stmt.where(Notification.notification_type == notification_type)
         count_stmt = count_stmt.where(Notification.notification_type == notification_type)
+    if category:
+        kinds = [PROFIT_PENDING, PROFIT_ALLOCATED] if category == "sale" else [INVENTORY_AGING]
+        stmt = stmt.where(Notification.notification_type.in_(kinds))
+        count_stmt = count_stmt.where(Notification.notification_type.in_(kinds))
     if entity_type:
         stmt = stmt.where(Notification.entity_type == entity_type)
         count_stmt = count_stmt.where(Notification.entity_type == entity_type)
-    if before_id is not None:
+    if before_created_at is not None and before_id is not None and sort_by_time:
+        older = or_(Notification.created_at < before_created_at, and_(Notification.created_at == before_created_at, Notification.id < before_id))
+        stmt = stmt.where(older)
+        count_stmt = count_stmt.where(older)
+    elif before_id is not None:
         stmt = stmt.where(Notification.id < before_id)
         count_stmt = count_stmt.where(Notification.id < before_id)
     if unread_only:
         stmt = stmt.where(Notification.read_at.is_(None))
         count_stmt = count_stmt.where(Notification.read_at.is_(None))
+    if read_only:
+        stmt = stmt.where(Notification.read_at.is_not(None))
+        count_stmt = count_stmt.where(Notification.read_at.is_not(None))
     rows = list(
         session.scalars(
-            stmt.order_by(Notification.id.desc()).limit(limit)
+            stmt.order_by(*([Notification.created_at.desc(), Notification.id.desc()] if sort_by_time else [Notification.id.desc()])).limit(limit)
         ).all()
     )
     return rows, int(session.scalar(count_stmt) or 0)
@@ -168,6 +188,7 @@ def mark_read_batch(
 
 
 __all__ = [
+    "INVENTORY_AGING",
     "PROFIT_ALLOCATED",
     "PROFIT_PENDING",
     "create_notification",

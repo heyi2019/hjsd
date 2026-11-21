@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
 import { dashboardApi } from "@/shared/api/dashboard.api";
+import { notificationsApi } from "@/shared/api/misc.api";
 import { dashboardSummary } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
@@ -25,6 +26,8 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
   vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary());
+  vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], total: 0, unread_total: 0 });
+  vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
 });
 
 describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
@@ -33,15 +36,15 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     renderLight(<DashboardPage />, { user: "admin" });
     expect((await screen.findAllByText(/dashboard down/)).length).toBeGreaterThan(0);
     const alerts = screen.getByRole("region", { name: "我的消息" });
-    expect(within(alerts).queryByText("暂无异常事项")).toBeNull();
-    expect(within(alerts).getByText(/消息加载失败/)).toBeInTheDocument();
+    expect(await within(alerts).findByText("暂无消息")).toBeInTheDocument();
   });
 
   it("没有订单权限时个人订单和客户数显示占位且不可跳转", async () => {
     const navigate = vi.fn();
     vi.mocked(dashboardApi.summary).mockResolvedValue(dashboardSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null, alerts: [{ type: "pending_profit", message: "分润待配置 7 条" }] }));
     renderLight(<DashboardPage onDashboardNavigate={navigate} />, { user: "admin" });
-    await screen.findByText("分润待配置 7 条");
+    await screen.findByRole("tab", { name: "最新消息" });
+    await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalled());
     for (const id of ["dashboard-personal-orders", "dashboard-personal-customers"]) {
       const card = screen.getByTestId(id);
       await waitFor(() => expect(within(card).getByText("-")).toBeInTheDocument());
@@ -65,8 +68,8 @@ describe("DashboardPage.deep：失败路径/计数/未覆盖入口", () => {
     renderLight(<DashboardPage />, { user: "admin" });
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
     const customerCard = (await screen.findByText("我的当期客户数")).closest(".ui-stat") as HTMLElement;
-    expect(within(totalCard).getByText("3")).toBeInTheDocument();
-    expect(within(customerCard).getByText("2")).toBeInTheDocument();
+    expect(await within(totalCard).findByText("3")).toBeInTheDocument();
+    expect(await within(customerCard).findByText("2")).toBeInTheDocument();
   });
 
   it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {

@@ -17,7 +17,7 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
   const periodState = useBusinessPeriod();
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState<BusinessOrderType>("HS");
-  const { summary, error, loading, alerts, loadSummary } = useDashboardSummary(active && periodState.ready, periodState.period);
+  const { summary, error, loading, loadSummary } = useDashboardSummary(active && periodState.ready, periodState.period);
   const period = summary?.period ?? null;
   const withPeriod = (path: string) => {
     if (!period) return path;
@@ -25,10 +25,10 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
     return `${path}${separator}trade_date_from=${encodeURIComponent(period.from)}&trade_date_to=${encodeURIComponent(period.to)}`;
   };
   const openDashboardPath = (path: string) => onDashboardNavigate?.(path);
-  const openPendingProfitAllocation = async () => {
+  const openPendingProfitAllocation = async (notificationId?: number) => {
     if (!onDashboardNavigate) return;
     try {
-      const target = await notificationsApi.pendingOrder();
+      const target = await notificationsApi.pendingOrder(notificationId);
       if (!target.order_no) {
         appMessage.warning("没有找到待配置分润的订单");
         return;
@@ -125,11 +125,9 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
         />
         </Card>
         <BusinessAlerts
-          alerts={alerts}
-          loading={loading}
-          error={Boolean(error)}
-          onPendingProfitNotificationsClick={() => void openPendingProfitAllocation()}
+          onPendingProfitNotificationsClick={(notificationId) => void openPendingProfitAllocation(notificationId)}
           onProfitNotificationsRead={() => void loadSummary()}
+          active={active}
         />
       </div>
 

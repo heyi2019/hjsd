@@ -35,6 +35,9 @@ class ProfitNotificationDetailOut(BaseModel):
     order_no: str
     order_type: str
     sale_amount: Decimal | None
+    game_type: str | None = None
+    cost_amount: Decimal | None = None
+    allocatable_profit: Decimal | None = None
     stock_no: str | None
     inventory_entry_at: datetime
     removed_at: datetime | None

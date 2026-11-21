@@ -1,7 +1,7 @@
 """API-01 / NOTIFY-01 通知功能：通知读写规则与售出、分润提醒闭环。"""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
@@ -88,13 +88,21 @@ def test_notification_cursor_keeps_later_unread_after_previous_page_is_read(seed
         seeded_db, recipient_user_id=2, unread_only=True, notification_type="PROFIT_ALLOCATED", entity_type="order", before_id=first[-1].id, limit=2,
     )
     assert [item.id for item in second] == [rows[0].id]
+    rows[0].created_at = datetime(2026, 11, 22, 10)
+    rows[1].created_at = datetime(2026, 11, 21, 10)
+    rows[2].created_at = datetime(2026, 11, 21, 10)
+    seeded_db.flush()
+    first, _ = notification_service.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, limit=2)
+    assert [item.id for item in first] == [rows[0].id, rows[2].id]
+    next_page, _ = notification_service.list_notifications(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", sort_by_time=True, before_created_at=first[-1].created_at, before_id=first[-1].id, limit=2)
+    assert [item.id for item in next_page] == [rows[1].id]
 
 
 def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, seeded_db):
     account = seeded_db.get(User, 2)
     account.role = "OPERATOR"
     account.owner_scope = "SELF"
-    visible = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=2)
+    visible = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=2, account_snapshot={"game_account": "visible-aging"})
     hidden = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
     pending = _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_PENDING", entity_type="order", entity_id=visible.order_no)
     _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_PENDING", entity_type="other")
@@ -103,14 +111,33 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.status_code == 200, response.text
     assert response.json() == {"order_no": visible.order_no, "order_id": visible.id}
+    response = seeded_client.get("/api/notifications/pending-order", params={"notification_id": pending.id}, headers=auth)
+    assert response.json() == {"order_no": visible.order_no, "order_id": visible.id}
+    response = seeded_client.get("/api/notifications/pending-order", params={"notification_id": pending.id}, headers={"X-Dev-User": "admin"})
+    assert response.json() == {"order_no": None, "order_id": None}
     pending.entity_id = hidden.order_no
     seeded_db.flush()
     response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.status_code == 200, response.text
     assert response.json() == {"order_no": hidden.order_no, "order_id": None}
     notification_service.mark_read_batch(seeded_db, [pending.id], recipient_user_id=2, actor="pytest")
+    assert seeded_client.get("/api/notifications/pending-order", params={"notification_id": pending.id}, headers=auth).json() == {"order_no": hidden.order_no, "order_id": None}
     response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.json() == {"order_no": None, "order_id": None}
+    _buy(seeded_db, visible)
+    account = seeded_db.get(Account, visible.account_id)
+    account.inventory_entry_at = datetime(2020, 1, 1)
+    seeded_db.flush()
+    sync = seeded_client.post("/api/notifications/sync-inventory", headers=auth)
+    assert sync.status_code == 200, sync.text
+    rows = seeded_client.get("/api/notifications", params={"category": "inventory", "unread_only": True}, headers=auth).json()["items"]
+    item = next(row for row in rows if row["entity_id"] == str(account.id))
+    assert visible.order_no in item["message"]
+    assert "成本 500.00" in item["message"]
+    assert seeded_client.post("/api/notifications/read", json={"ids": [item["id"]]}, headers=auth).status_code == 200
+    assert seeded_client.post("/api/notifications/sync-inventory", headers=auth).status_code == 200
+    read_rows = seeded_client.get("/api/notifications", params={"category": "inventory", "read_only": True}, headers=auth).json()["items"]
+    assert len([row for row in read_rows if row["entity_id"] == str(account.id)]) == 1
 
 
 def test_mark_read_not_found(seeded_db):
@@ -233,10 +260,10 @@ def test_sell_completed_notifies_seller_to_allocate(seeded_db):
     sell_event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL"))
     post_event(seeded_db, order.id, event_type="CANCEL", amount="800", occurred_on=TODAY2,
                actor="pytest", offset_event_id=sell_event.id, reason="取消售出")
-    assert rows[0].read_at is not None
+    assert rows[0].read_at is None
     other_id = _uid(seeded_db, "seeduser2")
     _sell(seeded_db, order, operator_ids=[other_id])
-    assert len([row for row in _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING) if row.read_at is None]) == 0
+    assert len([row for row in _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING) if row.read_at is None]) == 1
     assert len([row for row in _notifs(seeded_db, other_id, triggers.PROFIT_PENDING) if row.read_at is None]) == 1
 
 def test_sell_pending_notification_is_idempotent(seeded_db):
@@ -295,8 +322,8 @@ def test_set_allocations_after_completion_notifies_recipients(seeded_db):
 
     assert len(_notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 1
     assert len(_notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)) == 1
-    assert _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)[0].read_at is not None
-    assert _notifs(seeded_db, recipient_id, triggers.PROFIT_PENDING)[0].read_at is not None
+    assert _notifs(seeded_db, seller_id, triggers.PROFIT_PENDING)[0].read_at is None
+    assert _notifs(seeded_db, recipient_id, triggers.PROFIT_PENDING)[0].read_at is None
 
 def test_set_allocations_repeat_is_idempotent(seeded_db):
     """重复保存同一分润，接收人只收到一次「已确认」。"""
@@ -326,15 +353,15 @@ def test_set_allocations_repeat_is_idempotent(seeded_db):
     _set_person_allocations(seeded_db, order, changed)
     rows = _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)
     assert len(rows) == 3
-    assert sum(row.read_at is None for row in rows) == 1
+    assert sum(row.read_at is None for row in rows) == 2
 
     replacement_id = _uid(seeded_db, "seeduser3")
     _set_person_allocations(seeded_db, order, [{"user_id": replacement_id, "role": "OWNER", "allocation_rate": "100"}])
-    assert all(row.read_at is not None for row in _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED))
+    assert sum(row.read_at is None for row in _notifs(seeded_db, recipient_id, triggers.PROFIT_ALLOCATED)) == 2
     assert len([row for row in _notifs(seeded_db, replacement_id, triggers.PROFIT_ALLOCATED) if row.read_at is None]) == 1
     _set_person_allocations(seeded_db, order, [{"user_id": replacement_id, "role": "OWNER", "allocation_rate": "0"},
                                                {"user_id": None, "role": "OWNER", "allocation_rate": "100"}])
-    assert all(row.read_at is not None for row in _notifs(seeded_db, replacement_id, triggers.PROFIT_ALLOCATED))
+    assert sum(row.read_at is None for row in _notifs(seeded_db, replacement_id, triggers.PROFIT_ALLOCATED)) == 1
 
 def test_company_allocation_is_not_notified(seeded_db):
     """公司归属（user_id 为空）不通知，只通知绑定的利润接收人。"""
@@ -419,6 +446,7 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     _buy(seeded_db, order)
     _sell(seeded_db, order)
     mine = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
+    pending = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
     other = _make_unread(seeded_db, recipient_user_id=_uid(seeded_db, "seeduser2"), notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
     missing = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id="NO-SUCH-ORDER")
 
@@ -427,6 +455,14 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     assert [item["notification_id"] for item in response.json()] == [mine.id]
     assert response.json()[0]["order_no"] == order.order_no
     assert Decimal(response.json()[0]["sale_amount"]) == Decimal("800")
+    pending_detail = seeded_client.get("/api/notifications/profit-details", params={"ids": pending.id}, headers={"X-Dev-User": "admin"})
+    assert pending_detail.status_code == 200, pending_detail.text
+    detail = pending_detail.json()[0]
+    ledger = seeded_client.get("/api/orders", params={"keyword": order.order_no}, headers={"X-Dev-User": "admin"}).json()
+    ledger_order = next(item for item in ledger["items"] if item["id"] == order.id)
+    assert Decimal(detail["cost_amount"]) == Decimal(ledger_order["cost_amount"])
+    allocation = seeded_client.get(f"/api/orders/{order.id}/profit-allocations", headers={"X-Dev-User": "admin"}).json()
+    assert Decimal(detail["allocatable_profit"]) == Decimal(allocation["allocatable_profit"])
     original = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers={"X-Dev-User": "admin"})
     assert original.status_code == 200, original.text
     execution = original.json()

@@ -64,11 +64,11 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 90,
+        "files": 91,
         "layers": {
           "fast": 27,
           "quick": 7,
-          "react": 44,
+          "react": 45,
           "deep": 12
         },
         "cases": {
@@ -92,7 +92,7 @@
             "finance": 4,
             "operations": 3,
             "settings": 15,
-            "shared": 8,
+            "shared": 9,
             "system": 5
           }
         },

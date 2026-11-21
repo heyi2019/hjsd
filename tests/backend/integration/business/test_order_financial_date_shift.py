@@ -45,7 +45,7 @@ from app.domain.trade import (
 )
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.business.mutations import update_order
+from app.business.orders.mutations import update_order
 from app.operations.r2_monthly_pnl import r2_monthly_pnl
 from app.business.inventory.profile import create_account
 

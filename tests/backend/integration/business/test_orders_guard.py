@@ -27,7 +27,7 @@ from app.business.cancellation_model import get_cancellation_offset as _get_offs
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.orders.events_rules import _resolve_pool
-from app.business.mutations import update_order
+from app.business.orders.mutations import update_order
 from app.business.orders.queries import list_orders
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer

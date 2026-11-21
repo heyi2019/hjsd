@@ -577,6 +577,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/分润 · HS-2026-0001/);
     const amount = within(modal).getAllByLabelText("金额")[0];
     const rate = within(modal).getAllByLabelText("比例")[0];
+    expect(amount.closest(".money-input")).toHaveTextContent("¥");
+    expect(amount).toHaveAttribute("inputmode", "decimal");
     expect(rate).toHaveValue("10.00");
     vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
     fireEvent.change(amount, { target: { value: "200.00" } });

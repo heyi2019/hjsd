@@ -5,6 +5,7 @@ import {
   AdaptiveFormGrid,
   BusinessActionModal,
   BusinessRegistrationForm,
+  MoneyInput,
   MoneyText,
 } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
@@ -151,9 +152,9 @@ function AllocationFields({
                   label="金额"
                   rules={moneyRules("金额", { allowNegative: true })}
                 >
-                  <Input
+                  <MoneyInput
                     prefix="¥"
-                    inputMode="decimal"
+                    suffix=""
                     className="ui-control-width-140"
                     onChange={() => { invalidateConversion(field.name); allocationForm.setFieldValue(["allocations", field.name, "allocation_rate"], ""); }}
                     onBlur={(event) => convertValue(field.name, "AMOUNT_TO_RATE", event.target.value, "allocation_rate")}

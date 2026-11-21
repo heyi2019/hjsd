@@ -1891,6 +1891,23 @@ describe("库存售出三表单分支", () => {
     })));
   });
 
+  it("分期预览回填大额金额并保留用户修改的分位", async () => {
+    const preview = { per_period: "9999999999999999.98", per_period_service_fee: "9999999999999999.98" } as never;
+    vi.mocked(installmentsApi.previewSalePlan).mockReturnValue(new Promise(() => {})).mockResolvedValueOnce(preview);
+    renderLight(<RecoverySaleModal account={accounts[0] as Account} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    fireEvent.change(await screen.findByLabelText("售出金额"), { target: { value: "100" } });
+    await ui.click(screen.getByText("分期付款"));
+    const perPeriod = await screen.findByLabelText("每期金额");
+    const fee = screen.getByLabelText("每期服务费");
+    await waitFor(() => expect(perPeriod).toHaveValue("9999999999999999.98"));
+    expect(fee).toHaveValue("9999999999999999.98");
+    const calls = vi.mocked(installmentsApi.previewSalePlan).mock.calls.length;
+    vi.mocked(installmentsApi.previewSalePlan).mockResolvedValueOnce(preview);
+    fireEvent.change(perPeriod, { target: { value: "9999999999999999.99" } });
+    await waitFor(() => expect(installmentsApi.previewSalePlan).toHaveBeenCalledTimes(calls + 1));
+    await waitFor(() => expect(perPeriod).toHaveValue("9999999999999999.99"));
+  });
+
   it("提号库存售出可选择分期出售，确立时收首付", async () => {
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
       ...allFormFields().filter((field) => field.order_type_code === scope),

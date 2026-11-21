@@ -21,6 +21,7 @@ import { collectFullPayment, collectInstallmentPayment } from "./receiver";
 import { SaleFinanceCard } from "./SaleFinanceCard";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useRequestSession } from "../../../shared/hooks/useLatestRequest";
+import { compareMoney } from "../../../shared/lib/money";
 import "./sale-modal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
@@ -76,8 +77,8 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
   const periodServiceFee = Form.useWatch("per_period_service_fee", form);
   const perPeriod = Form.useWatch("per_period", form);
   const periods = Form.useWatch("periods", form);
-  const lastAutoPeriodFee = useRef<number | undefined>();
-  const lastAutoPeriodAmount = useRef<number | undefined>();
+  const lastAutoPeriodFee = useRef<string | undefined>();
+  const lastAutoPeriodAmount = useRef<string | undefined>();
   const [plan, setPlan] = useState<SaleInstallmentPlan | null>(null);
 
   useEffect(() => {
@@ -101,14 +102,14 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
       }).then((result) => {
         if (cancelled) return;
         setPlan(result);
-        const nextFee = Number(result.per_period_service_fee);
-        const isAutoFee = periodServiceFee === undefined || Number(periodServiceFee) === lastAutoPeriodFee.current;
+        const nextFee = result.per_period_service_fee;
+        const isAutoFee = periodServiceFee === undefined || (lastAutoPeriodFee.current !== undefined && compareMoney(String(periodServiceFee), lastAutoPeriodFee.current) === 0);
         if (isAutoFee) {
           form.setFieldValue("per_period_service_fee", nextFee);
           lastAutoPeriodFee.current = nextFee;
         }
-        const nextAmount = Number(result.per_period);
-        const isAutoAmount = perPeriod === undefined || Number(perPeriod) === lastAutoPeriodAmount.current;
+        const nextAmount = result.per_period;
+        const isAutoAmount = perPeriod === undefined || (lastAutoPeriodAmount.current !== undefined && compareMoney(String(perPeriod), lastAutoPeriodAmount.current) === 0);
         if (isAutoAmount) {
           form.setFieldValue("per_period", nextAmount);
           lastAutoPeriodAmount.current = nextAmount;

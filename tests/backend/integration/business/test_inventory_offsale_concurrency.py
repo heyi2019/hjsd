@@ -13,7 +13,7 @@ from app.business import schemas
 from app.business.shared.operations.consignment import register_consignment
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.business.routers.order_events_router import inventory_offsale
+from app.business.orders.routers.order_events_router import inventory_offsale
 from app.core.errors import AppError
 from app.core.security import DEV_USERS
 from app.domain.base import Base

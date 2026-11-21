@@ -32,7 +32,7 @@ from app.business.orders.events import post_event as orders_post_event
 from app.business.cancellation_model import cancel_order as orders_cancel_order
 from app.business.shared.operations.sale import apply_sale_details, sale_form_context
 
-from ..orders.router_output import (
+from ..router_output import (
     _actor,
     _order_output,
     _operator_names,

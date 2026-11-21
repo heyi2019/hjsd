@@ -28,7 +28,7 @@ from app.workbench.notifications.router import router as notifications_router
 from app.operations.router import router as reporting_router
 from app.funds.router import router as finance_router
 from app.business.installments.router import router as installments_router
-from app.business.router import router as orders_router
+from app.business.orders.router import router as orders_router
 from app.business.export_router import export_router as order_exports_router
 from app.business.form_fields_router import router as order_form_fields_router
 from app.customers.router import router as parties_router

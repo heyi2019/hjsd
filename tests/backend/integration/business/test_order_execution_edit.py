@@ -123,7 +123,7 @@ def test_execution_edit_saves_more_than_twenty_operations(seeded_client, seeded_
 
 
 def test_new_operation_requires_event_permission(seeded_client, seeded_db):
-    from app.business.routers.order_execution_router import edit_order_detail
+    from app.business.orders.routers.order_execution_router import edit_order_detail
     from app.core.security import CurrentUser, PERM_ORDER_UPDATE
     account = create_account(seeded_db, game_account="profile-operation-permission", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
@@ -823,7 +823,7 @@ def test_cashflow_batch_cross_order_rejects_and_rolls_back_prior_edit(seeded_cli
 
 
 def test_cashflow_edit_rejects_invisible_pool(seeded_client, seeded_db):
-    from app.business.routers.order_execution_router import edit_order_detail
+    from app.business.orders.routers.order_execution_router import edit_order_detail
     from app.core.security import CurrentUser, PERM_ORDER_UPDATE
 
     account = create_account(seeded_db, game_account="cashflow-hidden-pool", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")

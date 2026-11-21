@@ -14,8 +14,10 @@ export function BusinessPeriodPicker({ label = "当期日期区间", state, show
         if (value?.[0] && value?.[1]) setPeriod({ from: value[0].format("YYYY-MM-DD"), to: value[1].format("YYYY-MM-DD") });
       }}
     />
-    <button type="button" className="ui-period-shortcut" disabled={!ready} onClick={useCurrentPeriod}>本期</button>
-    <button type="button" className="ui-period-shortcut" disabled={!ready} onClick={usePreviousPeriod}>上期</button>
-    {showAll ? <button type="button" className="ui-period-shortcut" disabled={!ready} aria-pressed={period === null} onClick={useAllPeriods}>全部</button> : null}
+    <Space size="small">
+      <button type="button" className="ui-period-shortcut" disabled={!ready} onClick={useCurrentPeriod}>本期</button>
+      <button type="button" className="ui-period-shortcut" disabled={!ready} onClick={usePreviousPeriod}>上期</button>
+      {showAll ? <button type="button" className="ui-period-shortcut" disabled={!ready} aria-pressed={period === null} onClick={useAllPeriods}>全部</button> : null}
+    </Space>
   </Space>;
 }

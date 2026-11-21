@@ -5,7 +5,7 @@ from datetime import date
 from decimal import Decimal
 from sqlalchemy import select
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.errors import ErrorCode
 from app.domain.enums import AccountStatus
 from app.domain.foundation import Pool

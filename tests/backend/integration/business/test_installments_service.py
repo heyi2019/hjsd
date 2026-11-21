@@ -64,7 +64,7 @@ def _account(
     business_mode="SELF",
     inventory_type="RECOVERY",
 ):
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
 
     return create_account(
         seeded_db,

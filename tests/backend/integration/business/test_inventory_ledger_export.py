@@ -10,7 +10,7 @@ from sqlalchemy import event as sqlalchemy_event, text
 from app.business.create import create_order
 from app.business.events import post_event
 from app.business.order_detail.view import execution
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.security import CurrentUser
 from app.domain.trade import Cashflow, Installment, InstallmentDisposition, RebateRecord
 from app.shared.audit import record_audit
@@ -264,12 +264,12 @@ def test_inventory_ledger_export_is_server_owned(seeded_client, headers):
 
 
 def test_inventory_ledger_export_has_no_total_limit(seeded_client, headers, monkeypatch):
-    from app.business.stocks.inventory import inventory_ledger
+    from app.business.inventory.inventory import inventory_ledger
     seen = []
     def spy(db, **kwargs):
         seen.append(kwargs.get("limit"))
         return inventory_ledger(db, **kwargs)
-    monkeypatch.setattr("app.business.stocks.router.stocks_inventory_ledger", spy)
+    monkeypatch.setattr("app.business.inventory.router.stocks_inventory_ledger", spy)
     response = seeded_client.get("/api/stocks/inventory/ledger/export.csv", headers=headers)
     assert response.status_code == 200, response.text
     assert seen == [None]

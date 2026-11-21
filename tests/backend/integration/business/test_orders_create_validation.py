@@ -15,7 +15,7 @@ from app.core.security import CurrentUser, build_access_token
 from app.domain.enums import (
     AccountStatus,
     CustomerStatus)
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer, set_customer_status
 from app.domain.trade import Account, Order

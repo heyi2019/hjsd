@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.core.security import CurrentUser
-from app.business.stocks.collaboration import load_order_execution, load_order_execution_batch
-from app.business.stocks.schemas import AccountOut
+from app.business.inventory.collaboration import load_order_execution, load_order_execution_batch
+from app.business.inventory.schemas import AccountOut
 
 
 INVENTORY_EXPORT_HEADERS = (

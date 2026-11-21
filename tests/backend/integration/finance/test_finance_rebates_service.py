@@ -7,7 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
 from app.core.tokens import hash_password

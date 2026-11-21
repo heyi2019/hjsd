@@ -17,7 +17,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog

@@ -19,8 +19,8 @@ from app.domain.enums import AccountStatus, AuditAction
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import Account, Order
 from app.domain.users import User
-from app.business.stocks.inventory import inventory, inventory_ledger, list_accounts, total_inventory_cost
-from app.business.stocks.profile import create_account, get_account, update_account_profile
+from app.business.inventory.inventory import inventory, inventory_ledger, list_accounts, total_inventory_cost
+from app.business.inventory.profile import create_account, get_account, update_account_profile
 from app.funds.cashflows import create_cashflow
 from app.funds.rebates import create_rebate
 from app.business.create import create_order
@@ -169,7 +169,7 @@ class TestCreateAccountGuards:
         assert row["account"]["source_order_no"] == order.order_no
         assert source_queries == []
 
-        from app.business.stocks.router_output import _account_outputs
+        from app.business.inventory.router_output import _account_outputs
         admin = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
         normal = _account_outputs(seeded_db, [account], admin)[0]
         reused = _account_outputs(seeded_db, [account], admin, loaded_orders=[order])[0]

@@ -29,6 +29,6 @@ __all__ = [
 
 # 跨域注册（P0-A 第三批）：stocks 台账页的订单列输出经注册点取用，
 # stocks 不反向 import 本模块（合法方向只有 orders -> stocks）。
-from app.business.stocks.collaboration import register_order_list_payload_builder  # noqa: E402
+from app.business.inventory.collaboration import register_order_list_payload_builder  # noqa: E402
 
 register_order_list_payload_builder(_order_list_payload)

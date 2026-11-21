@@ -13,9 +13,9 @@ from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.shared.order_access import get_order
 from app.shared.order_amounts import order_profit_flow_by_order
-from app.business.stocks.profile import get_account
-from app.business.stocks.router_output import _account_outputs
-from app.business.stocks.schemas import AccountOut
+from app.business.inventory.profile import get_account
+from app.business.inventory.router_output import _account_outputs
+from app.business.inventory.schemas import AccountOut
 from app.business.router_output import cancellable_by_event
 from .execution_schemas import AccountAuditOut, AccountExecutionDetailOut
 
@@ -232,7 +232,7 @@ def load_order_execution_details_for_export(
 
 # 跨域注册（P0-A 第三批）：库存台账导出的执行明细读取经注册点取用，
 # stocks 不反向 import 本模块（合法方向只有 orders -> stocks）。
-from app.business.stocks.collaboration import register_order_execution_loader, register_order_execution_batch_loader  # noqa: E402
+from app.business.inventory.collaboration import register_order_execution_loader, register_order_execution_batch_loader  # noqa: E402
 
 register_order_execution_loader(load_order_execution_detail)
 register_order_execution_batch_loader(load_order_execution_details_for_export)

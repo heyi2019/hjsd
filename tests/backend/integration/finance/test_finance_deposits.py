@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.errors import NotFound, Validation
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType

@@ -19,12 +19,12 @@ from app.settings.auth.session import (
 from app.domain.enums import AuditAction
 from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
-from app.business.stocks.inventory import (
+from app.business.inventory.inventory import (
     inventory_ledger as stocks_inventory_ledger,
     list_accounts as stocks_list_accounts,
 )
-from app.business.stocks.deletion import delete_inventory as stocks_delete_inventory
-from app.business.stocks.export import build_inventory_ledger_csv
+from app.business.inventory.deletion import delete_inventory as stocks_delete_inventory
+from app.business.inventory.export import build_inventory_ledger_csv
 from app.shared.audit import record_audit
 from app.core.errors import PermissionDenied
 
@@ -37,7 +37,7 @@ from .router_output import (
     _actor,
     _account_outputs,
 )
-from app.business.stocks.collaboration import build_order_list_payload
+from app.business.inventory.collaboration import build_order_list_payload
 
 router = APIRouter(tags=["ACC-01 账号台账"])
 

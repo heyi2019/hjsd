@@ -83,7 +83,7 @@ def _cashflow_row(**overrides):
     return row
 
 def _order_with_buy_event(seeded_db):
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
     from app.business.create import create_order
     from app.business.events import post_event
 

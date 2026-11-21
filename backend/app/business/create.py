@@ -20,7 +20,7 @@ from app.shared.form_field_rules import validate_business_responsible, validate_
 from app.customers.counterparties import assert_counterparty_usable
 from app.customers.customer_merge import assert_customer_usable
 from app.shared.form_values import set_extra_values
-from app.business.stocks.profile import get_account
+from app.business.inventory.profile import get_account
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import ErrorCode, Validation

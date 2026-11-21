@@ -79,7 +79,7 @@ def delete_order(
 
     if inventory_id is not None and delete_inventory_after:
         # 延迟导入避免模块级循环依赖；订单已删，直接删除库存主档，不再反向查订单。
-        from app.business.stocks.deletion import delete_inventory_record
+        from app.business.inventory.deletion import delete_inventory_record
 
         delete_inventory_record(
             session,
@@ -233,6 +233,6 @@ __all__ = ["delete_order"]
 
 # 跨域注册（P0-A 第三批）：库存删除联动订单删除经注册点调用，
 # stocks 不反向 import 本模块（合法方向只有 orders -> stocks）。
-from app.business.stocks.collaboration import register_linked_order_deleter  # noqa: E402
+from app.business.inventory.collaboration import register_linked_order_deleter  # noqa: E402
 
 register_linked_order_deleter(delete_order)

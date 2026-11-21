@@ -15,7 +15,7 @@ from datetime import date
 import pytest
 from sqlalchemy import select, text
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.domain.trade import Account, OrderEvent
 from app.business import events as order_events
 

@@ -25,7 +25,7 @@ TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
 
 def _account(seeded_db, game_account: str):
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
 
     return create_account(
         seeded_db,

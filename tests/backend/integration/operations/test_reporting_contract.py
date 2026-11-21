@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import select
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, build_access_token

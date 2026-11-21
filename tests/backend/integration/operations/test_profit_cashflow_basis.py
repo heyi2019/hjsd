@@ -42,7 +42,7 @@ from app.operations.profit import order_profit_detail
 from app.operations.r2_monthly_pnl import r2_monthly_pnl
 from app.operations.r3_commission import r3_commission_reconciliation
 from app.operations.r5_business_pnl import r5_business_pnl
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from sqlalchemy import select
 
 D = date(2026, 10, 17)

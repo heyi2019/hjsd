@@ -27,7 +27,7 @@ from app.business.order_detail.editing.schemas import ExecutionEditRequest
 from app.business.order_detail.view.execution import load_order_execution_detail
 from app.business.order_detail.view.execution_schemas import AccountExecutionDetailOut
 from app.business.order_detail.view.image_previews import account_image_versions, image_version, preview_account_images
-from app.business.stocks.profile import get_account
+from app.business.inventory.profile import get_account
 
 
 router = APIRouter(tags=["ORD-01/02 订单与事件"])

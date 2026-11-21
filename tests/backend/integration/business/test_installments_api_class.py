@@ -28,7 +28,7 @@ TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)
 
 def _account(seeded_db, game_account: str):
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
 
     return create_account(
         seeded_db,
@@ -224,7 +224,7 @@ class TestInstallmentsApi:
         ("HS", "SALEREC", True), ("TH", "SALETH", True),
     ])
     def test_stock_sale_uses_its_own_custom_fields(self, seeded_client, seeded_db, headers, order_type, scope, installment):
-        from app.business.stocks.profile import create_account
+        from app.business.inventory.profile import create_account
 
         inventory_type = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[order_type]
         account = create_account(
@@ -333,7 +333,7 @@ class TestInstallmentsApi:
         ("HS", True, "customer_nickname"), ("TH", True, "intermediary_platform"),
     ])
     def test_stock_sale_conditions_use_actual_form_values(self, seeded_client, seeded_db, headers, order_type, installment, dependency):
-        from app.business.stocks.profile import create_account
+        from app.business.inventory.profile import create_account
 
         account = create_account(seeded_db, game_account=f"sale-condition-{order_type}-{installment}-{dependency}",
             business_mode="SELF" if order_type == "HS" else "DISTRIBUTION",
@@ -525,7 +525,7 @@ class TestInstallmentsApi:
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "SELL")) is None
 
     def test_consignment_sale_reuses_existing_consignor_and_records_sale_amount(self, seeded_client, seeded_db, headers):
-        from app.business.stocks.profile import create_account
+        from app.business.inventory.profile import create_account
         from app.customers.customers import create_customer
         customer = create_customer(seeded_db, display_name="代挂委托人", phone="13800138001", actor="pytest")
         account = create_account(seeded_db, game_account="atomic-consignment-sale", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
@@ -691,7 +691,7 @@ class TestInstallmentsApi:
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")) is None
 
     def test_stock_sale_with_zero_down_payment_creates_no_cashflow(self, seeded_client, seeded_db, headers):
-        from app.business.stocks.profile import create_account
+        from app.business.inventory.profile import create_account
         account = create_account(seeded_db, game_account="atomic-sale-zero-down", business_mode="DISTRIBUTION", inventory_type="PICKUP", actor="pytest")
         order = _order(seeded_db, order_type="TH", account_id=account.id)
         _buy(seeded_db, order.id, "100")

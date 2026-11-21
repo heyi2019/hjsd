@@ -11,7 +11,7 @@ from app.shared.audit import record_audit
 from app.core.security import CurrentUser, DEV_USERS, build_access_token
 from app.domain.enums import (
     AuditAction)
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.business.installments import create as inst_create
 from app.funds.rebates import create_rebate
 from app.business.create import create_order

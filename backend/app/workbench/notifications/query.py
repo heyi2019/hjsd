@@ -21,7 +21,7 @@ def visibility_filter(session: Session, user: CurrentUser):
     other = Notification.notification_type.notin_((INVENTORY_AGING, INSTALLMENT_OVERDUE))
     if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
         return other
-    from app.business.stocks._common import scope_filter
+    from app.business.inventory._common import scope_filter
     visible_accounts = select(cast(Account.id, String))
     account_scope = scope_filter(session, user)
     if account_scope is not None:

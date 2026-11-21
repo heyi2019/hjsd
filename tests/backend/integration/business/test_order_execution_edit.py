@@ -7,7 +7,7 @@ import pytest
 from sqlalchemy import event as sqlalchemy_event, select
 from sqlalchemy.orm import Session
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.domain.foundation import AuditLog
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, Reconciliation

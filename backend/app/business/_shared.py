@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 from app.business.schemas import OrderAccountSnapshot
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from sqlalchemy.orm import Session
 from app.core.errors import (
     ErrorCode,

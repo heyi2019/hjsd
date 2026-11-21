@@ -14,7 +14,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import (
     AccountStatus,
     OrderStatus)
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.domain.trade import Account, Cashflow
 from app.business.cancellation_model import cancel_order
 from app.business.create import create_order

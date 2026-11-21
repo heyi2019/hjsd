@@ -24,7 +24,7 @@ from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
 from app.business import events
 from app.business.create import create_order
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 
 TODAY = date(2026, 10, 6)
 

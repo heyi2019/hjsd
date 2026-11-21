@@ -15,7 +15,7 @@ from decimal import Decimal
 
 import pytest
 
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import (

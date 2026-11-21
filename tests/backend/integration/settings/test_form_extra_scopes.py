@@ -18,7 +18,7 @@ from app.settings.field_definitions.catalog_seed import seed_catalog
 from app.domain.form_scopes import FORM_SCOPES
 from app.shared.form_field_rules import validate_business_responsible, validate_form_extra
 from app.shared.form_field_value import has_field_value
-from app.business.stocks.profile import update_account_profile
+from app.business.inventory.profile import update_account_profile
 
 
 D = "2026-10-27"

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Account, Order
-from app.business.stocks.profile import update_account_profile
+from app.business.inventory.profile import update_account_profile
 
 from .schemas import ExecutionEditRequest
 from .cashflows import apply_cashflow_edits, lock_edit_pools, prepare_cashflow_event_edits

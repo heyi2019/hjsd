@@ -21,7 +21,7 @@ from app.core.settings import Settings, get_settings
 from app.core.request_context import reset_request_id, set_request_id
 from app.core.schemas import EngineInfoOut, HealthOut
 from app.settings.field_definitions.router import router as foundation_router
-from app.business.stocks.router import router as stocks_router
+from app.business.inventory.router import router as stocks_router
 from app.settings.audit.router import router as audit_router
 from app.funds.profit_allocation.router import router as profit_allocation_router
 from app.workbench.notifications.router import router as notifications_router

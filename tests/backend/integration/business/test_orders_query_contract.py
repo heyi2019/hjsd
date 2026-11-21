@@ -13,7 +13,7 @@ from app.core.security import CurrentUser, DEV_USERS
 from app.domain.enums import (
     AccountStatus,
     OrderStatus)
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.customers.customers import create_customer, list_customers, count_customers
 from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, OrderEvent

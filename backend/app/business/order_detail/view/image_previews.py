@@ -8,7 +8,7 @@ from io import BytesIO
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from app.business.stocks.schemas import AccountOut
+from app.business.inventory.schemas import AccountOut
 
 IMAGE_FIELDS = ("secondary_images", "wallet_realname_images", "account_images")
 

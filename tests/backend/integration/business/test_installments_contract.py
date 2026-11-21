@@ -99,7 +99,7 @@ def test_installment_order_context_reads_only_display_fields(seeded_db):
     assert all("customers.phone" not in sql and "counterparties.phone" not in sql for sql in statements)
 
 def _account(seeded_db, game_account: str):
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
 
     return create_account(
         seeded_db,
@@ -158,7 +158,7 @@ def _contract(
 def test_cancel_distribution_installment_uses_business_specific_account_result(
     seeded_db, order_type, contract_type, business_mode, inventory_type, expected_status
 ):
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
 
     account = create_account(
         seeded_db,
@@ -249,7 +249,7 @@ def test_cancel_installment_then_resell_in_installments(seeded_client, seeded_db
     from sqlalchemy import event
     from app.business.router_output import _order_list_payload
     from app.shared.order_amounts import order_cashflow_profit_by_order
-    from app.business.stocks.profile import create_account
+    from app.business.inventory.profile import create_account
     account = create_account(seeded_db, game_account=f"repeat-installment-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type="RECOVERY" if order_type == "HS" else "PICKUP", actor="pytest")
     order = _order(seeded_db, order_type=order_type, account_id=account.id)
     _buy(seeded_db, order.id, "100")

@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.business.stocks.schemas import AccountOut
+from app.business.inventory.schemas import AccountOut
 from .schemas import OrderDetailViewOut
 
 

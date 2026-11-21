@@ -11,7 +11,7 @@ from app.funds.cashflows import create_cashflow
 from app.funds.deposits.writes import create_deposit
 from app.business import events
 from app.business.create import create_order
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 
 
 TODAY = date(2026, 10, 6)

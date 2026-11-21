@@ -10,7 +10,7 @@
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
 #   L3  业务域     与前端 6 导航 key 一一对应：workbench（含 notifications）/ business（含
-#                  stocks、installments）/ customers / funds（含 profit_allocation）/
+#                  inventory、installments）/ customers / funds（含 profit_allocation）/
 #                  operations / settings（含 field_definitions、options、lists、auth、
 #                  audit、attachments）。依赖 L0+L1+L2。
 #
@@ -100,4 +100,4 @@ forbidden_modules =
     app.funds
 
 # 2026-11-19 域归并后契约收敛为 3 条：子模块均随父包被既有契约覆盖，
-# 不新增禁止边（stocks/notifications/settings 六子模块均已并入对应父域）。
+# 不新增禁止边（inventory/notifications/settings 六子模块均已并入对应父域）。

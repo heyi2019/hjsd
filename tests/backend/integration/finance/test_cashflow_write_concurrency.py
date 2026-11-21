@@ -22,7 +22,7 @@ from app.funds.reconciliation import create_reconciliation, resolve_reconciliati
 from app.funds.cashflows import create_cashflow, delete_cashflow, reverse_cashflow, update_cashflow
 from app.settings.field_definitions.seeds import seed_foundation
 from app.business.create import create_order
-from app.business.stocks.profile import create_account
+from app.business.inventory.profile import create_account
 from app.funds.rebates import create_rebate, update_rebate
 
 pytestmark = pytest.mark.db

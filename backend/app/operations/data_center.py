@@ -14,7 +14,7 @@ from app.domain.trade import Account, Order
 from app.funds.cashflow_queries import studio_summary
 from app.funds.deposits.reads import deposit_held_total
 from app.business.queries import order_status_counts
-from app.business.stocks.inventory import inventory_cost_by_entry_date
+from app.business.inventory.inventory import inventory_cost_by_entry_date
 
 from ._shared import ZERO, _apply_order_scope, _validate_date_range, cashflow_totals_by_order
 

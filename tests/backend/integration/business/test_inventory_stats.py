@@ -15,8 +15,8 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
-from app.business.stocks.inventory import inventory_stats
-from app.business.stocks.profile import create_account
+from app.business.inventory.inventory import inventory_stats
+from app.business.inventory.profile import create_account
 
 
 def _account(seeded_db, game_account: str, *, cost: str = "0", entry_days_ago: int | None = None):

@@ -20,7 +20,7 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     """为当前用户可见的超期库存生成一次提醒，重复刷新不重复生成。"""
     if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
         return 0
-    from app.business.stocks.inventory import _inventory_ledger_scope
+    from app.business.inventory.inventory import _inventory_ledger_scope
     from app.workbench.reminder_config import read_reminder_config
 
     # 与同用户同步/已读操作串行，同时允许通知插入时的外键 KEY SHARE，避免与编号锁死锁。

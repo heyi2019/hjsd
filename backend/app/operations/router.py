@@ -22,7 +22,7 @@ from app.settings.auth.session import (
     get_current_user,
     require_permissions,
 )
-from app.business.stocks._common import scope_filter as account_scope_filter
+from app.business.inventory._common import scope_filter as account_scope_filter
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order
 from app.shared.scope import owner_scope_filter

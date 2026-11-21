@@ -247,6 +247,25 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.getByText("编辑行:无,草稿:无")).toBeInTheDocument();
   });
 
+  it.each(["执行金额", "资金明细金额"])("%s清空时保存前拦截", async (kind) => {
+    const event = { id: 7, event_type: "BUY", amount: "100.00", note: null, occurred_at: "2026-10-01T10:00:00" } as never;
+    const detail = { account: accounts[0], orders: [{ events: [event] }], detail_view: { finance_rows: [{ flow_no: "CF7", amount: "100.00", occurred_at: "", note: "" }] } } as never;
+    const notify = vi.spyOn(appMessage, "error");
+    function Probe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
+      return <><Form form={editor.invEditExtraForm} /><button onClick={() => void editor.openEditor(accounts[0] as Account)}>编辑</button>
+        <button onClick={() => kind === "执行金额" ? editor.updateEventDraft(event, { amount: "" }) : editor.updateFinanceDraft("CF7", { amount: "" })}>清空金额</button>
+        <button onClick={() => void editor.saveInline()}>保存</button><span>{editor.editingAccount ? "编辑中" : "未编辑"}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText("编辑中");
+    await ui.click(screen.getByRole("button", { name: "清空金额" }));
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(notify).toHaveBeenCalledWith("请填写有效的金额"));
+    expect(ordersApi.updateExecution).not.toHaveBeenCalled();
+  });
+
   it.each(["保存成功", "保存失败"])("%s前不能切换或取消当前编辑，避免丢失草稿", async (saveResult) => {
     let resolveSave!: (value: { ok: boolean }) => void;
     let rejectSave!: (error: Error) => void;

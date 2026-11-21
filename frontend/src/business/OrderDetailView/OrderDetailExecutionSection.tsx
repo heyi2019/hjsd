@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import type { ColumnsType } from "antd/es/table";
 import type { AccountExecutionEvent } from "../../shared/api/types/account-execution";
 import type { OrderDraft } from "./editing/use-order-detail-editor";
-import { DataTable, DateField, MoneyInput, MoneyText, Select } from "../../shared/ui";
+import { DataTable, DateField, MoneyText, Select } from "../../shared/ui";
+import { OrderDetailMoneyInput } from "./OrderDetailMoneyInput";
 import {
   OrderSectionHeading,
   OPERATION_CATEGORY_LABEL,
@@ -134,14 +135,10 @@ export function OrderDetailExecutionSection({
         const event = item.event;
         if (!editing || !event || !isEditableCashflowEvent(event)) return <MoneyText value={value} />;
         return (
-          <MoneyInput
-            aria-label={`编辑执行金额 ${item.action}`}
+          <OrderDetailMoneyInput
+            label={`编辑执行金额 ${item.action}`}
             value={eventDrafts?.[event.id]?.amount ?? value}
-            status={/^\d*(\.\d{0,2})?$/.test(eventDrafts?.[event.id]?.amount ?? "") ? undefined : "error"}
-            onChange={(inputEvent) => {
-              const nextValue = inputEvent.target.value;
-              if (nextValue === "" || /^\d*(\.\d{0,2})?$/.test(nextValue)) onEventEdit?.(event, { amount: nextValue });
-            }}
+            onChange={(nextValue) => onEventEdit?.(event, { amount: nextValue })}
           />
         );
       },

@@ -2,7 +2,8 @@ import { Descriptions, Input, Typography } from "antd";
 import dayjs from "dayjs";
 import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
-import { DataTable, DateField, MoneyInput, MoneyText, Select } from "../../shared/ui";
+import { DataTable, DateField, MoneyText, Select } from "../../shared/ui";
+import { OrderDetailMoneyInput } from "./OrderDetailMoneyInput";
 import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Pool } from "../../shared/api/types/finance";
 import type { OrderFinanceRow, OrderDetailMeta } from "./OrderDetail.shared";
@@ -62,15 +63,11 @@ function editableFinanceColumns(
           if (row.poolId == null) return <MoneyText value={row.amount} />;
           const value = drafts?.[row.flowNo]?.amount ?? row.amount;
           return (
-            <MoneyInput
+            <OrderDetailMoneyInput
               className="order-finance-amount-input"
-              aria-label={`编辑资金明细金额 ${row.flowNo}`}
+              label={`编辑资金明细金额 ${row.flowNo}`}
               value={value}
-              status={/^\d*(\.\d{0,2})?$/.test(value) ? undefined : "error"}
-              onChange={(event) => {
-                const next = event.target.value;
-                if (next === "" || /^\d*(\.\d{0,2})?$/.test(next)) onEdit?.(row.flowNo, { amount: next });
-              }}
+              onChange={(next) => onEdit?.(row.flowNo, { amount: next })}
             />
           );
         },

@@ -6,6 +6,8 @@ import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/business/OrderDetailView/OrderDetail";
 import { OrderDetailImageGallery } from "@/business/OrderDetailView/OrderDetailImageGallery";
 import { OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
+import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
+import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
 import type { OrderDetailMeta } from "@/business/OrderDetailView/OrderDetail.shared";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
@@ -54,6 +56,16 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("清空执行金额和资金明细金额时在字段旁提示", () => {
+    const event = { id: 7, event_type: "BUY", amount: "100.00", cashflow: {} } as never;
+    renderLight(<>
+      <OrderDetailExecutionSection editing employees={[]} rows={[{ key: "event-7", orderId: 1, category: "INBOUND", action: "入库", occurredAt: "-", operator: "-", amount: "100.00", note: "-", platform: "-", event }]} eventDrafts={{ 7: { id: 7, amount: "", expected_amount: "100.00" } as never }} />
+      <OrderDetailFinanceSection editing rows={[{ key: "CF7", flowNo: "CF7", type: "支出", direction: "支出", amount: "100.00", occurredAt: "-", operator: "-", poolId: 1, poolName: "账户", note: "-" } as never]} orderExtras={[]} expenseCount={1} incomeCount={0} totalExpense="100.00" totalIncome="0" financeDrafts={{ CF7: { flow_no: "CF7", amount: "", occurred_at: "", note: "" } }} />
+    </>);
+    expect(screen.getByLabelText("编辑执行金额 入库")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("编辑资金明细金额 CF7")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getAllByText("请输入金额")).toHaveLength(2);
+  });
   it("编辑寄售价时保留大额金额精度", () => {
     const onEventEdit = vi.fn();
     const listing = { id: 7, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: "2026-10-01T10:00:00", form_extra: { consignment_platforms: ["平台甲"], consignment_price: "9999999999999999.99" } } as never;

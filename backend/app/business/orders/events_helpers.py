@@ -30,13 +30,13 @@ from app.domain.trade import Account, Installment, Order, OrderEvent
 from app.shared.operation_operators import validate_optional_operator_ids
 from app.shared.form_field_rules import validate_form_extra
 
-from ._common import _required_bool
-from .cancellation_model import (
+from .._common import _required_bool
+from ..cancellation_model import (
     get_cancellation_offset as _get_offset_event,
     opposite_cancellation_direction as _opposite_direction,
 )
 from .events_rules import _assert_pool_active, _resolve_pool
-from .delivery_fields import DELIVERY_FIELDS
+from ..delivery_fields import DELIVERY_FIELDS
 
 def _auto_link_recovered_installment_sale(
     session: Session,
@@ -51,7 +51,7 @@ def _auto_link_recovered_installment_sale(
     实际联动逻辑由 installments 域经 collaboration 注册点注入
     （orders 不得反向依赖 installments，见 backend/.importlinter）。
     """
-    from .collaboration import run_post_sell_hooks
+    from ..collaboration import run_post_sell_hooks
 
     run_post_sell_hooks(
         session,

@@ -21,7 +21,7 @@ from app.funds.deposits.lifecycle import cancel_deposit, lose_deposit, return_de
 from app.funds.deposits.reads import deposit_held_total, list_deposits
 from app.funds.reconciliation import create_reconciliation
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.funds.balances import pool_balance
 from app.customers.counterparties import create_counterparty, set_counterparty_status
 from app.operations.r2_monthly_pnl import r2_monthly_pnl

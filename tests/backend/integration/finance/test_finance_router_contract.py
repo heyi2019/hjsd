@@ -25,7 +25,7 @@ from app.funds.routers.reconciliation_router import (
     repair_transfer,
 )
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 
 TODAY = date(2026, 10, 17)

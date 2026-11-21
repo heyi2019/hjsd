@@ -20,7 +20,7 @@ from app.domain.enums import EventType, OperationType
 from app.domain.trade import Cashflow, Order, OrderEvent
 
 from app.shared.order_access import get_order
-from .events import post_event as _post_event
+from .orders.events import post_event as _post_event
 from .listing_state import active_listings
 
 

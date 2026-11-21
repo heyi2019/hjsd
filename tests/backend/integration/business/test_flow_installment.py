@@ -21,7 +21,7 @@ from app.domain.enums import Direction, InstallmentStatus, OrderStatus
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Order
 from app.domain.trade_models.cashflow import Cashflow
-from app.business import events
+from app.business.orders import events
 from app.business.orders.create import create_order
 from app.business.installments.create import create_installment
 from app.business.installments.recovery import deliver

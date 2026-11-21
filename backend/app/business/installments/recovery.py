@@ -11,7 +11,7 @@ from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
 from app.shared.scope import owner_scope_filter
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import (

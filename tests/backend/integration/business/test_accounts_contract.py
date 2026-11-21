@@ -24,7 +24,7 @@ from app.business.inventory.profile import create_account, get_account, update_a
 from app.funds.cashflows import create_cashflow
 from app.funds.rebates import create_rebate
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer
 

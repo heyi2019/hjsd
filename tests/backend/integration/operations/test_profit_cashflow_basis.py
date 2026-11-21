@@ -29,7 +29,7 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.shared.order_amounts import (
     event_totals,
     order_amounts,

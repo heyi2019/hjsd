@@ -18,7 +18,7 @@ from app.business.inventory.profile import create_account
 from app.domain.trade import Account, Cashflow
 from app.business.cancellation_model import cancel_order
 from app.business.orders.create import create_order
-from app.business.events import _opposite_direction, post_event
+from app.business.orders.events import _opposite_direction, post_event
 from app.funds.balances import pool_balance
 
 D = date(2026, 10, 4)

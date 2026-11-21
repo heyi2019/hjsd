@@ -28,7 +28,7 @@ from app.domain.trade import (
     OrderEvent,
 )
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.business.inventory.profile import create_account
 
 D = date(2026, 10, 20)

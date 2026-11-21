@@ -50,7 +50,7 @@ from app.business.installments import recovery as inst_recovery
 from app.business.installments.repayments.cancel import cancel_installment as inst_cancel
 from app.business.installments import settlement as inst_settlement
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 TODAY = date(2026, 10, 12)
 FUTURE = date(2026, 11, 30)

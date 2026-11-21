@@ -51,7 +51,7 @@ from app.business.installments.repayments.waive import waive_schedule as inst_wa
 from app.business.installments.repayments.extend import extend_schedule as inst_extend
 from app.business.installments import settlement as inst_settlement
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 TODAY = date(2026, 10, 12)
 FUTURE = date(2026, 11, 30)

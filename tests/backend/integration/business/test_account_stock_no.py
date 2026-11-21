@@ -17,7 +17,7 @@ from sqlalchemy import select, text
 
 from app.business.inventory.profile import create_account
 from app.domain.trade import Account, OrderEvent
-from app.business import events as order_events
+from app.business.orders import events as order_events
 
 KU_PATTERN = re.compile(r"^KU_\d{5}$")
 

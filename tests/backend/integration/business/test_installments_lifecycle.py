@@ -21,7 +21,7 @@ from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.installments.repayments.pay import _pick_schedule as inst_pick
 from app.business.installments.repayments.waive import waive_schedule as inst_waive
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 TODAY = date(2026, 10, 12)
 PAST = date(2026, 9, 1)

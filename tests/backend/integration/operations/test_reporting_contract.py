@@ -20,7 +20,7 @@ from app.domain.trade import Account, RebateRecord
 from app.domain.users import User
 from app.funds.cashflows import create_cashflow
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.funds.profit_allocation import service as policy_allocations
 from app.operations.profit import order_profit_detail
 from app.operations.r2_monthly_pnl import r2_monthly_pnl

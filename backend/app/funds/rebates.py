@@ -24,7 +24,7 @@ from app.domain.trade import Cashflow, OrderEvent, RebateRecord, Reconciliation
 from app.settings.field_definitions.pools import require_default_pool
 from app.shared.order_access import get_order
 from app.shared.operation_operators import validate_optional_operator_ids
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.shared.form_field_rules import validate_form_extra
 from ._common import _positive
 

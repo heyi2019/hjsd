@@ -354,7 +354,7 @@ def test_summary_paginates_items_without_changing_totals(seeded_client, seeded_d
 
 def test_summary_excludes_order_event_flows(seeded_client, seeded_db, headers):
     from app.business.orders.create import create_order
-    from app.business.events import post_event
+    from app.business.orders.events import post_event
     from app.business.inventory.profile import create_account
 
     account = create_account(

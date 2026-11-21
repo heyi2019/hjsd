@@ -18,7 +18,7 @@ from app.core.errors import Validation
 from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.foundation import Pool
 from app.funds.cashflows import create_cashflow, reverse_cashflow
-from app.business import events
+from app.business.orders import events
 from app.business.orders.create import create_order
 
 TODAY = date(2026, 10, 17)

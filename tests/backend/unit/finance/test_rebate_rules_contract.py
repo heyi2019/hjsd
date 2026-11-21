@@ -7,7 +7,7 @@ from decimal import Decimal
 from app.funds.rebates import create_rebate
 from app.business.inventory.profile import create_account
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 
 D = date(2026, 10, 17)

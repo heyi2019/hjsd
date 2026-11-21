@@ -16,7 +16,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.funds.reconciliation import create_reconciliation, resolve_reconciliation
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 TODAY = date(2026, 10, 4)
 

@@ -19,7 +19,7 @@ from sqlalchemy import select
 
 from app.domain.foundation import Pool
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 
 TODAY = date(2026, 10, 4)
 

@@ -15,7 +15,7 @@ from app.domain.users import User
 from app.funds import rebates
 from app.funds import cashflows
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.business.form_fields import create_order_form_field
 from app.domain.trade import Cashflow, Order, OrderEvent, OrderFormField, RebateRecord
 

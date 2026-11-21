@@ -83,7 +83,7 @@ def _cashflow_row(**overrides):
 def _order_with_buy_event(seeded_db):
     from app.business.inventory.profile import create_account
     from app.business.orders.create import create_order
-    from app.business.events import post_event
+    from app.business.orders.events import post_event
 
     account = create_account(
         seeded_db, game_account="cf-guard-account",

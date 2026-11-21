@@ -86,7 +86,7 @@ def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
 @pytest.mark.parametrize("first_action", ["edit", "reconcile"])
 @pytest.mark.parametrize("edit_kind", ["order", "rebate"])
 def test_reconciliation_and_amount_edit_serialize(v1_engine, first_action, edit_kind):
-    from app.business.events import post_event
+    from app.business.orders.events import post_event
     from app.business.order_detail.editing.editor import edit_execution_detail
     from app.business.order_detail.editing.schemas import ExecutionEditRequest
     from app.core.security import CurrentUser

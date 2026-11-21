@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.domain.foundation import Pool
 from app.funds.cashflows import create_cashflow
 from app.funds.deposits.writes import create_deposit
-from app.business import events
+from app.business.orders import events
 from app.business.orders.create import create_order
 from app.business.inventory.profile import create_account
 

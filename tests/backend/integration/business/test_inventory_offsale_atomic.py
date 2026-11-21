@@ -8,7 +8,7 @@ from sqlalchemy import select
 from app.business import schemas
 from app.business.consignment import platform_unlist_consignment, register_consignment
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.business.form_fields import create_order_form_field
 from app.business.routers.order_events_router import inventory_offsale
 from app.core.errors import Validation

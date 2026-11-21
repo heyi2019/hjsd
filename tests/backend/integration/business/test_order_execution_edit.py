@@ -12,7 +12,7 @@ from app.domain.foundation import AuditLog
 from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, Reconciliation
 from app.business.orders.create import create_order
-from app.business.events import post_event
+from app.business.orders.events import post_event
 from app.business.form_fields import create_order_form_field
 from app.core.database import get_db
 from app.customers.customers import create_customer

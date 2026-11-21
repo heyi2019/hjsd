@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from contextlib import nullcontext
 import csv
 import io
 import pytest
@@ -51,6 +52,35 @@ def test_inventory_csv_limits_detail_memory_to_each_batch(seeded_db, monkeypatch
     assert calls == [500, 500, 1]
     assert failed == 1001
     assert len(list(csv.reader(io.StringIO(csv_text)))) == 1002
+
+
+def test_inventory_csv_keeps_other_batches_when_one_detail_fails(monkeypatch):
+    account = SimpleNamespace(source_order_no="", business_mode="SELF", inventory_type="RECOVERY", game_type="",
+                              camp_account="", stock_no="KU", cost_amount=Decimal("0"), inventory_status="IN_STOCK",
+                              inventory_age_days=0, created_by="pytest", channel_region="", bound_phone="",
+                              has_secondary=None, account_description="", account_images=[], note="")
+    pairs = [(None, SimpleNamespace(id=i)) for i in range(501)]
+    detail = SimpleNamespace(orders=[], detail_view=None,
+                             finance_summary=SimpleNamespace(total_expense=Decimal("7"), total_income=Decimal("8")))
+    def load_batch(_db, ids, _user):
+        if ids[0] == 0:
+            raise RuntimeError("批量读取失败")
+        return [detail] * len(ids)
+    def load_one(_db, order_id, _user):
+        if order_id == 1:
+            raise RuntimeError("单条读取失败")
+        return detail
+    monkeypatch.setattr(inventory_export, "load_order_execution_batch", load_batch)
+    monkeypatch.setattr(inventory_export, "load_order_execution", load_one)
+    db = SimpleNamespace(begin_nested=nullcontext)
+    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
+    csv_text, failed = inventory_export.build_inventory_ledger_csv(pairs, [account] * len(pairs), db=db, user=user)
+    rows = list(csv.DictReader(io.StringIO(csv_text.lstrip("\ufeff"))))
+    assert len(rows) == 501
+    assert failed == 1
+    assert rows[0]["总收入"] == "8"
+    assert rows[1]["总收入"] == "0.00"
+    assert rows[-1]["总收入"] == "8"
 
 
 def test_inventory_export_batches_order_detail_queries(seeded_client, headers, seeded_db):

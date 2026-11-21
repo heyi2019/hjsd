@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from app.business.order_detail.view.derived import _finance_type
+from app.business.shared.order_detail.view.derived import _finance_type
 from app.business.output_labels import _elapsed_label
 from app.business.orders.router_outputs import detail
 

@@ -46,7 +46,7 @@ from app.business.installments.schemas import (
     ScheduleWaiveIn,
 )
 from app.business.schemas import EventCreate
-from app.business.order_detail.editing.schemas import ExecutionEditRequest
+from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
 from app.customers.schemas import (
     CounterpartyCreate,
     CounterpartyUpdate,

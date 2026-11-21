@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from sqlalchemy import event as sqlalchemy_event, text
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.business.order_detail.view import execution
+from app.business.shared.order_detail.view import execution
 from app.business.inventory.profile import create_account
 from app.core.security import CurrentUser
 from app.domain.trade import Cashflow, Installment, InstallmentDisposition, RebateRecord

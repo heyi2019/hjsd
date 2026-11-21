@@ -1090,7 +1090,7 @@ def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, se
 
 
 def test_listing_draft_conflict_checks_do_not_rescan_all_drafts(seeded_client, seeded_db, headers, monkeypatch):
-    from app.business.order_detail.editing.schemas import ExecutionEditItem
+    from app.business.shared.order_detail.editing.schemas import ExecutionEditItem
 
     account = create_account(seeded_db, game_account="listing-draft-scan", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
@@ -1159,7 +1159,7 @@ def test_duplicate_drafts_for_same_listing_are_rejected_without_mutation(seeded_
 
 
 def test_batch_linked_unlisting_conflict_matches_in_linear_time(seeded_client, seeded_db, headers, monkeypatch):
-    from app.business.order_detail.editing import events as editing_events
+    from app.business.shared.order_detail.editing import events as editing_events
 
     account = create_account(seeded_db, game_account="linked-conflict-batch", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

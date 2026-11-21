@@ -29,8 +29,8 @@ pytestmark = pytest.mark.db
 
 
 def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
-    from app.business.order_detail.editing.editor import edit_execution_detail
-    from app.business.order_detail.editing.schemas import ExecutionEditRequest
+    from app.business.shared.order_detail.editing.editor import edit_execution_detail
+    from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
     from app.core.security import CurrentUser
 
     database = f"heijin_rebate_date_test_{uuid4().hex}"
@@ -87,8 +87,8 @@ def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
 @pytest.mark.parametrize("edit_kind", ["order", "rebate"])
 def test_reconciliation_and_amount_edit_serialize(v1_engine, first_action, edit_kind):
     from app.business.orders.events import post_event
-    from app.business.order_detail.editing.editor import edit_execution_detail
-    from app.business.order_detail.editing.schemas import ExecutionEditRequest
+    from app.business.shared.order_detail.editing.editor import edit_execution_detail
+    from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
     from app.core.security import CurrentUser
     from app.funds.reconciliation import _system_balance_as_of
 

@@ -22,11 +22,11 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.shared.order_access import get_order as orders_get_order
-from app.business.order_detail.editing import edit_execution_detail
-from app.business.order_detail.editing.schemas import ExecutionEditRequest
-from app.business.order_detail.view.execution import load_order_execution_detail
-from app.business.order_detail.view.execution_schemas import AccountExecutionDetailOut
-from app.business.order_detail.view.image_previews import account_image_versions, image_version, preview_account_images
+from app.business.shared.order_detail.editing import edit_execution_detail
+from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
+from app.business.shared.order_detail.view.execution import load_order_execution_detail
+from app.business.shared.order_detail.view.execution_schemas import AccountExecutionDetailOut
+from app.business.shared.order_detail.view.image_previews import account_image_versions, image_version, preview_account_images
 from app.business.inventory.profile import get_account
 
 

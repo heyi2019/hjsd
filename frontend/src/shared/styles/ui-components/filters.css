@@ -108,11 +108,6 @@
 
 @media (--bp-md) {
   .settings-tabs > .ant-tabs-content-holder { max-height: none; overflow: visible; }
-  .dashboard-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@media (--bp-sm) {
-  .dashboard-page .ui-entry-row { grid-template-columns: 1fr; }
-  .dashboard-note { padding: var(--space-4); }
 }
 .ui-filter-bar {
   display: flex;

@@ -124,6 +124,10 @@
   .topbar__title { flex: 0 0 100%; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
+  .customer-list-filters > *,
+  .counterparty-filter-bar > * { flex: 0 1 auto; max-width: 100%; }
+  .customer-list-filters > :first-child,
+  .counterparty-filter-bar > :first-child { flex: 1 1 100%; }
   .ant-table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
   /* 单一滚动容器 = .ant-table-content（antd 默认已是 overflow-x:auto 的那层）：
      表宽取 max-content 撑开，横向滚动发生在 content 内而非 wrapper / page-content。

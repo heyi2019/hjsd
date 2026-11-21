@@ -2,6 +2,7 @@ import { Input, Radio } from "antd";
 import type { SaleInstallmentPlan } from "../../../shared/api/installments.api";
 import type { Pool } from "../../../shared/api/types/finance";
 import { AdaptiveFormGrid, MoneyInput, Select } from "../../../shared/ui";
+import { compareMoney } from "../../../shared/lib/money";
 import { CfgItem } from "../../ConfigurableField";
 import { InstallmentScheduleFields } from "../../InstallmentScheduleFields";
 
@@ -51,7 +52,7 @@ export function SaleFinanceCard({
         ) : (
           <div className="inventory-sale-installment-fields inventory-sale-installment-fields--grid">
             <p className="muted">出售时选择分期，系统会建立对应的售出分期合同，并将账号标记为“分期中”。</p>
-            <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, value) => { if (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > Number(saleAmount)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
+            <CfgItem name="down_payment" label="首付金额" initialValue="0" rules={[{ validator: async (_, value) => { const amount = String(value || "0"); const valid = compareMoney(amount, "0"); const maximum = compareMoney(amount, String(saleAmount ?? "")); if (valid === null || (maximum !== null && maximum > 0)) throw new Error("首付不能为负数或超过售出金额"); } }]}><MoneyInput placeholder="没有首付填 0" /></CfgItem>
             <CfgItem name="pool_id" label="资金账户" rules={downPayment != null && Number(downPayment) > 0 ? [{ required: true, message: "请选择首付收款资金账户" }] : []}>
               <Select placeholder="首付收款资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} notFoundContent="暂无可用资金账户" />
             </CfgItem>

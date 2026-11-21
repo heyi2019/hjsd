@@ -83,11 +83,13 @@ export function InventorySaleModalBase(props: InventorySaleModalProps) {
 
   useEffect(() => {
     const count = Number(periods);
-    const sale = Number(saleAmount);
-    const down = Number(downPayment ?? 0);
+    const sale = String(saleAmount ?? "");
+    const down = String(downPayment || "0");
+    const saleValid = compareMoney(sale, "0");
+    const downValid = compareMoney(down, sale);
     const fee = Number(serviceFee ?? 0);
-    if (!Number.isInteger(count) || count <= 0 || !Number.isFinite(sale) || sale < 0
-      || !Number.isFinite(down) || down < 0 || down > sale || !Number.isFinite(fee) || fee < 0) {
+    if (!Number.isInteger(count) || count <= 0 || saleValid === null
+      || downValid === null || downValid > 0 || !Number.isFinite(fee) || fee < 0) {
       setPlan(null);
       return;
     }

@@ -1891,6 +1891,17 @@ describe("库存售出三表单分支", () => {
     })));
   });
 
+  it("分期首付超过大额售出金额一分时提示并阻止提交", async () => {
+    vi.mocked(installmentsApi.previewSalePlan).mockReturnValue(new Promise(() => {}));
+    renderLight(<RecoverySaleModal account={accounts[0] as Account} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    fireEvent.change(await screen.findByLabelText("售出金额"), { target: { value: "9999999999999999.98" } });
+    await ui.click(screen.getByText("分期付款"));
+    fireEvent.change(await screen.findByLabelText("首付金额"), { target: { value: "9999999999999999.99" } });
+    await ui.click(screen.getByRole("button", { name: /确认售出/ }));
+    expect(await screen.findByText("首付不能为负数或超过售出金额")).toBeInTheDocument();
+    expect(installmentsApi.stockSale).not.toHaveBeenCalled();
+  });
+
   it("分期预览回填大额金额并保留用户修改的分位", async () => {
     const preview = { per_period: "9999999999999999.98", per_period_service_fee: "9999999999999999.98" } as never;
     vi.mocked(installmentsApi.previewSalePlan).mockReturnValue(new Promise(() => {})).mockResolvedValueOnce(preview);

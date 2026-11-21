@@ -150,7 +150,7 @@ export function AuditPanel() {
             onChange={(value) => setToDate(value?.format("YYYY-MM-DD") ?? "")}
           />
         </div>
-        <DataTable<AuditLogRow> columns={arrangeColumns(columns)} rows={rows} loading={loading} page={page} pageSize={pageSize} total={total} controlledPaging emptyText="暂无审计记录" onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}/>
+        <DataTable<AuditLogRow> columns={arrangeColumns(columns)} rows={error ? [] : rows} loading={loading} page={page} pageSize={pageSize} total={error ? 0 : total} controlledPaging pagination={error ? false : undefined} emptyText={error ? "审计记录加载失败，请重新加载" : "暂无审计记录"} onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}/>
       </Card>
     </section>
   );

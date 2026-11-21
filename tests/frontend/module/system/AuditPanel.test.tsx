@@ -111,10 +111,22 @@ describe("AuditPanel：审计记录", () => {
     await waitFor(() => expect(vi.mocked(auditApi.list)).toHaveBeenLastCalledWith(expect.objectContaining({ entity_type: "option_set" })));
   });
 
-  it("加载失败展示错误横幅", async () => {
-    vi.mocked(auditApi.list).mockRejectedValue(new Error("audit down"));
+  it("加载失败时隐藏旧结果并在重试成功后恢复", async () => {
+    vi.mocked(auditApi.list).mockRejectedValueOnce(new Error("audit down"));
     renderLight(<AuditPanel />, { user: "admin" });
     expect(await screen.findByText(/audit down/)).toBeInTheDocument();
+    expect(screen.getByText("审计记录加载失败，请重新加载")).toBeInTheDocument();
+    expect(screen.queryByText("暂无审计记录")).toBeNull();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("admin")).toBeInTheDocument();
+
+    vi.mocked(auditApi.list).mockRejectedValueOnce(new Error("filter down"));
+    await ui.type(screen.getByPlaceholderText("对象编号"), "1");
+    expect(await screen.findByText(/filter down/)).toBeInTheDocument();
+    expect(screen.queryByText("admin")).toBeNull();
+    expect(screen.getByText("审计记录加载失败，请重新加载")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("admin")).toBeInTheDocument();
   });
 
   it("按对象编号筛选重新加载", async () => {

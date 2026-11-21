@@ -91,7 +91,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
   } = controller;
 
   const statValue = (value: number | undefined) => (summaryLoading ? "—" : summaryError ? "不可用" : String(value ?? 0));
-  const typeCount = (key: BusinessFilterKey) => key === "all"
+  const typeCount = (key: BusinessFilterKey) => summaryLoading || summaryError ? "—" : key === "all"
     ? Object.values(ledgerSummary?.type_counts ?? {}).reduce((sum, count) => sum + count, 0)
     : ledgerSummary?.type_counts[key] ?? 0;
   const operatorOptions = [

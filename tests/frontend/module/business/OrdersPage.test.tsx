@@ -124,6 +124,17 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it("汇总加载及失败时类型计数显示占位符", async () => {
+    let rejectSummary!: (error: Error) => void;
+    vi.mocked(ordersApi.ledgerSummary).mockImplementation(() => new Promise((_resolve, reject) => { rejectSummary = reject; }));
+    renderLight(<OrdersPage initialTab="ledger" />);
+    await waitFor(() => expect(ordersApi.ledgerSummary).toHaveBeenCalled());
+    expect(screen.getByText("全部 —")).toBeInTheDocument();
+    await act(async () => rejectSummary(new Error("汇总加载失败")));
+    expect(screen.getByText("全部 —")).toBeInTheDocument();
+    expect(screen.queryByText("全部 0")).not.toBeInTheDocument();
+  });
+
   it("点击搜索立即查询当前关键词和统计", async () => {
     vi.useFakeTimers();
     try {

@@ -15,8 +15,10 @@ from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.security import CurrentUser
 from app.domain.trade import Account
 from app.domain.enums import AccountStatus
-from app.business import router, schemas
+from app.business import schemas
 from app.business.create import create_order
+from app.business.router_output import _order_list_payload, _order_output
+from app.business.routers.orders_router import create_order as create_order_endpoint
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer
 
@@ -87,7 +89,7 @@ def test_create_order_initial_cost_requires_buy_on_hs_th(seeded_db):
         initial_costs=[schemas.InitialCostCreate(amount=Decimal("0"), occurred_on=TODAY)],
     )
     with pytest.raises(Validation, match="初始费用仅适用于同时提交初始买入的回收或提号订单"):
-        router.create_order(payload, db=seeded_db, user=_admin())
+        create_order_endpoint(payload, db=seeded_db, user=_admin())
 
 # ---- create_order 权限拦截分支 ----
 
@@ -99,7 +101,7 @@ def test_create_order_hs_initial_buy_requires_event_perm(seeded_db):
         initial_buy=schemas.InitialBuyCreate(amount=Decimal("0"), occurred_on=TODAY),
     )
     with pytest.raises(PermissionDenied, match="无权登记买入事件"):
-        router.create_order(payload, db=seeded_db, user=_auditor())
+        create_order_endpoint(payload, db=seeded_db, user=_auditor())
 
 def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
     # 378: HS 初始费用需 order.event.post（财务仅可登记买卖事件）
@@ -110,7 +112,7 @@ def test_create_order_hs_initial_cost_requires_event_perm(seeded_db):
         initial_costs=[schemas.InitialCostCreate(amount=Decimal("0"), occurred_on=TODAY)],
     )
     with pytest.raises(PermissionDenied, match="无权登记费用事件"):
-        router.create_order(payload, db=seeded_db, user=_finance())
+        create_order_endpoint(payload, db=seeded_db, user=_finance())
 
 # ---- _order_output：订单主列表保留账号密码字段（按当前详情编辑口径） ----
 
@@ -124,7 +126,7 @@ def test_order_output_keeps_game_password_for_detail_editing(seeded_db):
         user=_admin(),
     )
     seeded_db.commit()
-    out = router._order_output(order)
+    out = _order_output(order)
     assert out.account_snapshot is not None
     assert out.account_snapshot.get("game_password") == "secret"
 
@@ -158,7 +160,7 @@ def test_order_list_payload_includes_customer_role(seeded_db):
     connection = seeded_db.connection()
     event.listen(connection, "after_cursor_execute", record_sql)
     try:
-        payloads = router._order_list_payload(seeded_db, [order])
+        payloads = _order_list_payload(seeded_db, [order])
     finally:
         event.remove(connection, "after_cursor_execute", record_sql)
     assert payloads[0]["party_name"] == "甲"
@@ -192,7 +194,7 @@ def test_order_list_payload_includes_counterparty_role(seeded_db):
         user=_admin(),
     )
     seeded_db.commit()
-    payloads = router._order_list_payload(seeded_db, [order])
+    payloads = _order_list_payload(seeded_db, [order])
     assert payloads[0]["party_name"] == "同行乙"
     assert payloads[0]["party_role"] == "PEER"
 

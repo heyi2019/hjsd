@@ -88,24 +88,9 @@
   max-width: 100% !important;
 }
 
-/* ── 紧凑弹窗的 Apple 观感精修 ──────────────────────────────────
- * 上一版只做到「能对齐」，观感仍是标准后台弹窗。按 macOS sheet 的硬指标补齐：
- * ① 圆角 12px → 18px（--radius-glass，sheet 级）；
- * ② 玻璃不透明度上调（--glass-alpha 1 → 1.35）：实测底层蓝色按钮会透过
- *    0.62 的弹窗底色干扰焦点，Apple 的 sheet 底色接近实色；
- * ③ 标题 20px/650 → 17px/600 并收紧字距：560 宽弹窗上 20px 标题过重；
- * ④ 页头与表单间距 8px → 16px，与表单行距回到同一栅格；
- * ⑤ 标签降为次级色，与控件主色拉开层级（Apple 表单标签弱于输入内容）；
- * ⑥ textarea 解除全站 36px 高锁（见下条）。 */
+/* 紧凑弹窗沿用公共毛玻璃背景，仅调整圆角和表单排版。 */
 .compact-form-modal .ant-modal-content {
-  /* 不能只改 --glass-alpha：--glass 在 :root 处已完成 var() 替换，子元素继承的是
-     已解析的 rgb(255 255 255 / 0.62)，改 --glass-alpha 不会反向重算（实测底色仍是
-     0.62）。必须用 --glass-rgb/--glass-a 就地重算，亮暗双轨由主题令牌自动跟随。 */
-  background: rgb(var(--glass-rgb) / calc(var(--glass-a) * 1.5)) !important;
-  border-color: rgb(var(--glass-border-rgb) / calc(var(--glass-border-a) * 1.35)) !important;
   border-radius: var(--radius-glass) !important;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
 .compact-form-modal .ant-modal-header {
   margin-bottom: var(--space-4);

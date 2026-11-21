@@ -9,17 +9,10 @@
  * 另一个 !important 且特异度更高者覆盖 —— 去掉前缀类会静默回落到 36px，看不出报错。
  */
 
-/* ① 玻璃外壳：26px 圆角 + 内高光 + 厚度阴影（分层近似 Liquid Glass，不追求逐像素一致）
-   必须双类 + !important：forms.css 的 .compact-form-modal .ant-modal-content 已用 !important
-   定了底色，同特异度下谁后加载谁赢，不可靠。 */
+/* 玻璃背景复用公共弹窗样式，保留工作室弹窗的圆角和阴影。 */
 .studio-ledger-modal.compact-form-modal .ant-modal-content {
-  /* 玻璃不透明度：compact 基准 ×1.5 已偏实，视觉稿需要「能透出背后内容但仍可读」。
-     实测 ×1.9 时 alpha 越过 1 → 变成纯白实底，玻璃感全失；1.05 保留淡淡的底色透出。 */
-  background: rgb(var(--glass-rgb) / calc(var(--glass-a) * 1.05)) !important;
   border: 1px solid var(--glass-border) !important;
   border-radius: 26px !important;
-  backdrop-filter: blur(38px) saturate(190%);
-  -webkit-backdrop-filter: blur(38px) saturate(190%);
   box-shadow:
     inset 0 1px 0 var(--glass-hi),
     0 30px 70px -24px rgb(8 12 24 / 0.42),

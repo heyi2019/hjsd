@@ -326,7 +326,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
       {!registerOpen && <InlineError error={write.error} />}
-      <div className="ui-filter-bar studio-expense-filters studio-expense-filters--single-row">
+      <div className="ui-filter-bar studio-expense-filters">
         <BusinessPeriodPicker label="工作室支出日期区间" state={periodState} showAll />
         <ToolbarSelect
           aria-label="工作室收支科目"

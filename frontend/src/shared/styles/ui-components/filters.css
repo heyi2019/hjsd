@@ -124,14 +124,11 @@
   gap: var(--space-3);
   align-items: center;
 }
-.studio-expense-filters--single-row {
-  flex-wrap: nowrap;
+.studio-expense-filters > .ant-space {
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 @media (--bp-sm) {
-  .studio-expense-filters--single-row {
-    flex-wrap: wrap;
-  }
-
   .studio-expense-filters {
     align-items: stretch;
   }

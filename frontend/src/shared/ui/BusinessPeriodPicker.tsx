@@ -5,7 +5,7 @@ import "./BusinessPeriodPicker.css";
 
 export function BusinessPeriodPicker({ label = "当期日期区间", state, showAll = false }: { label?: string; state: PeriodState; showAll?: boolean }) {
   const { period, setPeriod, useCurrentPeriod, usePreviousPeriod, useAllPeriods, ready } = state;
-  return <Space size="small">
+  return <Space size="small" wrap>
     <DatePicker.RangePicker
       aria-label={label} placeholder={["开始日期", "结束日期"]} format="YYYY-MM-DD"
       size="small" placement="bottomLeft" classNames={{ popup: { root: "compact-date-range-picker" } }}

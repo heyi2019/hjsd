@@ -13,6 +13,7 @@
 
 /* 共享表格外壳：基础滚动与排版归页面布局层，业务表格只补领域差异。 */
 * + .ui-table-wrap { margin-block-start: var(--space-4); }
+.ui-stack > .ui-table-wrap { margin-block-start: 0; }
 .ui-table-wrap { overflow: auto; }
 .ui-table-wrap table { font: var(--font-body-s); white-space: nowrap; }
 

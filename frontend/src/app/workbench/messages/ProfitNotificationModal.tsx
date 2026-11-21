@@ -36,7 +36,7 @@ export function ProfitNotificationModal({ selected, summary, onClose }: { select
             <Descriptions.Item label="通知时间">{formatDateTimeMinute(selected.created_at)}</Descriptions.Item>
           </Descriptions>
           <Typography.Title level={5}>分润明细</Typography.Title>
-          <CommissionDetailsTable row={detail} />
+          <CommissionDetailsTable row={{ ...detail, orders: detail.orders.filter((item) => item.user_id != null) }} />
           <Typography.Paragraph type="secondary" className="dashboard-notification-detail__message">{selected.message}</Typography.Paragraph>
         </section>
       )}

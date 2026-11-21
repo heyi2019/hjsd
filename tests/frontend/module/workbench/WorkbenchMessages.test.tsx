@@ -73,7 +73,7 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_ALLOCATED", title: "分润", message: `订单 HS${id} 分润`, entity_type: "order", entity_id: `HS${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
     vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
     vi.mocked(notificationsApi.profitDetails).mockImplementation(async (ids) => ids.map((id) => ({ notification_id: id, order_no: `HS${id}`, sale_amount: "300.00", cost_amount: "100.00", allocatable_profit: "150.00" })));
-    vi.mocked(reportsApi.commission).mockResolvedValue({ order_groups: [{ order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "180.00", orders: [{ user_id: 1, user_name: "何一", order_id: 1, order_no: "HS1", profit_base: "180.00", rate: "60.00" }] }], people: [], total: { order_count: 1, profit_base: "180.00" } });
+    vi.mocked(reportsApi.commission).mockResolvedValue({ order_groups: [{ order_id: 1, order_no: "HS1", inventory_date: "2026-11-10", outbound_date: "2026-11-20", profit_base: "180.00", orders: [{ user_id: 1, user_name: "何一", order_id: 1, order_no: "HS1", profit_base: "180.00", rate: "60.00" }, { user_id: null, user_name: "公司", order_id: 1, order_no: "HS1", profit_base: "120.00", rate: "40.00" }] }], people: [], total: { order_count: 1, profit_base: "180.00" } });
     renderLight(<DashboardPage />, { user: "admin" });
     const button = await screen.findByRole("button", { name: /订单 HS1 分润/ });
     expect(within(button).getByText(/2026-11-20 08:30/)).toBeInTheDocument();
@@ -90,6 +90,7 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(screen.getByText("150.00")).toBeInTheDocument();
     expect(screen.getByText("已配置分润合计")).toBeInTheDocument();
     expect(screen.getByText("何一")).toBeInTheDocument();
+    expect(screen.queryByText("公司")).not.toBeInTheDocument();
     expect(screen.getAllByText("180.00")).toHaveLength(2);
   });
 

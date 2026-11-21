@@ -1891,6 +1891,31 @@ describe("库存售出三表单分支", () => {
     })));
   });
 
+  it("分期售出金额字段拒绝超过两位小数", async () => {
+    vi.mocked(installmentsApi.previewSalePlan).mockReturnValue(new Promise(() => {}));
+    renderLight(<RecoverySaleModal account={accounts[0] as Account} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    fireEvent.change(await screen.findByLabelText("售出金额"), { target: { value: "1.234" } });
+    await ui.click(screen.getByText("分期付款"));
+    for (const label of ["首付金额", "分期服务费总额", "每期服务费", "每期金额"]) {
+      fireEvent.change(await screen.findByLabelText(label), { target: { value: "1.234" } });
+    }
+    await ui.click(screen.getByRole("button", { name: /确认售出/ }));
+    for (const label of ["售出金额", "首付金额", "分期服务费总额", "每期服务费", "每期金额"]) {
+      expect(await screen.findByText(`${label}必须是数字，最多两位小数`)).toBeInTheDocument();
+    }
+    expect(installmentsApi.stockSale).not.toHaveBeenCalled();
+  });
+
+  it("代挂售出金额和利润拒绝超过两位小数", async () => {
+    renderLight(<ConsignmentSaleModal account={accounts[0] as Account} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    fireEvent.change(await screen.findByLabelText("售出金额（仅记录）"), { target: { value: "1.234" } });
+    fireEvent.change(screen.getByLabelText("利润"), { target: { value: "1.234" } });
+    await ui.click(screen.getByRole("button", { name: /确认售出/ }));
+    expect(await screen.findByText("售出金额（仅记录）必须是数字，最多两位小数")).toBeInTheDocument();
+    expect(await screen.findByText("利润必须是数字，最多两位小数")).toBeInTheDocument();
+    expect(ordersApi.stockSale).not.toHaveBeenCalled();
+  });
+
   it("分期首付超过大额售出金额一分时提示并阻止提交", async () => {
     vi.mocked(installmentsApi.previewSalePlan).mockReturnValue(new Promise(() => {}));
     renderLight(<RecoverySaleModal account={accounts[0] as Account} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });

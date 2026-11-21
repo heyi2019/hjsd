@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import PermissionDenied, Validation
 from app.core.security import CurrentUser, PERM_ORDER_UPDATE
 from app.shared.order_access import get_order
-from .create import add_customer_role
+from .orders.create import add_customer_role
 from .delivery_fields import DELIVERY_FIELDS
 from .participants import resolve_customer_role
 from .schemas import CustomerDraftInput

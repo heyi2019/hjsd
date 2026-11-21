@@ -13,7 +13,7 @@ from app.domain.parties import OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.business.installments import create as inst_create
 from app.business.installments.repayments.pay import pay as inst_pay
-from app.business.create import add_customer_role, create_order
+from app.business.orders.create import add_customer_role, create_order
 from app.business.events import post_event
 from app.customers.customers import create_customer, set_customer_status
 

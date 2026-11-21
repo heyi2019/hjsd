@@ -24,7 +24,7 @@ from app.business.installments import create as inst_create
 from app.business.installments import queries as inst_queries
 from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.installments.repayments.cancel import cancel_installment as inst_cancel
-from app.business.create import create_order
+from app.business.orders.create import create_order
 from app.business.events import post_event
 
 TODAY = date(2026, 10, 12)
@@ -312,7 +312,7 @@ def test_cancelling_new_installment_only_refunds_its_own_payments(seeded_db):
 
 
 def test_cancelled_installment_does_not_inflate_receivable_totals(seeded_client, seeded_db, headers):
-    from app.business.create import add_customer_role
+    from app.business.orders.create import add_customer_role
     from app.customers.customer_detail import get_customer_detail
     from app.customers.customers import create_customer
     account = _account(seeded_db, "cancelled-installment-totals")

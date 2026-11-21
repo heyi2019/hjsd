@@ -27,7 +27,7 @@ from app.shared.form_field_rules import validate_form_extra
 from app.business import schemas
 from app.shared.order_access import get_order as orders_get_order
 from app.business.consignment import post_consignment_operation
-from app.business.create import add_customer_role
+from app.business.orders.create import add_customer_role
 from app.business.events import post_event as orders_post_event
 from app.business.cancellation_model import cancel_order as orders_cancel_order
 from app.business.sale import apply_sale_details, sale_form_context

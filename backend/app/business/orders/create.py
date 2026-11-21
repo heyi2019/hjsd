@@ -2,8 +2,7 @@
 
 建单只落订单主档与参与关系，金额一律由后续事件派生，不在建档时写汇总。
 
-实现已拆至 `orders/create_roles/`（guards / roles）；本文件保留
-`create_order` 编排与整合出口，调用方无需改动。
+参与方校验与角色写入位于 `create_roles/`，本文件负责建单编排。
 """
 from __future__ import annotations
 
@@ -33,10 +32,10 @@ from app.business._shared import (
     _validate_existing_account_context,
     _validate_participant_roles,
 )
-from app.business.create_roles.guards import (
+from app.business.orders.create_roles.guards import (
     _assert_no_duplicate_inventory_account,
 )
-from app.business.create_roles.roles import (
+from app.business.orders.create_roles.roles import (
     _counterparty_role,
     _customer_role,
     add_counterparty_role,

@@ -18,7 +18,7 @@ from app.domain.users import User
 from app.business.installments import create as inst_create
 from app.business.installments import recovery as inst_recovery
 from app.business.installments.repayments.pay import pay as inst_pay
-from app.business.create import create_order
+from app.business.orders.create import create_order
 from app.business.events import post_event
 
 TODAY = date(2026, 10, 12)

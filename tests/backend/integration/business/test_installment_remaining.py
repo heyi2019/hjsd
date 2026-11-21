@@ -17,7 +17,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.domain.trade import Installment, Order
-from app.business.create import create_order
+from app.business.orders.create import create_order
 from app.business.installments import create as inst_create
 
 TODAY = date(2026, 10, 12)

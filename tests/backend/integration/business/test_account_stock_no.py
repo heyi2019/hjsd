@@ -114,7 +114,7 @@ class TestStockNoAtOrderCreation:
 
 
 def service_create_order(db, **kw):
-    from app.business.create import create_order
+    from app.business.orders.create import create_order
 
     return create_order(
         db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", **kw

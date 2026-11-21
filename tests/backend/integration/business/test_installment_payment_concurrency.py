@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import create_engine, event, select, text, update
 from sqlalchemy.orm import sessionmaker
 
-from app.business.create import create_order
+from app.business.orders.create import create_order
 from app.business.events import post_event
 from app.core.errors import AppError
 from app.domain.base import Base

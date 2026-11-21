@@ -139,99 +139,50 @@
   --ui-control-height-lg: 36px;
   /* 控件最小宽（2026-09-11 收口，徽章/芯片 min-width:48px×3；维度值双主题同值，不加 dark 覆盖） */
   --control-min-w: 48px;
-  /* 业务控件尺寸：日期筛选与返利趋势图在桌面、窄屏下保持同一信息密度。 */
+  /* 业务控件尺寸：日期筛选。 */
   --control-date-width: 176px;
   --control-quick-date-min-width: 72px;
-  --control-rebate-trend-min-height: 190px;
-  --control-rebate-trend-item-min-width: 48px;
-  --control-rebate-trend-item-height: 170px;
-  --control-rebate-trend-label-max-width: 70px;
-  --control-rebate-trend-bar-width: 28px;
   /* 表单 / 筛选条字段宽（2026-09-17 收口，消除 styles.css 散落 220/360/168px；维度值双主题同值） */
   --control-field-min-width: 220px;
   --control-inline-field-width: 360px;
   --control-filter-select-width: 168px;
-  --control-rebate-trend-bar-min-height: 8px;
   /* 表格列宽 / 内联控件宽（2026-09-17 收口，消除薪资模块散落列宽魔法数；值命名令牌，
      零视觉变化，双主题同值）。antd 列 width 与 React style width 均接受 CSS var 字符串，
      浏览器解析后与原 px 等宽。新增列宽须复用此处令牌，不得再写裸数字。 */
-  --col-w-46: 46px;
   --col-w-60: 60px;
-  --col-w-64: 64px;
   --col-w-70: 70px;
-  --col-w-72: 72px;
-  --col-w-76: 76px;
   --col-w-80: 80px;
   --col-w-86: 86px;
   --col-w-90: 90px;
-  --col-w-92: 92px;
   --col-w-96: 96px;
   --col-w-100: 100px;
-  --col-w-104: 104px;
   --col-w-110: 110px;
   --col-w-120: 120px;
-  --col-w-128: 128px;
-  --col-w-130: 130px;
   --col-w-140: 140px;
-  --col-w-150: 150px;
   --col-w-160: 160px;
-  --col-w-170: 170px;
   --col-w-180: 180px;
   --col-w-200: 200px;
   --col-w-240: 240px;
-  --col-w-250: 250px;
   --col-w-280: 280px;
   --col-w-300: 300px;
-  --col-w-320: 320px;
   --col-w-420: 420px;
-  --col-w-640: 640px;
   /* 2026-09-18 二维孤儿清理：grid 列宽去重新增 */
-  --col-w-84: 84px;
-  --col-w-144: 144px;
-  --col-w-132: 132px;
   --col-w-190: 190px;
-  --col-w-210: 210px;
   --col-w-220: 220px;
   --col-w-260: 260px;
-  --col-w-290: 290px;
   --radius-compact-bar-end: 2px;
   /* 中性一次性尺寸令牌（2026-09-17 收口，消除各 CSS 散落几何 px，零视觉变化；
      维度值双主题同值，不加 dark 覆盖）。命名=value 即可读性，专供图标/装饰 blob/卡片
      最小高/进度条高等无复用语义的偶发尺寸；新增偶发尺寸须复用此处而非再写裸数字。 */
-  --sz-4: 4px;
-  --sz-6: 6px;
-  --sz-7: 7px;
-  --sz-8: 8px;
-  --sz-9: 9px;
-  --sz-14: 14px;
-  --sz-18: 18px;
-  --sz-22: 22px;
   --sz-24: 24px;
   --sz-28: 28px;
   --sz-30: 30px;
-  --sz-32: 32px;
   --sz-34: 34px;
-  --sz-35: 35px;
-  --sz-36: 36px;
-  --sz-38: 38px;
   --sz-40: 40px;
   --sz-42: 42px;
   --sz-52: 52px;
-  --sz-58: 58px;
-  --sz-84: 84px;
-  --sz-88: 88px;
-  --sz-94: 94px;
   --sz-106: 106px;
-  --sz-122: 122px;
-  --sz-132: 132px;
-  --sz-152: 152px;
-  --sz-154: 154px;
-  --sz-165: 165px;
-  --sz-180: 180px;
-  --sz-320: 320px;
-  --sz-360: 360px;
   --sz-680: 680px;
-  --sz-1260: 1260px;
   /* 日历弹层尺寸（2026-09-23 收口，消除 Calendar.css 散落 %/小数，零视觉变化；
      维度值双主题同值，不加 dark 覆盖）。range 整宽/面板宽/preset 宽已并入并行会话的 --col-w-*，此处不再重复；
      --cal-date-cell-ratio 为 7 列日期网格专用，year 3 列面板须排除。 */
@@ -243,9 +194,6 @@
   --app-max-width: 1680px;
 
   --sz-20: 20px;
-  --sz-260: 260px;
-  --sz-280: 280px;
-  --sz-300: 300px;
 
   /* 动效 */
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -336,11 +284,6 @@
   --chart-3: #30c4b0; /* teal 青 */
   --chart-4: #34c759; /* green 绿 */
   --chart-5: #f59e0b; /* amber 琥珀（同 --chart-amber） */
-  /* 薪资驾驶舱折线图尺寸（2026-09-18 收口，消除 PayrollCockpitPage 内联裸 px；双主题同值，不加 dark 覆盖） */
-  --chart-min-width: 620px;
-  --chart-height: 260px;
-  /* 经营看板趋势图横向滚动容器最小宽（2026-09-25 收口 orders.css 裸 1180px；双主题同值，不加 dark 覆盖） */
-  --trend-chart-min-width: 1180px;
 
   /* 语义色彩层：--color-* 是唯一权威名。 */
   --color-text-primary: #1c1c1e;
@@ -414,11 +357,7 @@
   --radius-card: 30px;
   --radius-preview: 10px;
   /* 选择面板尺寸 */
-  --sz-26: 26px;
   --sz-48: 48px;
-  --sz-62: 62px;
-  --sz-78: 78px;
-  --sz-760: 760px;
 }
 
 /* ── 动效关键帧（放在 :root 之外：@keyframes 是全局规则，嵌在选择器内虽合法但易被误读）──

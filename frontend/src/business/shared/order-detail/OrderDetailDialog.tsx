@@ -34,7 +34,7 @@ export function OrderDetailDialog({ orderId, onClose, onPartyNavigate }: { order
 
   return (
     <Modal open wrapClassName="order-detail-dialog" title="订单详情" onCancel={onClose} footer={null} width={1200} styles={{ body: { maxHeight: "70vh", overflowY: "auto" } }} destroyOnHidden>
-      {loading ? <div style={{ display: "grid", placeItems: "center", minHeight: "8rem" }}><Spin /></div> : error || !detail ? (
+      {loading ? <div className="order-detail-dialog__loading"><Spin /></div> : error || !detail ? (
         <div><Typography.Text type="warning">订单详情加载失败，可能没有查看权限。</Typography.Text><Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button></div>
       ) : <OrderDetail row={detail.account} detail={detail} contextOrderId={orderId} loading={false} employees={employees} onPartyClick={onPartyNavigate ? (party) => onPartyNavigate(`/customers?${party.entityType === "customer" ? "customer_id" : "counterparty_id"}=${party.id}`) : undefined} />}
     </Modal>

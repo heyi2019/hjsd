@@ -1,4 +1,4 @@
-import { act, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -942,6 +942,19 @@ describe("FundsPage：资金写路径", () => {
 
     expect(await screen.findByText("合作方编号必须是正整数")).toBeInTheDocument();
     expect(vi.mocked(depositsApi.create)).not.toHaveBeenCalled();
+  });
+
+  it("押金释放金额超过大额剩余一分时提示并阻止提交", async () => {
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_amount: "9999999999999999.98", returned_amount: "0.00", remaining_amount: "9999999999999999.98" }] as never);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    await ui.click(await screen.findByRole("button", { name: /释\s*放/ }));
+    const modal = screen.getByRole("dialog");
+    fireEvent.change(within(modal).getByLabelText("释放金额"), { target: { value: "9999999999999999.99" } });
+    await ui.click(within(modal).getByRole("button", { name: "确认释放" }));
+    expect(await within(modal).findByText("释放金额不得超过剩余可释放额 ¥9999999999999999.98")).toBeVisible();
+    expect(depositsApi.release).not.toHaveBeenCalled();
   });
 
   it("未发生释放或损失的押金可编辑并回填", async () => {

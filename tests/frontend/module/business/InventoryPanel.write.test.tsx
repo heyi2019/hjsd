@@ -140,6 +140,18 @@ beforeEach(() => {
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]);
 });
 describe("InventoryPanel：写入与长路径", () => {
+  it("库存筛选失败时隐藏旧列表和统计，重试后恢复", async () => {
+    renderLight(<InventoryPanel />, { user: "admin" });
+    expect(await screen.findByText("acc-1")).toBeVisible();
+    vi.mocked(stocksApi.inventoryLedger).mockRejectedValueOnce(new Error("库存筛选失败"));
+    await ui.click(screen.getByRole("button", { name: "最旧在前" }));
+    expect(await screen.findByText(/库存筛选失败/)).toBeVisible();
+    expect(screen.queryByText("acc-1")).not.toBeInTheDocument();
+    expect(screen.getByText("库存数据不可用，请点击重新加载")).toBeVisible();
+    expect(screen.getByText("在库账号").closest(".ui-stat")).toHaveTextContent("—");
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("acc-1")).toBeVisible();
+  });
   it("库存保存时，等待加载的其他账号不能抢走编辑状态", async () => {
     let resolveSecond!: (value: Awaited<ReturnType<typeof ordersApi.executionDetail>>) => void;
     const second = new Promise<Awaited<ReturnType<typeof ordersApi.executionDetail>>>((resolve) => { resolveSecond = resolve; });

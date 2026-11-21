@@ -11,20 +11,26 @@ export function requiredTextRules(rules: Rule[]): Rule[] {
     ? { ...rule, whitespace: true } : rule);
 }
 
+type MoneyRuleOptions = { allowNegative?: boolean; maxIntegerDigits?: number };
+
+/** 金额格式与可选整数位数限制，空值由必填规则处理。 */
+export function moneyValidationError(value: string, label = "金额", options?: MoneyRuleOptions): string | undefined {
+  const text = value.trim();
+  if (!/^-?\d+(\.\d{1,2})?$/.test(text)) return `${label}必须是数字，最多两位小数`;
+  if (!options?.allowNegative && Number(text) < 0) return `${label}不能为负数`;
+  const integer = text.replace(/^-/, "").split(".")[0].replace(/^0+/, "");
+  if (options?.maxIntegerDigits !== undefined && integer.length > options.maxIntegerDigits) return `${label}整数部分最多${options.maxIntegerDigits}位`;
+  return undefined;
+}
+
 /** 金额：数字、最多两位小数、非负（允许负值需显式传 allowNegative）。 */
-export function moneyRules(label = "金额", options?: { allowNegative?: boolean }): Rule[] {
+export function moneyRules(label = "金额", options?: MoneyRuleOptions): Rule[] {
   return [
     {
       validator: (_rule, value) => {
         if (value === undefined || value === null || value === "") return Promise.resolve();
-        const text = String(value).trim();
-        if (!/^-?\d+(\.\d{1,2})?$/.test(text)) {
-          return Promise.reject(new Error(`${label}必须是数字，最多两位小数`));
-        }
-        if (!options?.allowNegative && Number(text) < 0) {
-          return Promise.reject(new Error(`${label}不能为负数`));
-        }
-        return Promise.resolve();
+        const error = moneyValidationError(String(value), label, options);
+        return error ? Promise.reject(new Error(error)) : Promise.resolve();
       },
     },
   ];

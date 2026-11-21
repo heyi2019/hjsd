@@ -120,8 +120,8 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           aria-label="库存类型筛选"
           value={inventoryType ?? "all"}
           options={[
-            { value: "all", label: `全部 ${countInventoryRows()}` },
-            ...(inventoryTypeOptions ?? []).map((item) => ({ value: item.value, label: `${item.label} ${countInventoryRows(item.value)}` })),
+            { value: "all", label: `全部 ${controller.listLoading || controller.listError ? "—" : countInventoryRows()}` },
+            ...(inventoryTypeOptions ?? []).map((item) => ({ value: item.value, label: `${item.label} ${controller.listLoading || controller.listError ? "—" : countInventoryRows(item.value)}` })),
           ]}
           onChange={(value) => { setInventoryType(value === "all" ? undefined : String(value)); setPage(1); }}
         />
@@ -135,15 +135,16 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
         <ExportButton permission="report.read" aria-label="导出" loading={exporting} onClick={() => void handleExport()} />
       </Space>
       <StatRow items={[
-        { label: "在库账号", kind: "count", amount: controller.inventoryStats ? String(controller.inventoryStats.account_count) : "—" },
-        { label: "占用成本合计", amount: controller.inventoryStats?.occupied_cost ?? "—" },
-        { label: "超7天库存账号", kind: "count", amount: controller.inventoryStats ? String(controller.inventoryStats.over_7d_count) : "—" },
-        { label: "超30天库存账号", kind: "count", amount: controller.inventoryStats ? String(controller.inventoryStats.over_30d_count) : "—" },
+        { label: "在库账号", kind: "count", amount: !controller.listLoading && controller.inventoryStats ? String(controller.inventoryStats.account_count) : "—" },
+        { label: "占用成本合计", amount: controller.listLoading ? "—" : controller.inventoryStats?.occupied_cost ?? "—" },
+        { label: "超7天库存账号", kind: "count", amount: !controller.listLoading && controller.inventoryStats ? String(controller.inventoryStats.over_7d_count) : "—" },
+        { label: "超30天库存账号", kind: "count", amount: !controller.listLoading && controller.inventoryStats ? String(controller.inventoryStats.over_30d_count) : "—" },
       ]} />
       <DataTable
         className="inventory-table"
         columns={arrangeColumns(columns)}
         rows={rows}
+        loading={controller.listLoading}
         rowKey={(row) => `${row.id}:${row.account.id}`}
         page={page}
         pageSize={pageSize}
@@ -183,7 +184,8 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           expandRowByClick: true,
           onExpand: (expanded, row) => void handleExpand(expanded, row),
         }}
-        emptyText="暂无账号"
+        emptyText={controller.listError ? "库存数据不可用，请点击重新加载" : "暂无账号"}
+        pagination={controller.listError ? false : undefined}
         onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
       />
     </Card>

@@ -11,6 +11,7 @@ import type { Permission } from "../shared/state/session";
 import type { EmployeeOption } from "../shared/api/types/org";
 import { CfgItem, CustomFieldSections, FieldConfigScope } from "../business/ConfigurableField";
 import { today } from "../shared/lib/format";
+import { compareMoney } from "../shared/lib/money";
 import { positiveIntegerRules, requiredMoneyRules } from "../shared/lib/validators";
 import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
@@ -241,8 +242,8 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
             validator(_rule: unknown, value: unknown) {
               if (!returnTarget || !value) return Promise.resolve();
               // 上限取后端下发的剩余可释放额（口径同押金「剩余」列），不在前端重算。
-              const max = Number(returnTarget.remaining_amount);
-              if (Number(value) > max + 1e-9) {
+              const comparison = compareMoney(String(value), returnTarget.remaining_amount);
+              if (comparison !== null && comparison > 0) {
                 return Promise.reject(new Error(`释放金额不得超过剩余可释放额 ¥${returnTarget.remaining_amount}`));
               }
               return Promise.resolve();

@@ -35,6 +35,8 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [exporting, setExporting] = useState(false);
@@ -59,6 +61,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
 
   const load = useCallback(async () => {
     const requestId = loadSequence.start();
+    setListLoading(true);
     try {
       const data = await stocksApi.inventoryLedger({ ...filters, limit: pageSize, offset: (page - 1) * pageSize });
       if (!loadSequence.isCurrent(requestId)) return;
@@ -75,9 +78,18 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
       setTypeCounts(data.type_counts);
       setServerGameTypes(data.game_types);
       setInventoryStats(data.stats);
+      setListError(false);
       setError(null);
     } catch (err) {
-      if (loadSequence.isCurrent(requestId)) setError(normalizeError(err));
+      if (loadSequence.isCurrent(requestId)) {
+        setRows([]);
+        setTotalCount(0);
+        setInventoryStats(null);
+        setListError(true);
+        setError(normalizeError(err));
+      }
+    } finally {
+      if (loadSequence.isCurrent(requestId)) setListLoading(false);
     }
   }, [filters, page, pageSize, loadSequence]);
 
@@ -105,6 +117,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
       && previous.refreshKey === refreshKey && previous.keyword !== searchKeyword;
     previousSearchRef.current = { keyword: searchKeyword, filters: filterKey, refreshKey, revision: searchRevision };
     const timer = debounceSearch ? window.setTimeout(() => void load(), 250) : undefined;
+    if (debounceSearch) setListLoading(true);
     if (!debounceSearch) void load();
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
@@ -136,7 +149,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     inventoryOperatorIds, setInventoryOperatorIds,
     ageGtDays, setAgeGtDays,
     keyword, setKeyword, submitSearch, dateRange, setDateRange, sortDesc, setSortDesc,
-    page, setPage, pageSize, setPageSize, error, setError,
+    page, setPage, pageSize, setPageSize, error, setError, listLoading, listError,
     businessOptions, inventoryTypeOptions, gameTypeOptions, load,
     countInventoryRows, totalCount, setTotalCount,
     handleExport, exporting, locallyRemovedIdsRef,

@@ -552,6 +552,25 @@ describe("OrdersPage：操作与筛选分支", () => {
     ]), expect.any(Object)));
   });
 
+  it("分润比例换算失败时清空旧比例并提示重试", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "10.00" } },
+    }));
+    vi.mocked(profitAllocationApi.convert).mockResolvedValue({ value: "10.00" });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const amount = within(modal).getAllByLabelText("金额")[0];
+    const rate = within(modal).getAllByLabelText("比例")[0];
+    expect(rate).toHaveValue("10.00");
+    vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
+    fireEvent.change(amount, { target: { value: "200.00" } });
+    expect(rate).toHaveValue("");
+    fireEvent.blur(amount);
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith("分润比例换算失败，请重试"));
+    expect(rate).toHaveValue("");
+  });
+
   it("关闭分润弹窗后，旧订单的金额换算不能覆盖新订单", async () => {
     let finishFirst!: (result: { value: string | null }) => void;
     const firstConversion = new Promise<{ value: string | null }>((resolve) => { finishFirst = resolve; });

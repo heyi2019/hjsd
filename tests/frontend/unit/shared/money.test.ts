@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { moneyRules } from "@/shared/lib/validators";
 import {
   compareMoney,
   fromCents,
@@ -8,6 +9,18 @@ import {
 } from "@/shared/lib/money";
 
 describe("shared/lib/money：前端金额一律按整数分运算", () => {
+  it("金额格式与业务整数位数上限共用校验规则", async () => {
+    const rule = moneyRules("金额", { maxIntegerDigits: 16 })[0];
+    if (!("validator" in rule) || !rule.validator) throw new Error("缺少金额校验");
+    const validate = (value: string) => rule.validator!(rule as never, value, () => undefined);
+    await expect(validate("100.001")).rejects.toThrow("金额必须是数字，最多两位小数");
+    await expect(validate("-1")).rejects.toThrow("金额不能为负数");
+    await expect(validate("10000000000000000.00")).rejects.toThrow("金额整数部分最多16位");
+    await expect(validate("0009999999999999999.99")).resolves.toBeUndefined();
+    const signed = moneyRules("金额", { allowNegative: true })[0];
+    if (!("validator" in signed) || !signed.validator) throw new Error("缺少金额校验");
+    await expect(signed.validator(signed as never, "-1.00", () => undefined)).resolves.toBeUndefined();
+  });
   it("金额比较保留任意精度并识别等值格式", () => {
     expect(compareMoney("001.2", "1.20")).toBe(0);
     expect(compareMoney(".5", "0.49")).toBe(1);

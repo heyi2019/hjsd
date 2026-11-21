@@ -79,8 +79,11 @@ function AllocationFields({
     if (!value.trim()) return;
     void profitAllocationApi.convert(orderId, direction, value).then((result) => {
       if (!conversionVersion.isCurrent(row, version) || getAllocationSession() !== session) return;
-      allocationForm.setFieldValue(["allocations", row, target], result.value ?? "");
-    }).catch(() => undefined);
+      if (result.value == null) { appMessage.error("分润比例换算失败，请重试"); return; }
+      allocationForm.setFieldValue(["allocations", row, target], result.value);
+    }).catch(() => {
+      if (conversionVersion.isCurrent(row, version) && getAllocationSession() === session) appMessage.error("分润比例换算失败，请重试");
+    });
   };
   return (
     <Form.List name="allocations">
@@ -152,7 +155,7 @@ function AllocationFields({
                     prefix="¥"
                     inputMode="decimal"
                     className="ui-control-width-140"
-                    onChange={() => invalidateConversion(field.name)}
+                    onChange={() => { invalidateConversion(field.name); allocationForm.setFieldValue(["allocations", field.name, "allocation_rate"], ""); }}
                     onBlur={(event) => convertValue(field.name, "AMOUNT_TO_RATE", event.target.value, "allocation_rate")}
                   />
                 </Form.Item>

@@ -170,6 +170,24 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await ui.click(await screen.findByRole("button", { name: "新增需求" }));
     expect(await screen.findByText(/客户名单读取失败/)).toBeVisible();
   });
+  it("搜索客户失败时保留需求草稿与列表，并可在弹窗内重试", async () => {
+    vi.mocked(customersApi.options).mockResolvedValueOnce(customers)
+      .mockRejectedValueOnce(new Error("客户搜索失败"))
+      .mockResolvedValueOnce(customers);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    expect(await screen.findByText("LD-1")).toBeVisible();
+    await ui.click(screen.getByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("需求目标"), "保留的草稿");
+    await ui.type(within(modal).getByLabelText("客户"), "张三");
+    expect(await within(modal).findByText(/客户搜索失败/)).toBeVisible();
+    expect(within(modal).getByLabelText("需求目标")).toHaveValue("保留的草稿");
+    expect(screen.getByText("LD-1")).toBeInTheDocument();
+    await ui.click(within(modal).getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(customersApi.options).toHaveBeenLastCalledWith("张三"));
+    await waitFor(() => expect(within(modal).queryByText(/客户搜索失败/)).not.toBeInTheDocument());
+    expect(within(modal).getByLabelText("需求目标")).toHaveValue("保留的草稿");
+  });
   it("需求日期筛选失败隐藏旧数据，重试后恢复", async () => {
     const view = renderLight(<CustomerLeadPanel createdPeriod={{ from: "2026-10-01", to: "2026-10-31" }} />, { user: "admin" });
     await screen.findByText("LD-1");

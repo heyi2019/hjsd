@@ -38,6 +38,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const summaryRequestRef = useRef(0);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const failedCustomerSearch = useRef("");
   const { activeEmployees: employees } = useEmployeeOptions();
   const [createOpen, setCreateOpen] = useState(false);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
@@ -46,6 +47,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const write = useAsyncAction();
   const [customersLoading, setCustomersLoading] = useState(false);
+  const [customersError, setCustomersError] = useState<{ message: string; code?: string } | null>(null);
   const customersRequest = useLatestRequest();
   useEffect(() => () => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); }, []);
   const [createForm] = Form.useForm();
@@ -100,13 +102,14 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const searchCustomers = async (keyword: string) => {
     const request = customersRequest.start();
     setCustomersLoading(true);
+    setCustomersError(null);
     try {
       const items = await customersApi.options(keyword);
       if (customersRequest.isCurrent(request)) setCustomers(items);
     } catch (err) {
       if (customersRequest.isCurrent(request)) {
-        setCreateOpen(false);
-        setError(normalizeError(err));
+        failedCustomerSearch.current = keyword;
+        setCustomersError(normalizeError(err));
       }
     } finally {
       if (customersRequest.isCurrent(request)) setCustomersLoading(false);
@@ -117,6 +120,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
     setError(null);
     write.clearError();
     setCustomers([]);
+    setCustomersError(null);
     setCreateOpen(true);
     void searchCustomers("");
   };
@@ -198,6 +202,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       footer={null}
     >
       <InlineError error={write.error} />
+      <ErrorBanner error={customersError} onRetry={() => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); void searchCustomers(failedCustomerSearch.current); }} retrying={customersLoading} />
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm scope="LEAD" form={createForm} onFinish={createLead}>
           <FieldConfigStatus scope="LEAD" ready={configReady} error={configError} retry={retryConfig} />

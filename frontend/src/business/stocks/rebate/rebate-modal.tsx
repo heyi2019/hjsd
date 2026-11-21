@@ -20,6 +20,7 @@ import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLa
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { InventoryAccountSummary } from "../InventoryAccountSummary";
 import "./rebate-modal.css";
+import { indexEmployeeNames } from "../../employee-names";
 
 type RebateKind = "BUY" | "SELL";
 
@@ -50,6 +51,7 @@ export function InventoryRebateModal(props: {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [rebates, setRebates] = useState<Rebate[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const employeeNames = useMemo(() => indexEmployeeNames(employees), [employees]);
   const [editTarget, setEditTarget] = useState<Rebate | null>(null);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -274,7 +276,7 @@ export function InventoryRebateModal(props: {
                   <span role="cell">{row.rebate_type === "BUY" ? "买号返点" : "卖号返点"}</span>
                   <span role="cell"><MoneyText value={row.amount} /></span>
                   <span role="cell">{row.collected_on}</span>
-                  <span role="cell">{row.operator_user_ids?.map((id) => employees.find((employee) => employee.id === id)?.display_name).filter(Boolean).join("、") || row.operator || "-"}</span>
+                  <span role="cell">{row.operator_user_ids?.map((id) => employeeNames.get(id)).filter(Boolean).join("、") || row.operator || "-"}</span>
                   <span role="cell">
                     <Space size={2}>
                       <PermissionButton

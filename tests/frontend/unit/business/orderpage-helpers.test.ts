@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators } from "@/business/orderpage/helpers";
+import { indexEmployeeNames } from "@/business/employee-names";
 
 describe("订单台账冲销 helpers", () => {
+  it("按员工编号建立姓名索引，重复编号保留首名并线性读取", () => {
+    let reads = 0;
+    const employees = Array.from({ length: 200 }, (_, index) => ({
+      get id() { reads += 1; return index + 1; }, display_name: `员工${index + 1}`,
+    }));
+    const result = indexEmployeeNames([...employees, { id: 1, display_name: "后来的同编号" }]);
+    expect(result.get(1)).toBe("员工1");
+    expect(result.get(200)).toBe("员工200");
+    expect(result.get(201)).toBeUndefined();
+    expect(reads).toBeLessThanOrEqual(400);
+  });
   it("冲销操作人优先使用表单选择，其次匹配当前员工，最后匹配登录会话", async () => {
     const employees = [{ id: 1, username: "alice" }, { id: 2, username: "bob" }];
     const session = async () => ({ id: 2, username: "bob" });

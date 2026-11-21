@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AccountExecutionEvent, AccountExecutionOrder } from "@/shared/api/types/account-execution";
-import { consignmentListings, consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/business/operations/consignment-logic";
+import { availableConsignmentPlatforms, consignmentListings, consignmentPlatform, isActiveConsignmentListing, isConsignmentListing } from "@/business/operations/consignment-logic";
 
 const event = (overrides: Partial<AccountExecutionEvent>): AccountExecutionEvent => ({
   id: 1,
@@ -25,6 +25,16 @@ const order = (overrides: Partial<AccountExecutionOrder> = {}) => ({
 } as unknown as AccountExecutionOrder);
 
 describe("代挂寄售记录口径", () => {
+  it("平台候选排除已上架平台并保留原选项顺序", () => {
+    let reads = 0;
+    const listed = Array.from({ length: 100 }, (_, index) => ({
+      get platform() { reads += 1; return `平台${index}`; },
+    }));
+    const options = Array.from({ length: 200 }, (_, index) => ({ value: `平台${index}`, label: `名称${index}` }));
+    const result = availableConsignmentPlatforms(options, listed);
+    expect(result).toEqual(options.slice(100));
+    expect(reads).toBeLessThanOrEqual(200);
+  });
   it("大量上架记录只需线性检查事件，仍保留上架顺序", () => {
     let typeReads = 0;
     const events = Array.from({ length: 200 }, (_, index) => ({

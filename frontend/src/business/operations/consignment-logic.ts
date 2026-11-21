@@ -38,6 +38,11 @@ function eventExtra(event: AccountExecutionEvent): Record<string, unknown> {
 
 type UnlistedPlatforms = { all: boolean; platforms: Set<string> };
 
+export function availableConsignmentPlatforms<T extends { value: string }>(options: T[], listed: Array<{ platform: string }>): T[] {
+  const unavailable = new Set(listed.map((item) => item.platform));
+  return options.filter((option) => !unavailable.has(option.value));
+}
+
 function eventListings(order: AccountExecutionOrder, event: AccountExecutionEvent, unlisted: Map<string, UnlistedPlatforms>): ConsignmentListing[] {
   const platforms = eventPlatforms(event);
   if (!platforms.length || order.status === "CANCELLED") return [];

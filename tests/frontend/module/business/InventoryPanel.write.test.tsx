@@ -952,6 +952,19 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(table).not.toHaveTextContent("111.00");
   });
 
+  it("返点明细按操作人顺序展示姓名，未知员工回退登记人", async () => {
+    vi.mocked(rebatesApi.list).mockResolvedValue([
+      { id: 51, rebate_no: "RB51", source_order_id: 21, rebate_type: "BUY", channel: "买号返点", amount: "10.00", status: "OPEN", collected_on: "2026-10-17", operator: "登记人", operator_user_ids: [2, 1, 999] },
+      { id: 52, rebate_no: "RB52", source_order_id: 21, rebate_type: "BUY", channel: "买号返点", amount: "20.00", status: "OPEN", collected_on: "2026-10-17", operator: "登记人", operator_user_ids: [999] },
+    ] as never);
+    renderLight(<InventoryRebateModal account={accounts[0] as Account} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    const table = await screen.findByRole("table", { name: "返点明细表" });
+    await waitFor(() => expect(table).toHaveTextContent("小红、管理员"));
+    const rows = within(table).getAllByRole("row");
+    expect(rows[1]).toHaveTextContent("小红、管理员");
+    expect(rows[2]).toHaveTextContent("登记人");
+  });
+
   it("上一单返点保存完成后，不关闭新订单的返点弹窗", async () => {
     seedOrderFormFields();
     let finish!: (value: Awaited<ReturnType<typeof rebatesApi.create>>) => void;
@@ -1487,6 +1500,15 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     // VOID 账号按源码逻辑清空列表；不得渲染平台名
     await waitFor(() => expect(screen.queryByText("寄售平台A")).not.toBeInTheDocument());
   });
+});
+
+it("订单账号信息按草稿顺序展示业务操作人并标识未知员工", async () => {
+  renderLight(<OrderDetailProfileSection meta={{ sourceOrderNo: "HS-2026-0001" } as never}
+    detail={{ orders: [{ order_id: 21, order_no: "HS-2026-0001", order_type: "HS" }] } as never}
+    account={accounts[0] as Account}
+    employees={[{ id: 1, username: "admin", display_name: "管理员", is_active: true }, { id: 2, username: "bob", display_name: "小红", is_active: true }]}
+    orderDrafts={{ 21: { order_id: 21, occurred_at: "", note: "", form_extra: { business_responsible_ids: [2, 999, 1] } } }} />);
+  expect(await screen.findByText("小红、未知员工、管理员")).toBeInTheDocument();
 });
 
 it("订单详情编辑账号自定义字段时保留配置的类型", async () => {

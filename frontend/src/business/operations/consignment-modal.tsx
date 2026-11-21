@@ -16,7 +16,7 @@ import { InventoryAccountSummary } from "../stocks/InventoryAccountSummary";
 import { useLatestRequest, useRequestSession } from "../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
-import { activeConsignmentListings } from "./consignment-logic";
+import { activeConsignmentListings, availableConsignmentPlatforms } from "./consignment-logic";
 import "./consignment-modal.css";
 import "../../shared/ui/AdaptiveFormGrid/MoneyInput.css";
 
@@ -45,7 +45,7 @@ export function OrderConsignmentModal(props: {
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "CONSIGN" : undefined);
   const { labels } = useOrderFormSectionLabels(open ? "CONSIGN" : undefined);
   const platforms = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
-  const availablePlatforms = platforms.filter((option) => !listed.some((item) => item.platform === option.value));
+  const availablePlatforms = availableConsignmentPlatforms(platforms, listed);
 
   const refreshListed = async (orderId: number, generation: number) => {
     const detail = await ordersApi.executionDetail(orderId);

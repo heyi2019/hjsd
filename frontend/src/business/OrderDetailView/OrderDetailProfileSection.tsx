@@ -24,6 +24,7 @@ import {
 } from "../ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Select } from "../../shared/ui";
+import { indexEmployeeNames } from "../employee-names";
 
 type AccountProfileKey =
   | "gameType"
@@ -161,8 +162,9 @@ export function OrderDetailProfileSection({
   const creationOrderType = creationOrder?.order_type ?? undefined;
   const businessOperatorLabel = creationOrderType ? BUSINESS_OPERATOR_LABELS[creationOrderType] : undefined;
   const draftOperatorIds = creationOrder ? orderDrafts?.[creationOrder.order_id]?.form_extra?.business_responsible_ids : undefined;
+  const employeeNames = useMemo(() => indexEmployeeNames(employees), [employees]);
   const businessOperator = Array.isArray(draftOperatorIds)
-    ? draftOperatorIds.map((id: unknown) => employees.find((employee) => employee.id === id)?.display_name ?? "未知员工").join("、") || "-"
+    ? draftOperatorIds.map((id: unknown) => (typeof id === "number" ? employeeNames.get(id) : undefined) ?? "未知员工").join("、") || "-"
     : creationOrder?.operator || "-";
   const { config: creationConfig, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(creationOrderType);
   const { labels: sectionLabels } = useOrderFormSectionLabels(creationOrderType);

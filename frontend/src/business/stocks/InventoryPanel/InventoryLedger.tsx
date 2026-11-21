@@ -7,6 +7,7 @@ import { OrderDetail } from "../../OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
 import { ToolbarMultiSelect } from "../../../shared/ui/ToolbarMultiSelect";
 import type { ReactNode } from "react";
+import { indexEmployeeNames } from "../../employee-names";
 
 export function InventoryLedger({ controller, createAction }: { controller: InventoryController; createAction?: ReactNode }) {
   const {
@@ -67,6 +68,8 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
     openPartyCard,
   } = controller;
 
+  const employeeNames = indexEmployeeNames(employees);
+
   return (
     <Card className="glass" title="库存中心" extra={createAction}>
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
@@ -103,7 +106,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
         <ToolbarMultiSelect
           allowClear
           aria-label="入库负责人筛选"
-          selectedLabels={inventoryOperatorIds.map((id) => employees.find((employee) => employee.id === id)?.display_name ?? String(id))}
+          selectedLabels={inventoryOperatorIds.map((id) => employeeNames.get(id) ?? String(id))}
           placeholder="入库负责人"
           value={inventoryOperatorIds}
           options={employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name }))}

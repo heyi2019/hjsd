@@ -13,6 +13,7 @@ import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
 import { ToolbarMultiSelect } from "../../shared/ui/ToolbarMultiSelect";
 import "./OrdersLedgerPanel.css";
 import type { ReactNode } from "react";
+import { indexEmployeeNames } from "../employee-names";
 
 /** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
  *  「游戏账号/产品」而非入库操作人。本次保持默认隐藏目标不变，只把序号换成稳定 key，
@@ -98,6 +99,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
       ? [{ value: myOperator.id, label: myOperator.display_name }]
       : []),
   ];
+  const operatorNames = indexEmployeeNames(operatorOptions.map((option) => ({ id: option.value, display_name: option.label })));
 
   return (
     <section className="ui-stack orders-ledger-panel">
@@ -137,7 +139,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
           <ToolbarMultiSelect
             allowClear
             aria-label="入库负责人筛选"
-            selectedLabels={inventoryOperatorIds.map((id) => operatorOptions.find((option) => option.value === id)?.label ?? String(id))}
+            selectedLabels={inventoryOperatorIds.map((id) => operatorNames.get(id) ?? String(id))}
             placeholder="入库负责人"
             value={inventoryOperatorIds}
             options={operatorOptions}
@@ -146,7 +148,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
           <ToolbarMultiSelect
             allowClear
             aria-label="售出操作人筛选"
-            selectedLabels={saleOperatorIds.map((id) => operatorOptions.find((option) => option.value === id)?.label ?? String(id))}
+            selectedLabels={saleOperatorIds.map((id) => operatorNames.get(id) ?? String(id))}
             placeholder="售出操作人"
             value={saleOperatorIds}
             options={operatorOptions}

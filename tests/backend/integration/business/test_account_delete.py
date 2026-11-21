@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import select
 
 from app.domain.enums import (
@@ -81,6 +82,50 @@ def test_delete_inventory_removes_orders_and_keeps_audit_reason(seeded_client, s
     assert audit.before_json["stock_no"] == stock_no
     assert audit.before_json["game_account"] == "delete-target"
     assert audit.after_json["deleted_orders"][0]["id"] == order_id
+
+
+@pytest.mark.parametrize("entry", ["order", "inventory"])
+def test_delete_only_removes_target_event_cashflows_and_reversal_chain(seeded_client, seeded_db, headers, entry):
+    account_id, order_id = _account_with_order(seeded_db, "delete-scope-target")
+    other_account_id, other_order_id = _account_with_order(seeded_db, "delete-scope-other")
+    target = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order_id))
+    other = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == other_order_id))
+    assert target is not None and other is not None
+    # 历史流水可能仅靠事件编号关联订单。
+    target.order_id = None
+    other.order_id = None
+    reversals = []
+    for number, original in (("TEST-DEL-REV-A", target), ("TEST-DEL-REV-B", other)):
+        reversal = Cashflow(flow_no=number, pool_id=original.pool_id, occurred_on=D,
+                            category=original.category, direction="IN", amount=Decimal("10"),
+                            source_type="REVERSAL", source_id=original.flow_no,
+                            created_by="pytest", updated_by="pytest")
+        seeded_db.add(reversal)
+        reversals.append(reversal)
+    seeded_db.flush()
+    nested_reversal = Cashflow(flow_no="TEST-DEL-REV-A2", pool_id=target.pool_id, occurred_on=D,
+                               category=target.category, direction="OUT", amount=Decimal("10"),
+                               source_type="REVERSAL", source_id=reversals[0].flow_no,
+                               created_by="pytest", updated_by="pytest")
+    seeded_db.add(nested_reversal)
+    seeded_db.flush()
+    target_id, other_id = target.id, other.id
+    target_reversal_id, other_reversal_id = (item.id for item in reversals)
+    nested_reversal_id = nested_reversal.id
+    seeded_db.commit()
+
+    response = (_delete(seeded_client, account_id, headers=headers) if entry == "inventory" else
+                seeded_client.request("DELETE", f"/api/orders/{order_id}", headers=headers, json={"reason": "重复录入"}))
+    assert response.status_code == 204, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Order, order_id) is None
+    assert seeded_db.get(Cashflow, target_id) is None
+    assert seeded_db.get(Cashflow, target_reversal_id) is None
+    assert seeded_db.get(Cashflow, nested_reversal_id) is None
+    assert seeded_db.get(Order, other_order_id) is not None
+    assert seeded_db.get(Account, other_account_id) is not None
+    assert seeded_db.get(Cashflow, other_id) is not None
+    assert seeded_db.get(Cashflow, other_reversal_id) is not None
 
 def test_delete_requires_non_blank_reason(seeded_client, seeded_db, headers):
     account_id, _ = _account_with_order(seeded_db, "blank-reason")

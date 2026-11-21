@@ -135,7 +135,10 @@ def _collect_cashflow_ids(
             select(Cashflow.id).where(
                 or_(
                     Cashflow.order_id == order_id,
-                    Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value if event_ids else False,
+                    (
+                        (Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value)
+                        & Cashflow.source_id.in_(select(OrderEvent.event_no).where(OrderEvent.id.in_(event_ids)))
+                    ) if event_ids else False,
                     (
                         (Cashflow.source_type == CashflowSourceType.DEPOSIT.value)
                         & Cashflow.source_id.in_([str(item) for item in deposit_ids])

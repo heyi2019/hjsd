@@ -21,14 +21,18 @@ const CUSTOM_SECTION_LABEL: Record<NonNullable<OrderFormField["section"]>, strin
  *  值通过 CustomFormField 归集到 form_extra.<field_key>，随表单提交上报。 */
 export function CustomFieldSection(props: { testIdSuffix?: string; section?: OrderFormField["section"] } = {}): ReactElement | null {
   const cfg = useFieldConfig();
-  const sectionLabels = useSectionLabels();
   const defs = Object.values(cfg)
     .filter((field) => field.is_custom && field.is_active && (field.section ?? "EXTRA") === (props.section ?? "EXTRA"))
     .sort((a, b) => a.sort_order - b.sort_order);
+  return <CustomFieldSectionContent defs={defs} section={props.section ?? "EXTRA"} testIdSuffix={props.testIdSuffix} />;
+}
+
+function CustomFieldSectionContent({ defs, section, testIdSuffix }: { defs: OrderFormField[]; section: string; testIdSuffix?: string }): ReactElement | null {
+  const sectionLabels = useSectionLabels();
   if (defs.length === 0) return null;
   return (
-    <section className="ui-stack custom-field-section" data-testid={`custom-fields${props.testIdSuffix ? `-${props.testIdSuffix}` : ""}`}>
-      <Typography.Text type="secondary" strong>{sectionLabels[props.section ?? "EXTRA"] ?? CUSTOM_SECTION_LABEL[props.section ?? "EXTRA"] ?? props.section}</Typography.Text>
+    <section className="ui-stack custom-field-section" data-testid={`custom-fields${testIdSuffix ? `-${testIdSuffix}` : ""}`}>
+      <Typography.Text type="secondary" strong>{sectionLabels[section] ?? CUSTOM_SECTION_LABEL[section] ?? section}</Typography.Text>
       {defs.map((def) => (
         <CustomFormField key={def.id} def={def} />
       ))}
@@ -39,10 +43,17 @@ export function CustomFieldSection(props: { testIdSuffix?: string; section?: Ord
 /** 在没有固定板块布局的表单中展示所有已配置的自定义字段。 */
 export function CustomFieldSections({ testIdSuffix, excludeSections = [] }: { testIdSuffix?: string; excludeSections?: string[] }): ReactElement {
   const cfg = useFieldConfig();
-  const sections = [...new Set(Object.values(cfg)
-    .filter((field) => field.is_custom && field.is_active && !excludeSections.includes(field.section ?? "EXTRA"))
-    .map((field) => field.section ?? "EXTRA"))];
-  return <>{sections.map((section) => <CustomFieldSection key={section} section={section}
+  const excluded = new Set(excludeSections);
+  const sections = new Map<string, OrderFormField[]>();
+  for (const field of Object.values(cfg)) {
+    const section = field.section ?? "EXTRA";
+    if (!field.is_custom || !field.is_active || excluded.has(section)) continue;
+    const defs = sections.get(section) ?? [];
+    defs.push(field);
+    sections.set(section, defs);
+  }
+  return <>{[...sections].map(([section, defs]) => <CustomFieldSectionContent key={section} section={section}
+    defs={defs.sort((a, b) => a.sort_order - b.sort_order)}
     testIdSuffix={testIdSuffix ? `${testIdSuffix}-${section.toLowerCase()}` : undefined} />)}</>;
 }
 

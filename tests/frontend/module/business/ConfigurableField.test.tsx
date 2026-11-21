@@ -17,6 +17,7 @@ import {
   CfgItem,
   CfgNestedItem,
   CustomFieldSection,
+  CustomFieldSections,
   CustomFormField,
   FieldConfigContext,
   SectionLabelsContext,
@@ -377,6 +378,32 @@ it("运营板块自定义字段显示运营信息分组", () => {
   );
   expect(screen.getByText("运营信息")).toBeInTheDocument();
   expect(screen.getByLabelText("寄售运营备注")).toBeInTheDocument();
+});
+
+it("多个自定义板块只扫描一次配置，保持分组与字段排序", () => {
+  let reads = 0;
+  const sections = ["ACCOUNT_PRODUCT", "BUSINESS", "DELIVER", "OPERATION", "FINANCE", "PARTICIPANT", "EXTRA"] as const;
+  const fields = sections.flatMap((section, index) => [2, 1].map((sequence) => {
+    const field = makeField({ id: index * 2 + sequence, field_key: `field_${index}_${sequence}`, label: `字段${index}-${sequence}`, section, sort_order: sequence });
+    return { ...field, get is_custom() { reads += 1; return true; } };
+  }));
+  const config = Object.fromEntries(fields.map((field) => [field.field_key, field]));
+  renderLight(<Form><FieldConfigContext.Provider value={config}><CustomFieldSections excludeSections={["PARTICIPANT"]} testIdSuffix="batch" /></FieldConfigContext.Provider></Form>);
+  const first = screen.getByLabelText("字段0-1");
+  const second = screen.getByLabelText("字段0-2");
+  expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByLabelText("字段5-1")).toBeNull();
+  expect(reads).toBeLessThanOrEqual(fields.length * 2);
+});
+
+it("自定义板块随配置变化更新", () => {
+  const field = makeField({ id: 31, field_key: "remark", label: "旧标签", section: "BUSINESS" });
+  const { rerender } = renderLight(<Form><FieldConfigContext.Provider value={{ remark: field }}><CustomFieldSections /></FieldConfigContext.Provider></Form>);
+  expect(screen.getByLabelText("旧标签")).toBeInTheDocument();
+  rerender(<Form><FieldConfigContext.Provider value={{ remark: { ...field, label: "新标签", section: "OPERATION" } }}><CustomFieldSections /></FieldConfigContext.Provider></Form>);
+  expect(screen.queryByLabelText("旧标签")).toBeNull();
+  expect(screen.getByLabelText("新标签")).toBeInTheDocument();
+  expect(screen.getByText("运营信息")).toBeInTheDocument();
 });
 
 it("自定义字段配置异步出现时不改变 hooks 顺序", () => {

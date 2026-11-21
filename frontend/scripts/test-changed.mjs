@@ -25,7 +25,7 @@
  *   - 无前端/测试变更                → 直接退出 0
  *
  * 已知局限（故意不掩盖）：按区域选测只能覆盖「本区域测试」，跨域耦合（例如改 orders
- * 却由 workbench/DashboardPage.test.tsx 断言）测不到。改动跨多域或涉及公共层时，脚本会
+ * 却由 workbench/WorkbenchPage.test.tsx 断言）测不到。改动跨多域或涉及公共层时，脚本会
  * 主动降级到 quick 档；仍不确定时请直接 `npm run test:quick`。
  *
  * 约束：禁裸 npx（项目纪律），直接调用本地 node_modules/.bin/vitest。

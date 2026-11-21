@@ -43,14 +43,14 @@ export function BusinessOverview({
   return (
     <section aria-label="我的业务总览" className="ui-stack">
       <StatRow className="ui-stat-row--overview" items={[
-        { label: allPeriods ? "我的订单" : "我的当期订单", kind: "count", amount: loading || personalOrders === null ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrders === null ? undefined : onPersonalOrdersClick, testId: "dashboard-personal-orders" },
-        { label: allPeriods ? "我的收益" : "我的当期收益", amount: loading ? null : personalEarnings, hint: allPeriods ? "全部 · 本人分润基数" : "当期 · 本人分润基数", onClick: loading || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "dashboard-personal-earnings" },
-        { label: "在库账号", kind: "count", amount: amount(inventoryCount), onClick: onInventoryClick, testId: "dashboard-inventory" },
-        { label: "订单总量", kind: "count", amount: amount(orderCount), onClick: loading || orderCount === null ? undefined : onOrdersClick, testId: "dashboard-orders" },
-        { label: allPeriods ? "我的客户数" : "我的当期客户数", kind: "count", amount: loading || personalCustomers === null ? null : String(personalCustomers), onClick: loading || personalCustomers === null ? undefined : onPersonalCustomersClick, testId: "dashboard-personal-customers" },
-        { label: "分期合约", kind: "count", amount: amount(installmentCount), onClick: onInstallmentsClick, testId: "dashboard-installments" },
-        { label: "逾期合约", kind: "count", amount: amount(overdueInstallmentCount), tone: "warn", onClick: onOverdueInstallmentsClick, testId: "dashboard-overdue-installments" },
-        { label: "在库超期账号", kind: "count", amount: amount(inventoryOverdueCount), hint: "未售超过 30 天", tone: "warn", onClick: onInventoryOverdueClick, testId: "dashboard-inventory-overdue" },
+        { label: allPeriods ? "我的订单" : "我的当期订单", kind: "count", amount: loading || personalOrders === null ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrders === null ? undefined : onPersonalOrdersClick, testId: "workbench-personal-orders" },
+        { label: allPeriods ? "我的收益" : "我的当期收益", amount: loading ? null : personalEarnings, hint: allPeriods ? "全部 · 本人分润基数" : "当期 · 本人分润基数", onClick: loading || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "workbench-personal-earnings" },
+        { label: "在库账号", kind: "count", amount: amount(inventoryCount), onClick: onInventoryClick, testId: "workbench-inventory" },
+        { label: "订单总量", kind: "count", amount: amount(orderCount), onClick: loading || orderCount === null ? undefined : onOrdersClick, testId: "workbench-orders" },
+        { label: allPeriods ? "我的客户数" : "我的当期客户数", kind: "count", amount: loading || personalCustomers === null ? null : String(personalCustomers), onClick: loading || personalCustomers === null ? undefined : onPersonalCustomersClick, testId: "workbench-personal-customers" },
+        { label: "分期合约", kind: "count", amount: amount(installmentCount), onClick: onInstallmentsClick, testId: "workbench-installments" },
+        { label: "逾期合约", kind: "count", amount: amount(overdueInstallmentCount), tone: "warn", onClick: onOverdueInstallmentsClick, testId: "workbench-overdue-installments" },
+        { label: "在库超期账号", kind: "count", amount: amount(inventoryOverdueCount), hint: "未售超过 30 天", tone: "warn", onClick: onInventoryOverdueClick, testId: "workbench-inventory-overdue" },
       ]} />
     </section>
   );

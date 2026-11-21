@@ -7,33 +7,33 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class DashboardPeriodOut(BaseModel):
+class WorkbenchPeriodOut(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     from_date: date = Field(alias="from")
     to: date
 
 
-class DashboardOrdersOut(BaseModel):
+class WorkbenchOrdersOut(BaseModel):
     total_count: int
 
 
-class DashboardInventoryOut(BaseModel):
+class WorkbenchInventoryOut(BaseModel):
     account_count: int
     aging_count: int
     overdue_count: int
 
 
-class DashboardInstallmentsOut(BaseModel):
+class WorkbenchInstallmentsOut(BaseModel):
     total_count: int
     overdue_count: int
 
 
-class DashboardSummaryOut(BaseModel):
-    period: DashboardPeriodOut | None
-    orders: DashboardOrdersOut | None
+class WorkbenchSummaryOut(BaseModel):
+    period: WorkbenchPeriodOut | None
+    orders: WorkbenchOrdersOut | None
     personal_orders: int | None
     personal_customers: int | None
     personal_earnings: Decimal | None
-    inventory: DashboardInventoryOut | None
-    installments: DashboardInstallmentsOut | None
+    inventory: WorkbenchInventoryOut | None
+    installments: WorkbenchInstallmentsOut | None

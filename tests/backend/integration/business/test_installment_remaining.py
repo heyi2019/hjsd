@@ -159,7 +159,7 @@ def test_workbench_installment_cards_match_visible_contract_type(seeded_client, 
     visible.status = "OVERDUE"
     other_type.status = "OVERDUE"
     seeded_db.flush()
-    dashboard = seeded_client.get("/api/dashboard/summary", headers=headers)
+    dashboard = seeded_client.get("/api/workbench/summary", headers=headers)
     totals = seeded_client.get("/api/installments/totals", params={"contract_type": "STOCK_SALE"}, headers=headers)
     assert dashboard.status_code == totals.status_code == 200
     assert dashboard.json()["installments"] == {"total_count": totals.json()["total_count"], "overdue_count": totals.json()["overdue_count"]} == {"total_count": 1, "overdue_count": 1}

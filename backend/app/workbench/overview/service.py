@@ -21,7 +21,7 @@ from app.funds.installments import queries as installment_queries
 from app.shared.business_period import business_period, period_start_day
 from app.core.errors import Validation
 
-def dashboard_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None, all_time: bool = False) -> dict[str, Any]:
+def workbench_summary(session: Session, *, user: CurrentUser, from_date: date | None = None, to_date: date | None = None, all_time: bool = False) -> dict[str, Any]:
     today = date.today()
     if (all_time and (from_date is not None or to_date is not None)) or (from_date is None) != (to_date is None) or (from_date is not None and to_date is not None and from_date > to_date):
         raise Validation("请选择有效的开始和结束日期")

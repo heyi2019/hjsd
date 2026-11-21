@@ -36,7 +36,7 @@
       max(var(--space-3), env(safe-area-inset-left));
   }
   .topbar-action, .theme-switch button { min-height: var(--ui-control-height); }
-  .dashboard-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .workbench-page .ui-entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
@@ -104,7 +104,7 @@
   .nav-item--active { box-shadow: inset 0 3px 0 var(--color-primary) !important; }
   .main { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
   .page-content { padding-bottom: calc(var(--space-5) + 68px + env(safe-area-inset-bottom)); }
-  .dashboard-page .ui-entry-row { grid-template-columns: 1fr; }
+  .workbench-page .ui-entry-row { grid-template-columns: 1fr; }
   /* iOS 导航栏：移动端顶栏玻璃 + 吸顶 + 安全区，与底部 Tab 栏玻璃（blur(18px)）呼应。
      仅 ≤640px 生效（此区间侧栏已 fixed 到底部，无顶部横栏冲突）；641–960px 侧栏为顶部横栏，顶栏保持常规流。 */
   .topbar {

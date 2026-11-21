@@ -72,50 +72,50 @@
 .ui-entry-card--warn .ui-entry-card__value { color: var(--color-warning); }
 
 /* 工作台：一个明确的主动作，两个低权重导航入口；不虚构尚未加载的数据。 */
-.dashboard-page .ui-page-header { padding-block: var(--space-3) var(--space-2); }
-.dashboard-page .ui-page-header__title {
+.workbench-page .ui-page-header { padding-block: var(--space-3) var(--space-2); }
+.workbench-page .ui-page-header__title {
   font-size: clamp(30px, 3vw, 42px);
   letter-spacing: -0.05em;
 }
-.dashboard-page .ui-entry-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.dashboard-page .ui-entry-card {
+.workbench-page .ui-entry-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.workbench-page .ui-entry-card {
   border-radius: 20px;
 }
 /* 工作台入口组：所有业务复用相同的标题、内容与卡片高度。 */
-.dashboard-entry-group {
-  --dashboard-accent: var(--color-primary);
+.workbench-entry-group {
+  --workbench-accent: var(--color-primary);
   display: grid;
   grid-template-rows: var(--sz-42) var(--sz-106);
   gap: var(--space-2);
   min-width: 0;
   position: relative;
   padding: var(--space-3);
-  border: var(--border-w) solid color-mix(in srgb, var(--dashboard-accent) 26%, var(--glass-border));
+  border: var(--border-w) solid color-mix(in srgb, var(--workbench-accent) 26%, var(--glass-border));
   border-radius: var(--radius-xl);
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--dashboard-accent) 10%, var(--glass)),
-    color-mix(in srgb, var(--dashboard-accent) 3%, var(--glass))
+    color-mix(in srgb, var(--workbench-accent) 10%, var(--glass)),
+    color-mix(in srgb, var(--workbench-accent) 3%, var(--glass))
   );
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--dashboard-accent) 50%, transparent), var(--card-top-hi), 0 var(--space-3) var(--space-6) color-mix(in srgb, var(--dashboard-accent) 9%, transparent);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--workbench-accent) 50%, transparent), var(--card-top-hi), 0 var(--space-3) var(--space-6) color-mix(in srgb, var(--workbench-accent) 9%, transparent);
 }
-.dashboard-entry-group--sell { --dashboard-accent: var(--color-primary); }
-.dashboard-entry-group--self-owned { --dashboard-accent: var(--color-success); }
-.dashboard-entry-group--distribution { --dashboard-accent: var(--color-warning); }
+.workbench-entry-group--sell { --workbench-accent: var(--color-primary); }
+.workbench-entry-group--self-owned { --workbench-accent: var(--color-success); }
+.workbench-entry-group--distribution { --workbench-accent: var(--color-warning); }
 
 /* 只有售出承担主推视觉；其余入口用留白承托业务色。 */
-.dashboard-entry-group--self-owned,
-.dashboard-entry-group--distribution {
-  border-color: color-mix(in srgb, var(--dashboard-accent) 14%, var(--glass-border));
+.workbench-entry-group--self-owned,
+.workbench-entry-group--distribution {
+  border-color: color-mix(in srgb, var(--workbench-accent) 14%, var(--glass-border));
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--dashboard-accent) 4%, var(--glass)),
+    color-mix(in srgb, var(--workbench-accent) 4%, var(--glass)),
     var(--glass)
   );
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--dashboard-accent) 44%, transparent), var(--card-top-hi), var(--shadow-soft);
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--workbench-accent) 44%, transparent), var(--card-top-hi), var(--shadow-soft);
 }
 
-.dashboard-entry-group::before {
+.workbench-entry-group::before {
   content: "";
   position: absolute;
   inset-block-start: var(--space-4);
@@ -123,46 +123,46 @@
   width: var(--space-6);
   height: calc(var(--space-1) + 1px);
   border-radius: var(--radius-pill);
-  background: var(--dashboard-accent);
-  box-shadow: 0 0 0 var(--space-half) color-mix(in srgb, var(--dashboard-accent) 12%, transparent);
+  background: var(--workbench-accent);
+  box-shadow: 0 0 0 var(--space-half) color-mix(in srgb, var(--workbench-accent) 12%, transparent);
 }
 
-.dashboard-entry-group--no-accent::before { display: none; }
+.workbench-entry-group--no-accent::before { display: none; }
 
 /* 右侧业务组保持白色中性视觉，避免三组业务色叠在一起。 */
-.dashboard-entry-group--neutral {
+.workbench-entry-group--neutral {
   border: var(--border-w) solid var(--glass-border);
   background: var(--glass);
   box-shadow: var(--card-top-hi), var(--shadow-soft);
 }
 
-.dashboard-entry-group--neutral .ui-entry-card {
+.workbench-entry-group--neutral .ui-entry-card {
   border: var(--border-w) solid var(--glass-border);
   background: var(--glass);
   box-shadow: var(--card-top-hi), var(--shadow-soft);
 }
 
-.dashboard-entry-group--neutral .ui-entry-card::before { opacity: 0.28; }
-.dashboard-entry-group--neutral .ui-entry-card::after {
+.workbench-entry-group--neutral .ui-entry-card::before { opacity: 0.28; }
+.workbench-entry-group--neutral .ui-entry-card::after {
   color: var(--color-text-secondary);
   opacity: 0.6;
 }
 
-.dashboard-entry-group__heading {
+.workbench-entry-group__heading {
   display: flex;
   align-items: center;
   padding-inline: var(--space-1);
 }
 
-.dashboard-entry-group__heading h2 {
+.workbench-entry-group__heading h2 {
   margin: 0;
-  color: color-mix(in srgb, var(--dashboard-accent) 50%, var(--color-text-primary));
+  color: color-mix(in srgb, var(--workbench-accent) 50%, var(--color-text-primary));
   font: var(--font-card-title);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-.dashboard-entry-group__items {
+.workbench-entry-group__items {
   display: grid;
   grid-template-columns: 1fr;
   min-height: 0;
@@ -170,11 +170,11 @@
   gap: var(--space-2);
 }
 
-.dashboard-entry-group--distribution .dashboard-entry-group__items {
+.workbench-entry-group--distribution .workbench-entry-group__items {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.dashboard-page .ui-entry-card {
+.workbench-page .ui-entry-card {
   position: relative;
   overflow: hidden;
   min-height: 92px;
@@ -185,37 +185,37 @@
   box-shadow: var(--card-top-hi), var(--shadow-soft);
 }
 
-.dashboard-page .ui-entry-card::before {
+.workbench-page .ui-entry-card::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
   background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 18%, transparent), transparent 30%),
-    radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 12%, transparent), transparent 28%);
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--workbench-accent, var(--color-primary)) 18%, transparent), transparent 30%),
+    radial-gradient(circle at 0% 100%, color-mix(in srgb, var(--workbench-accent, var(--color-primary)) 12%, transparent), transparent 28%);
   filter: blur(var(--space-3));
   opacity: 0.6;
   pointer-events: none;
 }
 
-.dashboard-page .ui-entry-card::after {
+.workbench-page .ui-entry-card::after {
   content: "›";
   position: absolute;
   inset-block-start: var(--space-3);
   inset-inline-end: var(--space-3);
-  color: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 76%, var(--color-text-secondary));
+  color: color-mix(in srgb, var(--workbench-accent, var(--color-primary)) 76%, var(--color-text-secondary));
   font-size: var(--fs-title-3);
   font-weight: 500;
   opacity: 0.78;
   transition: transform var(--dur-fast) var(--ease-spring);
 }
 
-.dashboard-page .ui-entry-card:hover::after,
-.dashboard-page .ui-entry-card:focus-visible::after {
+.workbench-page .ui-entry-card:hover::after,
+.workbench-page .ui-entry-card:focus-visible::after {
   transform: translate(var(--space-1), 0);
 }
 
-.dashboard-page .ui-entry-card__title {
+.workbench-page .ui-entry-card__title {
   position: relative;
   z-index: 1;
   color: var(--color-text-primary);
@@ -225,21 +225,21 @@
   transform: translateY(calc(var(--space-2) * -1));
 }
 
-.dashboard-page .ui-entry-card__eyebrow {
+.workbench-page .ui-entry-card__eyebrow {
   position: relative;
   z-index: 1;
   width: fit-content;
   margin-block-end: var(--space-half);
   padding: var(--space-half) var(--space-2);
   border-radius: var(--radius-pill);
-  color: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 86%, var(--color-text-primary));
-  background: color-mix(in srgb, var(--dashboard-accent, var(--color-primary)) 12%, transparent);
+  color: color-mix(in srgb, var(--workbench-accent, var(--color-primary)) 86%, var(--color-text-primary));
+  background: color-mix(in srgb, var(--workbench-accent, var(--color-primary)) 12%, transparent);
   font: var(--font-caption-2);
   font-weight: 650;
   letter-spacing: 0.02em;
 }
 
-.dashboard-entry-group--sell .ui-entry-card--primary {
+.workbench-entry-group--sell .ui-entry-card--primary {
   background: linear-gradient(
     135deg,
     color-mix(in srgb, var(--color-primary) 15%, var(--glass)),
@@ -249,41 +249,41 @@
   border-color: color-mix(in srgb, var(--color-primary) 26%, var(--glass-border));
 }
 
-.dashboard-entry-group .ui-entry-card {
+.workbench-entry-group .ui-entry-card {
   min-height: var(--sz-106);
   height: var(--sz-106);
   box-sizing: border-box;
-  border-color: color-mix(in srgb, var(--dashboard-accent) 26%, var(--glass-border));
+  border-color: color-mix(in srgb, var(--workbench-accent) 26%, var(--glass-border));
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--dashboard-accent) 13%, var(--glass)),
-    color-mix(in srgb, var(--dashboard-accent) 3.5%, var(--glass))
+    color-mix(in srgb, var(--workbench-accent) 13%, var(--glass)),
+    color-mix(in srgb, var(--workbench-accent) 3.5%, var(--glass))
   );
 }
 
-.dashboard-entry-group .ui-entry-card__title {
-  color: color-mix(in srgb, var(--dashboard-accent) 50%, var(--color-text-primary));
+.workbench-entry-group .ui-entry-card__title {
+  color: color-mix(in srgb, var(--workbench-accent) 50%, var(--color-text-primary));
 }
 
-.dashboard-entry-group--self-owned .ui-entry-card,
-.dashboard-entry-group--distribution .ui-entry-card {
-  border-color: color-mix(in srgb, var(--dashboard-accent) 16%, var(--glass-border));
+.workbench-entry-group--self-owned .ui-entry-card,
+.workbench-entry-group--distribution .ui-entry-card {
+  border-color: color-mix(in srgb, var(--workbench-accent) 16%, var(--glass-border));
   background: linear-gradient(
     135deg,
-    color-mix(in srgb, var(--dashboard-accent) 6%, var(--glass)),
+    color-mix(in srgb, var(--workbench-accent) 6%, var(--glass)),
     var(--glass)
   );
 }
 
-.dashboard-entry-group--self-owned .ui-entry-card__title,
-.dashboard-entry-group--distribution .ui-entry-card__title,
-.dashboard-entry-group--self-owned .dashboard-entry-group__heading h2,
-.dashboard-entry-group--distribution .dashboard-entry-group__heading h2 {
+.workbench-entry-group--self-owned .ui-entry-card__title,
+.workbench-entry-group--distribution .ui-entry-card__title,
+.workbench-entry-group--self-owned .workbench-entry-group__heading h2,
+.workbench-entry-group--distribution .workbench-entry-group__heading h2 {
   color: var(--color-text-primary);
 }
 
 /* 中性右侧卡片覆盖业务渐变，只保留左下与右上的角落光晕。 */
-.dashboard-entry-group--neutral .ui-entry-card {
+.workbench-entry-group--neutral .ui-entry-card {
   border-color: var(--glass-border);
   background: var(--glass);
 }
@@ -295,11 +295,11 @@
      再把这个组提到第二位，让代挂落在 375px 首屏内。
      order 只作用于 .ui-entry-row 的直接子项：PermissionGate 返回 Fragment，
      EntryRow 直接渲染该 div，三组确为直接子项。 */
-  .dashboard-page .ui-entry-row > .dashboard-entry-group--sell { order: 0; }
-  .dashboard-page .ui-entry-row > .dashboard-entry-group--distribution { order: 1; }
-  .dashboard-page .ui-entry-row > .dashboard-entry-group--self-owned { order: 2; }
-  .dashboard-entry-group--distribution { grid-template-rows: var(--sz-42) auto; }
-  .dashboard-entry-group--distribution .dashboard-entry-group__items {
+  .workbench-page .ui-entry-row > .workbench-entry-group--sell { order: 0; }
+  .workbench-page .ui-entry-row > .workbench-entry-group--distribution { order: 1; }
+  .workbench-page .ui-entry-row > .workbench-entry-group--self-owned { order: 2; }
+  .workbench-entry-group--distribution { grid-template-rows: var(--sz-42) auto; }
+  .workbench-entry-group--distribution .workbench-entry-group__items {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

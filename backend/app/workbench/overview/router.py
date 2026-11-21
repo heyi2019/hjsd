@@ -13,14 +13,14 @@ from app.workbench.overview import schemas, service
 router = APIRouter(tags=["工作台"])
 
 
-@router.get("/dashboard/summary", response_model=schemas.DashboardSummaryOut)
-def dashboard_summary(
+@router.get("/workbench/summary", response_model=schemas.WorkbenchSummaryOut)
+def workbench_summary(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     all_time: bool = Query(default=False),
-) -> schemas.DashboardSummaryOut:
-    return schemas.DashboardSummaryOut.model_validate(
-        service.dashboard_summary(db, user=user, from_date=from_date, to_date=to_date, all_time=all_time)
+) -> schemas.WorkbenchSummaryOut:
+    return schemas.WorkbenchSummaryOut.model_validate(
+        service.workbench_summary(db, user=user, from_date=from_date, to_date=to_date, all_time=all_time)
     )

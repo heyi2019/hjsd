@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { normalizeError } from "../../../shared/api/client";
-import { dashboardApi, type DashboardSummary } from "../../../shared/api/dashboard.api";
+import { workbenchApi, type WorkbenchSummary } from "../../../shared/api/workbench.api";
 
-export function useDashboardSummary(active: boolean, selectedPeriod: { from: string; to: string } | null) {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+export function useWorkbenchSummary(active: boolean, selectedPeriod: { from: string; to: string } | null) {
+  const [summary, setSummary] = useState<WorkbenchSummary | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
@@ -13,7 +13,7 @@ export function useDashboardSummary(active: boolean, selectedPeriod: { from: str
     const request = ++requestRef.current;
     setLoading(true);
     try {
-      const result = await dashboardApi.summary(selectedPeriod);
+      const result = await workbenchApi.summary(selectedPeriod);
       if (!mountedRef.current || request !== requestRef.current) return;
       setSummary(result);
       setError(null);

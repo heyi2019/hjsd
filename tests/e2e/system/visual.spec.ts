@@ -70,7 +70,7 @@ test.describe("UI visual baseline", () => {
   test("工作台 desktop", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
-    await expect(page).toHaveScreenshot("dashboard-desktop.png", {
+    await expect(page).toHaveScreenshot("workbench-desktop.png", {
       animations: "disabled",
       caret: "hide",
       // 只截视口（默认 720 高）：全页模式会把文档流后段（业务总览/我的消息）一并拍入，
@@ -81,7 +81,7 @@ test.describe("UI visual baseline", () => {
       // maskColor 用中性灰：默认 magenta 会在基线图里留大片刺眼品红（实为遮罩色，非页面渲染缺陷）。
       maskColor: "#8a8a8a",
       mask: [
-        page.locator(".dashboard-summary .ui-stat__value"),
+        page.locator(".workbench-summary .ui-stat__value"),
         page.locator('section[aria-label="我的消息"]'),
       ],
     });
@@ -91,7 +91,7 @@ test.describe("UI visual baseline", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
-    await expect(page).toHaveScreenshot("dashboard-mobile.png", {
+    await expect(page).toHaveScreenshot("workbench-mobile.png", {
       animations: "disabled",
       caret: "hide",
       // 同 desktop：只截视口，避免全页把折叠线下的总览/消息区拍入。
@@ -100,7 +100,7 @@ test.describe("UI visual baseline", () => {
       // maskColor 用中性灰：默认 magenta 会在基线图里留大片刺眼品红（实为遮罩色，非页面渲染缺陷）。
       maskColor: "#8a8a8a",
       mask: [
-        page.locator(".dashboard-summary .ui-stat__value"),
+        page.locator(".workbench-summary .ui-stat__value"),
         page.locator('section[aria-label="我的消息"]'),
       ],
     });

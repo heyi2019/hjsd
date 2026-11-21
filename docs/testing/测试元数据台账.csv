@@ -1,5 +1,5 @@
 ﻿﻿﻿记录类型,功能编号,模块,功能名称,代码域/路由,说明,风险等级,关联旧编号(BIZ),承诺编号,层级,负责端,承诺内容,失效后果,验证证据,覆盖状态,历史别名,备注
-FEATURE,A01,A,工作台看板与经营聚合,前端 DashboardPage / app/reporting 聚合,首页 KPI、库存库龄提醒、资金概览,中,,,,,,,,,,
+FEATURE,A01,A,工作台看板与经营聚合,前端 WorkbenchPage / app/workbench 聚合,首页 KPI、库存库龄提醒、资金概览,中,,,,,,,,,,
 FEATURE,A02,A,经营数据可视化组件,前端图表/卡片组件,图表与卡片渲染,低,,,,,,,,,,
 FEATURE,B01,B,订单创建(HS/TH/DG),app/orders/router.py,create.py,POST /orders→201+order_no+ACTIVE,高,,,,,,,,,
 FEATURE,B02,B,订单状态流转,app/orders/events.py,mutations.py,core/state_machine,ACTIVE→COMPLETED/CANCELLED；非法流转拒绝,,,,,,,,,

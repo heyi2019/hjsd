@@ -52,8 +52,8 @@ export const fastTests = [
 // 日常反馈层：覆盖登录、权限、主工作台、订单写路径、报表和设置等关键面，
 // 不包含库存/客户/资金等长链路全量页面回归。
 export const quickTests = [
-  "tests/frontend/module/workbench/DashboardPage.test.tsx",
-  "tests/frontend/module/workbench/WorkbenchMessages.test.tsx",
+  "tests/frontend/module/workbench/WorkbenchPage.test.tsx",
+  "tests/frontend/module/workbench/Notifications.test.tsx",
   "tests/frontend/module/system/LoginPage.test.tsx",
   "tests/frontend/module/system/UserCenterPage.test.tsx",
   "tests/frontend/module/settings/SettingsPage.test.tsx",

@@ -24,8 +24,8 @@ export function ProfitNotificationModal({ selected, summary, onClose, onPartyNav
   const detail = result.id === selected.id ? result.detail : null;
   return (
     <Modal open title="订单分润通知详情" onCancel={onClose} footer={null} width={720} destroyOnHidden>
-      {loading ? <div className="dashboard-notification-detail__loading"><Spin /></div> : !detail ? <div><Typography.Text type="warning">订单详情暂时无法查看。</Typography.Text>{result.error && <Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button>}</div> : (
-        <section className="dashboard-notification-detail" aria-label={`订单 ${detail.order_no}`}>
+      {loading ? <div className="notifications-detail__loading"><Spin /></div> : !detail ? <div><Typography.Text type="warning">订单详情暂时无法查看。</Typography.Text>{result.error && <Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button>}</div> : (
+        <section className="notifications-detail" aria-label={`订单 ${detail.order_no}`}>
           <Descriptions bordered size="small" column={2}>
             <Descriptions.Item label="订单号">{detail.order_no}</Descriptions.Item>
             <Descriptions.Item label="可分配利润">{money(summary?.allocatable_profit)}</Descriptions.Item>
@@ -39,7 +39,7 @@ export function ProfitNotificationModal({ selected, summary, onClose, onPartyNav
           </Descriptions>
           <Typography.Title level={5}>分润明细</Typography.Title>
           <CommissionDetailsTable row={{ ...detail, orders: detail.orders.filter((item) => item.user_id != null) }} />
-          <div className="dashboard-notification-detail__actions"><Button type="primary" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button></div>
+          <div className="notifications-detail__actions"><Button type="primary" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button></div>
           {showOrderDetail && <OrderDetailDialog orderId={detail.order_id} onClose={() => setShowOrderDetail(false)} onPartyNavigate={onPartyNavigate} />}
         </section>
       )}

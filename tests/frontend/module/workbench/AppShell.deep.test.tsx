@@ -19,8 +19,8 @@ import { act } from "react";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
-import { dashboardApi } from "@/shared/api/dashboard.api";
-vi.mock("@/shared/api/dashboard.api");
+import { workbenchApi } from "@/shared/api/workbench.api";
+vi.mock("@/shared/api/workbench.api");
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -45,7 +45,7 @@ import { MemoryRouter } from "react-router-dom";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-const __allApi = { dashboardApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, profitAllocationApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, reportsApi, stocksApi };
+const __allApi = { workbenchApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, profitAllocationApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -80,7 +80,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
       },
     });
   }
-  const OBJECT_SHAPED = new Set(["dashboardApi", "reportsApi", "auditApi", "profitAllocationApi"]);
+  const OBJECT_SHAPED = new Set(["workbenchApi", "reportsApi", "auditApi", "profitAllocationApi"]);
   return { deepStub, OBJECT_SHAPED };
 });
 
@@ -110,7 +110,7 @@ beforeEach(() => {
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {
-  const { initialPath = "/dashboard", ...rest } = options;
+  const { initialPath = "/workbench", ...rest } = options;
   await act(async () => {
     renderApp(
       <MemoryRouter initialEntries={[initialPath]}>

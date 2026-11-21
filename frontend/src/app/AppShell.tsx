@@ -6,7 +6,7 @@ import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
 import { BusinessPeriodProvider } from "../shared/state/businessPeriod";
 import { loadOptionSets } from "../shared/lib/optionSets";
-import { DashboardPage } from "./DashboardPage";
+import { WorkbenchPage } from "./WorkbenchPage";
 import { LoginPage } from "../auth/LoginPage";
 import { ChangePasswordPage } from "../auth/ChangePasswordPage";
 import type { ComponentType } from "react";
@@ -22,7 +22,7 @@ const ReportsPage = lazy(() => import("../reporting/ReportsPage").then(({ Report
 const SettingsPage = lazy(() => import("../settings/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
 const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
 
-// 注：dashboard 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
+// 注：workbench 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
 // 其余页面统一收 onNavigate（ReportsPage 的数据中心入口卡跳业务中心用），无跳转需求的页面忽略该 prop。
 type PageProps = {
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
@@ -62,8 +62,8 @@ export function AppShell() {
   }, []);
   // 路由化：落点由 URL 唯一决定（深链 / 刷新 / 前进后退可用），不再用 useState 记忆。
   const segments = location.pathname.split("/").filter(Boolean);
-  const rawActive = segments[0] ?? "dashboard";
-  const active = navigation.some((e) => e.key === rawActive) ? rawActive : "dashboard";
+  const rawActive = segments[0] ?? "workbench";
+  const active = navigation.some((e) => e.key === rawActive) ? rawActive : "workbench";
   const customerFocusParams = active === "customers" ? new URLSearchParams(location.search) : null;
   const parsedCustomerFocusId = Number(customerFocusParams?.get("customer_id"));
   const parsedCounterpartyFocusId = Number(customerFocusParams?.get("counterparty_id"));
@@ -116,11 +116,11 @@ export function AppShell() {
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
   };
-  const navigateToDashboardPath = (path: string) => navigate(path);
+  const navigateToWorkbenchPath = (path: string) => navigate(path);
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
-      navigate("/dashboard", { replace: true });
+      navigate("/workbench", { replace: true });
     }
   }, [location.pathname, navigate]);
   // keep-alive：访问过的页面持续挂载，仅非激活态隐藏（display:none），避免切导航重挂载丢状态。
@@ -278,7 +278,7 @@ export function AppShell() {
           <Suspense fallback={<div className="page-loading" role="status">正在打开…</div>}>
             {[...visited, active].filter((k, i, a) => a.indexOf(k) === i).map((key) => {
               const isActive = key === active;
-              const PageComponent = key === "dashboard" ? DashboardPage : PAGES[key];
+              const PageComponent = key === "workbench" ? WorkbenchPage : PAGES[key];
               if (!PageComponent) return null;
               return (
                 <div
@@ -291,8 +291,8 @@ export function AppShell() {
                       page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
                       当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
                   <ErrorBoundary name={key}>
-                    {key === "dashboard" ? (
-                      <DashboardPage active={isActive} onNavigate={navigateTo} onDashboardNavigate={navigateToDashboardPath} />
+                    {key === "workbench" ? (
+                      <WorkbenchPage active={isActive} onNavigate={navigateTo} onWorkbenchNavigate={navigateToWorkbenchPath} />
                     ) : (
                       <PageComponent
                         onNavigate={navigateTo}

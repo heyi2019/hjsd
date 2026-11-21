@@ -73,7 +73,7 @@ vi.mock("axios", () => {
 import axios from "axios";
 import { clearApiCache, setDevUser } from "@/shared/api/client";
 import { reportsApi } from "@/shared/api/reports.api";
-import { dashboardApi } from "@/shared/api/dashboard.api";
+import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import "@/shared/state/referenceDataEvents";
 
@@ -116,9 +116,9 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     }
     const summary = await notificationsApi.profitDetails([1]);
     expect(await notificationsApi.profitDetails([1])).not.toBe(summary);
-    const firstDashboard = await dashboardApi.summary(params);
-    expect(await dashboardApi.summary(params)).not.toBe(firstDashboard);
-    const [firstConcurrent, secondConcurrent] = await Promise.all([dashboardApi.summary(params), dashboardApi.summary(params)]);
+    const firstWorkbench = await workbenchApi.summary(params);
+    expect(await workbenchApi.summary(params)).not.toBe(firstWorkbench);
+    const [firstConcurrent, secondConcurrent] = await Promise.all([workbenchApi.summary(params), workbenchApi.summary(params)]);
     expect(firstConcurrent).toBe(secondConcurrent);
     expect((axios as any).__getCallCount()).toBe(15);
   });

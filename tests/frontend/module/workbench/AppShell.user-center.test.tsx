@@ -13,7 +13,7 @@ afterEach(() => {
 it("FE-207：修改密码请求未返回时仍可关闭真实用户中心弹窗", async () => {
   vi.spyOn(client, "changePassword").mockReturnValue(new Promise(() => undefined));
   renderApp(
-    <MemoryRouter initialEntries={["/dashboard"]}>
+    <MemoryRouter initialEntries={["/workbench"]}>
       <AppShell />
     </MemoryRouter>,
     { user: "admin" },

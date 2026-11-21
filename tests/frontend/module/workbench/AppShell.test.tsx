@@ -21,9 +21,9 @@ import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { reportsApi } from "@/shared/api/reports.api";
-import { dashboardApi } from "@/shared/api/dashboard.api";
+import { workbenchApi } from "@/shared/api/workbench.api";
 vi.mock("@/shared/api/cashflows.api");
-vi.mock("@/shared/api/dashboard.api");
+vi.mock("@/shared/api/workbench.api");
 vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/deposits.api");
@@ -41,7 +41,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
-import { cashflowPage, customerSummary, dashboardSummary, installmentTotals, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
+import { cashflowPage, customerSummary, workbenchSummary, installmentTotals, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
@@ -51,7 +51,7 @@ import { setAntdDateRange } from "@fixtures/antdRange";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
-const __allApi = { dashboardApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, profitAllocationApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, reportsApi, stocksApi };
+const __allApi = { workbenchApi, cashflowsApi, orderCashflowsApi, counterpartiesApi, customersApi, leadsApi, depositsApi, installmentsApi, attachmentsApi, gameTypesApi, notificationsApi, sequencesApi, optionSetsApi, listColumnsApi, orderFormFieldsApi, orderTypesApi, ordersApi, employeesApi, teamsApi, usersApi, profitAllocationApi, poolsApi, reconciliationsApi, transfersApi, rebatesApi, auditApi, reportsApi, stocksApi };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -85,7 +85,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
 
   /** 返回对象而非数组的接口：其余一律 []（列表类）。 */
   const OBJECT_SHAPED = new Set([
-    "dashboardApi",
+    "workbenchApi",
     "reportsApi",
     "auditApi",
     "profitAllocationApi",
@@ -122,7 +122,7 @@ beforeEach(() => {
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
   vi.mocked(orderTypesApi.list).mockResolvedValue([]);
-  vi.mocked(dashboardApi.summary).mockImplementation(async (period) => dashboardSummary(period ? { period } : {}));
+  vi.mocked(workbenchApi.summary).mockImplementation(async (period) => workbenchSummary(period ? { period } : {}));
   vi.mocked(customersApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(customersApi.summary).mockResolvedValue(customerSummary());
   vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
@@ -136,7 +136,7 @@ beforeEach(() => {
 });
 
 async function renderShell(options: { user?: string; initialPath?: string } = {}) {
-  const { initialPath = "/dashboard", ...rest } = options;
+  const { initialPath = "/workbench", ...rest } = options;
   await act(async () => {
     renderApp(
       <MemoryRouter initialEntries={[initialPath]}>
@@ -152,7 +152,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
   it("从客户中心直接进入时不加载未访问的工作台，首次进入工作台再预热", async () => {
     await renderShell({ user: "admin", initialPath: "/customers" });
     await screen.findByRole("tab", { name: "客户档案" });
-    expect(document.querySelector(".dashboard-page")).toBeNull();
+    expect(document.querySelector(".workbench-page")).toBeNull();
     expect(poolsApi.list).not.toHaveBeenCalled();
     expect(gameTypesApi.list).not.toHaveBeenCalled();
     await ui.click(within(screen.getByRole("navigation", { name: "主导航" })).getByRole("button", { name: "工作台" }));
@@ -182,7 +182,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     ).toEqual(["1", "2", "3", "4", "5"]);
     expect(nav.querySelector('[data-nav-key="business"]')).toHaveAttribute("data-mobile-order", "1");
     expect(nav.querySelector('[data-nav-key="customers"]')).toHaveAttribute("data-mobile-order", "2");
-    expect(nav.querySelector('[data-nav-key="dashboard"]')).toHaveAttribute("data-mobile-order", "3");
+    expect(nav.querySelector('[data-nav-key="workbench"]')).toHaveAttribute("data-mobile-order", "3");
     expect(nav.querySelector('[data-nav-key="funds"]')).toHaveAttribute("data-mobile-order", "4");
     expect(nav.querySelector(".mobile-more-button")).toHaveAttribute("data-mobile-order", "5");
   });
@@ -247,19 +247,19 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
 
 describe("AppShell：角色展示与退出", () => {
   it("工作台全部时间统计与客户、收益明细保持一致", async () => {
-    vi.mocked(dashboardApi.summary).mockImplementation(async (period) => dashboardSummary({ period: (period === null ? null : period ?? currentReportPeriod()) as never }));
+    vi.mocked(workbenchApi.summary).mockImplementation(async (period) => workbenchSummary({ period: (period === null ? null : period ?? currentReportPeriod()) as never }));
     await renderShell({ user: "admin" });
-    await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalled());
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalled());
     await ui.click(screen.getByRole("button", { name: "全部" }));
-    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(null));
-    const orderCard = screen.getByTestId("dashboard-personal-orders");
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(null));
+    const orderCard = screen.getByTestId("workbench-personal-orders");
     await waitFor(() => expect(orderCard).toHaveAttribute("role", "button"));
-    await ui.click(screen.getByTestId("dashboard-personal-customers"));
+    await ui.click(screen.getByTestId("workbench-personal-customers"));
     await waitFor(() => expect(customersApi.page).toHaveBeenCalledWith(expect.objectContaining({ mine_orders: true })));
     expect(await screen.findByText(/订单操作人：.*全部时间/)).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: "工作台" }));
-    await waitFor(() => expect(screen.getByTestId("dashboard-personal-earnings")).toHaveAttribute("role", "button"));
-    await ui.click(screen.getByTestId("dashboard-personal-earnings"));
+    await waitFor(() => expect(screen.getByTestId("workbench-personal-earnings")).toHaveAttribute("role", "button"));
+    await ui.click(screen.getByTestId("workbench-personal-earnings"));
     await waitFor(() => expect(reportsApi.commission).toHaveBeenCalledWith(expect.objectContaining({ mine: true })));
     expect(vi.mocked(reportsApi.commission).mock.lastCall?.[0]).not.toHaveProperty("from");
     expect(vi.mocked(reportsApi.commission).mock.lastCall?.[0]).not.toHaveProperty("to");
@@ -268,7 +268,7 @@ describe("AppShell：角色展示与退出", () => {
     await ui.click(screen.getByRole("button", { name: "全部" }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission).mock.lastCall?.[0]).not.toHaveProperty("from"));
     await ui.click(screen.getByRole("button", { name: "工作台" }));
-    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(null));
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(null));
   });
 
   it("我的当期客户跳转展示本人和周期，并按订单口径筛选", async () => {
@@ -305,35 +305,35 @@ describe("AppShell：角色展示与退出", () => {
   it("工作台与经营中心共用已配置的周期和临时日期选择", async () => {
     vi.mocked(optionSetsApi.get).mockResolvedValue({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "10" }] } as never);
     await renderShell({ user: "admin" });
-    const dashboard = document.querySelector(".dashboard-page") as HTMLElement;
-    await waitFor(() => expect(dashboardApi.summary).toHaveBeenCalledWith(currentReportPeriod(dayjs(), 10)));
-    await ui.click(within(dashboard).getByRole("button", { name: "上期" }));
+    const workbench = document.querySelector(".workbench-page") as HTMLElement;
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledWith(currentReportPeriod(dayjs(), 10)));
+    await ui.click(within(workbench).getByRole("button", { name: "上期" }));
     const previous = previousReportPeriod(dayjs(), 10);
-    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(previous));
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(previous));
     const nav = screen.getByRole("navigation", { name: "主导航" });
     await ui.click(within(nav).getByRole("button", { name: "经营中心" }));
     await waitFor(() => expect(reportsApi.monthlyPnl).toHaveBeenCalledWith(previous));
     await ui.click(screen.getByRole("button", { name: "本期" }));
     await ui.click(within(nav).getByRole("button", { name: "工作台" }));
-    await waitFor(() => expect(dashboardApi.summary).toHaveBeenLastCalledWith(currentReportPeriod(dayjs(), 10)));
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(currentReportPeriod(dayjs(), 10)));
   });
 
   it("工作台个人卡片提供我的当期订单和我的当期收益入口，并进入对应业务视图", async () => {
     await renderShell({ user: "admin" });
     const topbar = document.querySelector(".topbar") as HTMLElement;
-    const dashboard = document.querySelector(".dashboard-page") as HTMLElement;
+    const workbench = document.querySelector(".workbench-page") as HTMLElement;
 
     expect(within(topbar).queryByRole("button", { name: "我的当期订单" })).toBeNull();
     expect(within(topbar).queryByRole("button", { name: "我的当期收益" })).toBeNull();
 
-    await waitFor(() => expect(within(dashboard).getByTestId("dashboard-personal-orders")).toHaveAttribute("role", "button"));
-    await ui.click(within(dashboard).getByTestId("dashboard-personal-orders"));
+    await waitFor(() => expect(within(workbench).getByTestId("workbench-personal-orders")).toHaveAttribute("role", "button"));
+    await ui.click(within(workbench).getByTestId("workbench-personal-orders"));
     expect(await screen.findByRole("tab", { name: "订单台账" })).toHaveAttribute("aria-selected", "true");
     expect(vi.mocked(ordersApi.listPage)).toHaveBeenCalledWith(expect.objectContaining({ mine: true }));
 
     await ui.click(screen.getByRole("button", { name: "工作台" }));
-    await waitFor(() => expect(screen.getByTestId("dashboard-personal-earnings")).toHaveAttribute("role", "button"));
-    await ui.click(screen.getByTestId("dashboard-personal-earnings"));
+    await waitFor(() => expect(screen.getByTestId("workbench-personal-earnings")).toHaveAttribute("role", "button"));
+    await ui.click(screen.getByTestId("workbench-personal-earnings"));
     const commissionTab = await screen.findByRole("tab", { name: "分润对账" });
     expect(commissionTab).toHaveAttribute("aria-selected", "true");
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true })));

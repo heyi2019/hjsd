@@ -217,8 +217,8 @@
 .allocation-modal .orders-allocation-row.is-action .ant-form-item .ant-form-item-row {
   grid-template-columns: max-content minmax(0, 1fr);
 }
- .dashboard-summary { display: grid; gap: var(--space-3); }
-.dashboard-summary .ui-stat {
+ .workbench-summary { display: grid; gap: var(--space-3); }
+.workbench-summary .ui-stat {
   min-height: 96px;
   justify-content: center;
   padding: var(--space-4) var(--space-5);

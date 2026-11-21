@@ -8,23 +8,23 @@ import { appMessage } from "../shared/ui/appFeedback";
 import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import { QuickAccess } from "./workbench/quick-access/QuickAccess";
 import { BusinessOverview } from "./workbench/overview/BusinessOverview";
-import { BusinessAlerts } from "./workbench/notifications/BusinessAlerts";
-import { useDashboardSummary } from "./workbench/overview/useDashboardSummary";
+import { Notifications } from "./workbench/notifications/Notifications";
+import { useWorkbenchSummary } from "./workbench/overview/useWorkbenchSummary";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 
-export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onDashboardNavigate?: (path: string) => void; active?: boolean }) {
+export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onWorkbenchNavigate?: (path: string) => void; active?: boolean }) {
   const periodState = useBusinessPeriod();
-  const { summary, error, loading, loadSummary } = useDashboardSummary(active && periodState.ready, periodState.period);
+  const { summary, error, loading, loadSummary } = useWorkbenchSummary(active && periodState.ready, periodState.period);
   const period = summary?.period ?? null;
   const withPeriod = (path: string) => {
     if (!period) return path;
     const separator = path.includes("?") ? "&" : "?";
     return `${path}${separator}trade_date_from=${encodeURIComponent(period.from)}&trade_date_to=${encodeURIComponent(period.to)}`;
   };
-  const openDashboardPath = (path: string) => onDashboardNavigate?.(path);
+  const openWorkbenchPath = (path: string) => onWorkbenchNavigate?.(path);
   const openPendingProfitAllocation = async (notificationId?: number) => {
-    if (!onDashboardNavigate) return;
+    if (!onWorkbenchNavigate) return;
     try {
       const target = await notificationsApi.pendingOrder(notificationId);
       if (!target.order_no) {
@@ -35,19 +35,19 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
         appMessage.warning(`未找到订单 ${target.order_no}`);
         return;
       }
-      onDashboardNavigate(`/business/ledger?allocation_order_id=${target.order_id}&keyword=${encodeURIComponent(target.order_no)}`);
+      onWorkbenchNavigate(`/business/ledger?allocation_order_id=${target.order_id}&keyword=${encodeURIComponent(target.order_no)}`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
   };
   return (
-    <section className="ui-stack dashboard-page">
+    <section className="ui-stack workbench-page">
       <PageHeader
         title="今天从这里开始"
       />
       <QuickAccess onNavigate={onNavigate} onCreated={() => void loadSummary()} />
 
-      <div className="dashboard-summary">
+      <div className="workbench-summary">
         <Card className="glass" title="我的业务总览">
         <div className="ui-filter-bar ui-filter-bar--spaced"><BusinessPeriodPicker state={periodState} showAll /></div>
         <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
@@ -62,21 +62,21 @@ export function DashboardPage({ onNavigate, onDashboardNavigate, active = true }
           allPeriods={periodState.period === null}
           personalOrders={summary?.personal_orders ?? null}
           personalCustomers={summary?.personal_customers ?? null}
-          onPersonalOrdersClick={() => openDashboardPath(withPeriod("/business/ledger?mine=true"))}
-          onPersonalCustomersClick={() => onDashboardNavigate ? openDashboardPath(withPeriod("/customers?mine_orders=true")) : undefined}
+          onPersonalOrdersClick={() => openWorkbenchPath(withPeriod("/business/ledger?mine=true"))}
+          onPersonalCustomersClick={() => onWorkbenchNavigate ? openWorkbenchPath(withPeriod("/customers?mine_orders=true")) : undefined}
           personalEarnings={summary?.personal_earnings ?? null}
-          onPersonalEarningsClick={() => openDashboardPath(period
+          onPersonalEarningsClick={() => openWorkbenchPath(period
               ? `/operations?tab=my-earnings&from=${encodeURIComponent(period.from)}&to=${encodeURIComponent(period.to)}`
               : "/operations?tab=my-earnings&period=all")}
-          onInventoryClick={() => openDashboardPath("/business/inventory")}
-          onOrdersClick={() => openDashboardPath(withPeriod("/business/ledger"))}
-          onInstallmentsClick={() => openDashboardPath("/business/collections")}
-          onOverdueInstallmentsClick={() => openDashboardPath("/business/collections?status=OVERDUE")}
-          onInventoryOverdueClick={() => openDashboardPath("/business/inventory?age_gt_days=30")}
+          onInventoryClick={() => openWorkbenchPath("/business/inventory")}
+          onOrdersClick={() => openWorkbenchPath(withPeriod("/business/ledger"))}
+          onInstallmentsClick={() => openWorkbenchPath("/business/collections")}
+          onOverdueInstallmentsClick={() => openWorkbenchPath("/business/collections?status=OVERDUE")}
+          onInventoryOverdueClick={() => openWorkbenchPath("/business/inventory?age_gt_days=30")}
         />
         </Card>
-        <BusinessAlerts
-          onPartyNavigate={onDashboardNavigate}
+        <Notifications
+          onPartyNavigate={onWorkbenchNavigate}
           onPendingProfitNotificationsClick={(notificationId) => void openPendingProfitAllocation(notificationId)}
           active={active}
         />

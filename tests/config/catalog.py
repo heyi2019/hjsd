@@ -280,9 +280,9 @@ CROSS_FLOW_LABEL = {
 # 前端测试文件 -> 功能编号（当前文件逐一登记，与后端 BACKEND_FILE_TO_FUNC 同构）。
 # 只登记**文件名**：搬目录、拆区域都不影响编号，这正是历史 1091 条前端用例零漂移的前提。
 FRONTEND_FILE_TO_FUNC: dict[str, str] = {
-    "DashboardPage.deep.test.tsx":         "A01",
-    "DashboardPage.test.tsx":              "A01",
-    "WorkbenchMessages.test.tsx":          "A01",
+    "WorkbenchPage.deep.test.tsx":         "A01",
+    "WorkbenchPage.test.tsx":              "A01",
+    "Notifications.test.tsx":          "A01",
     "CreateBusinessModal.deep.test.tsx":   "B01",
     "CreateBusinessModal.test.tsx":        "B01",
     "DeliveryInfoSection.test.tsx":        "B01",

@@ -11,7 +11,7 @@ export function isProfitNotification(item: NotificationItem) {
   return item.entity_type === "order" && (item.notification_type === "PROFIT_PENDING" || item.notification_type === "PROFIT_ALLOCATED");
 }
 
-export function useWorkbenchMessages({ onPendingProfitNotificationsClick, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void; active?: boolean }) {
+export function useNotifications({ onPendingProfitNotificationsClick, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void; active?: boolean }) {
   const { username } = useSession();
   const [dataOwner, setDataOwner] = useState(username);
   const [selected, setSelected] = useState<NotificationItem | null>(null);

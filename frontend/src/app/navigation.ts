@@ -10,7 +10,7 @@ import { createElement } from "react";
  * 既有角色（如 viewer 仅含 finance.read/report.read）的导航完整性。
  */
 export const navigation = [
-  { key: "dashboard", label: "工作台", icon: createElement(HomeOutlined) },
+  { key: "workbench", label: "工作台", icon: createElement(HomeOutlined) },
   { key: "business", label: "业务中心", icon: createElement(FileTextOutlined) },
   { key: "customers", label: "客户中心", icon: createElement(TeamOutlined) },
   { key: "funds", label: "资金中心", icon: createElement(WalletOutlined), requiredPermission: "finance.read" },
@@ -22,6 +22,6 @@ export const navigation = [
 export const MOBILE_NAV_ORDER: Record<string, number> = {
   business: 1,
   customers: 2,
-  dashboard: 3,
+  workbench: 3,
   funds: 4,
 };

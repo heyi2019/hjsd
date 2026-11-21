@@ -68,7 +68,7 @@ def test_order_create_uses_account_snapshot_as_the_only_account_input():
 
 
 def test_workbench_summary_exposes_one_backend_aggregate(seeded_client, headers):
-    response = seeded_client.get("/api/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/workbench/summary", headers=headers)
 
     assert response.status_code == 200, response.text
     payload = response.json()
@@ -95,7 +95,7 @@ def test_workbench_personal_earnings_uses_commission_profit_base(
         lambda *args, **kwargs: Decimal("123.45"),
     )
 
-    response = seeded_client.get("/api/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/workbench/summary", headers=headers)
 
     assert response.status_code == 200, response.text
     assert response.json()["personal_earnings"] == "123.45"
@@ -116,7 +116,7 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, 
 
     monkeypatch.setattr("app.workbench.overview.service.order_status_counts", fake_order_status_counts)
 
-    response = seeded_client.get("/api/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/workbench/summary", headers=headers)
 
     assert response.status_code == 200, response.text
     assert len(calls) == 2
@@ -128,23 +128,23 @@ def test_workbench_order_cards_use_the_current_period(seeded_client, seeded_db, 
     assert calls[1]["trade_date_to"] == expected["trade_date_to"]
     assert calls[1]["mine"] is True
     calls.clear()
-    response = seeded_client.get("/api/dashboard/summary", headers=headers, params={"from": "2026-01-02", "to": "2026-02-04"})
+    response = seeded_client.get("/api/workbench/summary", headers=headers, params={"from": "2026-01-02", "to": "2026-02-04"})
     assert response.status_code == 200, response.text
     assert response.json()["period"] == {"from": "2026-01-02", "to": "2026-02-04"}
     assert all(call["trade_date_from"] == date(2026, 1, 2) and call["trade_date_to"] == date(2026, 2, 4) for call in calls)
-    assert seeded_client.get("/api/dashboard/summary", headers=headers, params={"from": "2026-02-04", "to": "2026-01-02"}).status_code == 422
-    assert seeded_client.get("/api/dashboard/summary", headers=headers, params={"from": "2026-01-02"}).status_code == 422
+    assert seeded_client.get("/api/workbench/summary", headers=headers, params={"from": "2026-02-04", "to": "2026-01-02"}).status_code == 422
+    assert seeded_client.get("/api/workbench/summary", headers=headers, params={"from": "2026-01-02"}).status_code == 422
     calls.clear()
-    response = seeded_client.get("/api/dashboard/summary", headers=headers, params={"all_time": "true"})
+    response = seeded_client.get("/api/workbench/summary", headers=headers, params={"all_time": "true"})
     assert response.status_code == 200, response.text
     assert response.json()["period"] is None
     assert all(call["trade_date_from"] is None and call["trade_date_to"] is None for call in calls)
-    assert seeded_client.get("/api/dashboard/summary", headers=headers, params={"all_time": "true", "from": "2026-01-02", "to": "2026-02-04"}).status_code == 422
+    assert seeded_client.get("/api/workbench/summary", headers=headers, params={"all_time": "true", "from": "2026-01-02", "to": "2026-02-04"}).status_code == 422
     from app.domain.options import OptionSet
     setting = OptionSet(code="BUSINESS_PERIOD", label="当期设置", group="BUSINESS", editable=False, options=[{"value": "start_day", "label": "10"}], created_by="pytest", updated_by="pytest")
     seeded_db.add(setting)
     seeded_db.flush()
-    response = seeded_client.get("/api/dashboard/summary", headers=headers)
+    response = seeded_client.get("/api/workbench/summary", headers=headers)
     assert response.status_code == 200, response.text
     assert response.json()["period"] == {"from": "2026-11-10", "to": "2026-12-09"}
     from app.shared.business_period import business_period

@@ -4,7 +4,7 @@ import type { PoolBalance, PoolBalanceTotals } from "@/shared/api/types/finance"
 import type { InstallmentTotals } from "@/shared/api/types/installments";
 import type { ProfitAllocation, ProfitAllocationList } from "@/shared/api/types/profitAllocation";
 import type { DataCenterSummary } from "@/shared/api/types/reporting";
-import type { DashboardSummary } from "@/shared/api/dashboard.api";
+import type { WorkbenchSummary } from "@/shared/api/workbench.api";
 import type { Customer, CustomerDetail, CustomerSummary } from "@/shared/api/types/customers";
 import type { OptionSet, OptionSetList } from "@/shared/api/types/common";
 
@@ -196,7 +196,7 @@ export function installmentTotals(overrides: Partial<InstallmentTotals> = {}): I
 }
 
 /** 构造工作台汇总，默认值与空数据状态一致。 */
-export function dashboardSummary(overrides: Partial<DashboardSummary> = {}): DashboardSummary {
+export function workbenchSummary(overrides: Partial<WorkbenchSummary> = {}): WorkbenchSummary {
   return {
     period: { from: "2026-11-01", to: "2026-11-16" },
     orders: { total_count: 0 },

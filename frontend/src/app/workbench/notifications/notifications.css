@@ -1,0 +1,49 @@
+.notifications--expanded .ant-card {
+  display: flex;
+  flex-direction: column;
+  height: 20rem;
+  overflow: hidden;
+}
+.notifications--expanded .ant-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.notifications--expanded .ant-tabs { flex: none; }
+.notification__button {
+  padding: 0;
+  border: 0;
+  color: var(--color-primary-text);
+  background: transparent;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.notification__button:hover { color: var(--color-primary); text-decoration: underline; }
+.notification__message { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-3); row-gap: var(--space-1); width: 100%; }
+.notification__title, .notification__details { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notification__details, .notification__time { color: var(--color-text-secondary); }
+.notification__time { white-space: nowrap; text-align: right; }
+.notifications__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.notification__read, .notification__unread { justify-self: end; font-size: var(--fs-caption-1); }
+.notification__read { color: var(--color-text-secondary); }
+.notification__unread { color: var(--color-primary); }
+.notification__button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.notifications-detail__loading { display: grid; place-items: center; min-height: 8rem; }
+.notifications-detail__actions { display: flex; justify-content: flex-end; margin-top: var(--space-4); }
+.notifications-detail .commission-detail-container {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border-radius: var(--radius-md);
+  overflow: auto;
+}
+.notifications-detail .commission-detail-table { width: 100%; border-collapse: collapse; }
+.notifications-detail .commission-detail-table th,
+.notifications-detail .commission-detail-table td { padding: var(--space-3) var(--space-4); border-bottom: var(--border-w) solid var(--color-border); }
+.notifications-detail .commission-detail-table th { background: var(--soft); }
+.notifications-detail .commission-detail-table tr:last-child td { border-bottom: 0; }

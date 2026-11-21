@@ -316,7 +316,7 @@ class TestCreateAccountGuards:
         boundary.inventory_entry_at = datetime.combine(date.today() - timedelta(days=30), datetime.min.time())
         unlinked.inventory_entry_at = datetime.combine(date.today() - timedelta(days=45), datetime.min.time())
         seeded_db.flush()
-        dashboard = seeded_client.get("/api/dashboard/summary", headers=headers).json()["inventory"]
+        dashboard = seeded_client.get("/api/workbench/summary", headers=headers).json()["inventory"]
         ledger = seeded_client.get("/api/stocks/inventory/ledger", headers=headers).json()
         overdue = seeded_client.get("/api/stocks/inventory/ledger", params={"age_gt_days": 30}, headers=headers).json()
         aging = seeded_client.get("/api/stocks/inventory/ledger", params={"age_gt_days": 7}, headers=headers).json()

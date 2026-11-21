@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from sqlalchemy import select
 
 from app.domain.trade import Cashflow
-from app.business.consignment import register_consignment
+from app.business.shared.operations.consignment import register_consignment
 from app.business.orders import events
 from app.business.orders.create import create_order
 from app.business.orders.events import _opposite_direction, post_event

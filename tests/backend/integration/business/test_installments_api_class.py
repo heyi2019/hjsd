@@ -439,7 +439,7 @@ class TestInstallmentsApi:
         assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order.id, OrderEvent.event_type == "BUY"))
 
     def test_sale_customer_creation_keeps_customer_permission_check(self, seeded_db):
-        from app.business.sale import apply_sale_details
+        from app.business.shared.operations.sale import apply_sale_details
         from app.business.schemas import CustomerDraftInput
         from app.core.errors import PermissionDenied
         from app.core.security import PERM_ORDER_UPDATE

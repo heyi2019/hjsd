@@ -1076,7 +1076,7 @@ def test_edit_single_listed_platform_updates_linked_unlist(seeded_client, seeded
 
 
 def test_edit_listing_with_whitespace_updates_linked_unlisting(seeded_client, seeded_db, headers):
-    from app.business.consignment import platform_unlist_consignment
+    from app.business.shared.operations.consignment import platform_unlist_consignment
     from app.business.listing_state import active_listings
     account = create_account(seeded_db, game_account="edit-whitespace-platform", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

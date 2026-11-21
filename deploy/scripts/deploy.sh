@@ -45,8 +45,7 @@ echo "==> 发布版本 V${APP_VERSION}（镜像 tag 同此值）"
 # 镜像在联网机器上构建完毕，ECS 只做 load，四个网络依赖全部归零。
 if [ "${ERP_SKIP_BUILD:-0}" = "1" ]; then
   echo "==> 离线模式：跳过构建，校验已导入镜像"
-  for svc in backend frontend; do
-    img="heijin-${svc}:${APP_VERSION}"
+  for img in "heijin-backend:${APP_VERSION}" "heijin-frontend:${APP_VERSION}" redis:7.4-alpine; do
     if ! docker image inspect "$img" >/dev/null 2>&1; then
       echo "✗ 缺少镜像 ${img}" >&2
       echo "  请先导入离线包：gunzip -c heijin-images-${APP_VERSION}-amd64.tar.gz | docker load" >&2
@@ -65,10 +64,9 @@ if [ "${ERP_SKIP_BUILD:-0}" = "1" ]; then
 else
 # 基础镜像预检：Docker Hub 在部分网络（尤其 ECS 国内节点）不可达，而失败点落在 Dockerfile
 # 的 FROM 行、报错形似代码问题（TLS handshake timeout）。这里提前拉取，把网络问题变成明示。
-# 三个基础镜像：python:3.12-alpine=后端 FROM；alpine:3.20=前端运行阶段 FROM；
-# node:22-alpine=前端构建阶段 FROM。缺一即构建失败。
+# 基础镜像与 Redis 运行镜像都须可用，避免发布中途才发现无法拉取。
 echo "==> 检查基础镜像"
-for img in python:3.12-alpine alpine:3.20 node:22-alpine; do
+for img in python:3.12-alpine alpine:3.20 node:22-alpine redis:7.4-alpine; do
   if docker image inspect "$img" >/dev/null 2>&1; then
     echo "  ✓ ${img} 已存在"
     continue

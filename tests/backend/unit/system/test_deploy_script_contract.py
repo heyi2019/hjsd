@@ -430,3 +430,14 @@ def test_backend_runtime_receives_explicit_release_version():
     """运行中的 API 健康信息必须与导入镜像的发布版本一致。"""
     compose = COMPOSE_FILE.read_text(encoding="utf-8")
     assert "APP_VERSION: ${APP_VERSION:-latest}" in compose
+
+
+def test_offline_deploy_refuses_missing_rate_limit_image(tmp_path):
+    script, fake_bin = _release_tree(tmp_path)
+    docker = fake_bin / "docker"
+    source = docker.read_text(encoding="utf-8")
+    source = source.replace('case "$args" in\n', 'case "$args" in\n  *"image inspect redis:7.4-alpine"*) exit 1 ;;\n  *"image inspect"*"--format"*) printf "amd64\\n"; exit 0 ;;\n', 1)
+    docker.write_text(source, encoding="utf-8")
+    result = _run(script, fake_bin, extra_env={"ERP_SKIP_BUILD": "1", "APP_VERSION": "1.0.1"})
+    assert result.returncode != 0
+    assert "redis:7.4-alpine" in result.stdout + result.stderr

@@ -45,6 +45,8 @@ python-dotenv==1.2.4
     # via pydantic-settings
 python-multipart==0.0.12
     # via -r backend/requirements.txt
+redis==5.2.1
+    # via -r backend/requirements.txt
 sqlalchemy==2.0.35
     # via
     #   -r backend/requirements.txt

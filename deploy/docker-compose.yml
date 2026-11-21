@@ -4,6 +4,18 @@
 #   docker compose build
 #   docker compose up -d
 services:
+  rate-limit:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "32mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - erp_rate_limit:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   db:
     image: postgres:16-alpine
     environment:
@@ -32,10 +44,13 @@ services:
     environment:
       # 让 /health 与镜像 tag 显示同一发布版本；shell APP_VERSION 覆盖 .env 遗留值。
       APP_VERSION: ${APP_VERSION:-latest}
+      CUSTOMER_RATE_LIMIT_REDIS_URL: ${CUSTOMER_RATE_LIMIT_REDIS_URL:-redis://rate-limit:6379/0}
     volumes:
       - erp_db:/app/data   # 保留原 SQLite 备份与附件；正式业务库已切到 PostgreSQL
     depends_on:
       db:
+        condition: service_healthy
+      rate-limit:
         condition: service_healthy
     expose:
       - "8123"
@@ -72,3 +87,4 @@ services:
 volumes:
   erp_db:
   erp_pgdata:
+  erp_rate_limit:

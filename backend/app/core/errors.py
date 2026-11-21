@@ -25,6 +25,9 @@ class ErrorCode:
     # 429
     RATE_LIMITED = "RATE_LIMITED"
 
+    # 503
+    RATE_LIMIT_STORE_UNAVAILABLE = "RATE_LIMIT_STORE_UNAVAILABLE"
+
     # 409
     ORDER_STATUS_CONFLICT = "ORDER_STATUS_CONFLICT"
     VERSION_CONFLICT = "VERSION_CONFLICT"
@@ -122,6 +125,13 @@ class RateLimited(AppError):
     code = ErrorCode.RATE_LIMITED
 
 
+class RateLimitUnavailable(AppError):
+    """无法验证共享限流状态时拒绝访问。"""
+
+    http_status = 503
+    code = ErrorCode.RATE_LIMIT_STORE_UNAVAILABLE
+
+
 def require_condition(condition: bool, message: str, **kwargs: Any) -> None:
     """卫语句：条件不满足即按给定类型抛错，避免深层嵌套 if。"""
     if not condition:
@@ -137,6 +147,7 @@ __all__ = [
     "NotFound",
     "PermissionDenied",
     "RateLimited",
+    "RateLimitUnavailable",
     "TokenExpired",
     "Validation",
     "require_condition",

@@ -25,6 +25,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
       postgres:
         image: postgres:16
         env:
@@ -47,6 +56,7 @@ jobs:
       # CI 的 postgres service 是一次性单库，conftest 对「两变量同库」的拒绝已在 CI 下豁免。
       DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
       TEST_DATABASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432/heijin_erp_test"
+      TEST_REDIS_URL: "redis://127.0.0.1:6379/0"
     steps:
       - uses: actions/checkout@v4
 
@@ -85,6 +95,10 @@ jobs:
 
       - name: Prepare test configuration
         run: cp .env.example .env
+
+      - name: Verify shared customer rate limiting
+        working-directory: backend
+        run: python -m pytest ../tests/backend/integration/system/test_ratelimit.py -q -k TestRateLimiter
 
       # 基线一致性门禁：「改 ORM 即改基线」策略的静默失败模式是 ORM 与 alembic 0001 漂移
       # （测试库 create_all 全绿、生产 alembic 缺列）。本步骤建临时 drill 库跑 alembic upgrade head，

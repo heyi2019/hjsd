@@ -149,3 +149,37 @@ def test_customer_list_applies_rate_limit(seeded_client, headers):
     with mock.patch("app.customers.customers_router.customer_access_limiter.is_allowed", return_value=False):
         response = seeded_client.get("/api/customers", headers=headers)
     assert response.status_code == 429
+
+
+def test_customer_list_fails_closed_when_shared_limiter_is_unavailable(seeded_client, headers, monkeypatch):
+    from app.core.settings import get_settings
+    monkeypatch.setattr(get_settings(), "customer_rate_limit_redis_url", "redis://127.0.0.1:1/0")
+    response = seeded_client.get("/api/customers", headers=headers)
+    assert response.status_code == 503
+    assert response.json()["code"] == "RATE_LIMIT_STORE_UNAVAILABLE"
+
+
+def test_customer_list_enforces_budget_from_another_worker(seeded_client, headers, monkeypatch):
+    import os
+    import uuid
+    from dataclasses import replace
+    from redis import Redis
+    from app.core.ratelimit import RedisRateLimiter
+    from app.core.security import DEV_USERS
+    from app.core.settings import get_settings
+
+    url = os.environ.get("TEST_REDIS_URL")
+    if not url:
+        pytest.skip("需要独立的 TEST_REDIS_URL 验证共享限流")
+    user_id = uuid.uuid4().int % 1_000_000_000 + 1_000_000_000
+    key = f"read:{user_id}"
+    monkeypatch.setitem(DEV_USERS, "admin", replace(DEV_USERS["admin"], id=user_id))
+    monkeypatch.setattr(get_settings(), "customer_rate_limit_redis_url", url)
+    try:
+        other_worker = RedisRateLimiter(url)
+        for _ in range(300):
+            assert other_worker.is_allowed(key, 300)
+        response = seeded_client.get("/api/customers", headers=headers)
+        assert response.status_code == 429
+    finally:
+        Redis.from_url(url).delete(f"heijin:customer-rate:v1:{key}")

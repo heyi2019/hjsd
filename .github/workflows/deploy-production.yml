@@ -151,7 +151,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p output
-          docker save "heijin-backend:${APP_VERSION}" "heijin-frontend:${APP_VERSION}" \
+          docker pull --platform linux/amd64 redis:7.4-alpine
+          docker save "heijin-backend:${APP_VERSION}" "heijin-frontend:${APP_VERSION}" redis:7.4-alpine \
             | gzip > "output/heijin-images-${APP_VERSION}-amd64.tar.gz"
 
           # 只上传运行所需的部署文件；应用代码和静态资源已在镜像中。

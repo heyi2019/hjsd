@@ -13,7 +13,7 @@ from app.core.actor import actor_name as _actor
 from app.shared.audit import record_audit
 from app.core.database import get_db
 from app.core.errors import RateLimited, Validation
-from app.core.ratelimit import RateLimiter
+from app.core.ratelimit import CustomerRateLimiter
 from app.core.schemas import PageOut
 from app.core.security import (
     PERM_CUSTOMER_CREATE,
@@ -54,7 +54,7 @@ create_customers = require_permissions(PERM_CUSTOMER_CREATE)
 update_customers = require_permissions(PERM_CUSTOMER_UPDATE)
 merge_customers = require_permissions(PERM_CUSTOMER_MERGE)
 export_customers = require_permissions(PERM_CUSTOMER_READ, PERM_CUSTOMER_EXPORT)
-customer_access_limiter = RateLimiter()
+customer_access_limiter = CustomerRateLimiter()
 
 
 def _limit_customer_access(user: CurrentUser, action: str, limit: int) -> None:

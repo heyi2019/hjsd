@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     # 避免打断本地开发与 k6 压测。多 worker 下各进程独立计数（登录防暴破足够）。
     login_rate_limit_enabled: bool = True
     login_rate_limit_per_minute: int = 10
+    customer_rate_limit_redis_url: str = ""
 
     # database：统一 PostgreSQL（SQLite 已下线）。缺 .env 时用下面的本机兜底地址。
     database_url: str = DEFAULT_DEV_DATABASE_URL

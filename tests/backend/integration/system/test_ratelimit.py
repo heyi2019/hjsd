@@ -7,11 +7,20 @@
 """
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.core.ratelimit import RateLimiter, login_limiter
+from app.core.errors import RateLimitUnavailable
 from app.core.security import hash_password
 from app.core.settings import get_settings
 from app.domain.users import User
@@ -40,6 +49,58 @@ class TestRateLimiter:
     def test_default_window_is_60s(self):
         rl = RateLimiter()
         assert rl.is_allowed("k", 1) is True  # 默认 window_seconds=60
+
+    def test_shared_redis_limit_across_instances(self):
+        from app.core.ratelimit import RedisRateLimiter
+        url = os.environ.get("TEST_REDIS_URL")
+        if not url:
+            pytest.skip("需要独立的 TEST_REDIS_URL 验证跨实例原子限流")
+        first, second = RedisRateLimiter(url), RedisRateLimiter(url)
+        key = f"test:{uuid.uuid4()}"
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            allowed = list(executor.map(lambda index: (first if index % 2 else second).is_allowed(key, 5, 60), range(20)))
+        assert sum(allowed) == 5
+        assert not second.is_allowed(key, 5, 60)
+        assert first.is_allowed(key + ":other", 1, 60)
+        expiry_key = key + ":expiry"
+        assert first.is_allowed(expiry_key, 1, 1)
+        assert not second.is_allowed(expiry_key, 1, 1)
+        time.sleep(1.1)
+        assert second.is_allowed(expiry_key, 1, 1)
+        process_key = key + ":process"
+        env = {**os.environ, "RATE_TEST_KEY": process_key}
+        script = "import os; from app.core.ratelimit import RedisRateLimiter; raise SystemExit(0 if RedisRateLimiter(os.environ['TEST_REDIS_URL']).is_allowed(os.environ['RATE_TEST_KEY'], 1, 60) else 1)"
+        assert subprocess.run([sys.executable, "-c", script], env=env).returncode == 0
+        assert subprocess.run([sys.executable, "-c", script], env=env).returncode == 1
+
+    def test_customer_rate_limiter_fails_closed_without_redis_in_production(self, monkeypatch):
+        from app.core import ratelimit
+        monkeypatch.setattr(ratelimit, "get_settings", lambda: SimpleNamespace(is_production=True, is_development=False, customer_rate_limit_redis_url=""), raising=False)
+        with pytest.raises(RateLimitUnavailable) as exc:
+            ratelimit.CustomerRateLimiter().is_allowed("read:1", 10)
+        assert getattr(exc.value, "http_status", None) == 503
+
+    def test_production_customer_limit_is_shared_between_workers(self, monkeypatch):
+        from app.core import ratelimit
+        url = os.environ.get("TEST_REDIS_URL")
+        if not url:
+            pytest.skip("需要独立的 TEST_REDIS_URL 验证生产限流")
+        monkeypatch.setattr(ratelimit, "get_settings", lambda: SimpleNamespace(is_production=True, is_development=False, customer_rate_limit_redis_url=url))
+        key = f"read:test:{uuid.uuid4()}"
+        assert ratelimit.CustomerRateLimiter().is_allowed(key, 1)
+        assert not ratelimit.CustomerRateLimiter().is_allowed(key, 1)
+
+    def test_non_development_environment_cannot_bypass_shared_limiter(self, monkeypatch):
+        from app.core import ratelimit
+        monkeypatch.setattr(ratelimit, "get_settings", lambda: SimpleNamespace(is_production=False, is_development=False, customer_rate_limit_redis_url=""))
+        with pytest.raises(RateLimitUnavailable):
+            ratelimit.CustomerRateLimiter().is_allowed("read:1", 1)
+
+    def test_redis_connection_failure_is_a_service_error(self):
+        from app.core.ratelimit import RedisRateLimiter
+        with pytest.raises(RateLimitUnavailable) as exc:
+            RedisRateLimiter("redis://127.0.0.1:1/0").is_allowed("read:1", 1)
+        assert getattr(exc.value, "http_status", None) == 503
 
 
 @pytest.fixture

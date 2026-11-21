@@ -80,8 +80,13 @@ export function buildEventEdits(
   events: Array<Pick<AccountExecutionEvent, "id" | "amount" | "note" | "occurred_at" | "operator_user_ids" | "form_extra">>,
   drafts: Record<number, ExecutionEventDraft>,
 ): ExecutionEventEdit[] {
+  const originals = new Map<number, (typeof events)[number]>();
+  for (const event of events) {
+    const id = event.id;
+    if (!Number.isNaN(id) && !originals.has(id)) originals.set(id, event);
+  }
   return Object.values(drafts).filter((draft) => {
-    const original = events.find((event) => event.id === draft.id);
+    const original = originals.get(draft.id);
     return Boolean(original && (
       draft.amount !== original.amount
       || draft.note !== (original.note ?? null)

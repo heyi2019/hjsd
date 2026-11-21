@@ -5,6 +5,31 @@ import { resolveExecutionPlatform } from "@/business/OrderDetailView/OrderDetail
 import { mergeLedgerOrderWithDetail } from "@/business/orderpage/useLedgerInlineEdit";
 
 describe("详情编辑保存载荷", () => {
+  it("大量事件编辑只需线性匹配原记录，并保持草稿顺序", () => {
+    let reads = 0;
+    const events = Array.from({ length: 200 }, (_, index) => ({
+      get id() { reads += 1; return index + 1; },
+      amount: "100", note: null, occurred_at: "",
+    }));
+    const drafts = Object.fromEntries(events.map((_, index) => [index + 1, {
+      id: 200 - index, expected_amount: "100", amount: "120", note: null, occurred_at: "",
+    }]));
+    const result = buildEventEdits(events, drafts);
+    expect(result).toHaveLength(200);
+    expect(result.map((item) => item.id)).toEqual(Array.from({ length: 200 }, (_, index) => 200 - index));
+    expect(reads).toBeLessThanOrEqual(400);
+  });
+
+  it("重复事件编号使用首条原记录，找不到原记录时跳过", () => {
+    const events = [
+      { id: 7, amount: "100", note: null, occurred_at: "" },
+      { id: 7, amount: "200", note: null, occurred_at: "" },
+    ];
+    expect(buildEventEdits(events, {
+      7: { id: 7, expected_amount: "100", amount: "100", note: null, occurred_at: "" },
+      9: { id: 9, expected_amount: "100", amount: "200", note: null, occurred_at: "" },
+    })).toEqual([]);
+  });
   it("会提交事件和订单实际修改的文本、时间和操作人", () => {
     const payload = buildEventEdits(
       [{ id: 7, amount: "100.00", note: "旧备注", occurred_at: "2026-11-14T01:00:00" }],

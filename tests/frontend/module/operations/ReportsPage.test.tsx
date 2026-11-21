@@ -6,6 +6,9 @@ import { renderLight } from "@fixtures/render";
 import { ReportsPage } from "@/reporting/ReportsPage";
 import { DataCenterPanel } from "@/reporting/DataCenterPanel";
 import { Commission } from "@/reporting/reports/CommissionReport";
+import { MonthlyPnl } from "@/reporting/reports/MonthlyPnlReport";
+import { BusinessPnl } from "@/reporting/reports/BusinessPnlReport";
+import { OrderProfit } from "@/reporting/reports/OrderProfitReport";
 import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { antdRangeValues, setAntdDateRange } from "@fixtures/antdRange";
@@ -46,7 +49,11 @@ vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/ui", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   const { LightweightDataTable } = await import("@fixtures/LightweightDataTable");
-  return { ...actual, DataTable: LightweightDataTable };
+  const DataTable = (props: Parameters<typeof LightweightDataTable>[0] & { emptyText?: string }) => <>
+    <LightweightDataTable {...props} />
+    {!props.loading && props.rows.length === 0 && <div>{props.emptyText ?? "暂无数据"}</div>}
+  </>;
+  return { ...actual, DataTable };
 });
 
 beforeEach(() => {
@@ -77,6 +84,19 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
+  it.each([
+    ["月度经营损益", MonthlyPnl, "monthlyPnl", "所选区间无数据"],
+    ["业务级损益", BusinessPnl, "businessPnl", "所选区间无业务数据"],
+    ["订单利润", OrderProfit, "orderProfit", "所选区间无订单"],
+  ] as const)("%s 区分请求失败和空数据", async (_title, Component, apiName, emptyText) => {
+    vi.mocked(reportsApi[apiName]).mockRejectedValueOnce(new Error("请求失败"));
+    renderLight(<Component range={{ params: {}, picker: null }} />, { user: "admin" });
+    expect(await screen.findByText("报表数据不可用，请点击重新加载")).toBeInTheDocument();
+    expect(screen.queryByText(emptyText)).not.toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: /重新加载/ }));
+    expect(await screen.findByText(emptyText)).toBeInTheDocument();
+  });
+
   it("分润对账加载和失败时订单数不显示为零", async () => {
     let fail!: (reason: Error) => void;
     vi.mocked(reportsApi.commission).mockReturnValue(new Promise((_resolve, reject) => { fail = reject; }));
@@ -86,6 +106,7 @@ describe("ReportsPage：经营中心报表", () => {
     await act(async () => fail(new Error("分润加载失败")));
     await screen.findByText(/分润加载失败/);
     expect(orderCount).toHaveTextContent("-");
+    expect(screen.getByText("分润数据不可用，请点击重新加载")).toBeInTheDocument();
   });
 
   it("数据中心加载中不显示数据不可用，失败后才显示不可用", async () => {

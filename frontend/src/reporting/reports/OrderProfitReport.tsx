@@ -56,7 +56,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
          page={1}
          pageSize={10}
          total={data?.items.length ?? 0}
-         emptyText="所选区间无订单"
+         emptyText={error ? "报表数据不可用，请点击重新加载" : "所选区间无订单"}
          onPageChange={() => undefined}
       />
     </Card>

@@ -51,7 +51,7 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
          page={1}
          pageSize={10}
          total={data?.items.length ?? 0}
-         emptyText="所选区间无数据"
+         emptyText={error ? "报表数据不可用，请点击重新加载" : "所选区间无数据"}
          onPageChange={() => undefined}
       />
     </Card>

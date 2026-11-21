@@ -253,7 +253,7 @@ class TestCreateAccountGuards:
 
     def test_inventory_order_summary_reuses_loaded_accounts(self, seeded_db):
         from sqlalchemy import event
-        from app.business.router_outputs.list_payload import _order_list_payload
+        from app.business.orders.router_outputs.list_payload import _order_list_payload
 
         account = _account(seeded_db, "inventory-summary-reuse")
         order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", account_id=account.id)

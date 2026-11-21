@@ -472,7 +472,7 @@ def test_build_list_csv_under_limit_not_truncated(seeded_db):
     assert meta["truncated"] is False
 
 def test_order_exports_have_no_total_limit(seeded_client, headers, monkeypatch):
-    from app.business.queries import list_orders
+    from app.business.orders.queries import list_orders
     seen = []
     def spy(db, **kwargs):
         seen.append(kwargs.get("limit"))

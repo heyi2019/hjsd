@@ -14,7 +14,7 @@ from app.core.security import (
 )
 from app.domain.enums import InstallmentContractType
 from app.workbench.reminder_config import read_reminder_config
-from app.business.queries import order_customer_count, order_status_counts
+from app.business.orders.queries import order_customer_count, order_status_counts
 from app.operations.r3_commission import personal_commission_total
 from app.business.inventory.inventory import dashboard_inventory_summary
 from app.business.installments import queries as installment_queries

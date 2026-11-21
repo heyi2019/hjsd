@@ -28,7 +28,7 @@ from app.business.create import create_order
 from app.business.events import post_event
 from app.business.events_rules import _resolve_pool
 from app.business.mutations import update_order
-from app.business.queries import list_orders
+from app.business.orders.queries import list_orders
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer
 

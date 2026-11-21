@@ -20,7 +20,7 @@ from app.domain.users import User
 from app.business.cancellation_model import cancel_order
 from app.business.create import create_order
 from app.business.events import post_event
-from app.business.queries import list_orders, order_status_counts
+from app.business.orders.queries import list_orders, order_status_counts
 from app.business.inventory import inventory as inventory_service
 
 D = date(2026, 11, 1)

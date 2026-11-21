@@ -18,7 +18,7 @@ from app.domain.trade import Account, Cashflow, Installment, OrderEvent
 from app.domain.users import User
 from app.business.output_labels import _elapsed_label, _form_responsible_label, _selected_operator_label
 from app.shared.order_amounts import ZERO, event_totals, order_cashflow_profit_by_order
-from app.business.router_outputs._shared import _operator_names, _sale_amount
+from app.business.orders.router_outputs._shared import _operator_names, _sale_amount
 
 
 def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | None = None) -> list[dict]:

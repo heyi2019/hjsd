@@ -131,6 +131,19 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("切换时序后列表加载失败，不显示旧筛选结果，并支持重试", async () => {
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    expect(await screen.findByText("HS0001-INS01")).toBeVisible();
+    installmentListFixture.mockRejectedValueOnce(new Error("列表请求失败"));
+    await userEvent.click(screen.getByRole("button", { name: "最旧在前" }));
+    expect(await screen.findByText(/列表请求失败/)).toBeVisible();
+    expect(screen.queryByText("HS0001-INS01")).not.toBeInTheDocument();
+    expect(screen.getByText("分期合约数据不可用，请点击重新加载")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("HS0001-INS01")).toBeVisible();
+    expect(screen.queryByText("分期合约数据不可用，请点击重新加载")).not.toBeInTheDocument();
+  });
+
   it("分期合约按页加载并可切换第二页", async () => {
     const rows = Array.from({ length: 11 }, (_, index) => ({
       ...installments[0], id: index + 1, inst_no: `INS-${index + 1}`,

@@ -109,9 +109,9 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
       ) : null}
       <StatRow
         items={[
-          { label: "总收入", amount: cashflowUnavailable ? "不可用" : totalFlowIncome },
-          { label: "总支出", amount: cashflowUnavailable ? "不可用" : totalFlowExpense },
-          { label: "当前结果", kind: "count", amount: cashflowUnavailable ? "不可用" : cashflowTotal },
+          { label: "总收入", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowIncome },
+          { label: "总支出", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowExpense },
+          { label: "当前结果", kind: "count", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : cashflowTotal },
         ]}
       />
       <DataTable<Cashflow>

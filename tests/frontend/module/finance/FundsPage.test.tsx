@@ -536,6 +536,19 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.queryByRole("columnheader", { name: "资金性质" })).not.toBeInTheDocument();
   });
 
+  it("资金流水加载期间统计显示占位，失败后显示不可用", async () => {
+    let fail!: (reason: Error) => void;
+    vi.mocked(cashflowsApi.list).mockReturnValueOnce(new Promise((_resolve, reject) => { fail = reject; }));
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+    const income = screen.getByText("总收入").closest(".ui-stat") as HTMLElement;
+    expect(income).toHaveTextContent("-");
+    expect(income).not.toHaveTextContent("不可用");
+    await act(async () => fail(new Error("流水加载失败")));
+    await waitFor(() => expect(income).toHaveTextContent("不可用"));
+  });
+
   it("FE-229：资金流水失败时统计不可用且筛选禁用", async () => {
     vi.mocked(cashflowsApi.list).mockRejectedValueOnce(new Error("cashflows down"));
     renderLight(<FundsPage />, { user: "admin" });

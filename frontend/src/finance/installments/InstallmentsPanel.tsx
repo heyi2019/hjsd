@@ -42,6 +42,7 @@ function ContractTable({
     columns,
     defaultForm,
     error,
+    listError,
     exportCsv,
     exporting,
     load,
@@ -144,7 +145,8 @@ function ContractTable({
           pageSize={pageSize}
           total={pageTotal}
           controlledPaging
-          emptyText="暂无分期合约"
+          emptyText={listError ? "分期合约数据不可用，请点击重新加载" : "暂无分期合约"}
+          pagination={listError ? false : undefined}
           onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}
           expandable={{
             expandedRowRender: (row) => {

@@ -39,6 +39,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const [waiveTarget, setWaiveTarget] = useState<Schedule | null>(null);
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
+  const [listError, setListError] = useState(false);
   const [loading, setLoading] = useState(false);
   const [totalsLoading, setTotalsLoading] = useState(true);
   const [totalsError, setTotalsError] = useState<{ message: string; code?: string } | null>(null);
@@ -95,9 +96,10 @@ export function useContractTableController(params: { contractType: string; reloa
           }
           setRows(result.items);
           setPageTotal(result.total);
+          setListError(false);
           setError(null);
         })
-        .catch((err) => { if (seq === listSeqRef.current) setError(normalizeError(err)); })
+        .catch((err) => { if (seq === listSeqRef.current) { setRows([]); setPageTotal(0); setListError(true); setError(normalizeError(err)); } })
         .finally(() => { if (seq === listSeqRef.current) setLoading(false); });
   }, [contractType, dateFrom, dateTo, status, page, pageSize, sortDesc]);
 
@@ -204,6 +206,7 @@ export function useContractTableController(params: { contractType: string; reloa
     extendTarget,
     setExtendTarget,
     error,
+    listError,
     setError,
     loading,
     totalsLoading,

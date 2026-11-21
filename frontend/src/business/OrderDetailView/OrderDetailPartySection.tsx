@@ -38,6 +38,16 @@ export function getPartySelectionDelta(previous: number[], next: number[]) {
   return { added: next.filter((id) => !previousIds.has(id)), removed: previous.filter((id) => !nextIds.has(id)) };
 }
 
+export function groupCustomerIdsByRole(customers: Array<Pick<AccountExecutionCustomer, "id" | "role">>): Record<string, number[]> {
+  const groups = new Map<string, Set<number>>();
+  for (const customer of customers) {
+    const ids = groups.get(customer.role) ?? new Set<number>();
+    ids.add(customer.id);
+    groups.set(customer.role, ids);
+  }
+  return Object.fromEntries([...groups].map(([role, ids]) => [role, [...ids]]));
+}
+
 /** 板块6：参与方信息 = 参与方链接（客户 / 合作方）+ PARTICIPANT 自定义字段。复用既有渲染（meta.orderParties 与 orderExtras）。 */
 export function OrderDetailPartySection({
   meta,
@@ -83,12 +93,7 @@ export function OrderDetailPartySection({
 
   useEffect(() => {
     if (!editing) return;
-    const byRole: Record<string, number[]> = {};
-    for (const customer of order?.customers ?? []) {
-      const ids = byRole[customer.role] ?? [];
-      if (!ids.includes(customer.id)) byRole[customer.role] = [...ids, customer.id];
-    }
-    setSelectedCustomers(byRole);
+    setSelectedCustomers(groupCustomerIdsByRole(order?.customers ?? []));
     setNewCustomerNames({});
     setSelectedCounterpartyIds([...new Set(order?.counterparties?.map((item) => item.id) ?? [])]);
   }, [editing, order]);

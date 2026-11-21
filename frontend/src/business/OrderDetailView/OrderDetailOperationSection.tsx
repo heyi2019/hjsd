@@ -41,6 +41,22 @@ export function buildUnlistingOptions<T extends { eventId?: number; platform: st
   return { choices, byKey };
 }
 
+export function createOperationPlatformOptions(platformOptions: Array<{ value: string; label: string }>) {
+  const known = new Set(platformOptions.map((option) => option.value));
+  return (current: string[], includeSystem = false) => {
+    const addSystem = includeSystem && !known.has("__SYSTEM__");
+    const added = new Set(addSystem ? ["__SYSTEM__"] : []);
+    const prefix: Array<{ value: string; label: string }> = [];
+    for (let index = current.length - 1; index >= 0; index -= 1) {
+      const value = current[index];
+      if (!value || known.has(value) || added.has(value)) continue;
+      added.add(value);
+      prefix.push({ value, label: value });
+    }
+    return [...prefix.reverse(), ...platformOptions, ...(addSystem ? [{ value: "__SYSTEM__", label: "本系统" }] : [])];
+  };
+}
+
 export function buildOperationPlatformUsage(
   listings: Array<{ platform: string; eventId?: number }>,
   drafts: Partial<Record<string, Pick<OrderOperationDraft, "operation_type" | "form_extra">>>,
@@ -181,12 +197,7 @@ function editableOperationColumns(
 ): ColumnsType<OrderOperationRow> {
   const isPlatformTaken = buildOperationPlatformUsage(activeListings, operationDrafts ?? {});
   const unlistingOptions = buildUnlistingOptions(activeListings);
-  const platformOptionValues = (current: string[], includeSystem = false) => {
-    const options = [...platformOptions];
-    if (includeSystem && !options.some((option) => option.value === "__SYSTEM__")) options.push({ value: "__SYSTEM__", label: "本系统" });
-    current.filter(Boolean).reverse().forEach((value) => { if (!options.some((option) => option.value === value)) options.unshift({ value, label: value }); });
-    return options;
-  };
+  const platformOptionValues = createOperationPlatformOptions(platformOptions);
   const platformValues = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
   const eventExtra = (row: OrderOperationRow, draft?: OrderEventDraft) => draft?.form_extra !== undefined ? (draft.form_extra ?? {}) : (row.event?.form_extra ?? {});
   const operationType = (row: OrderOperationRow) => OPERATION_TYPE_BY_KEY[row.operationKey ?? "consignment"];

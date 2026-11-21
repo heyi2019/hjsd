@@ -5,11 +5,11 @@ import type { AccountExecutionDetail } from "@/shared/api/types/account-executio
 import type { Account } from "@/shared/api/types/accounts";
 import { groupOperationEvents, OrderDetail } from "@/business/OrderDetailView/OrderDetail";
 import { OrderDetailImageGallery } from "@/business/OrderDetailView/OrderDetailImageGallery";
-import { buildOperationPlatformUsage, buildUnlistingOptions, OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
+import { buildOperationPlatformUsage, buildUnlistingOptions, createOperationPlatformOptions, OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
 import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
 import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
-import { buildCustomerOptions, getPartySelectionDelta, mergeCustomerSearch } from "@/business/OrderDetailView/OrderDetailPartySection";
+import { buildCustomerOptions, getPartySelectionDelta, groupCustomerIdsByRole, mergeCustomerSearch } from "@/business/OrderDetailView/OrderDetailPartySection";
 import type { OrderDetailMeta } from "@/business/OrderDetailView/OrderDetail.shared";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
@@ -58,6 +58,14 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("参与方初始选择按角色去重并保留每个角色首次出现顺序", () => {
+    const customers = [
+      { id: 2, role: "SELLER" }, { id: 1, role: "BUYER" }, { id: 1, role: "SELLER" },
+      { id: 2, role: "SELLER" }, { id: 2, role: "BUYER" }, { id: 1, role: "BUYER" },
+    ];
+    expect(groupCustomerIdsByRole(customers)).toEqual({ SELLER: [2, 1], BUYER: [1, 2] });
+    expect(groupCustomerIdsByRole([])).toEqual({});
+  });
   it("参与方选择增删保留原顺序且不重复扫描", () => {
     expect(getPartySelectionDelta([1, 1, 2], [2, 3, 3])).toEqual({ added: [3, 3], removed: [1, 1] });
     let reads = 0;
@@ -158,6 +166,19 @@ describe("OrderDetail", () => {
     expect(result.choices.map((item) => item.value)).toEqual(['[7,"甲"]', '[7,"甲"]']);
     expect(result.byKey.get('[7,"甲"]')).toBe(first);
     expect(result.byKey.get('[null,"乙"]')).toBe(missing);
+  });
+
+  it("运营平台候选复用词典索引并保留已选平台原有排序", () => {
+    let reads = 0;
+    const options = Array.from({ length: 100 }, (_, index) => ({
+      get value() { reads += 1; return `平台${index}`; }, label: `名称${index}`,
+    }));
+    const build = createOperationPlatformOptions(options);
+    const result = build(["新增甲", "新增乙", "新增甲", "__SYSTEM__"], true);
+    expect(result.slice(0, 2).map((item) => item.value)).toEqual(["新增乙", "新增甲"]);
+    expect(result[result.length - 1]).toEqual({ value: "__SYSTEM__", label: "本系统" });
+    for (let i = 0; i < 50; i += 1) build(["新增甲"], false);
+    expect(reads).toBeLessThanOrEqual(200);
   });
 
   it("编辑草稿重渲染时复用运营记录，详情快照变化时更新", async () => {

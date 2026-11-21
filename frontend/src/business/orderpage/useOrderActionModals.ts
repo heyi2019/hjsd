@@ -98,6 +98,7 @@ export function useOrderActionModals({
       // 回显时用金额经 convert 反算比例供展示；历史比例模式数据（有 rate 无金额）
       // 则反向补金额，避免用户不改直接提交时把配置清成空金额。
       let requiredConversionFailed = false;
+      let ratioConversionFailed = false;
       await Promise.all(rows.map(async (row) => {
         if (row.allocation_type === "COMPANY") return;
         const amount = (row.allocation_amount ?? "").trim();
@@ -105,6 +106,7 @@ export function useOrderActionModals({
         if (amount && Number(amount) !== 0) {
           const converted = await profitAllocationApi.convert(order.id, "AMOUNT_TO_RATE", amount).catch(() => null);
           if (converted?.value != null) row.allocation_rate = converted.value;
+          else { row.allocation_rate = ""; ratioConversionFailed = true; }
         } else if (rate && Number(rate) !== 0) {
           const converted = await profitAllocationApi.convert(order.id, "RATE_TO_AMOUNT", rate).catch(() => null);
           if (converted?.value != null) row.allocation_amount = converted.value;
@@ -116,6 +118,7 @@ export function useOrderActionModals({
         appMessage.error("分润金额换算失败，请重试");
         return;
       }
+      if (ratioConversionFailed) appMessage.warning("分润比例换算失败，请重新编辑金额重试");
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
       allocationForm.resetFields();
       allocationForm.setFieldsValue({

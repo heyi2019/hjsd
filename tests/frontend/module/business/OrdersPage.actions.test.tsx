@@ -552,6 +552,21 @@ describe("OrdersPage：操作与筛选分支", () => {
     ]), expect.any(Object)));
   });
 
+  it.each(["请求失败", "没有结果"])("打开分润配置时比例换算%s，保留金额并提示", async (failure) => {
+    const warning = vi.spyOn(message, "warning").mockImplementation((() => undefined) as never);
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "9.99" } },
+    }));
+    if (failure === "请求失败") vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
+    else vi.mocked(profitAllocationApi.convert).mockResolvedValueOnce({ value: null });
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("100.00");
+    expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("");
+    expect(warning).toHaveBeenCalledWith("分润比例换算失败，请重新编辑金额重试");
+  });
+
   it("分润比例换算失败时清空旧比例并提示重试", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
       totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "10.00" } },

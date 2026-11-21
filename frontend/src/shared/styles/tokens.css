@@ -32,6 +32,7 @@
   --panel-2: rgba(255, 255, 255, 0.72);
   --soft: rgba(118, 118, 128, 0.12);
   --on-accent: #fff;
+  --danger-button-bg: #b23b3b;
   /* 表格/列表行微交互（2026-10-13 Apple 流体）：hover 复用既有 --brand-soft（蓝系，与品牌一致）；
      selected 用更强的蓝填充以区别于 hover。深色在 [data-theme=dark] 覆盖。 */
   --row-selected: rgba(10, 99, 216, 0.16);

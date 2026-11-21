@@ -107,9 +107,17 @@
    实测对比度仅 3.24:1，低于 WCAG AA 正文 4.5:1；而白字对渐变最浅段 #0c68d9
    为 5.25:1、最深段 #0757c7 为 6.57:1，均通过。
    tabs 指示条只有色块无文字，不参与 color 覆盖。 */
-:where(.ant-btn-primary:not(:disabled):not(.ant-btn-disabled), .ant-btn-color-primary:not(:disabled):not(.ant-btn-disabled)) {
+:where(.ant-btn-primary:not(.ant-btn-dangerous):not(:disabled):not(.ant-btn-disabled), .ant-btn-color-primary:not(.ant-btn-dangerous):not(:disabled):not(.ant-btn-disabled)) {
   background: var(--accent-grad) !important;
   color: var(--on-accent) !important;
+}
+/* 危险主操作独立使用可与白字保持对比的实底，禁用态交回组件主题。 */
+:where(.ant-btn-primary.ant-btn-dangerous:not(:disabled):not(.ant-btn-disabled)) {
+  background: var(--danger-button-bg) !important;
+  color: var(--on-accent) !important;
+}
+:where(.ant-btn-primary.ant-btn-dangerous:not(:disabled):not(.ant-btn-disabled):hover) {
+  background: color-mix(in srgb, var(--danger-button-bg) 85%, black) !important;
 }
 :where(.ant-tabs-ink-bar) {
   background: var(--accent-grad) !important;

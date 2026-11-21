@@ -16,7 +16,7 @@ import { useReferenceList } from "../../../shared/hooks/useReferenceList";
 import { buildEventEdits, buildOperationEventCreates, buildOrderEdits } from "./execution-edit-payload";
 import type { EventDraft, OperationDraft, FinanceDraft, OrderDraft, PartyAddition, OrderDetailEditor } from "./editor-types";
 import { defaultOperatorUserIds, propagateSharedOrderExtra, sharedOrderIdsForEdit } from "./editor-utils";
-import { isValidEditedMoney } from "./amount-validation";
+import { editedMoneyError } from "./amount-validation";
 
 /**
  * 订单详情编辑器状态机：库存中心和订单台账共用同一份订单级编辑状态。
@@ -267,7 +267,7 @@ export function useOrderDetailEditor(params: {
         const detail = getExecutionDetail(id);
         const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];
         const events = buildEventEdits(originalEvents, eventDrafts);
-        if (events.some((item) => !isValidEditedMoney(item.amount))) { appMessage.error("请填写有效的金额"); return; }
+        if (events.some((item) => editedMoneyError(item.amount))) { appMessage.error("请填写有效的金额"); return; }
         const new_events = buildOperationEventCreates(operationDrafts);
         const originalFinanceRows = detail?.detail_view.finance_rows ?? [];
         const cashflows = Object.values(financeDrafts).filter((draft) => {
@@ -288,7 +288,7 @@ export function useOrderDetailEditor(params: {
           note: draft.note,
           ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
         }));
-        if (cashflows.some((item) => item.amount !== undefined && !isValidEditedMoney(item.amount))) { appMessage.error("请填写有效的金额"); return; }
+        if (cashflows.some((item) => item.amount !== undefined && editedMoneyError(item.amount))) { appMessage.error("请填写有效的金额"); return; }
         const orders = buildOrderEdits(detail?.orders ?? [], orderDrafts);
         const parties = Object.entries(partyDrafts).flatMap(([orderId, additions]) => additions.map((item) => ({ order_id: Number(orderId), ...item })));
         const sourceOrderId = editingAccount.source_order_id;

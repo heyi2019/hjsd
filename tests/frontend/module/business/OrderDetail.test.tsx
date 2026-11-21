@@ -8,6 +8,7 @@ import { OrderDetailImageGallery } from "@/business/OrderDetailView/OrderDetailI
 import { OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
 import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
+import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
 import type { OrderDetailMeta } from "@/business/OrderDetailView/OrderDetail.shared";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
@@ -56,6 +57,16 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("详情编辑金额超过后端整数位数上限时在字段旁提示", () => {
+    const { rerender } = renderLight(<OrderDetailMoneyInput label="金额" value="10000000000000000.00" onChange={vi.fn()} />);
+    expect(screen.getByLabelText("金额")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("金额整数部分最多16位")).toBeInTheDocument();
+    rerender(<OrderDetailMoneyInput label="金额" value="9999999999999999.99" onChange={vi.fn()} />);
+    expect(screen.getByLabelText("金额")).toHaveAttribute("aria-invalid", "false");
+    expect(screen.queryByText("金额整数部分最多16位")).not.toBeInTheDocument();
+    rerender(<OrderDetailMoneyInput label="金额" value="00000000000000001.00" onChange={vi.fn()} />);
+    expect(screen.getByLabelText("金额")).toHaveAttribute("aria-invalid", "false");
+  });
   it("清空执行金额和资金明细金额时在字段旁提示", () => {
     const event = { id: 7, event_type: "BUY", amount: "100.00", cashflow: {} } as never;
     renderLight(<>

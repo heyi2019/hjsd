@@ -217,13 +217,6 @@
   min-height: var(--ui-control-height-compact) !important;
   height: var(--ui-control-height-compact) !important;
 }
-:where(.finance-entry-actions) + * {
-  margin-block-start:var(--space-5) !important;
-}
-:where(.finance-entry-actions) {
-  display: flex !important
-}
-
 /* 窄屏表格保持完整列宽，通过容器横向滑动查看，避免复选框与内容重叠。 */
 :where(.ant-table-wrapper) {
   max-width: 100%;

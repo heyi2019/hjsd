@@ -12,6 +12,7 @@ vi.mock("antd", () => ({
 }));
 
 import { Select } from "@/shared/ui/Select";
+import { ToolbarSelect } from "@/shared/ui/ToolbarSelect";
 import { toolbarSelectionWidth } from "@/shared/ui/toolbarSelectionWidth";
 
 describe("工具栏多选宽度", () => {
@@ -24,6 +25,11 @@ describe("工具栏多选宽度", () => {
 });
 
 describe("Select 公共弹层宽度", () => {
+  it("工具栏单选按分组内最长选项确定宽度", () => {
+    render(<ToolbarSelect options={[{ label: "分类", options: [{ value: "long", label: "工作室运营支出费用" }] }]} />);
+    expect((receivedProps.style as { width: number }).width).toBeGreaterThan(150);
+  });
+
   it("默认按选项内容展开，避免长选项被触发器宽度截断", () => {
     render(<Select options={[{ value: "owner", label: "经营中心负责人" }]} />);
 

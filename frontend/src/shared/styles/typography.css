@@ -41,16 +41,6 @@ h1, h2, h3, h4, h5, h6, p, figure, blockquote, ul, ol, dl, dd {
   letter-spacing: var(--ls-tight);
 }
 
-.login-card h1 {
-  font: var(--font-h1); /* 登录页标题保持与工作台页头同一层级 */
-  letter-spacing: var(--ls-tight);
-}
-
-.login-card > p:not(.eyebrow),
-.login-card label {
-  font: var(--font-body-s);
-}
-
 .ui-page-layout > h2,
 .fin-page-header h2,
 .pay-page-header h1,

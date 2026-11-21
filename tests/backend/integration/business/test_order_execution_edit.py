@@ -817,11 +817,19 @@ def test_event_cashflow_order_link_migration_backfills_and_rejects_orphans(seede
     migration.backfill_event_cashflow_order_id(seeded_db.connection())
     seeded_db.refresh(flow)
     assert flow.order_id == order.id
+    other_account = create_account(seeded_db, game_account="cashflow-migration-orphan", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    other_order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=other_account.id)
+    other_event, _ = post_event(seeded_db, other_order.id, event_type="BUY", amount=Decimal("200"), occurred_on=date(2026, 10, 1), actor="pytest")
+    orphan = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == other_event.event_no))
     flow.order_id = None
-    flow.source_id = "missing-event"
+    orphan.order_id = None
+    orphan.source_id = "missing-event"
     seeded_db.flush()
     with pytest.raises(RuntimeError, match="无法关联订单"):
-        migration.backfill_event_cashflow_order_id(seeded_db.connection())
+        with seeded_db.begin_nested():
+            migration.backfill_event_cashflow_order_id(seeded_db.connection())
+    seeded_db.refresh(flow)
+    assert flow.order_id is None
 
 
 def test_cashflow_batch_cross_order_rejects_and_rolls_back_prior_edit(seeded_client, seeded_db, headers):

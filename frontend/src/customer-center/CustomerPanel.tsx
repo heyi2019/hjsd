@@ -1,7 +1,8 @@
+import { SearchInput } from "../shared/ui/SearchInput";
 import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../shared/ui/ToolbarSelect";
 import { SearchOutlined } from "@ant-design/icons";
-import { Card, Input, Space } from "antd";
+import { Card, Space } from "antd";
 import type { Customer } from "../shared/api/types/customers";
 import { markMobileHiddenColumns } from "../shared/lib/listColumns";
 import { DataTable, ErrorBanner, ExportButton, PermissionButton, PermissionGate, StatRow } from "../shared/ui";
@@ -90,7 +91,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       <ErrorBanner error={error} onRetry={() => void load()} />
       <ErrorBanner error={summaryError} onRetry={() => void load()} />
       <Space wrap className="customer-list-filters customer-list-filters--separated">
-        <Input.Search
+        <SearchInput
           aria-label="搜索客户"
           enterButton={(
             <PermissionGate permission="customer.read">

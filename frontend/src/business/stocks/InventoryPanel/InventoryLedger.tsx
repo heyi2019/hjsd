@@ -1,7 +1,7 @@
+import { SearchInput } from "../../../shared/ui/SearchInput";
 import { TimeOrderControl } from "../../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../../shared/ui/ToolbarSelect";
-import { Card, DatePicker, Input, Segmented, Space } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
+import { Card, DatePicker, Segmented, Space } from "antd";
 import { DataTable, ExportButton, StatRow } from "../../../shared/ui";
 import { OrderDetail } from "../../OrderDetailView/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
@@ -70,9 +70,9 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
   return (
     <Card className="glass" title="库存中心" extra={createAction}>
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters">
-        <Input.Search
+        <SearchInput
           allowClear
-          enterButton={<span aria-label="搜索库存账号"><SearchOutlined /></span>}
+          searchButtonLabel="搜索库存账号"
           onSearch={(_value, _event, info) => { if (info?.source !== "clear") controller.submitSearch(); }}
           value={keyword}
           placeholder="搜索账号 / 产品 / 游戏类型 / 区服 / 成本"

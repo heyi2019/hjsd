@@ -1,5 +1,5 @@
+import { SearchInput } from "../shared/ui/SearchInput";
 import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
-import { SearchOutlined } from "@ant-design/icons";
 import { ToolbarSelect } from "../shared/ui/ToolbarSelect";
 import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
@@ -226,8 +226,8 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="counterparty-filter-bar">
-        <Input.Search type="search" aria-label="搜索合作方" maxLength={128} allowClear value={searchInput}
-          placeholder="搜索合作方编号 / 名称 / 联系方式" enterButton={<SearchOutlined />}
+        <SearchInput type="search" aria-label="搜索合作方" maxLength={128} allowClear value={searchInput}
+          placeholder="搜索合作方编号 / 名称 / 联系方式"
           onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}
           onSearch={(value) => { setKeyword(value); setPage(1); }} />
         {createdPicker}

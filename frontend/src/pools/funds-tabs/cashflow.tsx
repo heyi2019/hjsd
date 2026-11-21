@@ -1,8 +1,8 @@
+import { SearchInput } from "../../shared/ui/SearchInput";
 import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
 /** 资金明细 Tab：从 FundsPage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
-import { Card, Input, Typography } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
+import { Card, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, ErrorBanner, ExportButton, MoneyText, StatRow } from "../../shared/ui";
 import { useListViewColumns } from "../../shared/lib/listColumns";
@@ -81,7 +81,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
   return (
     <Card className="glass" title="资金明细">
       <div className="ui-filter-bar funds-cashflow-filters">
-        <Input.Search aria-label="流水搜索" enterButton={<span aria-label="搜索流水"><SearchOutlined /></span>} onSearch={(_value, _event, info) => { if (info?.source !== "clear") ctrl.submitCashflowSearch(); }} allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注 / 金额" onChange={(event) => setCashflowKeyword(event.target.value)} />
+        <SearchInput aria-label="流水搜索" searchButtonLabel="搜索流水" onSearch={(_value, _event, info) => { if (info?.source !== "clear") ctrl.submitCashflowSearch(); }} allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注 / 金额" onChange={(event) => setCashflowKeyword(event.target.value)} />
         <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
         <ToolbarSelect aria-label="流水资金账户" allowClear disabled={filtersDisabled || !fundsReady} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
         <ToolbarSelect aria-label="流水方向" allowClear disabled={filtersDisabled} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />

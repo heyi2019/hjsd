@@ -1,7 +1,7 @@
+import { SearchInput } from "../../shared/ui/SearchInput";
 import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
-import { Card, DatePicker, Dropdown, Input, Segmented, Space, Spin, Tag, Typography } from "antd";
-import { SearchOutlined } from "@ant-design/icons";
+import { Card, DatePicker, Dropdown, Segmented, Space, Spin, Tag, Typography } from "antd";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, ExportButton, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../OrderDetailView/OrderDetail";
@@ -103,9 +103,9 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
     <section className="ui-stack orders-ledger-panel">
       <Card className="glass orders-ledger-card" title="订单台账" extra={createAction}>
         <Space wrap className="ui-filter-bar ui-filter-bar--spaced inventory-filters orders-ledger-filters">
-          <Input.Search
+          <SearchInput
             allowClear
-            enterButton={<span aria-label="执行订单搜索"><SearchOutlined /></span>}
+            searchButtonLabel="执行订单搜索"
             onSearch={(_value, _event, info) => { if (info?.source !== "clear") controller.submitSearch(); }}
             value={keyword}
             placeholder="搜索订单号 / 账号 / 对方 / 备注 / 买入价 / 售出价"

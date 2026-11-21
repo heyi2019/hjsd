@@ -1,5 +1,5 @@
+import { SearchInput } from "../shared/ui/SearchInput";
 import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
-import { SearchOutlined } from "@ant-design/icons";
 import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
@@ -169,8 +169,8 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       <ErrorBanner error={error} onRetry={() => void load()} />
       <ErrorBanner error={summaryError} onRetry={() => void load()} />
       <Space wrap className="customer-list-filters customer-list-filters--separated">
-        <Input.Search type="search" aria-label="搜索客户需求" maxLength={128} allowClear value={searchInput}
-          placeholder="搜索需求编号 / 客户 / 需求目标" enterButton={<SearchOutlined />}
+        <SearchInput type="search" aria-label="搜索客户需求" maxLength={128} allowClear value={searchInput}
+          placeholder="搜索需求编号 / 客户 / 需求目标"
           onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}
           onSearch={(value) => { setKeyword(value); setPage(1); }} />
         {createdPicker}

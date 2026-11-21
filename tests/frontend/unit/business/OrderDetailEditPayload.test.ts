@@ -138,6 +138,31 @@ describe("详情编辑保存载荷", () => {
     expect(result[2]).toMatchObject({ occurred_at: "2026-11-01T10:00:00", note: "原备注" });
   });
 
+  it("批量同步交付字段时线性匹配订单并保留首条同号记录", () => {
+    let reads = 0;
+    const originals = Array.from({ length: 200 }, (_, index) => ({
+      get order_id() { reads += 1; return index + 1; },
+      created_at: `time-${index + 1}`, note: `备注-${index + 1}`,
+    }));
+    originals.push({ order_id: 1, created_at: "duplicate", note: "duplicate" });
+    const result = propagateSharedOrderExtra({}, Array.from({ length: 200 }, (_, index) => 200 - index),
+      { bound_phone_owner: "甲" }, originals);
+    expect(result[1]).toMatchObject({ occurred_at: "time-1", note: "备注-1", form_extra: { bound_phone_owner: "甲" } });
+    expect(result[200]).toMatchObject({ occurred_at: "time-200", note: "备注-200" });
+    expect(reads).toBeLessThanOrEqual(402);
+  });
+
+  it("没有共享字段时保留原草稿，已有草稿优先于原订单", () => {
+    const drafts = { 1: { order_id: 1, occurred_at: "draft", note: "草稿", form_extra: {} } };
+    expect(propagateSharedOrderExtra(drafts, [1], { unrelated: "x" })).toBe(drafts);
+    expect(propagateSharedOrderExtra(drafts, [1, 2], { bound_phone_owner: "甲" }, [
+      { order_id: 1, created_at: "original", note: "原订单" },
+    ])).toEqual({
+      1: { order_id: 1, occurred_at: "draft", note: "草稿", form_extra: { bound_phone_owner: "甲" } },
+      2: { order_id: 2, occurred_at: "", note: "", form_extra: { bound_phone_owner: "甲" } },
+    });
+  });
+
   it("详情缓存存在时使用全部关联订单，否则只更新当前订单", () => {
     expect(sharedOrderIdsForEdit({ orders: [{ order_id: 3 }, { order_id: 4 }] } as never, 9)).toEqual([3, 4]);
     expect(sharedOrderIdsForEdit(undefined, 9)).toEqual([9]);

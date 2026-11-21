@@ -22,9 +22,14 @@ export function propagateSharedOrderExtra(
   );
   if (!Object.keys(sharedChanges).length) return drafts;
 
+  const originals = new Map<number, (typeof originalOrders)[number]>();
+  for (const order of originalOrders) {
+    const id = order.order_id;
+    if (!Number.isNaN(id) && !originals.has(id)) originals.set(id, order);
+  }
   const next = { ...drafts };
   orderIds.forEach((orderId) => {
-    const original = originalOrders.find((order) => order.order_id === orderId);
+    const original = originals.get(orderId);
     const current = next[orderId] ?? {
       order_id: orderId,
       occurred_at: original?.created_at ?? "",

@@ -51,19 +51,6 @@
     grid-auto-rows: minmax(7rem, auto);
   }
 }
-.business-alerts--expanded .ant-card {
-  display: flex;
-  flex-direction: column;
-  height: 20rem;
-  overflow: hidden;
-}
-.business-alerts--expanded .ant-card-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
-.business-alerts--expanded .ant-tabs { flex: none; }
 .ui-stat {
   display: flex;
   flex-direction: column;

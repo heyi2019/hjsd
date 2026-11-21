@@ -81,32 +81,6 @@
 .dashboard-page .ui-entry-card {
   border-radius: 20px;
 }
-.business-alert__button {
-  padding: 0;
-  border: 0;
-  color: var(--color-primary-text);
-  background: transparent;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.business-alert__button:hover { color: var(--color-primary); text-decoration: underline; }
-.business-alert__message { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-3); row-gap: var(--space-1); width: 100%; }
-.business-alert__title, .business-alert__details { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.business-alert__details, .business-alert__time { color: var(--color-text-secondary); }
-.business-alert__time { white-space: nowrap; text-align: right; }
-.business-alerts__scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.business-alert__read, .business-alert__unread { justify-self: end; font-size: var(--fs-caption-1); }
-.business-alert__read { color: var(--color-text-secondary); }
-.business-alert__unread { color: var(--color-primary); }
-.business-alert__button:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
-}
-.dashboard-notification-detail-list { display: grid; gap: var(--space-3); }
-.dashboard-notification-detail__loading { display: grid; place-items: center; min-height: 8rem; }
-.dashboard-notification-detail__message { margin: var(--space-2) 0 0; }
-
 /* 工作台入口组：所有业务复用相同的标题、内容与卡片高度。 */
 .dashboard-entry-group {
   --dashboard-accent: var(--color-primary);

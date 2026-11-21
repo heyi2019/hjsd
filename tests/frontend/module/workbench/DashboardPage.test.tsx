@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { DashboardPage } from "@/app/DashboardPage";
-import { BusinessAlerts } from "@/app/BusinessOverview";
+import { BusinessAlerts } from "@/app/workbench/messages/BusinessAlerts";
 import { dashboardApi } from "@/shared/api/dashboard.api";
 import { notificationsApi } from "@/shared/api/misc.api";
 import { ordersApi } from "@/shared/api/orders.api";
@@ -177,7 +177,8 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
     const read = await screen.findByRole("button", { name: /订单 HS0001 待配置分润/ });
     expect(unread.compareDocumentPosition(read) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(unread).getByText("未读")).toBeInTheDocument();
-    expect(within(unread).getByText(/王者荣耀.*100.00.*200.00.*60.00/)).toBeInTheDocument();
+    expect(within(unread).getByText(/成本 100.00.*售出 200.00.*待分配利润 60.00/)).toBeInTheDocument();
+    expect(within(unread).queryByText(/王者荣耀/)).not.toBeInTheDocument();
     expect(within(unread).getByText(/通知时间 2026-11-21 09:30/)).toBeInTheDocument();
     expect(within(read).getByText("已读")).toBeInTheDocument();
     fireEvent.click(unread);

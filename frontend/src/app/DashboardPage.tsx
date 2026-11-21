@@ -8,7 +8,8 @@ import { EntryCard, EntryRow, ErrorBanner, PageHeader, PermissionGate, StatRow }
 import { appMessage } from "../shared/ui/appFeedback";
 import { CreateBusinessModal, type BusinessOrderType } from "../business/CreateBusinessModal";
 import type { BusinessCenterEntryTab } from "../business/businessCenter";
-import { BusinessAlerts, BusinessOverview } from "./BusinessOverview";
+import { BusinessOverview } from "./BusinessOverview";
+import { BusinessAlerts } from "./workbench/messages/BusinessAlerts";
 import { useDashboardSummary } from "./useDashboardSummary";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";

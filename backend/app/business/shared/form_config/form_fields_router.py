@@ -57,7 +57,7 @@ def list_order_form_fields(
     _user: CurrentUser = read_form_config,
 ) -> list[schemas.OrderFormFieldOut]:
     """按业务类型 code 列出建单表单字段配置（含停用项）。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     return [
         schemas.OrderFormFieldOut.model_validate(f)
@@ -77,7 +77,7 @@ def list_section_labels(
     _user: CurrentUser = read_form_config,
 ) -> dict[str, str]:
     """按业务类型返回板块键→显示标题映射（设置面板与建单表单共用的板块标题来源）。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     return ff.get_section_labels(db, order_type_code=order_type_code)
 
@@ -92,7 +92,7 @@ def save_section_labels(
     _user: CurrentUser = manage_form_fields,
 ) -> dict[str, str]:
     """覆盖保存某业务类型的板块标题（按板块键 upsert）。板块键须合法、作用域须已注册。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     return ff.save_section_labels(
         db, order_type_code=payload.order_type_code, labels=payload.labels, actor=_user.username
@@ -105,7 +105,7 @@ def rename_form_section(
     db: Session = Depends(get_db),
     _user: CurrentUser = manage_form_fields,
 ) -> dict[str, str]:
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     return ff.rename_form_section(
         db, order_type_code=payload.order_type_code, from_key=payload.from_key,
@@ -124,7 +124,7 @@ def create_order_form_field(
     _user: CurrentUser = manage_form_fields,
 ) -> schemas.OrderFormFieldOut:
     """新增自定义建单表单字段。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     return schemas.OrderFormFieldOut.model_validate(
         ff.create_order_form_field(
@@ -159,7 +159,7 @@ def update_order_form_field(
     _user: CurrentUser = manage_form_fields,
 ) -> schemas.OrderFormFieldOut:
     """编辑建单表单字段（label/类型/选项/必填态/排序/备注）。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     extra: dict[str, object] = {}
     # required_when 三态：未传=保持不变；显式 null=清除条件；对象=设为条件必填。
@@ -198,7 +198,7 @@ def set_order_form_field_active(
     _user: CurrentUser = manage_form_fields,
 ) -> schemas.OrderFormFieldOut:
     """启用/停用建单表单字段（核心字段亦允许，由前端提示风险）。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     return schemas.OrderFormFieldOut.model_validate(
         ff.set_order_form_field_active(db, field_id, active, actor=_user.username)
@@ -216,7 +216,7 @@ def delete_order_form_field(
     _user: CurrentUser = manage_form_fields,
 ) -> None:
     """删除建单表单字段：核心字段(locked)禁止删除。"""
-    from app.business import form_fields as ff
+    from app.business.shared.form_config import form_fields as ff
 
     ff.delete_order_form_field(db, field_id, actor=_user.username)
 

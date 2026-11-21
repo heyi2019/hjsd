@@ -98,7 +98,7 @@ def test_all_registered_long_scopes_can_configure_fields_and_labels(seeded_clien
 
 @pytest.mark.parametrize(("order_type", "value", "other_value"), [("HS", "文字", 12), ("TH", 12, "文字")])
 def test_order_account_custom_fields_do_not_mix_order_types(seeded_client, seeded_db, headers, order_type, value, other_value):
-    from app.business.form_fields import create_order_form_field
+    from app.business.shared.form_config.form_fields import create_order_form_field
     for scope, field_type in [("HS", "TEXT"), ("TH", "NUMBER")]:
         create_order_form_field(seeded_db, order_type_code=scope, field_key="shared_value", label="账号字段",
                                 field_type=field_type, section="ACCOUNT_PRODUCT", required=True, actor="pytest")
@@ -137,7 +137,7 @@ def test_operation_scope_seeds_match_registry(seeded_db):
     assert operation_codes | {"ALLOCATION", "INVEDIT"} <= registry_codes
     for code in ("ORDDELETE", "INVDELETE", "SYSREMIND", "SYSGAME", "SYSDICT", "SYSFIELD", "SYSORDER", "SYSPOOL"):
         assert code in seeded_codes
-    from app.business.form_fields import create_order_form_field, set_order_form_field_active, update_order_form_field
+    from app.business.shared.form_config.form_fields import create_order_form_field, set_order_form_field_active, update_order_form_field
     reason = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == "ORDDELETE", OrderFormField.field_key == "reason"))
     assert reason.required and reason.locked
     with pytest.raises(Validation, match="不可停用"):
@@ -279,7 +279,7 @@ def test_patch_order_merges_form_extra(seeded_client, seeded_db, headers):
 
 
 def test_profit_allocations_merge_form_extra(seeded_client, seeded_db, headers):
-    from app.business.form_fields import create_order_form_field
+    from app.business.shared.form_config.form_fields import create_order_form_field
     order = _create_order(seeded_client, headers)
     seeded_db.get(Order, order["id"]).status = "COMPLETED"
     create_order_form_field(seeded_db, order_type_code="ALLOCATION", field_key="remark",

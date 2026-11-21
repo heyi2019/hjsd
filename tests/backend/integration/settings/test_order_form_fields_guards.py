@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.core.errors import Validation
 from app.domain.trade import OrderFormField, OrderFormSectionLabel
-from app.business import form_fields as ff
+from app.business.shared.form_config import form_fields as ff
 from app.business.schemas import OrderFormFieldCreate, SectionLabelsSaveIn
 
 
@@ -256,7 +256,7 @@ def test_save_and_get_section_labels_roundtrip(seeded_db, monkeypatch):
         assert field.section == "CUSTOM_NEW"
         raise RuntimeError("模拟标题写入失败")
 
-    monkeypatch.setattr("app.business.section_labels.save_section_labels", fail_after_fields)
+    monkeypatch.setattr("app.business.shared.form_config.section_labels.save_section_labels", fail_after_fields)
     with pytest.raises(RuntimeError, match="模拟标题写入失败"):
         with seeded_db.begin_nested():
             ff.rename_form_section(

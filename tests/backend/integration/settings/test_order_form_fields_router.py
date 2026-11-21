@@ -14,7 +14,7 @@ import pytest
 
 from app.core.errors import Validation
 from app.domain.trade import OrderFormField
-from app.business import form_fields as ff
+from app.business.shared.form_config import form_fields as ff
 from app.business.schemas import OrderFormFieldCreate, OrderFormFieldUpdate
 
 

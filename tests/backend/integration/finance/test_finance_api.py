@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import event, select
 
 from app.business.inventory.profile import create_account
-from app.business.form_fields import create_order_form_field
+from app.business.shared.form_config.form_fields import create_order_form_field
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser, build_access_token
 from app.domain.foundation import Pool

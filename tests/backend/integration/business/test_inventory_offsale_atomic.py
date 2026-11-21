@@ -9,7 +9,7 @@ from app.business import schemas
 from app.business.shared.operations.consignment import platform_unlist_consignment, register_consignment
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.business.form_fields import create_order_form_field
+from app.business.shared.form_config.form_fields import create_order_form_field
 from app.business.orders.routers.order_events_router import inventory_offsale
 from app.core.errors import Validation
 from app.core.database import get_db

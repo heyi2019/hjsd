@@ -6,7 +6,7 @@ from datetime import date, datetime
 import pytest
 
 from app.business.orders.create import create_order
-from app.business.form_fields import create_order_form_field
+from app.business.shared.form_config.form_fields import create_order_form_field
 from app.domain.trade import OrderFormField
 from app.customers.customers import create_customer
 from app.customers.counterparties import create_counterparty

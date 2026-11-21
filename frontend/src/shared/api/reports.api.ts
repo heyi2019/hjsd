@@ -17,7 +17,7 @@ export const reportsApi = {
   },
   monthlyPnl: (params?: { from?: string; to?: string }) =>
     getFreshReport<MonthlyPnlReport>("/reports/monthly-pnl", params),
-  commission: (params?: { from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number }) =>
+  commission: (params?: { from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number; notification_id?: number }) =>
     getFreshReport<CommissionReport>("/reports/commission", params),
   businessPnl: (params?: { from?: string; to?: string }) =>
     getFreshReport<BusinessPnlReport>("/reports/business-pnl", params),

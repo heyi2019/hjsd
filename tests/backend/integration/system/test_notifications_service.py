@@ -526,6 +526,10 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
         OrderProfitAllocation(order_id=order.id, user_id=1, role="BUYER", allocation_type="BUY", allocation_rate=Decimal("60"), allocation_amount=Decimal("0")),
         OrderProfitAllocation(order_id=order.id, user_id=2, role="SALES", allocation_type="SELL", allocation_rate=Decimal("40"), allocation_amount=Decimal("0")),
     ])
+    unrelated = _order(seeded_db, "details-other")
+    _buy(seeded_db, unrelated)
+    _sell(seeded_db, unrelated)
+    seeded_db.add(OrderProfitAllocation(order_id=unrelated.id, user_id=1, role="BUYER", allocation_type="BUY", allocation_rate=Decimal("100"), allocation_amount=Decimal("0")))
     seeded_db.flush()
     mine = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
     pending = _make_unread(seeded_db, recipient_user_id=admin_id, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
@@ -545,29 +549,28 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     assert Decimal(detail["cost_amount"]) == Decimal(ledger_order["cost_amount"])
     allocation = seeded_client.get(f"/api/orders/{order.id}/profit-allocations", headers={"X-Dev-User": "admin"}).json()
     assert Decimal(detail["allocatable_profit"]) == Decimal(allocation["allocatable_profit"])
-    original = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers={"X-Dev-User": "admin"})
-    assert original.status_code == 200, original.text
-    execution = original.json()
-    detail = response.json()[0]
-    assert detail["stock_no"] == execution["account"]["stock_no"]
-    assert detail["inventory_entry_at"] == execution["account"]["inventory_entry_at"]
-    assert detail["sold_at"] == execution["detail_view"]["lifecycle"]["sold_at"]
-    recovery = next(row for row in execution["detail_view"]["execution_rows"] if row["category"] == "INBOUND")
-    assert detail["inventory_operator"] == recovery["operator"]
-    assert [row["allocation_type"] for row in detail["allocations"]] == ["BUY", "SELL"]
-    assert [Decimal(row["amount"]) for row in detail["allocations"]] == [Decimal("180.00"), Decimal("120.00")]
-    assert all(row["user_name"] for row in detail["allocations"])
-    from app.operations.r3_commission import r3_commission_reconciliation
-    report = r3_commission_reconciliation(seeded_db)
-    group = next(item for item in report["order_groups"] if item["order_id"] == order.id)
-    assert [row["amount"] for row in detail["allocations"]] == [str(row["profit_base"]) for row in group["orders"]]
-    from app.dashboard.notifications.profit_details import profit_details_for_notifications
+    report = seeded_client.get("/api/reports/commission", params={"notification_id": mine.id}, headers={"X-Dev-User": "admin"})
+    assert report.status_code == 200, report.text
+    groups = report.json()["order_groups"]
+    assert [row["order_id"] for row in groups] == [order.id]
+    assert [Decimal(row["profit_base"]) for row in groups[0]["orders"]] == [Decimal("180.00"), Decimal("120.00")]
+    denied_other = seeded_client.get("/api/reports/commission", params={"notification_id": other.id}, headers={"X-Dev-User": "admin"})
+    assert denied_other.status_code == 404
+    employee = seeded_db.get(User, 2)
+    employee.role = "EMPLOYEE"
+    employee.owner_scope = "ALL"
+    seeded_db.flush()
+    employee_auth = {"Authorization": f"Bearer {build_access_token(CurrentUser.build(id=2, username='seeduser2', roles=['EMPLOYEE'], owner_scope='ALL'))}"}
+    own_report = seeded_client.get("/api/reports/commission", params={"notification_id": other.id, "all_people": "true"}, headers=employee_auth)
+    assert own_report.status_code == 200
+    assert [row["order_id"] for row in own_report.json()["order_groups"]] == [order.id]
+    assert seeded_client.get("/api/reports/commission", headers=employee_auth).status_code == 403
+    assert seeded_client.get("/api/reports/commission", params={"notification_id": mine.id}, headers=employee_auth).status_code == 404
+    from app.operations.router import commission
     limited = CurrentUser(id=1, username="admin", permissions=frozenset({"finance.read"}), owner_scope="ALL")
-    limited_detail = profit_details_for_notifications(seeded_db, [mine], limited)[0]
-    assert len(limited_detail.allocations) == 1
-    assert limited_detail.allocations[0].amount == Decimal("180.00")
-    report_user = CurrentUser(id=1, username="admin", permissions=frozenset({"finance.read", "report.read"}), owner_scope="ALL")
-    assert len(profit_details_for_notifications(seeded_db, [mine], report_user)[0].allocations) == 2
+    limited_report = commission(db=seeded_db, user=limited, notification_id=mine.id, from_date=None, to_date=None, mine=False, all_people=False, user_id=None)
+    assert [row["user_id"] for row in limited_report["order_groups"][0]["orders"]] == [1]
+    assert [row["user_id"] for row in limited_report["people"]] == [1]
     scoped_account = seeded_db.get(User, 2)
     scoped_account.role = "OPERATOR"
     scoped_account.owner_scope = "SELF"
@@ -576,6 +579,8 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     denied = seeded_client.get("/api/notifications/profit-details", params={"ids": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
     assert denied.status_code == 200, denied.text
     assert denied.json() == []
+    denied_report = seeded_client.get("/api/reports/commission", params={"notification_id": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
+    assert denied_report.status_code == 404
 
 
 def test_profit_notification_details_batch_does_not_query_per_order(seeded_client, seeded_db):

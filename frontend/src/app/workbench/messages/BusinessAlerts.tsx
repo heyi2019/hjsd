@@ -44,6 +44,7 @@ export function BusinessAlerts(props: Parameters<typeof useWorkbenchMessages>[0]
       </Card>
       {dataOwner === username && selected?.notification_type === "PROFIT_ALLOCATED" && <ProfitNotificationModal
         selected={selected}
+        summary={notificationDetails[selected.id]}
         onClose={() => setSelected(null)}
       />}
       {dataOwner === username && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}</Modal>}

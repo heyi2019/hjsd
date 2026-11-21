@@ -30,7 +30,7 @@ from ._shared import (
 
 def _commission_rows_and_bases(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
-    user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
+    user: CurrentUser | None = None, mine: bool = False, all_people: bool = False, order_id: int | None = None,
 ) -> tuple[list[tuple[OrderProfitAllocation, Order]], dict[int, Decimal]]:
     _validate_date_range(from_date, to_date)
     personal_scope = mine and user is not None
@@ -48,6 +48,8 @@ def _commission_rows_and_bases(
         stmt = stmt.where(Order.trade_date >= from_date)
     if to_date is not None:
         stmt = stmt.where(Order.trade_date <= to_date)
+    if order_id is not None:
+        stmt = stmt.where(Order.id == order_id)
     if personal_scope:
         # 只允许查看本人有分润的订单；先取整单分配行统一处理尾差，输出时仍仅保留本人。
         stmt = stmt.where(Order.id.in_(
@@ -90,11 +92,11 @@ def personal_commission_total(
 def r3_commission_reconciliation(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
-    user_id: int | None = None,
+    user_id: int | None = None, order_id: int | None = None,
 ) -> dict[str, Any]:
     """分润对账：按订单汇总，展开订单查看人员明细。"""
     rows, base_by_allocation = _commission_rows_and_bases(
-        session, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people,
+        session, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, order_id=order_id,
     )
     order_ids = {order.id for _, order in rows}
     account_ids = {order.account_id for _, order in rows if order.account_id is not None}

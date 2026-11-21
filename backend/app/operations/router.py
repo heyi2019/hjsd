@@ -5,18 +5,27 @@ from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.errors import NotFound, PermissionDenied
 from app.shared.audit import record_audit
 from app.core.security import (
     PERM_REPORT_EXPORT,
     PERM_REPORT_READ,
+    PERM_ORDER_CREATE,
+    PERM_FINANCE_READ,
     CurrentUser,
 )
 from app.settings.auth.session import (
+    get_current_user,
     require_permissions,
 )
+from app.business.stocks._common import scope_filter as account_scope_filter
+from app.domain.notifications import Notification
+from app.domain.trade import Account, Order
+from app.shared.scope import owner_scope_filter
 from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.settings.lists.scopes import report_scope
@@ -53,14 +62,38 @@ def monthly_pnl(
 @router.get("/reports/commission", response_model=CommissionOut)
 def commission(
     db: Annotated[Session, Depends(get_db)],
-    user: CurrentUser = read_access,
+    user: CurrentUser = Depends(get_current_user),
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
     mine: bool = Query(default=False),
     all_people: bool = Query(default=False),
     user_id: int | None = Query(default=None, gt=0),
+    notification_id: int | None = Query(default=None, gt=0),
 ) -> CommissionOut:
     """分润对账：默认按权限范围汇总；经营中心可显式查看全员并按人员筛选。"""
+    if notification_id is not None:
+        if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ, PERM_REPORT_READ)):
+            raise PermissionDenied("当前角色无权查看分润通知")
+        stmt = select(Order.id).join(Account, Account.id == Order.account_id).join(
+            Notification, Notification.entity_id == Order.order_no,
+        ).where(Notification.id == notification_id, Notification.recipient_user_id == user.id,
+                Notification.notification_type == "PROFIT_ALLOCATED", Notification.entity_type == "order")
+        for scope in (owner_scope_filter(Order.owner_id, user, db), account_scope_filter(db, user)):
+            if scope is not None:
+                stmt = stmt.where(scope)
+        target_order_id = db.scalar(stmt)
+        if target_order_id is None:
+            raise NotFound("分润通知不可用")
+        can_view_all = user.has_any((PERM_ORDER_CREATE, PERM_REPORT_READ))
+        report = r3_commission_reconciliation(
+            db, user=user, order_id=target_order_id,
+            user_id=None if can_view_all else user.id,
+        )
+        if not can_view_all:
+            report["people"] = [person for person in report["people"] if person["user_id"] == user.id]
+        return report
+    if not user.has(PERM_REPORT_READ):
+        raise PermissionDenied("当前角色无权查看分润报表")
     return r3_commission_reconciliation(
         db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, user_id=user_id
     )

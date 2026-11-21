@@ -1,7 +1,7 @@
 """stocks.router_output：库存账号列表/详情的输出装配（来源订单、扩展字段、入库操作人）。
 
 只含只读查询与输出装配，不依赖 router 的权限注入与事务；
-与 orders/router_output.py、finance/router_output.py 保持同一范式。
+库存账号输出供库存接口和订单详情共用。
 """
 from __future__ import annotations
 

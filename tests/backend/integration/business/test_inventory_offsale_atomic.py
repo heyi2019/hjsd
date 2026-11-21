@@ -342,7 +342,7 @@ def test_recovery_offsale_unlists_and_reverses_buy(seeded_db):
 
 
 def test_recovery_cancellation_with_partial_refund_exits_inventory(seeded_db):
-    from app.business.orders.router_output import _order_list_payload
+    from app.business.orders.router_outputs.list_payload import _order_list_payload
     from app.shared.order_amounts import order_cashflow_profit_by_order
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "partial-cancel", "game_type": "王者荣耀"})
     buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")

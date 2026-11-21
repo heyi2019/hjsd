@@ -247,7 +247,7 @@ def test_cancelled_installment_can_be_replaced_without_losing_history(seeded_cli
 @pytest.mark.parametrize("order_type", ["HS", "TH"])
 def test_cancel_installment_then_resell_in_installments(seeded_client, seeded_db, headers, order_type):
     from sqlalchemy import event
-    from app.business.orders.router_output import _order_list_payload
+    from app.business.orders.router_outputs.list_payload import _order_list_payload
     from app.shared.order_amounts import order_cashflow_profit_by_order
     from app.business.inventory.profile import create_account
     account = create_account(seeded_db, game_account=f"repeat-installment-{order_type}", business_mode="SELF" if order_type == "HS" else "DISTRIBUTION", inventory_type="RECOVERY" if order_type == "HS" else "PICKUP", actor="pytest")

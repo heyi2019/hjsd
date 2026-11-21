@@ -17,7 +17,8 @@ from app.domain.trade import Account
 from app.domain.enums import AccountStatus
 from app.business.orders import schemas
 from app.business.orders.create import create_order
-from app.business.orders.router_output import _order_list_payload, _order_output
+from app.business.orders.router_outputs._shared import _order_output
+from app.business.orders.router_outputs.list_payload import _order_list_payload
 from app.business.orders.routers.orders_router import create_order as create_order_endpoint
 from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer

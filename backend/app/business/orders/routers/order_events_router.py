@@ -32,8 +32,8 @@ from app.business.orders.events import post_event as orders_post_event
 from app.business.shared.cancellation_model import cancel_order as orders_cancel_order
 from app.business.shared.operations.sale import apply_sale_details, sale_form_context
 
-from ..router_output import (
-    _actor,
+from app.core.actor import actor_name as _actor
+from ..router_outputs._shared import (
     _order_output,
     _operator_names,
     _event_output,

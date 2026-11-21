@@ -70,7 +70,7 @@ def build_order_list_payload(*args: Any, **kwargs: Any) -> Any:
     """组装订单列表摘要（转发给 orders 注册的组装器）；未注册 fail-fast。"""
     if _order_list_payload_builder is None:
         raise RuntimeError(
-            "订单列表摘要组装器未注册：orders/router_output 未被加载"
+            "订单列表摘要组装器未注册：orders/router_outputs/list_payload 未被加载"
             "（注册点 app.business.inventory.collaboration）"
         )
     return _order_list_payload_builder(*args, **kwargs)

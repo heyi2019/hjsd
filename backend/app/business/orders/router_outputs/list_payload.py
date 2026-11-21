@@ -16,6 +16,7 @@ from app.domain.parties import (
 )
 from app.domain.trade import Account, Cashflow, Installment, OrderEvent
 from app.domain.users import User
+from app.business.inventory.collaboration import register_order_list_payload_builder
 from app.business.orders.output_labels import _elapsed_label, _form_responsible_label, _selected_operator_label
 from app.shared.order_amounts import ZERO, event_totals, order_cashflow_profit_by_order
 from app.business.orders.router_outputs._shared import _operator_names, _sale_amount
@@ -199,3 +200,6 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             "installment_status": installment.status if installment else None,
         })
     return payloads
+
+
+register_order_list_payload_builder(_order_list_payload)

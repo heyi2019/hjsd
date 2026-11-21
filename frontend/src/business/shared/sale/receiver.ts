@@ -12,7 +12,7 @@ import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { serializeInstallmentSchedule } from "../forms/InstallmentScheduleFields";
 import type { SaleCustomerInput } from "../../../shared/api/orders-api/orders";
 
-export interface CollectPaymentInput {
+interface CollectPaymentInput {
   /** 关联入库订单 ID（售出事件/分期合同登记在其上）。 */
   sourceOrderId: number;
   /** 表单值。 */

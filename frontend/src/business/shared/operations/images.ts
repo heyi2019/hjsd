@@ -8,6 +8,3 @@ export const IMAGES_OPERATION: OrderOperationItem = {
 export function imagesOperation(context: OrderOperationContext): OrderOperationItem | null {
   return context.row.status === "SOLD" ? null : IMAGES_OPERATION;
 }
-
-export { OrderProfileModal } from "./profile-modal";
-export type { OrderProfileTarget } from "./profile-modal";

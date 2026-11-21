@@ -8,6 +8,3 @@ export const DESCRIPTION_OPERATION: OrderOperationItem = {
 export function descriptionOperation(context: OrderOperationContext): OrderOperationItem | null {
   return context.row.status === "SOLD" ? null : DESCRIPTION_OPERATION;
 }
-
-export { OrderProfileModal } from "./profile-modal";
-export type { OrderProfileTarget } from "./profile-modal";

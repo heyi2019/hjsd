@@ -38,7 +38,7 @@ function buyerRoleOf(inventoryType: string | null | undefined): "BUYER" | "CONSI
   return inventoryType === "CONSIGNMENT" ? "CONSIGNOR" : "BUYER";
 }
 
-export interface InventorySaleModalProps {
+interface InventorySaleModalProps {
   account: Account | null;
   onClose: () => void;
   onCreated: (account: Account) => void | Promise<void>;
@@ -56,7 +56,7 @@ type SaleWrapperProps = Pick<InventorySaleModalProps, "account" | "onClose" | "o
  * 库存售出表单的共享实现。回收 / 提号 / 代挂三种货源共用同一套字段、校验与提交逻辑，
  * 仅通过 inventoryType 注入的标题、买家信息标题与买家角色产生差异。
  */
-export function InventorySaleModalBase(props: InventorySaleModalProps) {
+function InventorySaleModalBase(props: InventorySaleModalProps) {
   const { account, inventoryType, title = "售出账号", buyerInfoTitle = "买家信息" } = props;
   const resolvedType = inventoryType;
   const isConsignment = resolvedType === "CONSIGNMENT";

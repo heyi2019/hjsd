@@ -71,7 +71,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       {mine ? <Note>仅展示当前登录用户在分润配置中获得的收益。</Note> : null}
       <StatRow
         items={[
-          { label: mine ? "收益订单数" : "订单数", kind: "count", amount: String(data?.total.order_count ?? 0) },
+          { label: mine ? "收益订单数" : "订单数", kind: "count", amount: data ? String(data.total.order_count) : null },
           { label: mine ? "我的收益" : "分润合计", amount: data?.total.profit_base ?? "-" },
         ]}
       />
@@ -104,7 +104,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
              </div>
            ),
          }}
-         emptyText="所选区间无分润记录"
+         emptyText={error ? "分润数据不可用，请点击重新加载" : "所选区间无分润记录"}
          onPageChange={() => undefined}
       />
     </Card>

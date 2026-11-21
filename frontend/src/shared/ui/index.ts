@@ -12,7 +12,6 @@ export { ExportButton } from "./ExportButton";
 export { ConfirmButton } from "./ConfirmButton";
 export { ConfirmDialog } from "./ConfirmDialog";
 export { InlineError } from "./InlineError";
-export { FormDrawer } from "./FormDrawer";
 export { ErrorBanner } from "./ErrorBanner";
 export { AdaptiveFormGrid } from "./AdaptiveFormGrid/AdaptiveFormGrid";
 export { FormField } from "./AdaptiveFormGrid/FormField";

@@ -249,7 +249,6 @@
 .ui-control-width-260 { width: var(--col-w-260); }
 .ui-control-min-180 { min-width: var(--col-w-180); }
 .ui-title-spaced { margin-block-start: var(--space-4); }
-.ui-drawer-actions { justify-content: flex-end; width: 100%; }
 
 /* 容器内错误提示（Modal / Drawer 内部）下边距：原用内联 style 控制，迁移到此处（ui_guards 规则 11）。 */
 .inline-error { margin-block-end: var(--space-3); }

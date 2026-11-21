@@ -24,7 +24,7 @@
   font: var(--font-caption-2);
 }
 
-/* ── FormDrawer / ErrorBanner 辅助 ────────────────────────── */
+/* ── 卡片与错误提示辅助 ────────────────────────── */
 /* 卡片内口径说明：位于统计卡组 / 表格上方，与上下文留出上下间距。 */
 .ui-card-hint {
   margin: var(--space-3) 0;
@@ -39,8 +39,7 @@
 }
 @media (prefers-reduced-transparency: reduce) {
   .glass,
-  .ui-error-banner,
-  .form-drawer .ant-drawer-footer {
+  .ui-error-banner {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
     background: var(--color-surface);

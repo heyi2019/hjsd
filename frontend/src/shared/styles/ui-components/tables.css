@@ -28,23 +28,3 @@
   border-radius: 20px;
   box-shadow: var(--shadow-soft);
 }
-
-/* 抽屉 footer 是唯一操作区：保持底部可见，避免长表单滚动后失去提交路径。 */
-.form-drawer .ant-drawer-footer {
-  padding: var(--space-3) var(--space-4) max(var(--space-3), env(safe-area-inset-bottom));
-  background: color-mix(in srgb, var(--glass) 92%, transparent);
-  backdrop-filter: var(--glass-blur-md);
-  -webkit-backdrop-filter: var(--glass-blur-md);
-}
-.form-drawer .ant-drawer-footer .ant-space {
-  gap: var(--space-2) !important;
-}
-.form-drawer .ant-drawer-footer .ant-btn {
-  min-width: var(--col-w-80);
-}
-.form-drawer .ant-form-item:last-child { margin-block-end: var(--space-2); }
-
-@media (max-width: 640px) {
-  .form-drawer .ant-drawer-footer .ant-space { width: 100%; }
-  .form-drawer .ant-drawer-footer .ant-btn { flex: 1; }
-}

@@ -1,13 +1,11 @@
 /**
- * 容器类组件——由 5 个碎片文件合并：
- *   FormDrawer / PermissionButton / BusinessForm(BusinessRegistrationForm) / ConfirmDialog / DataTable
+ * 容器类组件：权限、表单、确认框和表格。
  * 合并动因同 ui.atoms（文件级 import+transform 是固定成本）。用例与断言逐条保留。
  */
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { FormDrawer } from "@/shared/ui/FormDrawer";
 import { PermissionButton, PermissionGate } from "@/shared/ui/PermissionButton";
 import {
   BusinessRegistrationForm,
@@ -22,84 +20,6 @@ let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
-});
-
-const drawerFields = [
-  { name: "amount", label: "金额", required: true, kind: "money" as const },
-  { name: "note", label: "备注", kind: "textarea" as const, initialValue: "初始备注" },
-];
-
-describe("FormDrawer：金额动作必须走抽屉提交", () => {
-  it("关闭态不渲染内容", () => {
-    const { container } = renderLight(
-      <FormDrawer open={false} title="收款" fields={drawerFields} onClose={() => {}} onSubmit={() => {}} />,
-    );
-    expect(container.querySelector(".ant-drawer-content")).toBeNull();
-  });
-
-  it("打开后渲染字段与初始值", async () => {
-    renderLight(<FormDrawer open title="收款" fields={drawerFields} onClose={() => {}} onSubmit={() => {}} />);
-    expect(await screen.findByText("收款")).toBeInTheDocument();
-    expect(screen.getByLabelText("金额")).toBeInTheDocument();
-    const note = screen.getByLabelText("备注") as HTMLTextAreaElement;
-    expect(note.value).toBe("初始备注");
-  });
-
-  it("必填未填时校验拦截，不触发提交", async () => {
-    const onSubmit = vi.fn();
-    renderLight(<FormDrawer open title="收款" fields={drawerFields} onClose={() => {}} onSubmit={onSubmit} />);
-    await ui.click(await screen.findByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(screen.getByText("请输入金额")).toBeInTheDocument());
-    expect(onSubmit).not.toHaveBeenCalled();
-  });
-
-  it("填写后提交，金额以字符串回传（不做 Number 转换）", async () => {
-    const onSubmit = vi.fn();
-    renderLight(<FormDrawer open title="收款" fields={drawerFields} onClose={() => {}} onSubmit={onSubmit} />);
-    await screen.findByText("收款");
-    await ui.type(screen.getByLabelText("金额"), "1234.56");
-    await ui.click(screen.getByRole("button", { name: /提交/ }));
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
-    expect(onSubmit.mock.calls[0][0]).toMatchObject({ amount: "1234.56", note: "初始备注" });
-    expect(typeof (onSubmit.mock.calls[0][0] as Record<string, unknown>).amount).toBe("string");
-  });
-
-  it("取消按钮触发 onClose", async () => {
-    const onClose = vi.fn();
-    renderLight(<FormDrawer open title="收款" fields={drawerFields} onClose={onClose} onSubmit={() => {}} />);
-    await ui.click(await screen.findByRole("button", { name: /取消/ }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it("submitting 时提交按钮进入 loading，文案可自定义", async () => {
-    renderLight(
-      <FormDrawer
-        open
-        title="收款"
-        fields={drawerFields}
-        submitting
-        submitText="确认登记"
-        onClose={() => {}}
-        onSubmit={() => {}}
-      />,
-    );
-    const btn = await screen.findByRole("button", { name: /确认登记/ });
-    expect(btn.classList.contains("ant-btn-loading")).toBe(true);
-  });
-
-  it("extra 区域渲染在表单下方（用于校验提示等）", async () => {
-    renderLight(
-      <FormDrawer
-        open
-        title="收款"
-        fields={drawerFields}
-        extra={<span>余额不足</span>}
-        onClose={() => {}}
-        onSubmit={() => {}}
-      />,
-    );
-    expect(await screen.findByText("余额不足")).toBeInTheDocument();
-  });
 });
 
 describe("PermissionButton：无权限默认隐藏", () => {

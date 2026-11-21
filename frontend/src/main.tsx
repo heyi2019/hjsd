@@ -33,7 +33,7 @@ function ThemedApp() {
       theme={buildTheme(resolvedMode)}
       // 全局关闭 antd 两字中文按钮自动插空格：「取消/确认/保存」等会被渲染成「取 消/确 认/保 存」。
       // 覆盖所有 Button/Popconfirm/Drawer（含 Portal 到 body 的浮层，React context 沿组件树传递）。
-      // 此前靠 BusinessActionModal 等局部 ConfigProvider 各包一层兜底，遗漏了 ConfirmButton/FormDrawer；
+      // 此前靠 BusinessActionModal 等局部 ConfigProvider 各包一层兜底，遗漏了 ConfirmButton；
       // 收口到全局后，局部冗余一并移除，杜绝同类遗漏。
       button={{ autoInsertSpace: false }}
     >

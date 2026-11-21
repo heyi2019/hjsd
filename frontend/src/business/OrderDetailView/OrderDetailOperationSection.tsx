@@ -30,6 +30,33 @@ function operationPlatforms(extra: Record<string, unknown>): string[] {
     : [];
 }
 
+export function buildOperationPlatformUsage(
+  listings: Array<{ platform: string; eventId?: number }>,
+  drafts: Partial<Record<string, Pick<OrderOperationDraft, "operation_type" | "form_extra">>>,
+) {
+  const listingIds = new Map<string, Set<number | undefined>>();
+  for (const listing of listings) {
+    const ids = listingIds.get(listing.platform) ?? new Set<number | undefined>();
+    ids.add(listing.eventId);
+    listingIds.set(listing.platform, ids);
+  }
+  const draftKeys = new Map<string, Set<string>>();
+  for (const [key, draft] of Object.entries(drafts)) {
+    if (draft?.operation_type !== "CONSIGNMENT") continue;
+    for (const platform of operationPlatforms(draft.form_extra ?? {})) {
+      const keys = draftKeys.get(platform) ?? new Set<string>();
+      keys.add(key);
+      draftKeys.set(platform, keys);
+    }
+  }
+  return (platform: string, eventId: number | undefined, currentKey: string) => {
+    const ids = listingIds.get(platform);
+    const keys = draftKeys.get(platform);
+    return Boolean((ids && (ids.size > 1 || !ids.has(eventId) || Number.isNaN(eventId)))
+      || (keys && (keys.size > 1 || !keys.has(currentKey))));
+  };
+}
+
 /** 运营明细每一行按自己的事件数据展示，不能复用最新一条记录的内容。 */
 export function resolveOperationEventContent(
   operationKey: OrderOperationKey,
@@ -141,6 +168,7 @@ function editableOperationColumns(
   defaultOperatorIds: number[],
   activeListings: ReturnType<typeof activeConsignmentListings>,
 ): ColumnsType<OrderOperationRow> {
+  const isPlatformTaken = buildOperationPlatformUsage(activeListings, operationDrafts ?? {});
   const platformOptionValues = (current: string[], includeSystem = false) => {
     const options = [...platformOptions];
     if (includeSystem && !options.some((option) => option.value === "__SYSTEM__")) options.push({ value: "__SYSTEM__", label: "本系统" });
@@ -165,9 +193,7 @@ function editableOperationColumns(
           const selectedPlatforms = platformValues(extra.consignment_platforms);
           const currentPrice = typeof extra.consignment_price === "string" || typeof extra.consignment_price === "number" ? String(extra.consignment_price) : undefined;
           const choices = platformOptionValues(selectedPlatforms).filter((option) => {
-            const takenByListing = activeListings.some((listing) => listing.platform === option.value && listing.eventId !== row.event?.id);
-            const takenByDraft = Object.entries(operationDrafts ?? {}).some(([key, candidate]) => key !== row.key && candidate?.operation_type === "CONSIGNMENT" && platformValues(candidate.form_extra?.consignment_platforms).includes(String(option.value)));
-            return !takenByListing && !takenByDraft;
+            return !isPlatformTaken(option.value, row.event?.id, row.key);
           });
           return <div className="order-operation-edit-fields"><Select aria-label={`编辑上架平台${row.ariaLabelSuffix ?? ""}`} allowClear value={selectedPlatforms[0]} options={choices} placeholder="选择上架平台" onChange={(next) => { const nextExtra = { ...extra }; if (next) nextExtra.consignment_platforms = [next]; else { delete nextExtra.consignment_platforms; delete nextExtra.consignment_price; } updateExtra(row, nextExtra); }} /><InputNumber<string> stringMode className="money-input" aria-label={`编辑寄售价格${row.ariaLabelSuffix ?? ""}`} min="0" precision={2} suffix="元" value={currentPrice || null} placeholder="寄售价" onChange={(next) => { const nextExtra = { ...extra }; if (next == null) delete nextExtra.consignment_price; else nextExtra.consignment_price = next; updateExtra(row, nextExtra); }} /></div>;
         }

@@ -5,7 +5,7 @@ import type { AccountExecutionDetail } from "@/shared/api/types/account-executio
 import type { Account } from "@/shared/api/types/accounts";
 import { OrderDetail } from "@/business/OrderDetailView/OrderDetail";
 import { OrderDetailImageGallery } from "@/business/OrderDetailView/OrderDetailImageGallery";
-import { OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
+import { buildOperationPlatformUsage, OrderDetailOperationSection, resolveOperationEventContent } from "@/business/OrderDetailView/OrderDetailOperationSection";
 import { OrderDetailFinanceSection } from "@/business/OrderDetailView/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/OrderDetailView/OrderDetailExecutionSection";
 import { OrderDetailMoneyInput } from "@/business/OrderDetailView/OrderDetailMoneyInput";
@@ -58,6 +58,23 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("平台占用检查排除当前行且线性读取已有上架", () => {
+    let reads = 0;
+    const listings = Array.from({ length: 200 }, (_, i) => ({ get platform() { reads += 1; return `平台${i}`; }, eventId: i }));
+    const taken = buildOperationPlatformUsage(listings, { a: { operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["草稿平台"] } } });
+    expect(taken("平台0", 0, "x")).toBe(false);
+    expect(taken("平台0", 1, "x")).toBe(true);
+    expect(taken("草稿平台", undefined, "a")).toBe(false);
+    expect(taken("草稿平台", undefined, "b")).toBe(true);
+    for (let i = 0; i < 200; i++) taken(`平台${i}`, i, "x");
+    expect(reads).toBeLessThanOrEqual(400);
+    const duplicates = buildOperationPlatformUsage([{ platform: "A", eventId: 1 }, { platform: "A", eventId: 2 }], {
+      a: { operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["B"] } },
+      b: { operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["B"] } },
+    });
+    expect(duplicates("A", 1, "x")).toBe(true);
+    expect(duplicates("B", undefined, "a")).toBe(true);
+  });
   it("参与方候选按首条去重并保持现有客户的显示顺序", () => {
     expect(buildCustomerOptions([{ id: 1, display_name: "原客户" }, { id: 1, display_name: "重复" }, { id: 2, display_name: "旧名" }],
       [{ id: 2, customer_no: "C2", display_name: "新名" }])).toEqual([{ value: 1, label: "原客户" }, { value: 2, label: "C2 · 新名" }]);

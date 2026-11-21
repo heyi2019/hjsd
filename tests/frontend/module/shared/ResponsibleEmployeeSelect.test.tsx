@@ -20,7 +20,6 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 import * as client from "@/shared/api/client";
 import { employeesApi } from "@/shared/api/org.api";
 import { ResponsibleEmployeeSelect } from "@/shared/forms/ResponsibleEmployeeSelect";
-import { defaultOperatorUserIds } from "@/business/shared/order-detail/editing/use-order-detail-editor";
 
 const employees = [
   { id: 3, username: "operator", display_name: "业务员", is_active: true },
@@ -77,8 +76,4 @@ describe("ResponsibleEmployeeSelect：按人匹配用 username，不用角色", 
     expect(screen.getByText("交付操作人").closest("label")).toHaveClass("ant-form-item-required");
   });
 
-  it("详情新增动作行默认当前员工", () => {
-    expect(defaultOperatorUserIds(employees, "xiaoxuan")).toEqual([5]);
-    expect(defaultOperatorUserIds(employees, "missing")).toBeUndefined();
-  });
 });

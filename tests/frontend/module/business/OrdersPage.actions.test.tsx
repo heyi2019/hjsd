@@ -7,6 +7,7 @@ import { appMessage as message } from "@/shared/ui/appFeedback";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
 import { useLedgerInlineEdit } from "@/business/orders/useLedgerInlineEdit";
+import { defaultOperatorUserIds } from "@/business/shared/order-detail/editing/use-order-detail-editor";
 import { CashflowModal, type CashflowTarget } from "@/finance/cashflow";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
@@ -29,6 +30,15 @@ import type { ProfitAllocation } from "@/shared/api/types/profitAllocation";
 import type { Pool } from "@/shared/api/types/finance";
 
 let ui: ReturnType<typeof userEvent.setup>;
+
+it("详情新增动作行默认当前员工", () => {
+  const employees = [
+    { id: 3, username: "operator", display_name: "业务员", is_active: true },
+    { id: 5, username: "xiaoxuan", display_name: "小轩", is_active: true },
+  ];
+  expect(defaultOperatorUserIds(employees, "xiaoxuan")).toEqual([5]);
+  expect(defaultOperatorUserIds(employees, "missing")).toBeUndefined();
+});
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/orderCashflows.api");

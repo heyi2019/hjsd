@@ -88,12 +88,12 @@
           },
           "module": {
             "workbench": 4,
-            "business": 19,
+            "business": 18,
             "customer": 2,
             "finance": 4,
             "operations": 3,
             "settings": 16,
-            "shared": 9,
+            "shared": 10,
             "system": 8
           }
         },

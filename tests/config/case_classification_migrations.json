@@ -1,0 +1,108 @@
+[
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_company_allocation_is_not_notified",
+    "old_id": "IT-SYS08-129",
+    "new_id": "IT-A01-039"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_create_notification_rejects_blank_entity",
+    "old_id": "IT-SYS08-030",
+    "new_id": "IT-A01-041"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_create_notification_rejects_blank_title_or_message",
+    "old_id": "IT-SYS08-031",
+    "new_id": "IT-A01-042"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_list_notifications_unread_only_filters",
+    "old_id": "IT-SYS08-032",
+    "new_id": "IT-A01-047"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_mark_read_not_found",
+    "old_id": "IT-SYS08-033",
+    "new_id": "IT-A01-048"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_mark_read_sets_read_at_and_idempotent",
+    "old_id": "IT-SYS08-034",
+    "new_id": "IT-A01-049"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_api_creates_notification_visible_in_seller_inbox",
+    "old_id": "IT-SYS08-130",
+    "new_id": "IT-A01-054"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_completed_notifies_seller_to_allocate",
+    "old_id": "IT-SYS08-131",
+    "new_id": "IT-A01-055"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_pending_notification_is_idempotent",
+    "old_id": "IT-SYS08-132",
+    "new_id": "IT-A01-056"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_without_operator_ids_falls_back_to_actor",
+    "old_id": "IT-SYS08-133",
+    "new_id": "IT-A01-057"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_set_allocations_after_completion_notifies_recipients",
+    "old_id": "IT-SYS08-134",
+    "new_id": "IT-A01-058"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_set_allocations_repeat_is_idempotent",
+    "old_id": "IT-SYS08-135",
+    "new_id": "IT-A01-059"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_overview.py::test_workbench_order_cards_use_the_current_period",
+    "old_id": "IT-B01-392",
+    "new_id": "IT-A01-065"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_overview.py::test_workbench_personal_earnings_uses_commission_profit_base",
+    "old_id": "IT-B01-393",
+    "new_id": "IT-A01-066"
+  },
+  {
+    "nodeid": "tests/backend/integration/workbench/test_overview.py::test_workbench_summary_exposes_one_backend_aggregate",
+    "old_id": "IT-B01-394",
+    "new_id": "IT-A01-067"
+  },
+  {
+    "nodeid": "tests/frontend/module/settings/AppearancePanel.test.tsx::在外观设置中切换主题并持久化选择",
+    "old_id": "IT-SYS07-200",
+    "new_id": "IT-F01-203"
+  },
+  {
+    "nodeid": "tests/frontend/module/settings/AppearancePanel.test.tsx::拖动滑桿调用 setAlpha 并写回 localStorage",
+    "old_id": "IT-SYS07-056",
+    "new_id": "IT-F01-204"
+  },
+  {
+    "nodeid": "tests/frontend/module/settings/AppearancePanel.test.tsx::未保存主题偏好时默认选中浅色",
+    "old_id": "IT-SYS07-201",
+    "new_id": "IT-F01-205"
+  },
+  {
+    "nodeid": "tests/frontend/module/settings/AppearancePanel.test.tsx::系统开启降低透明度时显示强制实底提示",
+    "old_id": "IT-SYS07-057",
+    "new_id": "IT-F01-206"
+  },
+  {
+    "nodeid": "tests/frontend/module/settings/AppearancePanel.test.tsx::默认渲染滑桿，范围正确",
+    "old_id": "IT-SYS07-058",
+    "new_id": "IT-F01-207"
+  },
+  {
+    "nodeid": "tests/frontend/module/business/OrdersPage.actions.test.tsx::详情新增动作行默认当前员工",
+    "previous_nodeid": "tests/frontend/module/business/ResponsibleEmployeeSelect.test.tsx::详情新增动作行默认当前员工",
+    "old_id": "IT-SYS12-139",
+    "new_id": "IT-B01-626"
+  }
+]

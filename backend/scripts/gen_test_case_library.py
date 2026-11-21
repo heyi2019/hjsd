@@ -35,6 +35,7 @@ OUT_MD = os.path.join(REPO, "docs/testing", "测试用例库.md")
 REPORT_DIR = os.path.join(REPO, "tests", "backend", "_report")
 CASE_MAP = os.path.join(REPORT_DIR, "case_number_map.json")
 CASE_INDEX = os.path.join(REPORT_DIR, "case_index.json")
+CASE_MIGRATIONS = os.path.join(REPO, "tests", "config", "case_classification_migrations.json")
 
 # 统一目录（单一事实源）
 sys.path.insert(0, os.path.join(REPO, "tests", "config"))
@@ -510,26 +511,37 @@ def _load_number_map() -> dict[str, int]:
     return out
 
 
-def _check_published_classifications(cases: list[dict]) -> None:
+def _check_published_classifications(cases: list[dict]) -> dict[str, str]:
     """已有用例变更分类时停止生成，避免悄悄更换测试编号。"""
     if not os.path.exists(OUT_CSV):
-        return
+        return {}
+    migrations = {}
+    if os.path.exists(CASE_MIGRATIONS):
+        with open(CASE_MIGRATIONS, encoding="utf-8") as f:
+            migrations = {item["nodeid"]: item for item in json.load(f)}
     with open(OUT_CSV, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
         if reader.fieldnames:
             reader.fieldnames = [name.lstrip("\ufeff") for name in reader.fieldnames]
         published = {
-            (row.get("自动化测试文件及函数"), row.get("测试函数标识")): (row.get("测试层级"), row.get("功能编号"))
+            (row.get("自动化测试文件及函数"), row.get("测试函数标识")): (row.get("测试层级"), row.get("功能编号"), row.get("测试编号"))
             for row in reader
         }
     changed = []
+    expected_ids = {}
     for case in cases:
         key = (case["自动化测试文件及函数"], case["测试函数标识"])
         current = (case["测试层级"], case["功能编号"])
-        if key in published and published[key] != current:
-            changed.append(f"{key[0]}::{key[1]} {published[key]} -> {current}")
+        if key in published and published[key][:2] != current:
+            nodeid = f"{key[0]}::{key[1]}"
+            migration = migrations.get(nodeid)
+            if migration and migration["old_id"] == published[key][2] and migration["new_id"].rsplit("-", 1)[0] == "-".join(current):
+                expected_ids[nodeid] = migration["new_id"]
+            else:
+                changed.append(f"{nodeid} {published[key][:2]} -> {current}")
     if changed:
         raise ValueError(f"已有测试的分类发生变化（{len(changed)} 条），请先确认编号迁移：\n" + "\n".join(changed))
+    return expected_ids
 
 
 def main() -> None:
@@ -594,7 +606,7 @@ def main() -> None:
         for tname, doc, body in scan_ts(full, exclude_methods=E2E_STRUCTURAL):
             cases.append(_stage("E2E", func, rel, tname, doc, body, fn, primary, related, ""))
 
-    _check_published_classifications(cases)
+    expected_migrations = _check_published_classifications(cases)
 
     # ---- 稳定分配序号 ----
     cases.sort(key=lambda c: (c["功能编号"], c["测试层级"], c["自动化测试文件及函数"], c["测试函数标识"]))
@@ -635,6 +647,8 @@ def main() -> None:
         # nodeid 必须与 pytest 真实 nodeid 逐字一致。rootdir 是仓库根（pytest.ini 在根），
         # pytest 归一化后即 tests/backend/<file>.py::<func>，与 rel 完全同形。
         nodeid = f"{rel}::{c['测试函数标识']}"
+        if nodeid in expected_migrations and case_no != expected_migrations[nodeid]:
+            raise ValueError(f"测试编号迁移不一致：{nodeid} 预期 {expected_migrations[nodeid]}，实际 {case_no}")
         index[nodeid] = case_no
 
     # 编号与 nodeid 都必须唯一：重复即编号体系已失效（报告会漏行、执行记录会错挂），
@@ -650,7 +664,7 @@ def main() -> None:
               "前置条件", "输入数据", "预期结果", "合格标准", "自动化测试文件及函数",
               "测试函数标识", "优先级", "测试名称", "功能名称", "关联旧编号(BIZ)", "流程编号", "备注"]
     with open(OUT_CSV, "w", encoding="utf-8-sig", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
         w.writeheader()
         for c in cases:
             row = {k: c.get(k, "") for k in fields}

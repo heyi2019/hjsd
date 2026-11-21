@@ -69,6 +69,10 @@ def test_case_library_rejects_silent_reclassification(tmp_path, monkeypatch):
     case = {"自动化测试文件及函数": "tests/a.test.ts", "测试函数标识": "case a", "测试层级": "IT", "功能编号": "B02"}
     with pytest.raises(ValueError, match="分类发生变化"):
         generator._check_published_classifications([case])
+    migrations = tmp_path / "migrations.json"
+    migrations.write_text(json.dumps([{"nodeid": "tests/a.test.ts::case a", "old_id": "IT-B01-003", "new_id": "IT-B02-004"}]), encoding="utf-8")
+    monkeypatch.setattr(generator, "CASE_MIGRATIONS", str(migrations))
+    assert generator._check_published_classifications([case]) == {"tests/a.test.ts::case a": "IT-B02-004"}
 
 
 def _manifest() -> dict:

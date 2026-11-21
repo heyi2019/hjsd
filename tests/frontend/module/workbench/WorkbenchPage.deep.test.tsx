@@ -6,6 +6,12 @@ import { WorkbenchPage } from "@/app/WorkbenchPage";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { workbenchSummary } from "@fixtures/api-responses";
+import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
+import { seedOptionSets } from "@fixtures/optionSetsSeed";
+import { ordersApi, orderTypesApi } from "@/shared/api/orders.api";
+import { gameTypesApi } from "@/shared/api/misc.api";
+import { employeesApi } from "@/shared/api/org.api";
+import { poolsApi } from "@/shared/api/pools.api";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/workbench.api");
@@ -33,6 +39,40 @@ beforeEach(() => {
 });
 
 describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
+  it("快捷入口建单成功后关闭弹窗并刷新业务总览", async () => {
+    seedOptionSets();
+    seedOrderFormFields();
+    vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", is_active: true }]);
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }] as never);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]);
+    vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "系统管理员", is_active: true }] as never);
+    vi.mocked(ordersApi.create).mockResolvedValue({ id: 31, order_no: "HS0031", status: "ACTIVE" } as never);
+    vi.mocked(workbenchApi.summary)
+      .mockResolvedValueOnce(workbenchSummary({ orders: { total_count: 1 } }))
+      .mockResolvedValue(workbenchSummary({ orders: { total_count: 2 } }));
+
+    renderLight(<WorkbenchPage />, { user: "admin" });
+    const total = screen.getByTestId("workbench-orders");
+    expect(await within(total).findByText("1")).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: /自营·回收/ }));
+    expect(await screen.findByText("新建回收订单")).toBeInTheDocument();
+    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
+    await ui.type(screen.getByLabelText("账号密码"), "secret");
+    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.type(screen.getByLabelText("客户昵称"), "张三");
+    await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
+    const pool = screen.getByText("请选择资金账户", { exact: true });
+    await ui.click(pool.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+    await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+    await ui.click(screen.getByRole("button", { name: /创建订单/ }));
+
+    await waitFor(() => expect(ordersApi.create).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.queryByText("新建回收订单")).not.toBeInTheDocument());
+    expect(await within(total).findByText("2")).toBeInTheDocument();
+    expect(workbenchApi.summary).toHaveBeenCalledTimes(2);
+  });
+
   it("加载失败展示错误横幅", async () => {
     vi.mocked(workbenchApi.summary).mockRejectedValue(new Error("workbench down"));
     renderLight(<WorkbenchPage />, { user: "admin" });

@@ -36,6 +36,25 @@ beforeEach(() => {
 });
 
 describe("WorkbenchPage：动作入口（数据已迁数据中心）", () => {
+it("旧周期汇总晚返回时不覆盖新周期的数据", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof workbenchApi.summary>>) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof workbenchApi.summary>>>((resolve) => { finishOld = resolve; });
+    vi.mocked(workbenchApi.summary)
+      .mockReturnValueOnce(oldRequest)
+      .mockResolvedValueOnce(workbenchSummary({ period: previousReportPeriod(), personal_orders: 2 }));
+
+    renderLight(<WorkbenchPage />, { user: "admin" });
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "上期" }));
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(previousReportPeriod()));
+    const orders = screen.getByTestId("workbench-personal-orders");
+    expect(await within(orders).findByText("2")).toBeInTheDocument();
+
+    await act(async () => { finishOld(workbenchSummary({ period: currentReportPeriod(), personal_orders: 99 })); await oldRequest; });
+    expect(within(orders).getByText("2")).toBeInTheDocument();
+    expect(within(orders).queryByText("99")).not.toBeInTheDocument();
+  });
+
 it("切换周期加载期间隐藏旧统计并暂停旧周期跳转", async () => {
     let finish!: (value: Awaited<ReturnType<typeof workbenchApi.summary>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof workbenchApi.summary>>>((resolve) => { finish = resolve; });

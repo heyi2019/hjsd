@@ -95,3 +95,69 @@ def test_each_overdue_period_creates_one_notice(seeded_db, seeded_client):
     assert result.json()["created"] == 2
     assert {n.entity_id for n in _notifications(seeded_db)} == {str(first.id), str(second.id)}
     assert seeded_client.post("/api/notifications/sync-reminders", headers=auth).json()["created"] == 0
+
+
+def test_concurrent_overdue_sync_creates_one_notification(v1_engine):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from uuid import uuid4
+
+    from sqlalchemy import create_engine, event, text
+    from sqlalchemy.orm import Session
+
+    from app.domain.base import Base
+    from app.domain.users import User
+    from app.settings.field_definitions.seeds import seed_foundation
+
+    schema = f"overdue_concurrency_{uuid4().hex[:12]}"
+    with v1_engine.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(v1_engine.url, connect_args={"options": f"-c search_path={schema}"})
+    try:
+        Base.metadata.create_all(engine)
+        with Session(engine) as setup:
+            seed_foundation(setup, actor="pytest")
+            setup.add(User(id=1, username="seeduser1", display_name="test", password_hash="test", role="OPERATOR", owner_scope="SELF"))
+            setup.flush()
+            _, schedule = _schedule(setup, 1)
+            schedule_id = schedule.id
+            setup.commit()
+
+        first_created, second_lock_attempted, second_finished = Event(), Event(), Event()
+
+        def first_sync():
+            with Session(engine) as session:
+                created = _sync(session, _user())
+                first_created.set()
+                assert second_lock_attempted.wait(10)
+                assert not second_finished.wait(0.2), "第二个同步在首个事务提交前完成"
+                session.commit()
+                return created
+
+        def second_sync():
+            assert first_created.wait(10)
+            try:
+                with Session(engine) as session:
+                    def before(_conn, _cursor, statement, _params, _context, _many):
+                        if "FOR NO KEY UPDATE" in statement.upper():
+                            second_lock_attempted.set()
+                    event.listen(session.connection(), "before_cursor_execute", before)
+                    created = _sync(session, _user())
+                    session.commit()
+                    return created
+            finally:
+                second_finished.set()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            first = pool.submit(first_sync)
+            second = pool.submit(second_sync)
+            assert first.result(timeout=20) == 1
+            assert second.result(timeout=20) == 0
+        with Session(engine) as session:
+            messages = _notifications(session)
+            assert len(messages) == 1
+            assert messages[0].entity_id == str(schedule_id)
+    finally:
+        engine.dispose()
+        with v1_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))

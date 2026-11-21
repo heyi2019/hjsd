@@ -1,7 +1,7 @@
 """API-01 / NOTIFY-01 通知功能：通知读写规则与售出、分润提醒闭环。"""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 import base64
 import json
@@ -187,6 +187,42 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
         response = seeded_client.get(path, params=params, headers=auth)
         assert response.status_code == 200
         assert not any(row["id"] == item["id"] for row in response.json()["items"])
+
+
+def test_inventory_reminder_respects_calendar_threshold_and_changes(seeded_db, monkeypatch):
+    from app.domain.options import OptionSet
+    from app.workbench.notifications import inventory
+    from app.workbench.reminder_config import REMINDER_CODE
+
+    class FixedDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 11, 22)
+
+    monkeypatch.setattr(inventory, "date", FixedDate)
+    setting = seeded_db.scalar(select(OptionSet).where(OptionSet.code == REMINDER_CODE))
+    if setting is None:
+        setting = OptionSet(code=REMINDER_CODE, label="业务提醒", group="BUSINESS", editable=False, options=[])
+        seeded_db.add(setting)
+    setting.options = [{"value": "inventory_aging_days", "label": "7"}]
+    entries = []
+    for index, (age, hour) in enumerate(((8, 12), (7, 0), (7, 12), (6, 12))):
+        order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1, account_snapshot={"game_account": f"aging-boundary-{index}"})
+        _buy(seeded_db, order)
+        account = seeded_db.get(Account, order.account_id)
+        account.inventory_entry_at = datetime(2026, 11, 22, hour) - timedelta(days=age)
+        entries.append(str(account.id))
+    seeded_db.flush()
+    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
+    assert inventory.sync_inventory_notifications_for_user(seeded_db, user) == 1
+    def notified():
+        return {item.entity_id for item in seeded_db.scalars(select(Notification).where(Notification.recipient_user_id == 1, Notification.notification_type == "INVENTORY_AGING")).all()}
+    assert notified() == {entries[0]}
+    setting.options = [{"value": "inventory_aging_days", "label": "6"}]
+    seeded_db.flush()
+    assert inventory.sync_inventory_notifications_for_user(seeded_db, user) == 2
+    assert notified() == {entries[0], entries[1], entries[2]}
+    assert inventory.sync_inventory_notifications_for_user(seeded_db, user) == 0
 
 
 def test_inventory_sync_batches_numbers_and_is_idempotent(seeded_db):

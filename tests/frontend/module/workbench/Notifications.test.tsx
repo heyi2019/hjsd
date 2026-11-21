@@ -14,6 +14,7 @@ import { reportsApi } from "@/shared/api/reports.api";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { workbenchSummary } from "@fixtures/api-responses";
+import { useSession } from "@/shared/state/session";
 
 vi.mock("@/business/OrderDetailView/OrderDetail", () => ({ OrderDetail: ({ contextOrderId, onPartyClick }: { contextOrderId: number; onPartyClick?: (party: { entityType: "customer" | "counterparty"; id: number }) => void }) => <div>台账订单详情 {contextOrderId}<button onClick={() => onPartyClick?.({ entityType: "customer", id: 7 })}>客户详情</button><button onClick={() => onPartyClick?.({ entityType: "counterparty", id: 8 })}>合作方详情</button></div> }));
 vi.mock("@/shared/api/cashflows.api");
@@ -42,6 +43,44 @@ beforeEach(() => {
 });
 
 describe("工作台消息", () => {
+it("切换分类后旧分类的迟到消息不会混入当前列表", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof notificationsApi.list>>) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof notificationsApi.list>>>((resolve) => { finishOld = resolve; });
+    vi.mocked(notificationsApi.list)
+      .mockReturnValueOnce(oldRequest)
+      .mockResolvedValue({ items: [{ id: 2, title: "售出", message: "当前分类消息", entity_type: "other", entity_id: "2", read_at: null }], next_cursor: null });
+
+    renderLight(<Notifications />, { user: "admin" });
+    await waitFor(() => expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ category: "latest" })));
+    fireEvent.click(screen.getByRole("tab", { name: "售出消息" }));
+    expect(await screen.findByRole("button", { name: /当前分类消息/ })).toBeInTheDocument();
+
+    await act(async () => { finishOld({ items: [{ id: 1, title: "旧消息", message: "旧分类消息", entity_type: "other", entity_id: "1", read_at: null }], next_cursor: null }); await oldRequest; });
+    expect(screen.getByRole("button", { name: /当前分类消息/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /旧分类消息/ })).not.toBeInTheDocument();
+  });
+
+it("切换用户后旧用户的迟到消息不会混入当前列表", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof notificationsApi.list>>) => void;
+    const oldRequest = new Promise<Awaited<ReturnType<typeof notificationsApi.list>>>((resolve) => { finishOld = resolve; });
+    vi.mocked(notificationsApi.list)
+      .mockReturnValueOnce(oldRequest)
+      .mockResolvedValue({ items: [{ id: 2, title: "提醒", message: "新用户消息", entity_type: "other", entity_id: "2", read_at: null }], next_cursor: null });
+    function UserSwitcher() {
+      const { switchUser } = useSession();
+      return <button onClick={() => switchUser("operator")}>切换用户</button>;
+    }
+
+    renderLight(<><UserSwitcher /><Notifications /></>, { user: "admin" });
+    await waitFor(() => expect(notificationsApi.list).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "切换用户" }));
+    expect(await screen.findByRole("button", { name: /新用户消息/ })).toBeInTheDocument();
+
+    await act(async () => { finishOld({ items: [{ id: 1, title: "提醒", message: "旧用户消息", entity_type: "other", entity_id: "1", read_at: null }], next_cursor: null }); await oldRequest; });
+    expect(screen.getByRole("button", { name: /新用户消息/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /旧用户消息/ })).not.toBeInTheDocument();
+  });
+
 it("离开工作台时关闭已打开的消息弹窗", async () => {
     vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "提醒详情", message: "消息内容", entity_type: "other", entity_id: "1", read_at: "2026-11-21" }], next_cursor: null });
     const view = renderLight(<Notifications active />, { user: "admin" });

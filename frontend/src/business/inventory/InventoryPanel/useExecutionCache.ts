@@ -70,7 +70,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     accountLoadingByOrder.current[orderId] = row.id;
     setExecutionLoading((current) => ({ ...current, [row.id]: true }));
     try {
-      const detail = await ordersApi.executionDetail(orderId, { imagePreviews: true });
+      const detail = await ordersApi.executionDetail(orderId, { imagePreviews: true, ...(force ? { fresh: true } : {}) });
       if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(row.id, accountVersion)) return;
       setExecutionDetails((current) => ({ ...current, [row.id]: detail }));
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));
@@ -92,7 +92,7 @@ export function useExecutionCache({ setRows, setError, locallyRemovedIdsRef }: {
     orderLoadingTokens.current[orderId] = token;
     setOrderExecutionLoading((current) => ({ ...current, [orderId]: true }));
     try {
-      const detail = await ordersApi.executionDetail(orderId, { imagePreviews: true });
+      const detail = await ordersApi.executionDetail(orderId, { imagePreviews: true, ...(force ? { fresh: true } : {}) });
       if (!orderVersions.isCurrent(orderId, version) || !accountVersions.isCurrent(detail.account.id, accountSnapshot.get(detail.account.id) ?? 0)) return null;
       orderAccountIds.current[orderId] = detail.account.id;
       setOrderExecutionDetails((current) => ({ ...current, [orderId]: detail }));

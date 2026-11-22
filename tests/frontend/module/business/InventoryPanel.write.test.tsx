@@ -806,6 +806,7 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(screen.getByRole("button", { name: "资金收支" }));
     await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledTimes(1));
     await ui.click(screen.getByRole("button", { name: "刷新" }));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(21, { imagePreviews: true, fresh: true }));
     await waitFor(() => expect(screen.getByTestId("cached-amount")).toHaveTextContent("250.00"));
     await act(async () => {
       if (pending === "订单详情") finishDetail(detail("100.00"));

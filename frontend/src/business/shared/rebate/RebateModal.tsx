@@ -19,7 +19,7 @@ import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmpl
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { InventoryAccountSummary } from "../inventory/InventoryAccountSummary";
-import "./rebate-modal.css";
+import "./RebateModal.css";
 import { indexEmployeeNames } from "../employee-names";
 
 type RebateKind = "BUY" | "SELL";

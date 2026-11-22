@@ -22,7 +22,7 @@ import { SaleFinanceCard } from "./SaleFinanceCard";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { compareMoney } from "../../../shared/lib/money";
-import "./sale-modal.css";
+import "./SaleModal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
 

@@ -17,7 +17,6 @@ from app.shared.order_amounts import order_profit_flow_by_order
 from app.business.inventory.profile import get_account
 from app.business.inventory.router_output import _account_outputs
 from app.business.inventory.schemas import AccountOut
-from app.business.orders.router_outputs._shared import cancellable_by_event
 from .execution_schemas import AccountAuditOut, AccountExecutionDetailOut
 
 from .assembler import build_order_outputs
@@ -160,11 +159,6 @@ def load_order_execution_details_for_export(
             ids = [order.id for order in visible]
             relations = load_relations(db, visible)
             context = load_event_context(db, ids)
-            # 每笔订单独立计算冲销余额，与逐单读取一致。
-            for order_events in context.events_by_order.values():
-                amounts = cancellable_by_event(order_events)
-                for event in order_events:
-                    event.cancellable_amount = amounts[event.id]
             account_outputs = {
                 account.id: output for account, output in zip(
                     accounts, _account_outputs(db, accounts, user, loaded_orders=visible), strict=True,

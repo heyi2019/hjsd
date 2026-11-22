@@ -495,7 +495,7 @@ def test_stocks_export_has_no_total_limit(seeded_client, headers, monkeypatch):
         seen.update(kwargs)
         return original(db, **kwargs)
 
-    monkeypatch.setattr("app.business.inventory.router.stocks_list_accounts", spy)
+    monkeypatch.setattr("app.business.inventory.router.query_inventory_accounts", spy)
     resp = seeded_client.get("/api/stocks/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
     assert "limit" in seen and seen["limit"] is None

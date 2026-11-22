@@ -20,10 +20,10 @@ from app.domain.enums import AuditAction
 from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.business.inventory.inventory import (
-    inventory_ledger as stocks_inventory_ledger,
-    list_accounts as stocks_list_accounts,
+    inventory_ledger as query_inventory_ledger,
+    list_accounts as query_inventory_accounts,
 )
-from app.business.inventory.deletion import delete_inventory as stocks_delete_inventory
+from app.business.inventory.deletion import delete_inventory as delete_inventory_record
 from app.business.inventory.export import build_inventory_ledger_csv
 from app.shared.audit import record_audit
 from app.core.errors import PermissionDenied
@@ -51,7 +51,7 @@ def export_accounts_csv(
     _user: CurrentUser = read_access,
 ) -> Response:
     """库存中心按可见列导出 CSV，沿用 /stocks 的权限口径。"""
-    accounts = stocks_list_accounts(
+    accounts = query_inventory_accounts(
         db, status=status, user=_user, limit=None, offset=0
     )
     outputs = _account_outputs(
@@ -106,7 +106,7 @@ def delete_inventory(
     全部物理删除，库存快照与原因写入审计日志，操作不可恢复。
     """
     _require_admin(user)
-    stocks_delete_inventory(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
+    delete_inventory_record(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
     return Response(status_code=204)
 
 
@@ -128,7 +128,7 @@ def inventory_ledger(
     user: CurrentUser = read_access,
 ) -> InventoryLedgerOut:
     """库存台账服务端筛选与分页；响应只包含当前页明细和后端汇总。"""
-    result = stocks_inventory_ledger(
+    result = query_inventory_ledger(
         db, business_mode=business_mode, inventory_type=inventory_type,
         game_type=game_type, keyword=keyword, date_from=date_from,
         date_to=date_to, inventory_operator_ids=inventory_operator_ids,
@@ -163,7 +163,7 @@ def export_inventory_ledger_csv(
     user: CurrentUser = read_access,
 ) -> Response:
     """按库存中心当前筛选口径导出；明细读取与 CSV 拼装不再由浏览器承担。"""
-    result = stocks_inventory_ledger(
+    result = query_inventory_ledger(
         db,
         business_mode=business_mode,
         inventory_type=inventory_type,

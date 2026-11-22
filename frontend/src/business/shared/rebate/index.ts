@@ -1,1 +1,1 @@
-export { InventoryRebateModal } from "./rebate-modal";
+export { InventoryRebateModal } from "./RebateModal";

@@ -419,7 +419,7 @@ def test_available_actions_match_business_rules():
     """后端纯函数按合约状态和处置记录生成可执行动作。"""
     from app.business.installments import action_availability as av
 
-    def legacy_inst(status, disps):
+    def expected_actions(status, disps):
         acts = []
         if status not in {"SETTLED", "DELIVERED", "CLOSED", "CANCELLED"}:
             acts.append("pay")
@@ -436,7 +436,7 @@ def test_available_actions_match_business_rules():
 
     for status in InstallmentStatus:
         for disps in ([], ["RECOVER"], ["RESELL"], ["RECOVER", "RESELL"]):
-            assert av.available_installment_actions(status.value, disps) == legacy_inst(status.value, disps)
+            assert av.available_installment_actions(status.value, disps) == expected_actions(status.value, disps)
     for status in ScheduleStatus:
         expected = [] if status in {ScheduleStatus.PAID, ScheduleStatus.WAIVED} else ["waive", "extend"]
         assert av.available_schedule_actions(status.value) == expected

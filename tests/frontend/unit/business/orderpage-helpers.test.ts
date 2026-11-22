@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildAllocationOptionGroups, pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators } from "@/business/orders/helpers";
+import { pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators } from "@/business/orders/helpers";
+import { buildAllocationOptionGroups } from "@/business/profit_allocation/allocationHelpers";
 import { indexEmployeeNames } from "@/business/shared/employee-names";
 
 describe("订单台账冲销 helpers", () => {

@@ -1,4 +1,4 @@
-import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/business/orders/helpers";
+import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/business/profit_allocation/allocationHelpers";
 import { describe, expect, it, vi } from "vitest";
 import { INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL } from "@/business/shared/inventory/inventory-logic";
 import { applyOffsetEventSelection } from "@/business/shared/cancellation/InventoryCancellationDialog";

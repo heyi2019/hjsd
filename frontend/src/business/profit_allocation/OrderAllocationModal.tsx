@@ -26,7 +26,7 @@ import {
   type ActionAllocationCandidates,
   type AllocationFormRow,
   type AllocationType,
-} from "../orders/helpers";
+} from "./allocationHelpers";
 
 type AllocationController = Pick<OrdersPageController,
   | "actionOrder"

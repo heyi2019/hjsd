@@ -22,7 +22,7 @@ import {
   buildActionAllocationRows,
   type ActionAllocationCandidates,
   type AllocationFormRow,
-} from "./helpers";
+} from "../profit_allocation/allocationHelpers";
 
 /** 由主 controller 注入的跨域共享枢纽；子 hook 不自行持有这些状态。 */
 interface OrderActionModalsDeps {

@@ -1,7 +1,7 @@
+import { buildActionAllocationRows } from "@/business/profit_allocation/allocationHelpers";
 import { describe, expect, it } from "vitest";
 import type { Order } from "@/shared/api/types/orders";
 import {
-  buildActionAllocationRows,
   filterBusinessOrders,
   formatOrderAmount,
 } from "@/business/orders/helpers";

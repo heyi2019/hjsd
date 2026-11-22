@@ -22,6 +22,17 @@ manage_access = require_permissions(PERM_POLICY_MANAGE)
 read_access = require_permissions(PERM_ORDER_CREATE)
 
 
+def _allocation_response(view: dict) -> schemas.ProfitAllocationListOut:
+    return schemas.ProfitAllocationListOut(
+        items=[schemas.ProfitAllocationOut.model_validate(item) for item in view["items"]],
+        total=view["total"],
+        order_profit=view["order_profit"],
+        company_rate=view["company_rate"],
+        allocatable_profit=view["allocatable_profit"],
+        totals_by_type=view["totals_by_type"],
+    )
+
+
 @router.get("/profit-allocation/company-settings", response_model=schemas.CompanyProfitSettingsOut)
 def get_company_profit_settings(db: Annotated[Session, Depends(get_db)], user: CurrentUser = manage_access) -> schemas.CompanyProfitSettingsOut:
     del user
@@ -42,14 +53,7 @@ def list_allocations(
     user: CurrentUser = read_access,
 ) -> schemas.ProfitAllocationListOut:
     view = service.get_allocations_view(db, order_id, user=user)
-    return schemas.ProfitAllocationListOut(
-        items=[schemas.ProfitAllocationOut.model_validate(item) for item in view["items"]],
-        total=view["total"],
-        order_profit=view["order_profit"],
-        company_rate=view["company_rate"],
-        allocatable_profit=view["allocatable_profit"],
-        totals_by_type=view["totals_by_type"],
-    )
+    return _allocation_response(view)
 
 
 @router.post(
@@ -88,14 +92,7 @@ def set_allocations(
         user=user,
     )
     view = service.get_allocations_view(db, order_id, user=user)
-    return schemas.ProfitAllocationListOut(
-        items=[schemas.ProfitAllocationOut.model_validate(item) for item in view["items"]],
-        total=view["total"],
-        order_profit=view["order_profit"],
-        company_rate=view["company_rate"],
-        allocatable_profit=view["allocatable_profit"],
-        totals_by_type=view["totals_by_type"],
-    )
+    return _allocation_response(view)
 
 
 __all__ = ["router"]

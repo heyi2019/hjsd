@@ -15,8 +15,6 @@
 - action.py      按动作分润写路径
 - listing.py     查询与按动作汇总（读路径）
 
-2026-11-18 从 718 行单文件按职责拆分；包级 __init__ 不再重导出符号，
-调用方直连本服务或上述真实模块。
 """
 from __future__ import annotations
 

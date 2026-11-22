@@ -28,9 +28,15 @@ COPY backend/requirements.lock.txt .
 # pypi 用阿里云镜像：ECS 直连 pypi.org 实测 ~15kB/s 不可用。
 # 装到标准位置（不 --target）：控制台脚本 alembic/uvicorn 落在 /usr/local/bin，稍后随运行层带走。
 # strip .so 去符号表；删 __pycache__/*.pyc 去掉 pip compileall 生成的字节码水分。
+# 删 AVIF 支持（Pillow 捆绑 libavif 5MB）：本项目只用 Pillow 预览表格里的 png/jpeg，
+# 从不产出/消费 AVIF；musllinux wheel 捆绑的全套编解码器里 AVIF 是最大单块水分。
+# 删 _avif.so + AvifImagePlugin.py + pillow.libs/libavif.so 后，JPEG/PNG/WebP/GIF 等全部保留。
 RUN pip install --no-cache-dir --break-system-packages \
         -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.lock.txt \
     && find /usr/local/lib/python3.12/site-packages -type f \( -name '*.so' -o -name '*.so.*' \) -exec strip --strip-unneeded {} + 2>/dev/null \
+    && rm -f /usr/local/lib/python3.12/site-packages/PIL/_avif*.so \
+             /usr/local/lib/python3.12/site-packages/PIL/AvifImagePlugin.py \
+             /usr/local/lib/python3.12/site-packages/pillow.libs/libavif*.so.* \
     && find /usr/local/lib/python3.12/site-packages -type d -name __pycache__ -prune -exec rm -rf {} + \
     && find /usr/local/lib/python3.12/site-packages -name '*.pyc' -delete \
     && pip uninstall -y --break-system-packages pip \

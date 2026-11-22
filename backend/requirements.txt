@@ -8,7 +8,7 @@ anyio==4.14.0
 # 代价：高并发下事件循环从 uvloop 退为 asyncio 默认、HTTP 解析退为纯 Python；内部 ERP 并发低可接受。
 # 启动命令勿加 --loop uvloop / --http httptools（当前未用，保持默认即可）。
 uvicorn==0.30.6
-sqlalchemy==2.0.35
+sqlalchemy==2.1.9
 redis==5.2.1
 alembic>=1.13.0
 psycopg[binary]>=3.2.0

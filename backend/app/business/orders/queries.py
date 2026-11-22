@@ -107,7 +107,7 @@ def order_customer_ids(
         session=session,
     ).with_only_columns(Order.id, maintain_column_froms=True).subquery()
     return (
-        select(OrderCustomerRole.customer_id.distinct())
+        select(OrderCustomerRole.customer_id).distinct()
         .select_from(OrderCustomerRole)
         .join(order_stmt, order_stmt.c.id == OrderCustomerRole.order_id)
     )

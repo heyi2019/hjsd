@@ -118,9 +118,11 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         for item in db.execute(
             select(Installment.order_id, Installment.principal, Installment.paid_amount,
                    Installment.periods, Installment.status, Installment.created_at)
-            .where(Installment.order_id.in_(order_ids))
-            .distinct(Installment.order_id)
-            .order_by(Installment.order_id, Installment.id.desc())
+            .where(Installment.id.in_(
+                select(func.max(Installment.id))
+                .where(Installment.order_id.in_(order_ids))
+                .group_by(Installment.order_id)
+            ))
         ).all()
     } if order_ids else {}
 

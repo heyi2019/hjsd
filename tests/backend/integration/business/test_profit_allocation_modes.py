@@ -24,8 +24,8 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Order
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.funds.profit_allocation import service as policy_allocations
-from app.funds.profit_allocation.terms import allocation_terms, convert_action_allocation
+from app.business.profit_allocation import service as policy_allocations
+from app.business.profit_allocation.terms import allocation_terms, convert_action_allocation
 from app.operations.r3_commission import r3_commission_reconciliation
 
 D = date(2026, 10, 17)

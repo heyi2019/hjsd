@@ -9,8 +9,8 @@ from app.business.inventory._common import scope_filter as account_scope_filter
 from app.core.security import CurrentUser
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order
-from app.funds.profit_allocation.company_settings import get_company_settings
-from app.funds.profit_allocation.terms import allocatable_profit_for, company_rate_for_order
+from app.business.profit_allocation.company_settings import get_company_settings
+from app.business.profit_allocation.terms import allocatable_profit_for, company_rate_for_order
 from app.shared.scope import owner_scope_filter
 from .schemas import ProfitNotificationDetailOut
 

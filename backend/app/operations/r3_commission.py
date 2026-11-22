@@ -19,9 +19,9 @@ from app.domain.trade import (
 from app.domain.users import User
 
 from app.core.money import to_money_or_zero
-from app.funds.profit_allocation.calculation import effective_distribution
-from app.funds.profit_allocation.company_settings import get_company_settings
-from app.funds.profit_allocation.terms import company_rate_for_order
+from app.business.profit_allocation.calculation import effective_distribution
+from app.business.profit_allocation.company_settings import get_company_settings
+from app.business.profit_allocation.terms import company_rate_for_order
 from ._shared import (
     ZERO,
     _apply_order_scope,

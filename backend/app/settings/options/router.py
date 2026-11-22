@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.errors import AppError, ErrorCode, Validation
 from app.shared.business_period import PERIOD_CONFIG_CODE
-from app.funds.profit_allocation.company_settings import COMPANY_PROFIT_CODE
+from app.business.profit_allocation.company_settings import COMPANY_PROFIT_CODE
 from app.core.security import (
     PERM_OPTION_SET_MANAGE,
     CurrentUser,

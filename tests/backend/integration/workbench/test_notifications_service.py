@@ -22,7 +22,7 @@ from app.workbench.notifications import triggers
 from app.workbench.notifications import service as notification_service
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.funds.profit_allocation import service as policy_allocations
+from app.business.profit_allocation import service as policy_allocations
 
 
 def _make_unread(seeded_db, **kwargs):

@@ -10,7 +10,7 @@
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
 #   L3  业务域     与前端 6 导航 key 一一对应：workbench（含 notifications）/ business（含
-#                  inventory、installments）/ customers / funds（含 profit_allocation）/
+#                  inventory、installments、profit_allocation）/ customers / funds /
 #                  operations / settings（含 field_definitions、options、lists、auth、
 #                  audit、attachments）。依赖 L0+L1+L2。
 #

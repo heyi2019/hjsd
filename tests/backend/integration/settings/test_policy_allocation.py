@@ -15,8 +15,8 @@ from app.core.money import to_money
 from app.domain.trade import OrderEvent, OrderProfitAllocation
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.funds.profit_allocation import service as policy_allocations
-from app.funds.profit_allocation.listing import list_allocations
+from app.business.profit_allocation import service as policy_allocations
+from app.business.profit_allocation.listing import list_allocations
 
 
 

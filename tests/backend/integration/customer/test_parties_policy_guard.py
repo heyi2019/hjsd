@@ -25,7 +25,7 @@ from app.customers.customer_detail import get_customer_activity_summary
 from app.customers.customer_merge import merge_customers
 from app.customers.customers import create_customer
 from app.customers.leads import close_lead, convert_lead, create_lead, get_lead, list_leads, update_lead
-from app.funds.profit_allocation import service as policy_allocations
+from app.business.profit_allocation import service as policy_allocations
 
 
 # ───────────────────────────── 共用辅助 ─────────────────────────────

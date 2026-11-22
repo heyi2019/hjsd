@@ -37,7 +37,7 @@ from app.shared.order_amounts import (
 )
 from app.operations._shared import cashflow_totals_by_order
 from app.business.orders.router_outputs.list_payload import _order_list_payload
-from app.funds.profit_allocation import service as policy_allocations
+from app.business.profit_allocation import service as policy_allocations
 from app.operations.profit import order_profit_detail
 from app.operations.r2_monthly_pnl import r2_monthly_pnl
 from app.operations.r3_commission import r3_commission_reconciliation
@@ -282,7 +282,7 @@ def test_company_rate_settings_recalculate_existing_order_without_rewriting_allo
     assert {row["user_id"]: row["profit_base"] for row in group["orders"]} == amounts
 
     # 亏损和固定金额按原金额占比计算，分配尾差到分。
-    from app.funds.profit_allocation.calculation import effective_distribution
+    from app.business.profit_allocation.calculation import effective_distribution
     fixed = [OrderProfitAllocation(id=10, order_id=999, user_id=1, role="OWNER", allocation_amount=Decimal("-20"), allocation_rate=0),
              OrderProfitAllocation(id=11, order_id=999, user_id=2, role="OWNER", allocation_amount=Decimal("-10"), allocation_rate=0)]
     _, effective, _ = effective_distribution(fixed, Decimal("-100.01"), Decimal("50"))

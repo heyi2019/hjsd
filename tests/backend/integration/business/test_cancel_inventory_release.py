@@ -138,7 +138,7 @@ def test_dg_platform_offsale_keeps_account_in_stock(seeded_db):
 
 @pytest.mark.parametrize("order_type", ["HS", "TH"])
 def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_type):
-    from app.funds.profit_allocation.service import set_allocations
+    from app.business.profit_allocation.service import set_allocations
     from app.operations.r3_commission import r3_commission_reconciliation
 
     snapshot = {**_snapshot(f"cancel-sale-{order_type}"), "bound_phone": "13700000001"}
@@ -185,7 +185,7 @@ def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_typ
 
 @pytest.mark.parametrize("order_type", ["HS", "TH"])
 def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded_db, headers, order_type):
-    from app.funds.profit_allocation.service import set_allocations
+    from app.business.profit_allocation.service import set_allocations
     from app.operations.r3_commission import r3_commission_reconciliation
     from app.shared.order_amounts import order_cashflow_profit_by_order
     order = create_order(seeded_db, order_type=order_type, trade_date=D, actor="pytest", account_snapshot=_snapshot(f"partial-sale-{order_type}"))

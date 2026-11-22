@@ -23,7 +23,7 @@ from app.core.schemas import EngineInfoOut, HealthOut
 from app.settings.field_definitions.router import router as foundation_router
 from app.business.inventory.router import router as stocks_router
 from app.settings.audit.router import router as audit_router
-from app.funds.profit_allocation.router import router as profit_allocation_router
+from app.business.profit_allocation.router import router as profit_allocation_router
 from app.workbench.notifications.router import router as notifications_router
 from app.operations.router import router as reporting_router
 from app.funds.router import router as finance_router

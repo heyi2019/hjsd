@@ -33,7 +33,7 @@ from app.shared.form_field_rules import validate_form_extra
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
 from app.domain.notifications import Notification
-from app.funds.profit_allocation.schemas import ProfitAllocationItem
+from app.business.profit_allocation.schemas import ProfitAllocationItem
 
 from ._shared import _scoped_order
 from .company_settings import get_company_settings

@@ -12,7 +12,7 @@ from app.business.orders.events import post_event
 from app.domain.notifications import Notification
 from app.domain.options import OptionSet
 from app.domain.users import User
-from app.funds.profit_allocation.service import set_allocations
+from app.business.profit_allocation.service import set_allocations
 from app.workbench.notifications.service import PROFIT_ALLOCATED, PROFIT_PENDING
 from app.workbench.reminder_config import REMINDER_CODE
 

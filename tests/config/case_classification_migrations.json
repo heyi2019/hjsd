@@ -122,5 +122,35 @@
     "previous_nodeid": "tests/backend/unit/settings/test_product_alias_compat.py::test_product_contract_uses_canonical_account_fields_only",
     "old_id": "UT-F04-003",
     "new_id": "UT-F04-003"
+  },
+  {
+    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定",
+    "old_id": "IT-B05-020",
+    "new_id": "IT-B10-049"
+  },
+  {
+    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::分润候选按动作预分组并保留员工原顺序和禁用状态",
+    "old_id": "IT-SYS12-200",
+    "new_id": "IT-B10-050"
+  },
+  {
+    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::分润售出优先使用交付负责人，缺失时才回退售出事件操作人或当前人",
+    "old_id": "IT-B05-032",
+    "new_id": "IT-B10-051"
+  },
+  {
+    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账执行人与存量一致时合并为一行；台账换人后份额并入合计，候选为空时保留存量人员",
+    "old_id": "IT-B01-365",
+    "new_id": "IT-B10-052"
+  },
+  {
+    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账新增执行人后保留动作合计，均分由后端处理",
+    "old_id": "IT-B01-408",
+    "new_id": "IT-B10-053"
+  },
+  {
+    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账给买号新增执行人时，已存分润联动均分（1 人 → 2 人）",
+    "old_id": "IT-B01-279",
+    "new_id": "IT-B10-054"
   }
 ]

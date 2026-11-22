@@ -24,6 +24,7 @@ export const fastTests = [
   "tests/frontend/unit/system/test-full-sharded-scheduling.test.ts",
   // 业务纯逻辑
   "tests/frontend/unit/business/inventory-logic.test.ts",
+  "tests/frontend/unit/business/ProfitAllocation.test.ts",
   "tests/frontend/unit/business/InventoryPanel-helpers.test.ts",
   "tests/frontend/unit/business/OrderDetailEditPayload.test.ts",
   "tests/frontend/unit/business/StocksApiRoutes.test.ts",

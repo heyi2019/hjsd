@@ -1,4 +1,3 @@
-import { buildActionAllocationCandidates, buildActionAllocationRows } from "@/business/profit_allocation/allocationHelpers";
 import { describe, expect, it, vi } from "vitest";
 import { INVENTORY_AGE_COLOR, INVENTORY_TYPE_LABEL } from "@/business/shared/inventory/inventory-logic";
 import { applyOffsetEventSelection } from "@/business/shared/cancellation/InventoryCancellationDialog";
@@ -17,38 +16,6 @@ describe("库存纯逻辑", () => {
     expect(Object.keys(INVENTORY_AGE_COLOR)).toHaveLength(3);
   });
 
-
-  it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {
-    const candidates = buildActionAllocationCandidates({
-      form_extra: {
-        business_responsible_ids: [11],
-        delivery_responsible_ids: [99],
-        sell_delivery_responsible_ids: [22],
-      },
-      events: [
-        { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "100" },
-        { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "200" },
-        { id: 3, event_no: "EV-3", order_id: 10, event_type: "OPERATE", operation_type: "DESCRIPTION", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "20" },
-      ],
-    });
-    const rows = buildActionAllocationRows([], candidates);
-
-    expect(candidates).toMatchObject({ BUY: [11], SELL: [22], OPERATION: [33], COMPANY: [] });
-    expect(rows.map((row) => row.employee_ids ?? row.employee)).toEqual([[11], [22], [33], "COMPANY"]);
-    expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
-  });
-
-  it("分润售出优先使用交付负责人，缺失时才回退售出事件操作人或当前人", () => {
-    expect(buildActionAllocationCandidates({
-      form_extra: { delivery_responsible_ids: [99], sell_delivery_responsible_ids: [22] },
-      events: [{ id: 1, event_no: "EV-1", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [44], cancellable_amount: "200" }],
-    })).toMatchObject({ SELL: [22] });
-    expect(buildActionAllocationCandidates({
-      form_extra: {},
-      events: [{ id: 1, event_no: "EV-1", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [44], cancellable_amount: "200" }],
-    })).toMatchObject({ SELL: [44] });
-    expect(buildActionAllocationCandidates({ form_extra: {}, events: [] }, 55)).toMatchObject({ SELL: [55] });
-  });
 
   // —— #19 切换冲销流水的字段回填（金额 / 资金账户 / 操作人重置）——
   it("切换冲销流水：金额与资金账户跟随新流水，操作人重置为默认值", () => {

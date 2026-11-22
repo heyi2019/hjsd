@@ -300,6 +300,7 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "OrderDetail.test.tsx":                "B04",
     "StocksApiRoutes.test.ts":             "B04",
     "inventory-logic.test.ts":             "B05",
+    "ProfitAllocation.test.ts":             "B10",
     "RecoveryFeeSection.test.tsx":         "B06",
     "findCancelable.test.ts":              "B06",
     "sale-plan.test.ts":                   "B06",

@@ -65,9 +65,9 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 93,
+        "files": 94,
         "layers": {
-          "fast": 27,
+          "fast": 28,
           "quick": 9,
           "react": 45,
           "deep": 12
@@ -81,7 +81,7 @@
         "byArea": {
           "unit": {
             "workbench": 1,
-            "business": 9,
+            "business": 10,
             "settings": 1,
             "shared": 12,
             "system": 5

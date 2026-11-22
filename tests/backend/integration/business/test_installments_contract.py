@@ -425,7 +425,7 @@ def test_available_actions_match_business_rules():
             acts.append("pay")
         if status == "SETTLED":
             acts.append("deliver")
-        has_rec, has_resell = "RECOVER" in disps, "RESELL" in disps
+        has_rec = "RECOVER" in disps
         if status in {"OVERDUE", "DEFAULTED"} and not has_rec:
             acts.append("recover")
         if status in {"PENDING", "ACTIVE", "OVERDUE"}:

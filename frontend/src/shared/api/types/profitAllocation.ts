@@ -26,4 +26,5 @@ export interface ProfitAllocationList {
   company_rate: string;
   allocatable_profit: string;
   totals_by_type: Partial<Record<ProfitAllocationType, ProfitAllocationTypeTotal>>;
+  action_candidates: Record<ProfitAllocationType, number[]>;
 }

@@ -1,17 +1,15 @@
 import { Form } from "antd";
 import { useState } from "react";
-import { useSession } from "../../shared/state/session";
-import { currentDevUser, normalizeError } from "../../shared/api/client";
+import { normalizeError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
 import { employeesApi } from "../../shared/api/org.api";
 import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import type { Order } from "../../shared/api/types/orders";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { buildActionAllocationCandidates, buildActionAllocationRows, type ActionAllocationCandidates, type AllocationFormRow } from "./allocationHelpers";
+import { buildActionAllocationRows, type ActionAllocationCandidates, type AllocationFormRow } from "./allocationHelpers";
 
 export function useProfitAllocation(selectedOrder: Order | null, actionRequest: LatestRequest) {
-  const { username } = useSession();
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationForm] = Form.useForm();
   /** 扣除公司配置比例后的可分配利润，负数表示可分配的亏损分担额。 */
@@ -42,15 +40,12 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
         employeesApi.list(),
       ]);
       if (!actionRequest.isCurrent(session)) return;
-      if (typeof result.order_profit !== "string" || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type) {
+      if (typeof result.order_profit !== "string" || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type || !result.action_candidates
+        || !(["BUY", "SELL", "OPERATION", "COMPANY"] as const).every((key) => Array.isArray(result.action_candidates[key]))) {
         appMessage.error("分润数据不完整，请刷新后重试");
         return;
       }
-      const currentEmployee = userResult.find((item) => item.is_active && item.username === username)
-        ?? (import.meta.env.DEV
-          ? userResult.find((item) => item.is_active && item.username === currentDevUser())
-          : undefined);
-      const candidates = buildActionAllocationCandidates(order, currentEmployee?.id);
+      const candidates = result.action_candidates;
       const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates, result.totals_by_type);
       const companyRow = rows.find((row) => row.allocation_type === "COMPANY");
       if (companyRow) {

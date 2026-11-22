@@ -114,6 +114,32 @@ def test_allocation_view_returns_grouped_rates_for_display(seeded_db, buy, sell,
     assert view["totals_by_type"]["SELL"]["allocation_rate"] == Decimal(sell_rate)
 
 
+def test_allocation_candidates_follow_order_responsibles_and_events(seeded_db, seeded_client, headers):
+    from app.core.security import CurrentUser
+    from app.domain.trade import OrderEvent
+
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    buy = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "BUY"))
+    sell = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL"))
+    buy.operator_user_ids = [2, 2]
+    sell.operator_user_ids = [2]
+    order.form_extra = {"business_responsible_ids": [1, 1], "sell_delivery_responsible_ids": [1]}
+    seeded_db.flush()
+    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
+    candidates = policy_allocations.get_allocations_view(seeded_db, order_id, user=user)["action_candidates"]
+    assert candidates == {"BUY": [1], "SELL": [1], "OPERATION": [1], "COMPANY": []}
+    response = seeded_client.get(f"/api/orders/{order_id}/profit-allocations", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["action_candidates"] == candidates
+    order.form_extra = {}
+    candidates = policy_allocations.get_allocations_view(seeded_db, order_id, user=user)["action_candidates"]
+    assert candidates == {"BUY": [2], "SELL": [2], "OPERATION": [], "COMPANY": []}
+    sell.operator_user_ids = []
+    seeded_db.flush()
+    assert policy_allocations.get_allocations_view(seeded_db, order_id, user=user)["action_candidates"]["SELL"] == [1]
+
+
 def test_grouped_allocation_derives_responsible_ids_on_server(seeded_db):
     order_id = _order_with_profit(seeded_db)
     order = seeded_db.get(Order, order_id)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildActionAllocationCandidates, buildActionAllocationRows, buildAllocationOptionGroups } from "@/business/profit_allocation/allocationHelpers";
+import { buildActionAllocationRows, buildAllocationOptionGroups } from "@/business/profit_allocation/allocationHelpers";
 
 describe("分润配置纯逻辑", () => {
   it("台账给买号新增执行人时，已存分润联动均分（1 人 → 2 人）", () => {
@@ -86,38 +86,6 @@ describe("分润配置纯逻辑", () => {
       expect.objectContaining({ employee_ids: [1], allocation_amount: "30.00" }),
     ]);
   });
-  it("P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定", () => {
-    const candidates = buildActionAllocationCandidates({
-      form_extra: {
-        business_responsible_ids: [11],
-        delivery_responsible_ids: [99],
-        sell_delivery_responsible_ids: [22],
-      },
-      events: [
-        { id: 1, event_no: "EV-1", order_id: 10, event_type: "BUY", amount: "100", occurred_on: "2026-10-01", is_posted: true, operator_user_ids: [], cancellable_amount: "100" },
-        { id: 2, event_no: "EV-2", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [], cancellable_amount: "200" },
-        { id: 3, event_no: "EV-3", order_id: 10, event_type: "OPERATE", operation_type: "DESCRIPTION", amount: "20", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [33], cancellable_amount: "20" },
-      ],
-    });
-    const rows = buildActionAllocationRows([], candidates);
-
-    expect(candidates).toMatchObject({ BUY: [11], SELL: [22], OPERATION: [33], COMPANY: [] });
-    expect(rows.map((row) => row.employee_ids ?? row.employee)).toEqual([[11], [22], [33], "COMPANY"]);
-    expect(rows.map((row) => row.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
-  });
-
-  it("分润售出优先使用交付负责人，缺失时才回退售出事件操作人或当前人", () => {
-    expect(buildActionAllocationCandidates({
-      form_extra: { delivery_responsible_ids: [99], sell_delivery_responsible_ids: [22] },
-      events: [{ id: 1, event_no: "EV-1", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [44], cancellable_amount: "200" }],
-    })).toMatchObject({ SELL: [22] });
-    expect(buildActionAllocationCandidates({
-      form_extra: {},
-      events: [{ id: 1, event_no: "EV-1", order_id: 10, event_type: "SELL", amount: "200", occurred_on: "2026-10-02", is_posted: true, operator_user_ids: [44], cancellable_amount: "200" }],
-    })).toMatchObject({ SELL: [44] });
-    expect(buildActionAllocationCandidates({ form_extra: {}, events: [] }, 55)).toMatchObject({ SELL: [55] });
-  });
-
   it("分润候选按动作预分组并保留员工原顺序和禁用状态", () => {
     let reads = 0;
     const options = Array.from({ length: 200 }, (_, index) => ({

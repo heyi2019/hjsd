@@ -61,6 +61,13 @@ class ProfitAllocationTypeTotal(BaseModel):
     allocation_amount: Decimal = Decimal("0")
 
 
+class ActionCandidatesOut(BaseModel):
+    BUY: list[int]
+    SELL: list[int]
+    OPERATION: list[int]
+    COMPANY: list[int]
+
+
 class ProfitAllocationListOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -70,6 +77,7 @@ class ProfitAllocationListOut(BaseModel):
     company_rate: Decimal
     allocatable_profit: Decimal
     totals_by_type: dict[str, ProfitAllocationTypeTotal]
+    action_candidates: ActionCandidatesOut
 
 
 __all__ = [

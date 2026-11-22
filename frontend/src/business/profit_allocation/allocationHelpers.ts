@@ -1,5 +1,3 @@
-import type { Order } from "../../shared/api/types/orders";
-
 export type AllocationType = "BUY" | "SELL" | "OPERATION" | "COMPANY";
 export const ALLOCATION_TYPES: readonly AllocationType[] = ["BUY", "SELL", "OPERATION", "COMPANY"];
 
@@ -50,39 +48,9 @@ function ids(value: unknown): number[] {
   return [...new Set(value.filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
 }
 
-/** 已过账事件里的操作人，可按事件类型过滤。 */
-function operatorIds(order: Pick<Order, "events">, eventTypes?: ReadonlySet<string>): number[] {
-  const matched = (order.events ?? []).filter(
-    (event) => event.is_posted && (!eventTypes || eventTypes.has(event.event_type)),
-  );
-  return ids(matched.flatMap((event) => event.operator_user_ids ?? []));
-}
-
-/** 依次取第一个非空来源，表达"首选 A、否则 B、再否则 C"的优先级。 */
+/** 依次取第一个非空人员列表。 */
 function firstNonEmpty(...sources: number[][]): number[] {
   return sources.find((source) => source.length > 0) ?? [];
-}
-
-/** 从订单事实提取四类动作操作人：建单操作人、卖出表单操作人和运营信息中的操作人。 */
-export function buildActionAllocationCandidates(
-  order: Pick<Order, "events" | "form_extra">,
-  defaultOperatorId?: number,
-): ActionAllocationCandidates {
-  const formExtra = order.form_extra ?? {};
-  // 运营事件类型 = 除 BUY/SELL/CANCEL 之外的已登记事件。
-  const operationTypes = new Set(
-    (order.events ?? [])
-      .map((event) => event.event_type)
-      .filter((eventType) => !["BUY", "SELL", "CANCEL"].includes(eventType)),
-  );
-  const sellIds = operatorIds(order, new Set(["SELL"]));
-  const operationEventIds = operatorIds(order, operationTypes);
-  return {
-    BUY: firstNonEmpty(ids(formExtra.business_responsible_ids), operatorIds(order, new Set(["BUY"]))),
-    SELL: firstNonEmpty(ids(formExtra.sell_delivery_responsible_ids), sellIds, defaultOperatorId ? [defaultOperatorId] : []),
-    OPERATION: firstNonEmpty(ids(formExtra.operation_responsible_ids), operationEventIds, ids(formExtra.business_responsible_ids)),
-    COMPANY: [],
-  };
 }
 
 /**

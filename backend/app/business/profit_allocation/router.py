@@ -30,6 +30,7 @@ def _allocation_response(view: dict) -> schemas.ProfitAllocationListOut:
         company_rate=view["company_rate"],
         allocatable_profit=view["allocatable_profit"],
         totals_by_type=view["totals_by_type"],
+        action_candidates=view["action_candidates"],
     )
 
 

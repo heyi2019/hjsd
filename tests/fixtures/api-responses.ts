@@ -102,6 +102,7 @@ export function profitAllocationResponse<T extends ProfitAllocation>(
     company_rate: "40.00",
     allocatable_profit: overrides.order_profit ?? "0.00",
     totals_by_type: {},
+    action_candidates: { BUY: [], SELL: [9], OPERATION: [], COMPANY: [] },
     ...overrides,
   };
 }

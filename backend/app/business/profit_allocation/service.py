@@ -36,6 +36,7 @@ from app.business.profit_allocation.schemas import ProfitAllocationItem
 from app.shared.order_access import get_order
 from .company_settings import get_company_settings
 from .calculation import effective_distribution
+from .candidates import allocation_candidates
 from app.domain.trade import OrderProfitAllocation
 from .action import set_action_allocations
 from .action_rows import expand_action_form_rows
@@ -177,7 +178,8 @@ def get_allocations_view(
             total["allocation_rate"] = (total["allocation_amount"] * Decimal("100") / terms["order_profit"]).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP,
             )
-    return {"items": items, "total": len(items), "totals_by_type": totals_by_type, **terms}
+    return {"items": items, "total": len(items), "totals_by_type": totals_by_type,
+            "action_candidates": allocation_candidates(session, order, user), **terms}
 
 
 def convert_value(

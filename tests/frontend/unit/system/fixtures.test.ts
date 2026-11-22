@@ -85,6 +85,7 @@ describe("测试夹具隔离", () => {
       company_rate: "40.00",
       allocatable_profit: "10.00",
       totals_by_type: {},
+      action_candidates: { BUY: [], SELL: [9], OPERATION: [], COMPANY: [] },
     });
     expect(inventoryLedgerResponse([{ id: 1 } as never])).toEqual({
       items: [{ id: 1 }],

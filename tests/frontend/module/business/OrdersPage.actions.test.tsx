@@ -734,7 +734,7 @@ describe("OrdersPage：操作与筛选分支", () => {
 
   it("分润：只展示可分配动作，公司比例由规则配置补入", async () => {
     // 空分润 → 只展示买号、售出、运营；公司 40% 隐藏并由规则配置自动补入。
-    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00" }));
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", allocatable_profit: "3000.00", company_rate: "40.00", action_candidates: { BUY: [11], SELL: [22], OPERATION: [33], COMPANY: [] } }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {
@@ -764,7 +764,7 @@ describe("OrdersPage：操作与筛选分支", () => {
   });
   it("分润：一个动作多人时提交动作合计，均分由后端处理", async () => {
     // 前端只提交动作合计和人员名单；按人数均分由后端保存服务统一处理。
-    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00" }));
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "5000.00", action_candidates: { BUY: [11, 22], SELL: [22], OPERATION: [33], COMPANY: [] } }));
     vi.mocked(ordersApi.get).mockResolvedValue({
       ...order1,
       form_extra: {

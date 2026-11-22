@@ -33,7 +33,7 @@ from app.domain.enums import OrderStatus
 from app.domain.notifications import Notification
 from app.business.profit_allocation.schemas import ProfitAllocationItem
 
-from ._shared import _scoped_order
+from app.shared.order_access import get_order
 from .company_settings import get_company_settings
 from .calculation import effective_distribution
 from app.domain.trade import OrderProfitAllocation
@@ -85,7 +85,7 @@ def set_allocations(
       纯比例时合计仍须 100%；一旦出现金额，改为校验金额合计不超过订单利润，
       因为此时「剩余未分配」默认留在公司，强行凑 100% 会逼用户编数字。
     """
-    order = _scoped_order(session, order_id, user)
+    order = get_order(session, order_id, user)
     if order.status != OrderStatus.COMPLETED.value:
         raise Validation("订单售出完成后才能配置分润", details={"order_id": order_id})
 
@@ -149,8 +149,8 @@ def get_allocations_view(
 
     HTTP 层只负责把结果映射到响应契约；查询、口径与汇总的编排都在此主体服务。
     """
-    order = _scoped_order(session, order_id, user)
-    terms = allocation_terms(session, order_id, user=user)
+    order = get_order(session, order_id, user)
+    terms = allocation_terms(session, order)
     stored = list(session.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id).order_by(OrderProfitAllocation.id)).all())
     rows, amounts, rates = effective_distribution(stored, terms["order_profit"], terms["company_rate"])
     zero_profit = terms["order_profit"] == 0

@@ -11,13 +11,13 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Order, OrderProfitAllocation
 
-from ._shared import _scoped_order
+from app.shared.order_access import get_order
 
 
 def list_allocations(
     session: Session, order_id: int, user: CurrentUser | None = None
 ) -> list[dict[str, Any]]:
-    order = _scoped_order(session, order_id, user)
+    order = get_order(session, order_id, user)
     return collect_allocations(session, order)
 
 

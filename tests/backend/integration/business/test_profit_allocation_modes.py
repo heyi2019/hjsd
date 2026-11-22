@@ -64,7 +64,7 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     order = seeded_db.get(Order, order_id)
     assert order is not None
 
-    profit_terms = allocation_terms(seeded_db, order_id)
+    profit_terms = allocation_terms(seeded_db, seeded_db.get(Order, order_id))
     assert profit_terms == {
         "order_profit": Decimal("500.00"),
         "company_rate": Decimal("40.00"),
@@ -74,7 +74,7 @@ def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
     loss_order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
     loss_order = seeded_db.get(Order, loss_order_id)
     assert loss_order is not None
-    loss_terms = allocation_terms(seeded_db, loss_order_id)
+    loss_terms = allocation_terms(seeded_db, seeded_db.get(Order, loss_order_id))
     assert loss_terms["company_rate"] == Decimal("50.00")
     assert loss_terms["allocatable_profit"] == Decimal("-250.00")
 

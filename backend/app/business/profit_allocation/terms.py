@@ -14,7 +14,7 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Order
 
-from ._shared import _scoped_order
+from app.shared.order_access import get_order
 from .company_settings import CompanyProfitSettings, get_company_settings
 
 DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
@@ -50,9 +50,8 @@ def allocatable_profit_for(order_profit: Decimal, company_rate: Decimal) -> Deci
     )
 
 
-def allocation_terms(session: Session, order_id: int, user: CurrentUser | None = None) -> dict[str, Decimal]:
-    """返回订单总利润、公司比例与扣除公司后的可分配利润。"""
-    order = _scoped_order(session, order_id, user)
+def allocation_terms(session: Session, order: Order) -> dict[str, Decimal]:
+    """根据已校验的订单计算利润与分配口径。"""
     order_profit = order_profit_of(session, order)
     company_rate = company_rate_for_order(order, order_profit, get_company_settings(session))
     return {
@@ -78,7 +77,7 @@ def convert_action_allocation(
     （如利润 1000、公司 40%、BUY 20% → 换算 120 但对账 200），前端展示与
     实际应付对不上，故此处必须用 order_profit_of 的原值。
     """
-    order = _scoped_order(session, order_id, user)
+    order = get_order(session, order_id, user)
     order_profit = order_profit_of(session, order)
     input_value = to_money(value)
     if direction == "RATE_TO_AMOUNT":

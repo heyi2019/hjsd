@@ -40,63 +40,6 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
   );
 }
 
-export function ResaleModal({ controller }: { controller: ContractTableController }) {
-  const { employees, resaleOrders, resaleForm, resaleTarget, setResaleTarget, submitResale, write } = controller;
-  return (
-    <InstallmentActionModal
-      title={resaleTarget ? `登记出售 · ${resaleTarget.inst_no}` : "登记出售"}
-      open={Boolean(resaleTarget)}
-      onCancel={() => setResaleTarget(null)}
-      scope="INSTRESALE"
-      form={resaleForm}
-      onFinish={submitResale}
-      write={write}
-      permission="order.update"
-      submitLabel="确认登记"
-      employees={employees}
-      intro={
-        <Typography.Paragraph type="secondary">
-          回收账号转售登记：请先在库存中心售出该账号生成售出订单，再在此关联。
-          出售订单必须已登记 SELL 事件且关联同一账号，每个合约只能登记一次。
-        </Typography.Paragraph>
-      }
-      testIdSuffix="installment-resale"
-    >
-      <CfgItem
-        name="resale_order_id"
-        label="出售订单"
-        rules={[{ required: true, message: "请选择出售订单" }]}
-      >
-        <Select
-          showSearch
-          placeholder="请选择售出订单"
-          virtual={resaleOrders.length > 100}
-          popupMatchSelectWidth={resaleOrders.length > 100}
-          optionFilterProp="label"
-          options={resaleOrders
-            .filter((item) => item.id !== resaleTarget?.order_id)
-            .map((item) => ({
-              value: item.id,
-              label: `${item.order_no}${item.party_name ? ` · ${item.party_name}` : ""}`,
-            }))}
-        />
-      </CfgItem>
-      <CfgItem
-        name="occurred_on"
-        label="出售日期"
-        rules={[{ required: true }]}
-        getValueFromEvent={dateValueFromEvent}
-        getValueProps={dateValueProps}
-      >
-        <DateField />
-      </CfgItem>
-      <CfgItem name="note" label="出售说明" rules={[{ required: true }]}>
-        <Input.TextArea rows={2} />
-      </CfgItem>
-    </InstallmentActionModal>
-  );
-}
-
 export function DeliverModal({ controller }: { controller: ContractTableController }) {
   const { deliverForm, deliverTarget, employees, setDeliverTarget, submitDeliver, write } = controller;
   return (

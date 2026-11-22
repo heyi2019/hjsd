@@ -69,7 +69,6 @@ FORM_SCOPES: list[FormScope] = [
     # -- 分期 --
     FormScope("INSTPAY", "分期收款", GROUP_INSTALLMENT),
     FormScope("INSTRECOVER", "分期回收", GROUP_INSTALLMENT),
-    FormScope("INSTRESALE", "分期出售登记", GROUP_INSTALLMENT),
     FormScope("INSTDELIVER", "交付换绑", GROUP_INSTALLMENT),
     FormScope("INVCANCEL", "取消", GROUP_INSTALLMENT),
     FormScope("INSTCANCEL", "取消退款", GROUP_INSTALLMENT),

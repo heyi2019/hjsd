@@ -16,8 +16,6 @@ export const installmentsApi = {
   previewSalePlan: (payload: { sale_amount: string; down_payment: string; service_fee: string; periods: number; per_period?: string }) =>
     api.post<SaleInstallmentPlan>("/installments/plan", payload).then((r) => r.data),
   recover: (id: number, data: {occurred_on: string; recovery_cost: string; note: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/recover`, data).then(r => r.data),
-  /** 回收转售登记：把已回收账号的新售出订单关联回分期合约（后端只认 resale_order_id）。 */
-  resale: (id: number, data: {resale_order_id: number; occurred_on: string; note: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown>}) => api.post<InstallmentDisposition>(`/installments/${id}/resale`, data).then(r => r.data),
   page: (params: InstallmentListParams & { limit: number; offset: number; sort_desc: boolean }) =>
     api.get<PageResponse<Installment>>("/installments", { params }).then((r) => r.data),
   updateOperationOperators: (id: number, operationKey: string, operator_user_ids: number[]) =>

@@ -9,14 +9,13 @@ export function useContractModalState(active: boolean) {
   const [payTarget, setPayTarget] = useState<Installment | null>(null);
   const [deliverTarget, setDeliverTarget] = useState<Installment | null>(null);
   const [recoverTarget, setRecoverTarget] = useState<Installment | null>(null);
-  const [resaleTarget, setResaleTarget] = useState<Installment | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Installment | null>(null);
   const [settleTarget, setSettleTarget] = useState<Installment | null>(null);
   const [defaultTarget, setDefaultTarget] = useState<Installment | null>(null);
   const [waiveTarget, setWaiveTarget] = useState<Schedule | null>(null);
   const [extendTarget, setExtendTarget] = useState<Schedule | null>(null);
   const actionSession = useRequestSession(JSON.stringify([
-    active, payTarget?.id, deliverTarget?.id, recoverTarget?.id, resaleTarget?.id,
+    active, payTarget?.id, deliverTarget?.id, recoverTarget?.id,
     cancelTarget?.id, settleTarget?.id, defaultTarget?.id, waiveTarget?.id, extendTarget?.id,
   ]));
   // 写操作共用防重状态；切换目标时使旧会话失效。
@@ -30,18 +29,17 @@ export function useContractModalState(active: boolean) {
   const prevTargetsRef = useRef<Record<string, unknown>>({});
   useEffect(() => {
     const targets: Record<string, unknown> = {
-      payTarget, deliverTarget, recoverTarget, resaleTarget,
+      payTarget, deliverTarget, recoverTarget,
       cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     };
     const openedNew = Object.keys(targets).some((k) => targets[k] && targets[k] !== prevTargetsRef.current[k]);
     if (openedNew) write.clearError();
     prevTargetsRef.current = targets;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget]);
+  }, [payTarget, deliverTarget, recoverTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget]);
   const [payForm] = Form.useForm();
   const [deliverForm] = Form.useForm();
   const [recoverForm] = Form.useForm();
-  const [resaleForm] = Form.useForm();
   const [cancelForm] = Form.useForm();
   const [settleForm] = Form.useForm();
   const [defaultForm] = Form.useForm();
@@ -49,9 +47,9 @@ export function useContractModalState(active: boolean) {
   const [extendForm] = Form.useForm();
 
   return {
-    payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
-    setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
-    payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
+    payTarget, deliverTarget, recoverTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
+    setPayTarget, setDeliverTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
+    payForm, deliverForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     actionSession, write,
   };
 }

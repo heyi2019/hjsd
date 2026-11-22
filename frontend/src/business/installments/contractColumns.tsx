@@ -32,7 +32,6 @@ export type ContractColumnsDeps = {
   setWaiveTarget: Dispatch<SetStateAction<Schedule | null>>;
   setExtendTarget: Dispatch<SetStateAction<Schedule | null>>;
   openDeliver: (row: Installment) => void;
-  openResale: (row: Installment) => void | Promise<void>;
   settlePermission: Permission;
 };
 
@@ -43,7 +42,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
   const {
     payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
-    setWaiveTarget, setExtendTarget, openDeliver, openResale, settlePermission,
+    setWaiveTarget, setExtendTarget, openDeliver, settlePermission,
   } = deps;
 
   const columns: ColumnsType<Installment> = [
@@ -174,15 +173,6 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
           >
             登记违约
           </PermissionButton>
-          {can(row, "resale") && (
-              <PermissionButton
-                permission="order.update"
-                size="small"
-                onClick={() => void openResale(row)}
-              >
-                登记出售
-              </PermissionButton>
-            )}
         </Space>
       ),
     },

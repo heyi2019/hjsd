@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { installmentsApi } from "../../shared/api/installments.api";
 import type { Installment, InstallmentTotals } from "../../shared/api/types/installments";
-import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { useListViewColumns } from "../../shared/lib/listColumns";
@@ -23,16 +22,15 @@ export function useContractTableController(params: { contractType: string; reloa
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pageTotal, setPageTotal] = useState(0);
-  const [resaleOrders, setResaleOrders] = useState<Order[]>([]);
   const { activeEmployees: employees, error: employeeError } = useEmployeeOptions();
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
   const modal = useContractModalState(active);
   const {
-    payTarget, deliverTarget, recoverTarget, resaleTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
-    setPayTarget, setDeliverTarget, setRecoverTarget, setResaleTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
-    payForm, deliverForm, recoverForm, resaleForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm, write,
+    payTarget, deliverTarget, recoverTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
+    setPayTarget, setDeliverTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
+    payForm, deliverForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm, write,
   } = modal;
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const [listError, setListError] = useState(false);
@@ -117,13 +115,12 @@ export function useContractTableController(params: { contractType: string; reloa
   }, [active, loadTotals, reloadKey]);
 
   const {
-    exportCsv, submitPay, submitDeliver, openDeliver, submitRecover, submitResale,
-    openResale, submitCancel, submitSettleEarly, submitDefault, submitWaive,
+    exportCsv, submitPay, submitDeliver, openDeliver, submitRecover,
+    submitCancel, submitSettleEarly, submitDefault, submitWaive,
     submitExtend, updateOperationOperators,
   } = useContractActions({
-    active,
     modal,
-    load: reloadAfterAction, setError, setResaleOrders, setExporting,
+    load: reloadAfterAction, setExporting,
     filters: { contract_type: contractType, status: status || undefined, trade_date_from: dateFrom || undefined, trade_date_to: dateTo || undefined },
   });
 
@@ -140,7 +137,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const { columns, scheduleColumns } = buildContractColumns({
     payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
-    setWaiveTarget, setExtendTarget, openDeliver, openResale, settlePermission,
+    setWaiveTarget, setExtendTarget, openDeliver, settlePermission,
   });
 
   return {
@@ -161,9 +158,6 @@ export function useContractTableController(params: { contractType: string; reloa
     setDeliverTarget,
     recoverTarget,
     setRecoverTarget,
-    resaleTarget,
-    setResaleTarget,
-    resaleOrders,
     cancelTarget,
     setCancelTarget,
     settleTarget,
@@ -185,7 +179,6 @@ export function useContractTableController(params: { contractType: string; reloa
     payForm,
     deliverForm,
     recoverForm,
-    resaleForm,
     cancelForm,
     settleForm,
     defaultForm,
@@ -199,7 +192,6 @@ export function useContractTableController(params: { contractType: string; reloa
     submitDeliver,
     openDeliver,
     submitRecover,
-    submitResale,
     submitCancel,
     submitSettleEarly,
     submitDefault,

@@ -164,7 +164,7 @@ class InstallmentOut(BaseModel):
     schedules: list[ScheduleOut] = Field(default_factory=list)
     dispositions: list[DispositionOut] = Field(default_factory=list)
     operation_operators: list[OperationOperatorOut] = Field(default_factory=list)
-    # 后端下发的合约级可用动作（pay/deliver/recover/cancel/settle_early/default/resale）；
+    # 后端下发的合约级可用动作（pay/deliver/recover/cancel/settle_early/default）；
     # 等价搬运自前端原状态判定，前端只回显，不再自行拼状态白名单
     available_actions: list[str] = Field(default_factory=list)
 
@@ -239,10 +239,6 @@ class RecoverIn(DispositionIn):
     recovery_cost: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
 
 
-class ResaleIn(DispositionIn):
-    resale_order_id: int
-
-
 class ScheduleWaiveIn(RequestModel):
     amount: Decimal = Field(gt=0)
     waived_on: date
@@ -305,5 +301,5 @@ __all__ = [
     "ScheduleWaiveIn",
     "ScheduleCreate",
     "ScheduleOut",
-    "ResaleIn",
+    "RecoverIn",
 ]

@@ -100,7 +100,6 @@ class TestInstallmentsApi:
         ("extend", "INSTEXTEND", "new_due_on"),
         ("default", "INSTDEFAULT", "reason"),
         ("recover", "INSTRECOVER", "note"),
-        ("resale", "INSTRESALE", "resale_order_id"),
         ("deliver", "INSTDELIVER", "delivered_on"),
     ])
     def test_installment_conditional_fields_follow_action_values(
@@ -120,8 +119,6 @@ class TestInstallmentsApi:
         base = f"/api/installments/{contract.id}"
         if action in {"default", "recover"}:
             contract.status = "OVERDUE"
-        elif action == "resale":
-            contract.status = "CLOSED"
         elif action == "deliver":
             settled = seeded_client.post(f"{base}/settle-early", headers=headers, json={"paid_on": TODAY.isoformat()})
             assert settled.status_code == 200, settled.text
@@ -141,8 +138,6 @@ class TestInstallmentsApi:
             url, payload = f"{base}/default", {"reason": "违约原因"}
         elif action == "recover":
             url, payload = f"{base}/recover", {"occurred_on": TODAY.isoformat(), "note": "回收说明", "recovery_cost": "0"}
-        elif action == "resale":
-            url, payload = f"{base}/resale", {"occurred_on": TODAY.isoformat(), "note": "出售说明", "resale_order_id": 999999}
         else:
             url, payload = f"{base}/deliver", {"delivered_on": TODAY.isoformat(), "note": "换绑凭证", "operator_user_ids": [1]}
 
@@ -166,12 +161,9 @@ class TestInstallmentsApi:
         assert spoofed.status_code == 422, spoofed.text
         assert "条件凭据" in spoofed.text
         saved = seeded_client.post(url, headers=headers, json={**payload, "form_extra": {"receipt": "凭据A"}})
-        if action == "resale":
-            assert saved.status_code == 422 and "出售必须关联新的售出订单" in saved.text
-        else:
-            assert saved.status_code == 200, saved.text
-            seeded_db.refresh(contract)
-            assert contract.form_extra["receipt"] == "凭据A"
+        assert saved.status_code == 200, saved.text
+        seeded_db.refresh(contract)
+        assert contract.form_extra["receipt"] == "凭据A"
 
     @pytest.mark.parametrize(("action", "scope", "other_scope"), [
         ("payments", "INSTPAY", "INSTSETTLE"),

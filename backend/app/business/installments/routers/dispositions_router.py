@@ -73,29 +73,6 @@ def list_installment_dispositions(
     ]
 
 @router.post(
-    "/installments/{installment_id}/resale",
-    response_model=schemas.DispositionOut,
-)
-def resale_installment_account(
-    installment_id: int,
-    payload: schemas.ResaleIn,
-    db: Session = Depends(get_db),
-    user: CurrentUser = default_manage,
-) -> schemas.DispositionOut:
-    item = inst_recovery.record_sale(
-        db,
-        installment_id,
-        sale_order_id=payload.resale_order_id,
-        occurred_on=payload.occurred_on,
-        actor=_actor(user),
-        note=payload.note,
-        form_extra=payload.form_extra,
-        operator_user_ids=payload.operator_user_ids,
-        user=user,
-    )
-    return schemas.DispositionOut.model_validate(item)
-
-@router.post(
     "/installments/{installment_id}/deliver", response_model=schemas.InstallmentOut
 )
 def deliver_installment(

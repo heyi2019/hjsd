@@ -19,7 +19,8 @@ import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { moneyRules } from "../../shared/lib/validators";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { EmployeeSelectControl } from "../../shared/forms/ResponsibleEmployeeSelect";
-import type { OrdersPageController } from "../orders/useOrdersPageController";
+import type { Order } from "../../shared/api/types/orders";
+import type { useProfitAllocation } from "./useProfitAllocation";
 import {
   ALLOCATION_TYPE_LABEL,
   buildAllocationOptionGroups,
@@ -28,20 +29,10 @@ import {
   type AllocationType,
 } from "./allocationHelpers";
 
-type AllocationController = Pick<OrdersPageController,
-  | "actionOrder"
-  | "allocationCandidates"
-  | "allocationForm"
-  | "allocationIsLoss"
-  | "allocationOpen"
-  | "allocationProfit"
-  | "allocationOrderProfit"
-  | "employeeOptions"
-  | "load"
-  | "loadLedgerDetail"
-  | "closeAllocations"
-  | "getAllocationSession"
->;
+type AllocationController = ReturnType<typeof useProfitAllocation> & {
+  load: () => Promise<void>;
+  loadLedgerDetail: (order: Pick<Order, "id" | "account_id">, force?: boolean) => Promise<void>;
+};
 
 type AllocationFormValues = {
   allocations: AllocationFormRow[];

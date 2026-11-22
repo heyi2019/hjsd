@@ -23,6 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 PYTHON = ROOT / ".venv" / "bin" / "python"
+LOCAL_TEST_PYTHON = Path("/Users/aries/Applications/Python_3.13/bin/python3")
+LOCAL_TEST_DEPENDENCIES = Path("/Users/aries/.local/share/heijin-erp/python313-runtime")
 
 # 模块/类型/跨模块筛选统一走共享目录（单一事实源）
 sys.path.insert(0, str(REPO / "tests" / "config"))
@@ -117,10 +119,22 @@ def regression_environment() -> dict[str, str]:
     历史上这里 `setdefault` 注入一个隔离临时库地址，目的是让回归跑在隔离库上、
     不碰联调库。测试夹具迁到 PostgreSQL 后该做法已无意义——夹具硬性要求
     PostgreSQL 且库名含 test，注入非 PG 地址只会让它直接 exit。
-    现在测试库由 `TEST_DATABASE_URL`（其次 `.env` 的 `DATABASE_URL`）决定，
-    隔离性由「库名必须含 test + 会话开始 TRUNCATE」保证。
+    测试库由 `TEST_DATABASE_URL` 决定，夹具会验证其与开发库隔离。
     """
     return os.environ.copy()
+
+
+def pytest_runtime() -> tuple[str, dict[str, str]]:
+    """本机使用隔离的 Python 3.13 测试环境；CI 保持自身运行环境。"""
+    env = regression_environment()
+    if sys.platform == "darwin" and Path.home() == Path("/Users/aries") and not env.get("CI"):
+        if not LOCAL_TEST_PYTHON.is_file() or not LOCAL_TEST_DEPENDENCIES.is_dir():
+            raise SystemExit("缺少 Python 3.13 或本项目隔离依赖，请先配置测试环境")
+        existing = env.get("PYTHONPATH")
+        env["PYTHONPATH"] = os.pathsep.join(filter(None, (str(LOCAL_TEST_DEPENDENCIES), existing)))
+        env.setdefault("TEST_REDIS_URL", "redis://127.0.0.1:6389/0")
+        return str(LOCAL_TEST_PYTHON), env
+    return (str(PYTHON) if PYTHON.exists() else sys.executable), env
 
 # 三档测试体系（何一裁决）：
 #   ① unit    —— 纯逻辑、无 DB/HTTP，秒级，改完即跑；
@@ -329,6 +343,7 @@ GROUPS = {
         "tests/backend/integration/system/test_attachments_service.py",
         "tests/backend/integration/workbench/test_contract_message_visibility.py",
         "tests/backend/integration/workbench/test_notifications_service.py",
+        "tests/backend/integration/workbench/test_profit_notifications.py",
         "tests/backend/integration/workbench/test_overdue_notifications.py",
         "tests/backend/integration/workbench/test_profit_notifications_settings.py",
     ],
@@ -619,12 +634,12 @@ def main() -> int:
                 print("frontend: npm run check + npm run test:fast")
             print("\n".join(paths))
             return 0
-        runner = str(PYTHON) if PYTHON.exists() else sys.executable
-        print(f"=== 执行 {label}：{len(paths)} 个后端文件 ===")
+        runner, test_env = pytest_runtime()
+        print(f"=== 执行 {label}：{len(paths)} 个后端文件，Python: {runner} ===", flush=True)
         result = subprocess.run(
             [runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
             cwd=ROOT,
-            env=regression_environment(),
+            env=test_env,
             check=False,
         )
         if result.returncode:
@@ -674,12 +689,12 @@ def main() -> int:
     if not paths:
         print(f"[{label}] 无匹配后端测试文件")
         return 0
-    runner = str(PYTHON) if PYTHON.exists() else sys.executable
-    print(f"=== 执行 {label}：{len(paths)} 个后端文件 ===")
+    runner, test_env = pytest_runtime()
+    print(f"=== 执行 {label}：{len(paths)} 个后端文件，Python: {runner} ===", flush=True)
     result = subprocess.run(
         [runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
         cwd=ROOT,
-        env=regression_environment(),
+        env=test_env,
         check=False,
     )
     rc = result.returncode

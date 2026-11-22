@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
 from _repo import BACKEND_DIR as BACKEND, BE_TESTS, REPO_ROOT as REPO
 
 sys.path.insert(0, str(BACKEND))
@@ -26,6 +27,62 @@ sys.path.insert(0, str(BACKEND))
 import run_regression as rr  # noqa: E402
 
 EXPECTED_PREFIX = "tests/backend/"
+
+
+def test_macos_regression_uses_isolated_python313(monkeypatch, tmp_path):
+    python = tmp_path / "python3"
+    python.touch()
+    dependencies = tmp_path / "runtime"
+    dependencies.mkdir()
+    monkeypatch.setattr(rr.sys, "platform", "darwin")
+    monkeypatch.setattr(rr.Path, "home", lambda: Path("/Users/aries"))
+    monkeypatch.setattr(rr, "LOCAL_TEST_PYTHON", python, raising=False)
+    monkeypatch.setattr(rr, "LOCAL_TEST_DEPENDENCIES", dependencies, raising=False)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("TEST_REDIS_URL", raising=False)
+    monkeypatch.setenv("PYTHONPATH", "/existing")
+
+    runner, env = rr.pytest_runtime()
+    assert runner == str(python)
+    assert env["PYTHONPATH"] == f"{dependencies}:/existing"
+    assert env["TEST_REDIS_URL"] == "redis://127.0.0.1:6389/0"
+    monkeypatch.setenv("TEST_REDIS_URL", "redis://127.0.0.1:6390/1")
+    assert rr.pytest_runtime()[1]["TEST_REDIS_URL"] == "redis://127.0.0.1:6390/1"
+
+    dependencies.rmdir()
+    with pytest.raises(SystemExit, match="隔离依赖"):
+        rr.pytest_runtime()
+
+
+def test_ci_regression_uses_its_own_python(monkeypatch, tmp_path):
+    python = tmp_path / "venv-python"
+    python.touch()
+    monkeypatch.setattr(rr.sys, "platform", "linux")
+    monkeypatch.setattr(rr, "PYTHON", python)
+    monkeypatch.setenv("CI", "true")
+    monkeypatch.setenv("PYTHONPATH", "/ci")
+    runner, env = rr.pytest_runtime()
+    assert runner == str(python)
+    assert env["PYTHONPATH"] == "/ci"
+    monkeypatch.setattr(rr.sys, "platform", "darwin")
+    assert rr.pytest_runtime()[0] == str(python)
+
+
+def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
+    from types import SimpleNamespace
+
+    calls = []
+    monkeypatch.setattr(rr, "pytest_runtime", lambda: ("test-python", {"PYTHONPATH": "isolated"}))
+    monkeypatch.setattr(rr.subprocess, "run", lambda command, **kwargs: calls.append((command, kwargs)) or SimpleNamespace(returncode=0))
+    monkeypatch.setattr(rr, "is_structural_change", lambda paths: False)
+    monkeypatch.setattr(rr, "groups_for_changes", lambda paths: [])
+    for args in (["run_regression.py", "changed", "--backend-only", "--changed-paths", "docs/example.md"],
+                 ["run_regression.py", "smoke"]):
+        monkeypatch.setattr(rr.sys, "argv", args)
+        assert rr.main() == 0
+    assert len(calls) == 2
+    assert all(command[:3] == ["test-python", "-m", "pytest"] and kwargs["env"]["PYTHONPATH"] == "isolated"
+               for command, kwargs in calls)
 
 
 def _disk_names() -> set[str]:

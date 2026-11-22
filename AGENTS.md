@@ -28,9 +28,11 @@
 
 - **测试库铁律**：跑测试前必须核 `TEST_DATABASE_URL` ≠ dev（应 `heijin_erp_test`）。`conftest` TRUNCATE 全表，曾误清 dev 118 单。**只跑针对性测试**，禁动不动全量。
 - Python：服务/lint 用 `backend/.venv/bin/python3`；SQLAlchemy + pytest 唯一用 `/Users/aries/Applications/Python_3.13/bin/python3`。端口：8123 dev / 8125 main、前端 5188 / 5199。
+- 本机测试使用 `/Users/aries/.local/share/heijin-erp/pytest`：该入口调用上述 Python 3.13，并通过 `PYTHONPATH` 使用 `/Users/aries/.local/share/heijin-erp/python313-runtime` 中按 `backend/requirements.lock.txt` 安装的隔离依赖；直接运行其他 SQLAlchemy 命令时也需设置该 `PYTHONPATH`。共享 Python 环境服务其他项目，不直接按本项目锁文件覆盖。
+- 本机共享限流测试使用独立容器 `heijin-test-redis`（仅监听 `127.0.0.1:6389`，无持久化）；测试入口和本机回归默认设置 `TEST_REDIS_URL=redis://127.0.0.1:6389/0`，显式设置时以调用者提供的独立测试 Redis 为准。
 - **金额**：用 `Amount` + `to_money()`，禁 float；写路径走 Service 事务 + `record_audit`；按月聚合走 Python 层 `reporting/_shared.py::_month_key()`，禁 `func.strftime` / `func.json_extract`。
 - **迁移/发布**：活动链只剩基线 0001（create_all + seed_catalog），改 ORM 即改基线，**不加增量迁移**，落后库绝不 stamp；上线走原地增量。`push origin/main` = 上线，须单独确认；分支只留 main/dev；`RELEASE.md` 不可删。
-- **分层**：`core`(L0，零 ORM) → `domain`(L1) → `shared`(L2，跨域原语) → 业务域(L3)。`backend/.importlinter` 5 契约必须全绿；改 import 前先查 `app/shared/`；环检测必须用 AST，正则会漏。
+- **分层**：`core`(L0，零 ORM) → `domain`(L1) → `shared`(L2，跨域原语) → 业务域(L3)。`backend/.importlinter` 的 3 条契约必须全绿；改 import 前先查 `app/shared/`；环检测必须用 AST，正则会漏。
 - **拆分纪律**：拆测试文件须同步 4 处元数据（`tests/manifest.json`、`tests/config/catalog.py::BACKEND_FILE_TO_FUNC`、`docs/testing/测试元数据台账.csv`、`backend/run_regression.py::GROUPS`）。
 - 前端：antd Modal 禁嵌受控 Modal children；`.login-card` 固定深色；≤640px 按列 key 打标 `ui-col-mobile-hide`，禁 nth-child；控件高 36px；`useSession()` user→role+username。
 - 提交：先 `git status --short`；只 pathspec 暂存；禁 `git add -A` / `--no-verify`；不 push 除非明确要求。

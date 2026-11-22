@@ -148,6 +148,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_migration.py": "SYS13",
     "test_money.py": "SYS02",
     "test_notifications_service.py": "A01",
+    "test_profit_notifications.py": "A01",
     "test_overview.py": "A01",
     "test_contract_message_visibility.py": "A01",
     "test_overdue_notifications.py": "A01",

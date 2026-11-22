@@ -6,7 +6,7 @@ import { OrderProfileModal, OrderPlatformOffsaleModal } from "../shared/operatio
 import { OrderDeleteDialog } from "./OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
-import { AllocationModal } from "./OrderAllocationModal";
+import { AllocationModal } from "../profit_allocation/OrderAllocationModal";
 import { CreateBusinessModalWrapper, OrderAccountActionModals } from "./OrderActionModals";
 
 export function OrderModals({ controller, onNavigate }: { controller: OrdersPageController; onNavigate?: (key: string) => void }) {

@@ -19,14 +19,14 @@ import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import { moneyRules } from "../../shared/lib/validators";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { EmployeeSelectControl } from "../../shared/forms/ResponsibleEmployeeSelect";
-import type { OrdersPageController } from "./useOrdersPageController";
+import type { OrdersPageController } from "../orders/useOrdersPageController";
 import {
   ALLOCATION_TYPE_LABEL,
   buildAllocationOptionGroups,
   type ActionAllocationCandidates,
   type AllocationFormRow,
   type AllocationType,
-} from "./helpers";
+} from "../orders/helpers";
 
 type AllocationController = Pick<OrdersPageController,
   | "actionOrder"

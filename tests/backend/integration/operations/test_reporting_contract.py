@@ -226,7 +226,15 @@ class TestR3Commission:
             event.remove(connection, "before_cursor_execute", record)
         assert summary["personal_earnings"] == report["total"]["profit_base"] == Decimal("-2.49")
         assert not any("from accounts where accounts.id in" in sql for sql in statements)
-        assert not any("select order_events.order_id, order_events.occurred_on" in sql for sql in statements)
+        # personal_commission_total 只取本人分润总额，不得装配 r3_commission_reconciliation
+        # 那种「两列 + join orders」逐单查最新售出日期的报表明细 SQL（N+1 风险）。
+        # 注意：order_amounts.cashflow_totals_by_order 算「回收收入」会发一条三列批量查询
+        # （order_id, occurred_on, amount ... where order_id in (...)）——它是口径必需的
+        # 单条批量查询，不是逐单明细，故此处只匹配「occurred_on 后直接 from」的明细形态，放行它。
+        assert not any(
+            "select order_events.order_id, order_events.occurred_on from" in sql
+            for sql in statements
+        ), [sql for sql in statements if "order_events.order_id, order_events.occurred_on" in sql]
 
     def test_commission_limits_profit_calculation_to_order_date_range(self, seeded_db, monkeypatch):
         import app.operations.r3_commission as commission_service

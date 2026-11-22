@@ -305,8 +305,11 @@ def test_current_user_owner_scope_model():
 
 @pytest.mark.parametrize("raw", ["PRODUCTION", " production "])
 def test_is_production_normalizes_case_and_space(raw):
-    assert Settings(app_env=raw).is_production is True
+    # 显式传安全测试密钥：CI 会 cp .env.example .env，其中 JWT_SECRET_KEY 是
+    # replace-with- 占位符；Settings 非 development 时会校验密钥并抛错。
+    # 这里只测 app_env 归一化，密钥用合法测试值隔离 .env，避免耦合。
+    assert Settings(app_env=raw, jwt_secret_key="test-secret-key-for-auth-teams-32chars").is_production is True
 
 @pytest.mark.parametrize("raw", ["development", "staging"])
 def test_is_production_false_for_non_prod(raw):
-    assert Settings(app_env=raw).is_production is False
+    assert Settings(app_env=raw, jwt_secret_key="test-secret-key-for-auth-teams-32chars").is_production is False

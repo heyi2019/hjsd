@@ -90,7 +90,7 @@ cd ..
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
 | `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 ux-audit 的 E2E 证据（JSON 与截图），历史文档已于 2026-11-11 全部清退 |
 | `dependencies` | 本机 Python 依赖及前端依赖入口；不进入 Git 和 Docker 构建上下文 |
-| `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
+| `runtime/logs` `runtime/outputs` | 本机日志和临时生成物，内容默认不提交 |
 
 ## 关键业务约束
 

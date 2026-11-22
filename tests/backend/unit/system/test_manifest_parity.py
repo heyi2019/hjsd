@@ -44,6 +44,21 @@ GUARD_AREA = {
 }
 
 
+def test_backend_result_does_not_claim_missing_log(tmp_path, monkeypatch):
+    import conftest as recorder
+
+    result = tmp_path / "results.jsonl"
+    monkeypatch.setattr(recorder, "_RESULTS_JSONL", result)
+    monkeypatch.setattr(recorder, "_RUN_STATE", {
+        "run_id": "sample", "rows": {"tests/example.py::test_one": {"status": "PASS"}},
+        "case_index": {},
+    })
+    recorder.pytest_sessionfinish(None, 0)
+    record = json.loads(result.read_text(encoding="utf-8"))
+    assert record["status"] == "PASS"
+    assert record["evidence"] == ""
+
+
 def test_case_number_map_uses_published_numbers_when_cache_conflicts(tmp_path, monkeypatch):
     from scripts import gen_test_case_library as generator
 

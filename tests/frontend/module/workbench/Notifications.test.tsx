@@ -134,7 +134,7 @@ it("未读消息逐页滚动加载且不自动标已读", async () => {
     const scroll = document.querySelector(".notifications__scroll")!;
     scroll.scrollTop = 400;
     fireEvent.scroll(scroll);
-    expect(await screen.findByRole("button", { name: /^通知 1 未读.*通知时间/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^通知 1\s*未读\s*通知时间/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "加载更多" })).not.toBeInTheDocument();
     expect(notificationsApi.list).toHaveBeenCalledWith(expect.objectContaining({ cursor: "page-2", category: "latest" }));
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();

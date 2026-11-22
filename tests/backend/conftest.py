@@ -796,7 +796,8 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: D401
                 "status": rec.get("status", "UNKNOWN"),
                 "duration": round(float(rec.get("duration", 0.0)), 4),
                 "reason": rec.get("reason", ""),
-                "evidence": f"logs/pytest/{run_id}.log",
+                # 本记录器不生成独立日志，不能填写不存在的证据路径。
+                "evidence": "",
             }, ensure_ascii=False))
         if lines:
             with _RESULTS_JSONL.open("a", encoding="utf-8") as fh:

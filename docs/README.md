@@ -85,7 +85,7 @@
 | 路径 | 用途 |
 |---|---|
 | `tests/README.md` | 测试文件与执行入口索引：目录结构、三根轴、子目录约定、新增测试四步、`db` 标记派生的快/慢通道、FE 手工用例 ↔ 自动化映射（第 8 节） |
-| `outputs/README.md` | 运行产物目录说明 |
+| `runtime/README.md` | 日志和运行产物目录说明 |
 | `README.md`（仓库根） | 项目总入口：快速启动、开发命令、目录结构、关键业务约束 |
 | [Git 历史发布记录](https://github.com/heyi2019/hjsd/blob/2ebd308bdb8f8bf9fddf1f99fad19c7a388572b1/RELEASE.md) | 版本重置前的历史记录 |
 

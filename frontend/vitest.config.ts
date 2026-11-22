@@ -87,7 +87,8 @@ export default defineConfig({
         // （deps.optimizer.ssr.enabled ??= false，resolveOptimizerConfig 返回 disabled），
         // server.deps.inline 只决定「外部化（node 原生 import）还是内联（Vite transform）」，
         // 与预打包无关。外部化的代价是 node 原生 import 绕过 resolve.alias 与 vi.mock。
-        // 故整树内联，确保 alias 桩与 vi.mock 对 antd 子路径生效。
+        // 内联依赖以确保 alias 桩与 vi.mock 对 antd 子路径生效。
+        // 唯一例外是 Node 代理模块：其 npm 包缺少 sourcemap 源码，且不参与 UI 桩或 mock。
         // 已实测并否决的两条路（勿再试）：
         //   1) 全外部化（留空/undefined）：@ant-design/cssinjs no-op 桩失效 = 丢失 aa3885a 的 5×
         //      提速来源，且 InventoryPanel.sale 等交互用例确定性失败。
@@ -95,7 +96,8 @@ export default defineConfig({
         //      均绿），但全量反而更慢（基线 78.85s → 94~100s）：真实 rc-motion 比桩多出的 transform
         //      成本大于省下的 transitionend 等待。桩本就是最优解。
         // 注：不能写 inline:false —— matchPattern 会对 false 做 for...of，抛 TypeError。
-        inline: true,
+        inline: [/node_modules\/(?!https-proxy-agent\/)/],
+        external: [/node_modules\/https-proxy-agent\//],
       },
     },
     projects: [

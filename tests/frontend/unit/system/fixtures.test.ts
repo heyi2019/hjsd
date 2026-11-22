@@ -82,6 +82,8 @@ describe("测试夹具隔离", () => {
       items: [{ id: 1 }],
       total: 1,
       order_profit: "10.00",
+      company_rate: "40.00",
+      allocatable_profit: "10.00",
       totals_by_type: {},
     });
     expect(inventoryLedgerResponse([{ id: 1 } as never])).toEqual({

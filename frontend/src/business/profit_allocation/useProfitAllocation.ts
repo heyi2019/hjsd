@@ -42,6 +42,10 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
         employeesApi.list(),
       ]);
       if (!actionRequest.isCurrent(session)) return;
+      if (typeof result.order_profit !== "string" || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type) {
+        appMessage.error("分润数据不完整，请刷新后重试");
+        return;
+      }
       const currentEmployee = userResult.find((item) => item.is_active && item.username === username)
         ?? (import.meta.env.DEV
           ? userResult.find((item) => item.is_active && item.username === currentDevUser())
@@ -50,7 +54,7 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
       const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates, result.totals_by_type);
       const companyRow = rows.find((row) => row.allocation_type === "COMPANY");
       if (companyRow) {
-        companyRow.allocation_rate = result.company_rate ?? "40";
+        companyRow.allocation_rate = result.company_rate;
         companyRow.allocation_amount = "";
       }
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
@@ -61,8 +65,8 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
       setActionOrder(order);
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);
-      setAllocationProfit(result.allocatable_profit ?? result.order_profit ?? "0");
-      setAllocationOrderProfit(result.order_profit ?? "0");
+      setAllocationProfit(result.allocatable_profit);
+      setAllocationOrderProfit(result.order_profit);
       setAllocationOpen(true);
     } catch (error) {
       if (actionRequest.isCurrent(session)) appMessage.error(normalizeError(error).message);

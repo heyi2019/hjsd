@@ -22,8 +22,8 @@ export interface ProfitAllocationTypeTotal {
 export interface ProfitAllocationList {
   items: ProfitAllocation[];
   total: number;
-  order_profit?: string;
-  company_rate?: string;
-  allocatable_profit?: string;
+  order_profit: string;
+  company_rate: string;
+  allocatable_profit: string;
   totals_by_type: Partial<Record<ProfitAllocationType, ProfitAllocationTypeTotal>>;
 }

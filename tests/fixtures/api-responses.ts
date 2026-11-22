@@ -99,6 +99,8 @@ export function profitAllocationResponse<T extends ProfitAllocation>(
     items,
     total: items.length,
     order_profit: "0.00",
+    company_rate: "40.00",
+    allocatable_profit: overrides.order_profit ?? "0.00",
     totals_by_type: {},
     ...overrides,
   };

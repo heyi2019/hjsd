@@ -639,6 +639,15 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(screen.queryByText(/分润 · HS-2026-0001/)).not.toBeInTheDocument();
   });
 
+  it("分润口径缺失时提示错误且不打开弹窗", async () => {
+    const incomplete = profitAllocationResponse([]);
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValueOnce({ ...incomplete, company_rate: undefined } as never);
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith("分润数据不完整，请刷新后重试"));
+    expect(screen.queryByText(/分润 · HS-2026-0001/)).not.toBeInTheDocument();
+  });
+
   it("分润比例换算失败时清空旧比例并提示重试", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
       totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "10.00" } },

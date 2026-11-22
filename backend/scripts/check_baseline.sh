@@ -14,7 +14,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."   # backend/
 
-PY="${PYTHON:-.venv/bin/python3}"
+# 本地优先用 .venv（含项目依赖）；CI 无 .venv（setup-python 全局装依赖），回退 python3。
+PY="${PYTHON:-}"
+if [ -z "$PY" ]; then
+  if [ -x ".venv/bin/python3" ]; then PY=".venv/bin/python3"; else PY="python3"; fi
+fi
 REPO_ROOT="$(cd .. && pwd)"
 
 BASE_URL="${BASE_URL:-$("$PY" -c "from app.core.settings import get_settings; print(get_settings().database_url.rsplit('/', 1)[0])")}"

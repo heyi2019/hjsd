@@ -95,6 +95,20 @@ export function profitAllocationResponse<T extends ProfitAllocation>(
   items: T[],
   overrides: Partial<Omit<ProfitAllocationList, "items" | "total">> & { total?: number } = {},
 ): ProfitAllocationList {
+  const candidates = overrides.action_candidates ?? { BUY: [], SELL: [9], OPERATION: [], COMPANY: [] };
+  const totals = overrides.totals_by_type ?? {};
+  const roles = { BUY: "BUYER", SELL: "SALES", OPERATION: "SERVICE", COMPANY: "OWNER" } as const;
+  const formRows = (Object.keys(roles) as Array<keyof typeof roles>).map((kind) => {
+    const existing = items.filter((item) => item.allocation_type === kind);
+    const stored = [...new Set(existing.map((item) => item.user_id).filter((id): id is number => typeof id === "number" && Number.isInteger(id) && id > 0))];
+    return {
+      allocation_type: kind,
+      employee_ids: kind === "COMPANY" ? [] : candidates[kind].length ? candidates[kind] : stored,
+      role: existing[0]?.role || roles[kind],
+      allocation_rate: kind === "COMPANY" ? overrides.company_rate ?? "40.00" : totals[kind]?.allocation_rate ?? "",
+      allocation_amount: kind === "COMPANY" ? "" : totals[kind]?.allocation_amount ?? "",
+    };
+  });
   return {
     items,
     total: items.length,
@@ -102,7 +116,8 @@ export function profitAllocationResponse<T extends ProfitAllocation>(
     company_rate: "40.00",
     allocatable_profit: overrides.order_profit ?? "0.00",
     totals_by_type: {},
-    action_candidates: { BUY: [], SELL: [9], OPERATION: [], COMPANY: [] },
+    action_candidates: candidates,
+    form_rows: formRows,
     ...overrides,
   };
 }

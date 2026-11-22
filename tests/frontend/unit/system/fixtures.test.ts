@@ -86,6 +86,12 @@ describe("测试夹具隔离", () => {
       allocatable_profit: "10.00",
       totals_by_type: {},
       action_candidates: { BUY: [], SELL: [9], OPERATION: [], COMPANY: [] },
+      form_rows: [
+        { allocation_type: "BUY", employee_ids: [], role: "BUYER", allocation_rate: "", allocation_amount: "" },
+        { allocation_type: "SELL", employee_ids: [9], role: "SALES", allocation_rate: "", allocation_amount: "" },
+        { allocation_type: "OPERATION", employee_ids: [], role: "SERVICE", allocation_rate: "", allocation_amount: "" },
+        { allocation_type: "COMPANY", employee_ids: [], role: "OWNER", allocation_rate: "40.00", allocation_amount: "" },
+      ],
     });
     expect(inventoryLedgerResponse([{ id: 1 } as never])).toEqual({
       items: [{ id: 1 }],

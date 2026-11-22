@@ -41,7 +41,7 @@ from app.domain.trade import OrderProfitAllocation
 from .action import set_action_allocations
 from .action_rows import expand_action_form_rows
 from .listing import collect_allocations
-from .listing import summarize_allocations_by_type
+from .listing import allocation_form_rows, summarize_allocations_by_type
 from .person import set_person_allocations
 from .terms import (
     allocation_terms,
@@ -178,8 +178,10 @@ def get_allocations_view(
             total["allocation_rate"] = (total["allocation_amount"] * Decimal("100") / terms["order_profit"]).quantize(
                 Decimal("0.01"), rounding=ROUND_HALF_UP,
             )
+    candidates = allocation_candidates(session, order, user)
     return {"items": items, "total": len(items), "totals_by_type": totals_by_type,
-            "action_candidates": allocation_candidates(session, order, user), **terms}
+            "action_candidates": candidates,
+            "form_rows": allocation_form_rows(items, candidates, totals_by_type, terms["company_rate"]), **terms}
 
 
 def convert_value(

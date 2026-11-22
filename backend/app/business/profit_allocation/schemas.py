@@ -68,6 +68,14 @@ class ActionCandidatesOut(BaseModel):
     COMPANY: list[int]
 
 
+class AllocationFormRowOut(BaseModel):
+    allocation_type: Literal["BUY", "SELL", "OPERATION", "COMPANY"]
+    employee_ids: list[int]
+    role: str
+    allocation_rate: str
+    allocation_amount: str
+
+
 class ProfitAllocationListOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -78,6 +86,7 @@ class ProfitAllocationListOut(BaseModel):
     allocatable_profit: Decimal
     totals_by_type: dict[str, ProfitAllocationTypeTotal]
     action_candidates: ActionCandidatesOut
+    form_rows: list[AllocationFormRowOut]
 
 
 __all__ = [

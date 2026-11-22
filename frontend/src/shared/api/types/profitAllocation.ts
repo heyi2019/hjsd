@@ -27,4 +27,5 @@ export interface ProfitAllocationList {
   allocatable_profit: string;
   totals_by_type: Partial<Record<ProfitAllocationType, ProfitAllocationTypeTotal>>;
   action_candidates: Record<ProfitAllocationType, number[]>;
+  form_rows: { allocation_type: ProfitAllocationType; employee_ids: number[]; role: string; allocation_rate: string; allocation_amount: string }[];
 }

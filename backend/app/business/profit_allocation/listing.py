@@ -70,3 +70,27 @@ def summarize_allocations_by_type(
 
 
 __all__ = ["collect_allocations", "list_allocations", "summarize_allocations_by_type"]
+
+
+def allocation_form_rows(
+    items: list[dict[str, Any]],
+    candidates: dict[str, list[int]],
+    totals: dict[str, dict[str, Decimal]],
+    company_rate: Decimal,
+) -> list[dict[str, Any]]:
+    """按订单执行人和已保存配置准备分润表单，不改写历史记录。"""
+    roles = {"BUY": "BUYER", "SELL": "SALES", "OPERATION": "SERVICE", "COMPANY": "OWNER"}
+    rows = []
+    for kind, default_role in roles.items():
+        existing = [item for item in items if item.get("allocation_type") == kind]
+        stored = list(dict.fromkeys(item["user_id"] for item in existing
+                                   if isinstance(item.get("user_id"), int) and not isinstance(item["user_id"], bool) and item["user_id"] > 0))
+        group = totals.get(kind, {})
+        rows.append({
+            "allocation_type": kind,
+            "employee_ids": [] if kind == "COMPANY" else candidates[kind] or stored,
+            "role": (existing[0].get("role") if existing else None) or default_role,
+            "allocation_rate": str(company_rate) if kind == "COMPANY" else str(group.get("allocation_rate", "")),
+            "allocation_amount": "" if kind == "COMPANY" else str(group.get("allocation_amount", "")),
+        })
+    return rows

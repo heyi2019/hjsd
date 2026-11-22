@@ -114,6 +114,22 @@ def test_allocation_view_returns_grouped_rates_for_display(seeded_db, buy, sell,
     assert view["totals_by_type"]["SELL"]["allocation_rate"] == Decimal(sell_rate)
 
 
+def test_allocation_form_rows_preserve_totals_and_existing_people_when_no_candidates():
+    from app.business.profit_allocation.listing import allocation_form_rows
+
+    items = [
+        {"allocation_type": "BUY", "user_id": 1, "role": "BUYER"},
+        {"allocation_type": "BUY", "user_id": 2, "role": "BUYER"},
+    ]
+    totals = {"BUY": {"allocation_rate": Decimal("20.00"), "allocation_amount": Decimal("100.00")}}
+    candidates = {"BUY": [3], "SELL": [], "OPERATION": [], "COMPANY": []}
+    rows = allocation_form_rows(items, candidates, totals, Decimal("40.00"))
+    assert rows[0] == {"allocation_type": "BUY", "employee_ids": [3], "role": "BUYER", "allocation_rate": "20.00", "allocation_amount": "100.00"}
+    assert rows[-1]["allocation_rate"] == "40.00"
+    candidates["BUY"] = []
+    assert allocation_form_rows(items, candidates, totals, Decimal("40.00"))[0]["employee_ids"] == [1, 2]
+
+
 def test_allocation_candidates_follow_order_responsibles_and_events(seeded_db, seeded_client, headers):
     from app.core.security import CurrentUser
     from app.domain.trade import OrderEvent

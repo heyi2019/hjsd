@@ -7,7 +7,7 @@ import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import type { Order } from "../../shared/api/types/orders";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { buildActionAllocationRows, type ActionAllocationCandidates, type AllocationFormRow } from "./allocationHelpers";
+import { type ActionAllocationCandidates } from "./allocationHelpers";
 
 export function useProfitAllocation(selectedOrder: Order | null, actionRequest: LatestRequest) {
   const [allocationOpen, setAllocationOpen] = useState(false);
@@ -40,22 +40,16 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
         employeesApi.list(),
       ]);
       if (!actionRequest.isCurrent(session)) return;
-      if (typeof result.order_profit !== "string" || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type || !result.action_candidates
+      if (typeof result.order_profit !== "string" || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type || !Array.isArray(result.form_rows) || !result.action_candidates
         || !(["BUY", "SELL", "OPERATION", "COMPANY"] as const).every((key) => Array.isArray(result.action_candidates[key]))) {
         appMessage.error("分润数据不完整，请刷新后重试");
         return;
       }
       const candidates = result.action_candidates;
-      const rows: AllocationFormRow[] = buildActionAllocationRows(result.items, candidates, result.totals_by_type);
-      const companyRow = rows.find((row) => row.allocation_type === "COMPANY");
-      if (companyRow) {
-        companyRow.allocation_rate = result.company_rate;
-        companyRow.allocation_amount = "";
-      }
       // 弹窗是复用的：先清空上次打开残留的字段（含 form_extra 自定义字段），再回填本单数据。
       allocationForm.resetFields();
       allocationForm.setFieldsValue({
-        allocations: rows,
+        allocations: result.form_rows,
       });
       setActionOrder(order);
       setUsers(userResult.filter((item) => item.is_active));

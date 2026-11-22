@@ -55,13 +55,15 @@ cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 
 ## 开发命令
 
 ```bash
-# 后端针对性测试（本机；先确认测试库与开发库隔离）
-/Users/aries/.local/share/heijin-erp/pytest -q tests/backend/unit/system/test_settings.py
+# 准备本机隔离测试环境（依赖和独立 Redis）
+python3 backend/scripts/setup_test_environment.py
+# 后端针对性测试（先确认测试库与开发库隔离）
+scripts/ops/test-local.sh -q tests/backend/unit/system/test_settings.py
 
 # 迁移
 cd backend
-PYTHONPATH=/Users/aries/.local/share/heijin-erp/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic upgrade head
-PYTHONPATH=/Users/aries/.local/share/heijin-erp/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic check
+PYTHONPATH=../dependencies/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic upgrade head
+PYTHONPATH=../dependencies/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic check
 cd ..
 
 # 前端：守卫 + 类型 + 构建（build 自带前两步）

@@ -7,7 +7,7 @@ import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { workbenchSummary } from "@fixtures/api-responses";
-import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
+import { currentReportPeriod, previousReportPeriod } from "@/shared/lib/reportPeriod";
 /** 工作台页面组合、业务总览及消息交互；快捷入口功能由 QuickAccess.test.tsx 覆盖。 */
 
 vi.mock("@/shared/api/cashflows.api");

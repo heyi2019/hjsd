@@ -391,3 +391,4 @@ def test_profit_notification_details_batch_does_not_query_per_order(seeded_clien
     assert one.status_code == many.status_code == 200
     assert len(many.json()) == 3
     assert many_count <= one_count + 1, (one_count, many_count)
+    assert not any("from order_customer_roles" in sql.lower() or "from order_counterparty_roles" in sql.lower() for sql in statements)

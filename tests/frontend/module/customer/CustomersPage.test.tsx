@@ -16,7 +16,7 @@ import type { OrderFormField } from "@/shared/api/types/forms";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { resolveMockOnce } from "@fixtures/mock-api";
 import { customerDetail, customerSummary, pageResponse } from "@fixtures/api-responses";
-import { currentReportPeriod } from "@/reporting/reportPeriod";
+import { currentReportPeriod } from "@/shared/lib/reportPeriod";
 import { notifyReferenceDataChanged } from "@/shared/state/referenceDataEvents";
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");

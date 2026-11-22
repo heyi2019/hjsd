@@ -2,7 +2,7 @@ import { CalendarOutlined } from "@ant-design/icons";
 import { Form, InputNumber } from "antd";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
-import { currentReportPeriod } from "../../reporting/reportPeriod";
+import { currentReportPeriod } from "../../shared/lib/reportPeriod";
 import { optionSetsApi } from "../../shared/api/options.api";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { announceBusinessPeriodChange, BUSINESS_PERIOD_CODE } from "../../shared/state/businessPeriod";

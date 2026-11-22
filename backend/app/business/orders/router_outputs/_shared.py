@@ -6,11 +6,10 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.money import to_money, to_money_or_zero
+from app.core.money import to_money
 from app.domain.trade import OrderEvent
 from app.domain.users import User
 from app.business.orders import schemas
-from app.shared.order_amounts import ZERO
 from app.business.orders.output_labels import _selected_operator_label
 
 
@@ -33,26 +32,6 @@ def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
         return {}
     users = db.scalars(select(User).where(User.id.in_(ids))).all()
     return {user.id: user.display_name or user.username for user in users}
-
-
-def _sale_amount(order_type: str, events: list[OrderEvent]) -> Decimal | None:
-    """列表展示的售出金额：只取 SELL，不把 BUY 成本合进来。"""
-    sell_events = [event for event in events if event.event_type == "SELL"]
-    if not sell_events:
-        return None
-    # 回收/提号可取消售出后重新售出；补录日期可能早于前次，按事件编号识别本次。
-    # 历史资金流水仍单独参与利润计算。
-    if order_type in ("HS", "TH"):
-        return to_money(max(sell_events, key=lambda event: event.id).amount)
-    if order_type == "DG":
-        recorded = [
-            to_money_or_zero((event.form_extra or {}).get("sale_amount"))
-            for event in sell_events
-            if (event.form_extra or {}).get("sale_amount") not in (None, "")
-        ]
-        if recorded:
-            return sum(recorded, ZERO)
-    return sum((to_money(event.amount) for event in sell_events), ZERO)
 
 
 def cancellable_by_event(events: list[OrderEvent]) -> dict[int, Decimal]:

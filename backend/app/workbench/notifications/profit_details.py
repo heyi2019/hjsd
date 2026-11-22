@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.business.orders.router_outputs.list_payload import _order_list_payload
+from app.business.orders.amount_summaries import order_amount_summaries
 from app.business.inventory._common import scope_filter as account_scope_filter
 from app.core.security import CurrentUser
 from app.domain.notifications import Notification
@@ -28,7 +28,7 @@ def profit_details_for_notifications(db: Session, notifications: list[Notificati
     if not pairs:
         return []
     orders = [order for order, _ in pairs]
-    payload_by_id = {item["id"]: item for item in _order_list_payload(db, orders, accounts=[account for _, account in pairs])}
+    amounts_by_id, _ = order_amount_summaries(db, orders)
     orders_by_number = {order.order_no: order for order in orders}
     results = []
     settings = get_company_settings(db)
@@ -36,11 +36,11 @@ def profit_details_for_notifications(db: Session, notifications: list[Notificati
         order = orders_by_number.get(notification.entity_id)
         if order is None:
             continue
-        payload = payload_by_id[order.id]
-        profit = payload["profit_base"]
+        amounts = amounts_by_id[order.id]
+        profit = amounts.profit_base
         results.append(ProfitNotificationDetailOut(
             notification_id=notification.id, order_no=order.order_no,
-            sale_amount=payload["sale_amount"], cost_amount=payload["cost_amount"],
+            sale_amount=amounts.sale_amount, cost_amount=amounts.cost_amount,
             allocatable_profit=allocatable_profit_for(profit, company_rate_for_profit(profit, settings)),
         ))
     return results

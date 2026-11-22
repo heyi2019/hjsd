@@ -46,7 +46,7 @@ import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
 import dayjs from "dayjs";
-import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
+import { currentReportPeriod, previousReportPeriod } from "@/shared/lib/reportPeriod";
 import { setAntdDateRange } from "@fixtures/antdRange";
 
 let ui: ReturnType<typeof userEvent.setup>;

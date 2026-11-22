@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import dayjs from "dayjs";
 import { optionSetsApi } from "../api/options.api";
-import { currentReportPeriod, previousReportPeriod, type ReportPeriod } from "../../reporting/reportPeriod";
+import { currentReportPeriod, previousReportPeriod, type ReportPeriod } from "../lib/reportPeriod";
 
 export const BUSINESS_PERIOD_CODE = "BUSINESS_PERIOD";
 const PERIOD_CHANGED = "business-period-config-changed";

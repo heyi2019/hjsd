@@ -21,7 +21,7 @@ import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { BusinessPeriodProvider, useBusinessPeriod } from "@/shared/state/businessPeriod";
-import { previousReportPeriod } from "@/reporting/reportPeriod";
+import { previousReportPeriod } from "@/shared/lib/reportPeriod";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {

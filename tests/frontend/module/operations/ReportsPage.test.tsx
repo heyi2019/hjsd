@@ -9,7 +9,7 @@ import { Commission } from "@/reporting/reports/CommissionReport";
 import { MonthlyPnl } from "@/reporting/reports/MonthlyPnlReport";
 import { BusinessPnl } from "@/reporting/reports/BusinessPnlReport";
 import { OrderProfit } from "@/reporting/reports/OrderProfitReport";
-import { currentReportPeriod, previousReportPeriod } from "@/reporting/reportPeriod";
+import { currentReportPeriod, previousReportPeriod } from "@/shared/lib/reportPeriod";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { antdRangeValues, setAntdDateRange } from "@fixtures/antdRange";
 import { appMessage } from "@/shared/ui/appFeedback";

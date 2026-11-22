@@ -6,20 +6,18 @@ from datetime import datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.money import to_money
-from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.parties import (
     Counterparty,
     Customer,
     OrderCounterpartyRole,
     OrderCustomerRole,
 )
-from app.domain.trade import Account, Cashflow, Installment, OrderEvent
+from app.domain.trade import Account, Installment
 from app.domain.users import User
 from app.business.inventory.collaboration import register_order_list_payload_builder
 from app.business.orders.output_labels import _elapsed_label, _form_responsible_label, _selected_operator_label
-from app.shared.order_amounts import ZERO, event_totals, order_cashflow_profit_by_order
-from app.business.orders.router_outputs._shared import _operator_names, _sale_amount
+from app.business.orders.amount_summaries import order_amount_summaries
+from app.business.orders.router_outputs._shared import _operator_names
 
 
 def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | None = None) -> list[dict]:
@@ -29,7 +27,7 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         item.id: dict(item.form_extra or {}) for item in orders
     }
     order_ids = [item.id for item in orders]
-    cashflow_profits = order_cashflow_profit_by_order(db, order_ids=order_ids)
+    amount_summaries, events_by_order = order_amount_summaries(db, orders)
     account_ids = [item.account_id for item in orders if item.account_id is not None]
     accounts_by_id = (
         {item.id: item for item in accounts}
@@ -77,37 +75,6 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         ).all():
             parties.setdefault(order_id, (name, role, source, created_by, created_at))
 
-    events_by_order: dict[int, list[OrderEvent]] = {}
-    if order_ids:
-        for event in db.scalars(
-            select(OrderEvent)
-            .where(OrderEvent.order_id.in_(order_ids), OrderEvent.is_posted.is_(True))
-            .order_by(OrderEvent.occurred_on.desc(), OrderEvent.id.desc())
-        ).all():
-            events_by_order.setdefault(event.order_id, []).append(event)
-
-    # 订单初始费用是资金明细，不生成额外业务事件。
-    # 只取未关联业务事件的成本流水，避免把业务事件派生流水重复计入。
-    # （初始费用仅回收/提号订单可提交，DG 无初始成本；此处只需识别两种直接成本属性。）
-    unlinked_cost_by_order = {
-        order_id: to_money(total or 0)
-        for order_id, total in db.execute(
-            select(Cashflow.order_id, func.coalesce(func.sum(Cashflow.amount), 0))
-            .where(
-                Cashflow.order_id.in_(order_ids),
-                Cashflow.source_type != CashflowSourceType.ORDER_EVENT.value,
-                Cashflow.direction == Direction.OUT.value,
-                Cashflow.accounting_attribute.in_(
-                    (
-                        AccountingAttribute.SELF_DIRECT_COST.value,
-                        AccountingAttribute.TH_DIRECT_COST.value,
-                    )
-                ),
-            )
-            .group_by(Cashflow.order_id)
-        ).all()
-    } if order_ids else {}
-
     operator_names = _operator_names(
         db,
         [event for events in events_by_order.values() for event in events],
@@ -132,8 +99,7 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         snapshot = order.account_snapshot or {}
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
-        income, event_cost, additional_cost = event_totals(events)
-        total_cost = event_cost + additional_cost + unlinked_cost_by_order.get(order.id, ZERO)
+        amounts = amount_summaries[order.id]
         latest = events[0] if events else None
         sale_events = [event for event in events if event.event_type == "SELL"]
         sale_event = (
@@ -188,11 +154,11 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             "sale_at": sale_at,
             "sale_operator": sale_operator,
             "in_hand_time": _elapsed_label(inventory_entry_at, sale_at),
-            "sale_amount": _sale_amount(order.order_type, events),
-            "cost_amount": total_cost,
+            "sale_amount": amounts.sale_amount,
+            "cost_amount": amounts.cost_amount,
             # 台账利润与利润分配、报表共用现金流口径：所有收入 − 所有支出，
             # 收入含返点，支出含分期坏账；不能再用 SELL/BUY/COST 事件推导。
-            "profit_base": cashflow_profits.get(order.id, ZERO),
+            "profit_base": amounts.profit_base,
             "last_event_type": latest.event_type if latest else None,
             "last_event_amount": latest.amount if latest else None,
             "last_event_on": latest.occurred_on if latest else None,

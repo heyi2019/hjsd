@@ -38,6 +38,8 @@ def test_macos_regression_uses_isolated_python313(monkeypatch, tmp_path):
     monkeypatch.setattr(rr.Path, "home", lambda: Path("/Users/aries"))
     monkeypatch.setattr(rr, "LOCAL_TEST_PYTHON", python, raising=False)
     monkeypatch.setattr(rr, "LOCAL_TEST_DEPENDENCIES", dependencies, raising=False)
+    monkeypatch.setattr(rr, "runtime_mismatches", lambda _lock, _runtime: [])
+    monkeypatch.setattr(rr, "test_tool_mismatches", lambda _requirements, _runtime: [])
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.delenv("TEST_REDIS_URL", raising=False)
     monkeypatch.setenv("PYTHONPATH", "/existing")
@@ -48,6 +50,9 @@ def test_macos_regression_uses_isolated_python313(monkeypatch, tmp_path):
     assert env["TEST_REDIS_URL"] == "redis://127.0.0.1:6389/0"
     monkeypatch.setenv("TEST_REDIS_URL", "redis://127.0.0.1:6390/1")
     assert rr.pytest_runtime()[1]["TEST_REDIS_URL"] == "redis://127.0.0.1:6390/1"
+    monkeypatch.setattr(rr, "runtime_mismatches", lambda _lock, _runtime: ["redis 版本不符"])
+    with pytest.raises(SystemExit, match="锁文件不一致"):
+        rr.pytest_runtime()
 
     dependencies.rmdir()
     with pytest.raises(SystemExit, match="隔离依赖"):
@@ -83,6 +88,73 @@ def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
     assert len(calls) == 2
     assert all(command[:3] == ["test-python", "-m", "pytest"] and kwargs["env"]["PYTHONPATH"] == "isolated"
                for command, kwargs in calls)
+
+
+def test_runtime_check_detects_missing_and_stale_locked_dependencies(tmp_path):
+    from scripts.setup_test_environment import runtime_mismatches, test_tool_mismatches
+
+    lock = tmp_path / "requirements.lock.txt"
+    lock.write_text("redis==5.2.1\nsqlalchemy==2.1.9\n", encoding="utf-8")
+    target = tmp_path / "runtime"
+    target.mkdir()
+    dist = target / "redis-5.2.0.dist-info"
+    dist.mkdir()
+    (dist / "METADATA").write_text("Name: redis\nVersion: 5.2.0\n", encoding="utf-8")
+    assert runtime_mismatches(lock, target) == ["redis: 5.2.0 != 5.2.1", "sqlalchemy: 未安装 != 2.1.9"]
+    (dist / "METADATA").write_text("Name: redis\nVersion: 5.2.1\n", encoding="utf-8")
+    dist2 = target / "sqlalchemy-2.1.9.dist-info"
+    dist2.mkdir()
+    (dist2 / "METADATA").write_text("Name: SQLAlchemy\nVersion: 2.1.9\n", encoding="utf-8")
+    assert runtime_mismatches(lock, target) == []
+    dev = tmp_path / "requirements-dev.txt"
+    dev.write_text("pytest>=8.0.0\npytest-xdist==3.8.0\nhttpx==0.27.2\n", encoding="utf-8")
+    assert len(test_tool_mismatches(dev, target)) == 3
+    for name, version in (("pytest", "9.1.1"), ("pytest-xdist", "3.8.0"), ("httpx", "0.27.2")):
+        package = target / f"{name}-{version}.dist-info"
+        package.mkdir()
+        (package / "METADATA").write_text(f"Name: {name}\nVersion: {version}\n", encoding="utf-8")
+    assert test_tool_mismatches(dev, target) == []
+
+
+def test_failed_runtime_install_keeps_existing_dependencies(monkeypatch, tmp_path):
+    import subprocess
+    from scripts import setup_test_environment as setup
+
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "existing").write_text("keep", encoding="utf-8")
+    python = tmp_path / "python3"
+    python.touch()
+    monkeypatch.setattr(setup, "RUNTIME", runtime)
+    monkeypatch.setattr(setup, "PYTHON", python)
+    monkeypatch.setattr(setup, "runtime_mismatches", lambda _lock, _runtime: ["not ready"])
+    def fail(command, **_kwargs):
+        if "venv" in command:
+            return
+        assert "installer" in command[0]
+        assert "--ignore-installed" in command
+        raise subprocess.CalledProcessError(1, "pip")
+    monkeypatch.setattr(setup.subprocess, "run", fail)
+    with pytest.raises(subprocess.CalledProcessError):
+        setup.prepare_runtime()
+    assert (runtime / "existing").read_text(encoding="utf-8") == "keep"
+
+
+def test_setup_rejects_redis_with_nonlocal_port(monkeypatch):
+    import json
+    from types import SimpleNamespace
+    from scripts import setup_test_environment as setup
+
+    calls = []
+    container = [{"HostConfig": {"PortBindings": {"6379/tcp": [{"HostIp": "0.0.0.0", "HostPort": "6389"}]}},
+                  "Config": {"Image": "redis:7-alpine"}, "State": {"Running": True}}]
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(container))
+    monkeypatch.setattr(setup.subprocess, "run", fake_run)
+    with pytest.raises(RuntimeError, match="不是预期的独立本机 Redis"):
+        setup.ensure_redis()
+    assert len(calls) == 1
 
 
 def _disk_names() -> set[str]:

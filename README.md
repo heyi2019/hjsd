@@ -11,7 +11,7 @@ FastAPI + React 的工作室经营系统。后端入口为 `app/main.py`。
 ```bash
 # 0) 环境（一次性）
 python3 -m venv backend/.venv
-backend/.venv/bin/python -m pip install -r backend/requirements-dev.txt
+backend/.venv/bin/python -m pip install -r backend/requirements-dev.lock.txt
 npm install
 
 # 1) 配置（一次性）—— .env 必须在**仓库根目录**
@@ -57,6 +57,9 @@ cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 
 ```bash
 # 准备本机隔离测试环境（依赖和独立 Redis）
 python3 backend/scripts/setup_test_environment.py
+# 修改后端依赖声明后，在仓库根目录重新生成对应锁文件
+# backend/.venv/bin/pip-compile --no-emit-index-url --output-file=backend/requirements.lock.txt --strip-extras backend/requirements.txt
+# backend/.venv/bin/pip-compile --no-emit-index-url --allow-unsafe --constraint backend/requirements.lock.txt --output-file=backend/requirements-dev.lock.txt --strip-extras backend/requirements-dev.txt
 # 后端针对性测试（先确认测试库与开发库隔离）
 scripts/ops/test-local.sh -q tests/backend/unit/system/test_settings.py
 

@@ -39,7 +39,6 @@ def test_macos_regression_uses_isolated_python313(monkeypatch, tmp_path):
     monkeypatch.setattr(rr, "LOCAL_TEST_PYTHON", python, raising=False)
     monkeypatch.setattr(rr, "LOCAL_TEST_DEPENDENCIES", dependencies, raising=False)
     monkeypatch.setattr(rr, "runtime_mismatches", lambda _lock, _runtime: [])
-    monkeypatch.setattr(rr, "test_tool_mismatches", lambda _requirements, _runtime: [])
     monkeypatch.delenv("CI", raising=False)
     monkeypatch.delenv("TEST_REDIS_URL", raising=False)
     monkeypatch.setenv("PYTHONPATH", "/existing")
@@ -48,6 +47,10 @@ def test_macos_regression_uses_isolated_python313(monkeypatch, tmp_path):
     assert runner == str(python)
     assert env["PYTHONPATH"] == f"{dependencies}:/existing"
     assert env["TEST_REDIS_URL"] == "redis://127.0.0.1:6389/0"
+    checked = []
+    monkeypatch.setattr(rr, "runtime_mismatches", lambda lock, _runtime: checked.append(lock.name) or [])
+    rr.pytest_runtime()
+    assert "requirements-dev.lock.txt" in checked
     monkeypatch.setenv("TEST_REDIS_URL", "redis://127.0.0.1:6390/1")
     assert rr.pytest_runtime()[1]["TEST_REDIS_URL"] == "redis://127.0.0.1:6390/1"
     monkeypatch.setattr(rr, "runtime_mismatches", lambda _lock, _runtime: ["redis 版本不符"])
@@ -91,7 +94,7 @@ def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
 
 
 def test_runtime_check_detects_missing_and_stale_locked_dependencies(tmp_path):
-    from scripts.setup_test_environment import runtime_mismatches, test_tool_mismatches
+    from scripts.setup_test_environment import runtime_mismatches
 
     lock = tmp_path / "requirements.lock.txt"
     lock.write_text("redis==5.2.1\nsqlalchemy==2.1.9\n", encoding="utf-8")
@@ -106,14 +109,16 @@ def test_runtime_check_detects_missing_and_stale_locked_dependencies(tmp_path):
     dist2.mkdir()
     (dist2 / "METADATA").write_text("Name: SQLAlchemy\nVersion: 2.1.9\n", encoding="utf-8")
     assert runtime_mismatches(lock, target) == []
-    dev = tmp_path / "requirements-dev.txt"
-    dev.write_text("pytest>=8.0.0\npytest-xdist==3.8.0\nhttpx==0.27.2\n", encoding="utf-8")
-    assert len(test_tool_mismatches(dev, target)) == 3
-    for name, version in (("pytest", "9.1.1"), ("pytest-xdist", "3.8.0"), ("httpx", "0.27.2")):
+    dev = tmp_path / "requirements-dev.lock.txt"
+    dev.write_text("pytest==9.1.1\npytest-xdist==3.8.0\nhttpcore==1.0.9\n", encoding="utf-8")
+    assert len(runtime_mismatches(dev, target)) == 3
+    for name, version in (("pytest", "9.1.1"), ("pytest-xdist", "3.8.0"), ("httpcore", "1.0.9")):
         package = target / f"{name}-{version}.dist-info"
         package.mkdir()
         (package / "METADATA").write_text(f"Name: {name}\nVersion: {version}\n", encoding="utf-8")
-    assert test_tool_mismatches(dev, target) == []
+    assert runtime_mismatches(dev, target) == []
+    (target / "httpcore-1.0.9.dist-info" / "METADATA").write_text("Name: httpcore\nVersion: 1.0.8\n", encoding="utf-8")
+    assert runtime_mismatches(dev, target) == ["httpcore: 1.0.8 != 1.0.9"]
 
 
 def test_failed_runtime_install_keeps_existing_dependencies(monkeypatch, tmp_path):

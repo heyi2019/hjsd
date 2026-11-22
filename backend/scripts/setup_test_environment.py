@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LOCK = ROOT / "backend/requirements.lock.txt"
-DEV_REQUIREMENTS = ROOT / "backend/requirements-dev.txt"
+DEV_LOCK = ROOT / "backend/requirements-dev.lock.txt"
 RUNTIME = ROOT / "dependencies/python313-runtime"
 PYTHON = Path("/Users/aries/Applications/Python_3.13/bin/python3")
 REDIS_NAME = "heijin-test-redis"
@@ -39,40 +39,8 @@ def runtime_mismatches(lock: Path, runtime: Path) -> list[str]:
     return mismatches
 
 
-def test_tool_mismatches(requirements: Path, runtime: Path) -> list[str]:
-    """检查测试运行必需的工具，版本约束以开发依赖文件为准。"""
-    installed: dict[str, set[str]] = {}
-    for dist in importlib.metadata.distributions(path=[str(runtime)]):
-        name = dist.metadata.get("Name")
-        if name:
-            installed.setdefault(re.sub(r"[-_.]+", "-", name).lower(), set()).add(dist.version)
-    wanted_tools = {"pytest", "pytest-xdist", "httpx"}
-    found: set[str] = set()
-    mismatches = []
-    for line in requirements.read_text(encoding="utf-8").splitlines():
-        match = re.fullmatch(r"(pytest|pytest-xdist|httpx)(==|>=)([0-9.]+)", line.strip())
-        if not match:
-            continue
-        name, op, wanted = match.groups()
-        found.add(name)
-        versions = installed.get(name, set())
-        valid = len(versions) == 1
-        if valid:
-            version = next(iter(versions))
-            if op == "==":
-                valid = version == wanted
-            else:
-                match_version = re.fullmatch(r"[0-9]+(?:\.[0-9]+)*", version)
-                valid = bool(match_version) and tuple(map(int, version.split("."))) >= tuple(map(int, wanted.split(".")))
-        if not valid:
-            actual = ", ".join(sorted(versions)) if versions else "未安装"
-            mismatches.append(f"{name}: {actual} 不满足 {op}{wanted}")
-    mismatches.extend(f"{name}: 开发依赖未声明" for name in sorted(wanted_tools - found))
-    return mismatches
-
-
 def prepare_runtime() -> None:
-    mismatches = runtime_mismatches(LOCK, RUNTIME) + test_tool_mismatches(DEV_REQUIREMENTS, RUNTIME)
+    mismatches = runtime_mismatches(LOCK, RUNTIME) + runtime_mismatches(DEV_LOCK, RUNTIME)
     if not mismatches:
         print("Python 测试依赖已与锁文件一致")
         return
@@ -90,8 +58,8 @@ def prepare_runtime() -> None:
         raise RuntimeError(f"存在上次保留的依赖目录，请先检查: {previous}")
     try:
         subprocess.run([str(PYTHON), "-I", "-m", "venv", str(installer)], check=True)
-        subprocess.run([str(installer / "bin/python"), "-I", "-m", "pip", "install", "--ignore-installed", "--target", str(staging), "-r", str(LOCK), "-r", str(DEV_REQUIREMENTS)], check=True)
-        remaining = runtime_mismatches(LOCK, staging) + test_tool_mismatches(DEV_REQUIREMENTS, staging)
+        subprocess.run([str(installer / "bin/python"), "-I", "-m", "pip", "install", "--ignore-installed", "--target", str(staging), "-r", str(LOCK), "-r", str(DEV_LOCK)], check=True)
+        remaining = runtime_mismatches(LOCK, staging) + runtime_mismatches(DEV_LOCK, staging)
         if remaining:
             raise RuntimeError("新依赖与锁文件不一致: " + "; ".join(remaining))
         if RUNTIME.exists():
@@ -130,7 +98,7 @@ def main() -> None:
     parser.add_argument("--check", action="store_true", help="只检查依赖与锁文件是否一致")
     args = parser.parse_args()
     if args.check:
-        mismatches = runtime_mismatches(LOCK, RUNTIME) + test_tool_mismatches(DEV_REQUIREMENTS, RUNTIME)
+        mismatches = runtime_mismatches(LOCK, RUNTIME) + runtime_mismatches(DEV_LOCK, RUNTIME)
         if mismatches:
             raise SystemExit("测试依赖不一致，请运行 python3 backend/scripts/setup_test_environment.py：\n" + "\n".join(mismatches))
         print("Python 测试依赖与锁文件一致")

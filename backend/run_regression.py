@@ -26,7 +26,7 @@ PYTHON = ROOT / ".venv" / "bin" / "python"
 LOCAL_TEST_PYTHON = Path("/Users/aries/Applications/Python_3.13/bin/python3")
 LOCAL_TEST_DEPENDENCIES = REPO / "dependencies" / "python313-runtime"
 
-from scripts.setup_test_environment import runtime_mismatches, test_tool_mismatches  # noqa: E402
+from scripts.setup_test_environment import runtime_mismatches  # noqa: E402
 
 # 模块/类型/跨模块筛选统一走共享目录（单一事实源）
 sys.path.insert(0, str(REPO / "tests" / "config"))
@@ -133,7 +133,7 @@ def pytest_runtime() -> tuple[str, dict[str, str]]:
         if not LOCAL_TEST_PYTHON.is_file() or not LOCAL_TEST_DEPENDENCIES.is_dir():
             raise SystemExit("缺少 Python 3.13 或本项目隔离依赖，请先运行 python3 backend/scripts/setup_test_environment.py")
         mismatches = (runtime_mismatches(ROOT / "requirements.lock.txt", LOCAL_TEST_DEPENDENCIES)
-                      + test_tool_mismatches(ROOT / "requirements-dev.txt", LOCAL_TEST_DEPENDENCIES))
+                      + runtime_mismatches(ROOT / "requirements-dev.lock.txt", LOCAL_TEST_DEPENDENCIES))
         if mismatches:
             raise SystemExit("测试依赖与锁文件不一致，请先运行 python3 backend/scripts/setup_test_environment.py：\n" + "\n".join(mismatches))
         existing = env.get("PYTHONPATH")

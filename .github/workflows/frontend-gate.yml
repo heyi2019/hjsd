@@ -10,7 +10,7 @@ name: frontend-gate
 # 并由它把「原始 push 范围」的变更路径集经 changed_paths 传入，天然不含自动发版改的版本文件。
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
   pull_request:
   workflow_dispatch:
     inputs:

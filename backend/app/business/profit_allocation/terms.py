@@ -17,17 +17,13 @@ from app.domain.trade import Order
 from app.shared.order_access import get_order
 from .company_settings import CompanyProfitSettings, get_company_settings
 
-DEFAULT_PROFIT_COMPANY_RATE = Decimal("40")
-DEFAULT_LOSS_COMPANY_RATE = Decimal("50")
-
-
 def validate_amount_directions(amounts: list[Decimal], profit: Decimal) -> None:
     """每笔金额均须与订单盈亏方向一致，禁止正负互抵掩盖超额分配。"""
     if any((profit > 0 and amount < 0) or (profit < 0 and amount > 0) or (profit == 0 and amount != 0) for amount in amounts):
         raise Validation("每笔分润金额方向必须与订单利润一致")
 
 
-def company_rate_for_order(order: Order, order_profit: Decimal, settings: CompanyProfitSettings) -> Decimal:
+def company_rate_for_profit(order_profit: Decimal, settings: CompanyProfitSettings) -> Decimal:
     """公司分润比例按订单盈亏读取当前配置。"""
     raw = settings.loss_rate if order_profit < 0 else settings.profit_rate
     rate = to_money(raw or 0)
@@ -53,7 +49,7 @@ def allocatable_profit_for(order_profit: Decimal, company_rate: Decimal) -> Deci
 def allocation_terms(session: Session, order: Order) -> dict[str, Decimal]:
     """根据已校验的订单计算利润与分配口径。"""
     order_profit = order_profit_of(session, order)
-    company_rate = company_rate_for_order(order, order_profit, get_company_settings(session))
+    company_rate = company_rate_for_profit(order_profit, get_company_settings(session))
     return {
         "order_profit": order_profit,
         "company_rate": company_rate,
@@ -96,11 +92,9 @@ def convert_action_allocation(
 
 
 __all__ = [
-    "DEFAULT_LOSS_COMPANY_RATE",
-    "DEFAULT_PROFIT_COMPANY_RATE",
     "allocatable_profit_for",
     "allocation_terms",
-    "company_rate_for_order",
+    "company_rate_for_profit",
     "convert_action_allocation",
     "order_profit_of",
 ]

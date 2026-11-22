@@ -44,7 +44,7 @@ from .listing import summarize_allocations_by_type
 from .person import set_person_allocations
 from .terms import (
     allocation_terms,
-    company_rate_for_order,
+    company_rate_for_profit,
     convert_action_allocation,
     order_profit_of,
 )
@@ -118,7 +118,7 @@ def set_allocations(
                 normalized_items = expand_action_form_rows(
                     typed,
                     order_profit=order_profit,
-                    company_rate=company_rate_for_order(order, order_profit, get_company_settings(session)),
+                    company_rate=company_rate_for_profit(order_profit, get_company_settings(session)),
                 )
             result = set_action_allocations(
                 session, order, items=normalized_items, actor=actor

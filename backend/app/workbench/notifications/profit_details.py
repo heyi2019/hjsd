@@ -10,7 +10,7 @@ from app.core.security import CurrentUser
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order
 from app.business.profit_allocation.company_settings import get_company_settings
-from app.business.profit_allocation.terms import allocatable_profit_for, company_rate_for_order
+from app.business.profit_allocation.terms import allocatable_profit_for, company_rate_for_profit
 from app.shared.scope import owner_scope_filter
 from .schemas import ProfitNotificationDetailOut
 
@@ -41,6 +41,6 @@ def profit_details_for_notifications(db: Session, notifications: list[Notificati
         results.append(ProfitNotificationDetailOut(
             notification_id=notification.id, order_no=order.order_no,
             sale_amount=payload["sale_amount"], cost_amount=payload["cost_amount"],
-            allocatable_profit=allocatable_profit_for(profit, company_rate_for_order(order, profit, settings)),
+            allocatable_profit=allocatable_profit_for(profit, company_rate_for_profit(profit, settings)),
         ))
     return results

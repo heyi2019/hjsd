@@ -39,4 +39,5 @@
 
 - `.github/workflows/`：`backend-gate` / `frontend-gate` / `lint-gate` / `main-ci-cd` / `deploy-production` / `rollback`。
 - main 的 push 由 `main-ci-cd` 在 release sha 上统一 dispatch 三道门禁，再触发生产部署；PR 直接触发门禁。
+- `dev` 的直接 push 也触发三道门禁（三个 gate 的 `branches` 含 dev）；main/master push 仍由 main-ci-cd 统一 dispatch，不重复跑。
 - CI 能拦语法、pyflakes、测试回归；**拦不住业务语义跑偏**——第 1 节的口径必须靠 agent 自觉遵守。

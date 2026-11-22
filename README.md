@@ -4,7 +4,7 @@ FastAPI + React 的工作室经营系统。后端入口为 `app/main.py`。
 
 开发与本地验收见 [研发流程](docs/研发流程.md)，测试见 [测试流程](docs/测试流程.md)，阿里云上线见 [发布流程](docs/发布流程.md)，版本规则与记录见 [版本管理](docs/版本管理.md)。
 
-> 发布通道：远端只有 `origin/main`，`git push origin main` 后由 `main-ci-cd` 同时启动 lint / frontend / backend 门禁与镜像构建，门禁全绿后才部署到 ECS。**推送即触发生产发布**，纯文档提交同样会触发。
+> 开发主线为 `origin/dev`，发布分支为 `origin/main`。更新 `main` 后由 `main-ci-cd` 同时启动 lint / frontend / backend 门禁与镜像构建，门禁全绿后才部署到 ECS。**更新 main 即触发生产发布**，纯文档提交同样会触发。
 
 ## 快速启动
 
@@ -31,7 +31,7 @@ cd backend && .venv/bin/python -m uvicorn app.main:app --reload --host 0.0.0.0 -
 cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 --strictPort
 ```
 
-前端代理端口读取 `VITE_BACKEND_PORT`，开发环境固定为前端 `5188` → 后端 `8123`；本地 `main` worktree 使用前端 `5199` → 后端 `8125`。其他测试端口和验证方式见 [研发流程](docs/研发流程.md)。
+前端代理端口读取 `VITE_BACKEND_PORT`，开发环境固定为前端 `5188` → 后端 `8123`。本地不保留 `main` worktree；测试和验证方式见 [研发流程](docs/研发流程.md)。
 
 登录页会先检查 `/api/health`。后端未启动或端口不一致时，会直接提示连接问题，
 不会再把 Vite 代理错误显示成笼统的 500。

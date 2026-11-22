@@ -11,8 +11,8 @@ FastAPI + React 的工作室经营系统。后端入口为 `app/main.py`。
 ```bash
 # 0) 环境（一次性）
 python3 -m venv backend/.venv
-backend/.venv/bin/pip install -r backend/requirements-dev.txt
-cd frontend && npm install && cd ..
+backend/.venv/bin/python -m pip install -r backend/requirements-dev.txt
+npm install
 
 # 1) 配置（一次性）—— .env 必须在**仓库根目录**
 cp .env.example .env
@@ -50,24 +50,23 @@ cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 
 ### 配置约定
 
 - `.env` 查找顺序：`ERP_ENV_FILE` 覆盖 → 仓库根 `.env` → `backend/.env`。
-  **根目录优先**，测试对此有断言（`tests/v1/test_settings.py`）。
-- `DATABASE_URL` 必须是 v1 库。`core.settings` 硬拒绝 `heijin.db` / `heijin_v2.db`
-  两个 v0 遗留库，防止误建。
-- `*.db` 不入版本库，本地库由 `scripts/v1_init_db.py` 重建。
+- 本地开发使用 PostgreSQL 的 `heijin_erp_dev`；测试使用独立的 `heijin_erp_test`，运行前必须确认两者隔离。
 
 ## 开发命令
 
 ```bash
-# 后端测试
-cd backend && .venv/bin/python -m pytest tests -q
+# 后端针对性测试（本机；先确认测试库与开发库隔离）
+/Users/aries/.local/share/heijin-erp/pytest -q tests/backend/unit/system/test_settings.py
 
 # 迁移
-cd backend && .venv/bin/python -m alembic upgrade head
-cd backend && .venv/bin/python -m alembic check          # 应为「无新差异」
+cd backend
+PYTHONPATH=/Users/aries/.local/share/heijin-erp/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic upgrade head
+PYTHONPATH=/Users/aries/.local/share/heijin-erp/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic check
+cd ..
 
 # 前端：守卫 + 类型 + 构建（build 自带前两步）
-cd frontend && npm run check
-cd frontend && npm run build
+(cd frontend && npm run check)
+(cd frontend && npm run build)
 ```
 
 `npm run build` 会先跑 `scripts/ui_guards.mjs`：校验后端枚举状态值是否都被
@@ -77,27 +76,23 @@ cd frontend && npm run build
 
 | 目录 | 职责 |
 |---|---|
-| `backend/app/core` | settings / database / money / errors / security / audit / numbering |
+| `backend/app/core` | settings / database / money / errors / security 等技术底座 |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
-| `backend/app` 领域包 | 20 个已挂载 router：`field_definitions` `customer_center` `orders` + `orders.form_fields` `installments` `finance` `stocks` `reporting` `profit_allocation` `notifications` `audit` `auth` + `auth.admin`（人员）+ `auth.teams` `attachments` `options` `lists`；`core`/`domain` 为基础设施与 ORM，`shared` 为跨域共享原语（无独立 router） |
+| `backend/app` 领域包 | `business`、`customers`、`funds`、`operations`、`settings`、`workbench`；`shared` 为跨域共享原语 |
 | `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
-| `backend/alembic/squashed_versions` | 唯一活动迁移基线 `0001`，用于全新 PostgreSQL 数据库初始化 |
 | `tests/backend` | 后端测试（pytest，按实际磁盘文件数维护） |
-| `frontend/src` | 按业务域拆分（`orders/` `stocks/` `customers/` `installments/` `pools/` `rebates/` `reporting/` 等 20 个目录），无 `pages/`；`shared/` 为 UI 与 API 基础层 |
+| `frontend/src` | 按业务域拆分，包含 `app`、`business`、`customer-center`、`finance`、`reporting`、`settings` 等；`shared` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
 | `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 ux-audit 的 E2E 证据（JSON 与截图），历史文档已于 2026-11-11 全部清退 |
-| `rawdata/原始数据` | 金山文档导出的 5 份只读 JSON |
+| `dependencies` | 本机 Python 依赖及前端依赖入口；不进入 Git 和 Docker 构建上下文 |
 | `data` `logs` `outputs` | 运行态与生成物，默认不提交 |
 
 ## 关键业务约束
 
 写代码前必看 `docs/PRD.md` 与 `docs/数据字典.md`（旧功能规格 F01 已下线，编号体系见 `docs/testing/测试元数据台账.csv`（`FEATURE` 记录）），几条最容易踩的：
 
-- **分润比例**：公司分润比例固定为盈利 40% / 亏损 50%；规则快照字段已下线，
-  订单 / 返点 / 分期不再保存规则版本与参数快照。
-  同一定义下区间不得重叠——两个都无失效日的版本必然重叠，必须拒绝。
+- **分润比例**：公司盈利和亏损分润比例可在设置中调整，默认分别为 40% 和 50%；已有订单按当前设置和原人员占比计算。
 - **金额** 一律 `core.money.Amount`（DECIMAL(18,2)）+ `to_money()`，禁止 float 参与计算。
-- **写路径** 一律走 Service 事务 + `core.audit.record_audit`，路由层不直接改模型。
-- **权限** `require_permissions(...)` 返回的已是 `Depends` 对象，路由里**直接作默认值**，
-  不要再包一层 `Depends()`。
+- **写路径** 一律走 Service 事务 + `shared.audit.record_audit`，路由层不直接改模型。
+- **权限** 使用 `settings.auth.session.require_permissions` 配合 FastAPI `Depends`。
 - **校验错误** 抛 `Validation` 映射 **422**（非 400），断言要按项目惯例写。

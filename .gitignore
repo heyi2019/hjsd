@@ -6,6 +6,7 @@ venv/
 .DS_Store
 .pytest_cache/
 node_modules/
+/dependencies/
 dist/
 .env
 **/.env.local
@@ -45,15 +46,9 @@ htmlcov/
 # 运行期目录：日志与截图产物，不入版本库
 /logs/*
 !/logs/.gitkeep
-# outputs：运行产物目录。11-11 清退一次性导入脚本后，入库的只剩目录说明与
-# legacy_import 的核对脚本；csv/xlsx/json 等数据产物一律不入库。
+# outputs：运行产物不入版本库，仅保留目录说明。
 /outputs/*
 !/outputs/README.md
-# 父目录被 /outputs/* 忽略后，子文件需先放行父目录才能被 ! 救回
-/outputs/*/
-!/outputs/legacy_import/
-/outputs/legacy_import/*
-!/outputs/legacy_import/*.py
 
 # 附件上传运行产物，不纳入代码版本库
 /backend/data/attachments/*

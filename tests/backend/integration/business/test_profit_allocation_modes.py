@@ -169,6 +169,32 @@ def test_grouped_allocation_derives_responsible_ids_on_server(seeded_db):
     assert order.form_extra["operation_responsible_ids"] == [1]
 
 
+@pytest.mark.parametrize(("buy", "sell", "amounts_changed", "expected_status"), [
+    ("1000", "1000", False, 200),
+    ("1000", "1000", True, 422),
+    ("1000", "1500", False, 200),
+])
+def test_allocation_form_uses_server_profit_to_choose_save_mode(
+    seeded_client, seeded_db, headers, buy, sell, amounts_changed, expected_status,
+):
+    order_id = _order_with_profit(seeded_db, buy=buy, sell=sell)
+    zero = buy == sell
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "60" if zero else "20", "allocation_amount": "0" if zero else "100"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "0" if zero else "40", "allocation_amount": "0" if zero else "200"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0", "allocation_amount": "0"},
+        {"allocation_type": "COMPANY", "employee_ids": [], "role": "OWNER", "allocation_rate": "40", "allocation_amount": None},
+    ]
+    missing = seeded_client.put(f"/api/orders/{order_id}/profit-allocations", headers=headers, json={"items": items})
+    assert missing.status_code == 422
+    response = seeded_client.put(f"/api/orders/{order_id}/profit-allocations", headers=headers, json={"items": items, "amounts_changed": amounts_changed})
+    assert response.status_code == expected_status, response.text
+    if expected_status == 200:
+        row = next(item for item in response.json()["form_rows"] if item["allocation_type"] == "BUY")
+        assert Decimal(row["allocation_rate"]) == Decimal("60" if zero else "20")
+        assert Decimal(row["allocation_amount"]) == Decimal("0" if zero else "100")
+
+
 def test_zero_profit_grouped_rates_survive_resaving(seeded_db):
     order_id = _order_with_profit(seeded_db, buy="1000", sell="1000")
     seeded_db.get(Order, order_id).form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}

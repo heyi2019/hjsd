@@ -162,7 +162,6 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
-    allocationOrderProfit,
     employeeOptions,
     load,
     loadLedgerDetail,
@@ -184,20 +183,15 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
     const session = getAllocationSession();
     await write.run(async () => {
       try {
-        // 零利润时金额不能表达原人员权重；未修改金额则保留已有比例。
-        const preserveRates = Number(allocationOrderProfit) === 0
-          && rows.some((item) => Number(item.allocation_rate || 0) !== 0)
-          && !rows.some((_, index) => allocationForm.isFieldTouched(["allocations", index, "allocation_amount"]));
+        const amountsChanged = rows.some((_, index) => allocationForm.isFieldTouched(["allocations", index, "allocation_amount"]));
         const payloadRows = rows.map((item) => ({
           allocation_type: item.allocation_type,
           employee_ids: item.employee_ids ?? [],
           role: item.role ?? "OWNER",
-          allocation_rate: preserveRates ? (item.allocation_rate?.trim() || "0") : null,
-          allocation_amount: preserveRates || item.allocation_type === "COMPANY"
-            ? null
-            : (item.allocation_amount?.trim() ? item.allocation_amount : null),
+          allocation_rate: item.allocation_rate?.trim() || null,
+          allocation_amount: item.allocation_amount?.trim() || null,
         }));
-        await profitAllocationApi.set(actionOrder.id, payloadRows, formExtraOrUndefined(values.form_extra));
+        await profitAllocationApi.set(actionOrder.id, payloadRows, formExtraOrUndefined(values.form_extra), amountsChanged);
         appMessage.success("分润已保存");
         const savedOrder = actionOrder;
         if (getAllocationSession() === session) closeAllocations();

@@ -4,6 +4,7 @@
 
 - set_allocations()    写路径：整单保存、售出守卫、两种录入口径分流、
                        form_extra 回滚与利润接收人通知
+- prepare_form_allocations() 按服务端利润确定表单保存口径
 - get_allocations_view() 读路径：明细 + 口径 + 按动作汇总的响应组装
 - convert_value()      比例↔金额换算
 
@@ -150,6 +151,30 @@ def set_allocations(
     return result
 
 
+def prepare_form_allocations(
+    session: Session,
+    order_id: int,
+    *,
+    items: list[dict[str, Any]],
+    amounts_changed: bool,
+    user: CurrentUser | None = None,
+) -> list[dict[str, Any]]:
+    """根据最新订单利润与表单修改状态，确定金额或比例写入口径。"""
+    order = get_order(session, order_id, user)
+    # 与订单事件写入使用同一行锁，避免计算口径和保存期间利润并发变化。
+    session.refresh(order, with_for_update=True)
+    order = get_order(session, order_id, user)
+    profit = order_profit_of(session, order)
+    preserve_rates = (profit == 0 and not amounts_changed
+                      and any(Decimal(str(item.get("allocation_rate") or 0)) != 0 for item in items))
+    return [
+        {**item,
+         "allocation_rate": (item.get("allocation_rate") or Decimal("0")) if preserve_rates else None,
+         "allocation_amount": None if preserve_rates or str(item.get("allocation_type") or "").upper() == "COMPANY" else item.get("allocation_amount")}
+        for item in items
+    ]
+
+
 def get_allocations_view(
     session: Session,
     order_id: int,
@@ -198,4 +223,4 @@ def convert_value(
     )
 
 
-__all__ = ["set_allocations", "get_allocations_view", "convert_value"]
+__all__ = ["set_allocations", "prepare_form_allocations", "get_allocations_view", "convert_value"]

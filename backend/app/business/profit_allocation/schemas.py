@@ -4,7 +4,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.core.schemas import RequestModel
 
@@ -21,6 +21,16 @@ class ProfitAllocationItem(RequestModel):
 class ProfitAllocationSet(RequestModel):
     items: list[ProfitAllocationItem] = Field(default_factory=list)
     form_extra: dict[str, object] | None = None
+    amounts_changed: bool | None = None
+
+    @model_validator(mode="after")
+    def require_grouped_form_state(self):
+        grouped = [item for item in self.items if item.allocation_type]
+        if grouped and self.amounts_changed is None:
+            raise ValueError("按动作分润必须提供金额修改状态")
+        if self.amounts_changed is not None and len(grouped) != len(self.items):
+            raise ValueError("金额修改状态仅用于按动作分润")
+        return self
 
 
 class ProfitAllocationConvertIn(RequestModel):

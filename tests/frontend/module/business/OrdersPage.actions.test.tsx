@@ -582,8 +582,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     const modal = await modalOf(/分润 · HS-2026-0001/);
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
-      expect.objectContaining({ allocation_type: "BUY", allocation_rate: "60.00", allocation_amount: null }),
-    ]), undefined));
+      expect.objectContaining({ allocation_type: "BUY", allocation_rate: "60.00", allocation_amount: "0.00" }),
+    ]), undefined, false));
   });
 
   it("公司比例为 100% 但订单有利润时，仍按金额提交", async () => {
@@ -595,8 +595,8 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openRowMenu("HS-2026-0001", "分润配置");
     await clickModalOk(await modalOf(/分润 · HS-2026-0001/));
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
-      expect.objectContaining({ allocation_type: "BUY", allocation_rate: null, allocation_amount: "0.00" }),
-    ]), undefined));
+      expect.objectContaining({ allocation_type: "BUY", allocation_rate: "0.00", allocation_amount: "0.00" }),
+    ]), undefined, false));
   });
 
   it("打开分润配置直接展示后端汇总金额与比例，不逐行换算", async () => {
@@ -792,8 +792,9 @@ describe("OrdersPage：操作与筛选分支", () => {
 
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
-    const [, payload, extra] = vi.mocked(profitAllocationApi.set).mock.calls[0];
+    const [, payload, extra, amountsChanged] = vi.mocked(profitAllocationApi.set).mock.calls[0];
     expect(extra).toBeUndefined();
+    expect(amountsChanged).toBe(true);
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
     expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: null, allocation_amount: "300.00" }]);
     expect(payload).toHaveLength(4);
@@ -813,7 +814,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await act(async () => { finish(pageResponse(orders) as never); await slowReload; });
   });
 
-  it("分润：按操作四项提交时只传金额、比例一律传 null", async () => {
+  it("分润：提交表单数据并由后端决定保存口径", async () => {
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
       ...allFormFields().filter((field) => field.order_type_code === scope),
       ...(scope === "ALLOCATION" ? [{ id: 9001, order_type_code: scope, field_key: "receipt", label: "分润凭据",
@@ -836,9 +837,9 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(payload).toHaveLength(4);
     expect(payload.map((item) => item.allocation_type)).toEqual(["BUY", "SELL", "OPERATION", "COMPANY"]);
     expect(payload.find((item) => item.allocation_type === "OPERATION")).toMatchObject({ employee_ids: [9], role: "SERVICE" });
-    // 比例只读展示，落库与提交唯一口径是金额：比例一律 null，公司行金额留空交后端补。
-    expect(payload.every((item) => item.allocation_rate === null)).toBe(true);
-    expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: null, allocation_amount: null });
+    // 同时提交展示的比例与金额，由后端依据利润及修改状态决定保存口径。
+    expect(payload.find((item) => item.allocation_type === "COMPANY")).toMatchObject({ allocation_rate: "40.00", allocation_amount: null });
+    expect(vi.mocked(profitAllocationApi.set).mock.calls[0][3]).toBe(false);
     expect(vi.mocked(profitAllocationApi.set).mock.calls[0][2]).toEqual(expect.objectContaining({ receipt: "分润凭据A" }));
     expect(vi.mocked(profitAllocationApi.set).mock.calls[0][2]).not.toHaveProperty("optional_number");
   });

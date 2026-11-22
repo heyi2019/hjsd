@@ -85,10 +85,15 @@ def set_allocations(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = manage_access,
 ) -> schemas.ProfitAllocationListOut:
+    items = [item.model_dump() for item in payload.items]
+    if payload.amounts_changed is not None:
+        items = service.prepare_form_allocations(
+            db, order_id, items=items, amounts_changed=payload.amounts_changed, user=user,
+        )
     service.set_allocations(
         db,
         order_id,
-        items=[item.model_dump() for item in payload.items],
+        items=items,
         actor=user.username,
         form_extra=payload.form_extra,
         user=user,

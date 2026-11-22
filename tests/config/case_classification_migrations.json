@@ -152,5 +152,10 @@
     "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账给买号新增执行人时，已存分润联动均分（1 人 → 2 人）",
     "old_id": "IT-B01-279",
     "new_id": "IT-B10-054"
+  },
+  {
+    "nodeid": "tests/frontend/module/business/OrdersPage.actions.test.tsx::分润：提交表单数据并由后端决定保存口径",
+    "old_id": "IT-B01-560",
+    "new_id": "IT-B01-640"
   }
 ]

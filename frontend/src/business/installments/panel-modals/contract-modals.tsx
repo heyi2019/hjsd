@@ -1,6 +1,6 @@
 import { Input, Typography } from "antd";
 import { CfgItem } from "../../../shared/forms/ConfigurableField";
-import { DateField, Select, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
+import { DateField, MoneyInput, Select, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
 import { cancelRefundIntro } from "../../../shared/lib/cancellationCopy";
 import type { ContractTableController } from "../useContractTableController";
 import { InstallmentActionModal } from "./_shared";
@@ -29,6 +29,9 @@ export function RecoverModal({ controller }: { controller: ContractTableControll
         getValueProps={dateValueProps}
       >
         <DateField />
+      </CfgItem>
+      <CfgItem name="recovery_cost" label="回收成本" alwaysActive rules={[{ required: true, message: "请填写回收成本" }, { pattern: /^\d+(?:\.\d{1,2})?$/, message: "请输入非负金额，最多两位小数" }]}>
+        <MoneyInput placeholder="请输入回收成本" />
       </CfgItem>
       <CfgItem name="note" label="回收说明" rules={[{ required: true }]}>
         <Input.TextArea rows={2} />

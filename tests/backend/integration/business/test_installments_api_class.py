@@ -140,7 +140,7 @@ class TestInstallmentsApi:
         elif action == "default":
             url, payload = f"{base}/default", {"reason": "违约原因"}
         elif action == "recover":
-            url, payload = f"{base}/recover", {"occurred_on": TODAY.isoformat(), "note": "回收说明"}
+            url, payload = f"{base}/recover", {"occurred_on": TODAY.isoformat(), "note": "回收说明", "recovery_cost": "0"}
         elif action == "resale":
             url, payload = f"{base}/resale", {"occurred_on": TODAY.isoformat(), "note": "出售说明", "resale_order_id": 999999}
         else:
@@ -816,7 +816,7 @@ class TestInstallmentsApi:
             contract.id,
             occurred_on=TODAY,
             note="逾期回收",
-            actor="pytest",
+            actor="pytest", recovery_cost=0
         )
 
         response = seeded_client.get("/api/installments", headers=headers)
@@ -990,7 +990,7 @@ class TestInstallmentsApi:
 
         response = seeded_client.post(
             f"/api/installments/{contract.id}/recover",
-            json={"occurred_on": TODAY.isoformat(), "note": "客户逾期回收"},
+            json={"occurred_on": TODAY.isoformat(), "note": "客户逾期回收", "recovery_cost": "0"},
             headers=headers,
         )
 
@@ -1052,14 +1052,91 @@ class TestInstallmentsApi:
         inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
         recovered = inst_recovery.recover_account(
             seeded_db, contract.id, occurred_on=TODAY,
-            actor="recovery-operator", note="客户逾期回收",
+            actor="recovery-operator", note="客户逾期回收", recovery_cost=0
         )
 
         assert recovered.action == "RECOVER"
         assert recovered.installment_id == contract.id
         seeded_db.refresh(account)
         seeded_db.refresh(contract)
-        assert account.status == "WAITING"
+        assert account.status == "SOLD"
         assert contract.status == InstallmentStatus.CLOSED.value
 
+    def test_recovery_with_manual_cost_creates_separate_non_cash_inventory(self, seeded_client, seeded_db, headers):
+        from app.shared.order_amounts import order_cashflow_profit_by_order
 
+        account = _account(seeded_db, "overdue-recovery-manual-cost")
+        order = _order(seeded_db, order_type="HS", account_id=account.id, owner_id=1)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(seeded_db, order.id, contract_type=InstallmentContractType.STOCK_SALE.value,
+                             principal="1000", down_payment="100", periods=1, per_period="900", first_due_on=PAST)
+        from app.domain.trade import OrderProfitAllocation
+        allocation = OrderProfitAllocation(order_id=order.id, user_id=1, role="OWNER", allocation_rate=Decimal("25"), allocation_amount=Decimal("123"))
+        seeded_db.add(allocation)
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        seeded_db.flush()
+        response = seeded_client.post(f"/api/installments/{contract.id}/recover", headers=headers, json={
+            "occurred_on": TODAY.isoformat(), "note": "逾期回收", "recovery_cost": "200.00", "operator_user_ids": [1],
+        })
+        assert response.status_code == 200, response.text
+        seeded_db.expire_all()
+        recovered = seeded_db.get(Installment, contract.id)
+        assert recovered.bad_debt_amount == Decimal("1000.00")
+        seeded_db.refresh(allocation)
+        assert allocation.allocation_rate == Decimal("25.00")
+        assert allocation.allocation_amount == Decimal("123.00")
+        ledger = seeded_client.get("/api/stocks/inventory/ledger", headers=headers)
+        assert ledger.status_code == 200, ledger.text
+        rows = [row for row in ledger.json()["items"] if row["account"]["game_account"] == account.game_account]
+        assert len(rows) == 1
+        new_order_id = rows[0]["order"]["id"]
+        assert new_order_id != order.id
+        assert Decimal(rows[0]["account"]["cost_amount"]) == Decimal("200.00")
+        assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == new_order_id)) is None
+        from app.business.shared.cancellation_model import get_cancellation_offset
+        from app.core.errors import Validation
+        recovery_event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == new_order_id, OrderEvent.source_type == "INSTALLMENT_RECOVERY"))
+        with pytest.raises(Validation, match="不能按付款冲销"):
+            get_cancellation_offset(seeded_db, recovery_event.id, order_id=new_order_id)
+        assert order_cashflow_profit_by_order(seeded_db, order_ids=[new_order_id])[new_order_id] == Decimal("-200.00")
+        detail = seeded_client.get(f"/api/orders/{new_order_id}/execution-detail", headers=headers)
+        assert detail.status_code == 200, detail.text
+        assert Decimal(detail.json()["finance_summary"]["total_expense"]) == Decimal("200.00")
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        sale = seeded_client.post(f"/api/orders/{new_order_id}/stock-sale", headers=headers, json={
+            "amount": "500", "occurred_on": TODAY.isoformat(), "pool_id": pool.id,
+            "operator_user_ids": [1], "customer_input": {"display_name": "回收重售买家", "role": "BUYER"},
+        })
+        assert sale.status_code == 201, sale.text
+        assert order_cashflow_profit_by_order(seeded_db, order_ids=[new_order_id])[new_order_id] == Decimal("300.00")
+        seeded_db.refresh(recovered)
+        assert recovered.bad_debt_amount == Decimal("1000.00")
+        dispositions = seeded_client.get(f"/api/installments/{contract.id}/dispositions", headers=headers).json()
+        assert any(row["action"] == "RESELL" and row["related_order_id"] == new_order_id for row in dispositions)
+
+
+
+    def test_recovered_inventory_can_be_resold_on_new_installment(self, seeded_client, seeded_db, headers):
+        from app.shared.order_amounts import order_cashflow_profit_by_order
+        account = _account(seeded_db, "overdue-installment-resale")
+        order = _order(seeded_db, order_type="HS", account_id=account.id, owner_id=1)
+        _buy(seeded_db, order.id, amount="800")
+        contract = _contract(seeded_db, order.id, contract_type=InstallmentContractType.STOCK_SALE.value,
+                             principal="1000", down_payment="100", periods=1, per_period="900", first_due_on=PAST)
+        inst_recovery.mark_overdue(seeded_db, as_of=TODAY)
+        seeded_db.flush()
+        response = seeded_client.post(f"/api/installments/{contract.id}/recover", headers=headers, json={
+            "occurred_on": TODAY.isoformat(), "note": "逾期回收", "recovery_cost": "200.00", "operator_user_ids": [1],
+        })
+        assert response.status_code == 200, response.text
+        new_order_id = response.json()["related_order_id"]
+        pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+        sale = seeded_client.post("/api/installments/stock-sale", headers=headers, json={
+            "order_id": new_order_id, "principal": "500", "down_payment": "100", "periods": 1,
+            "per_period": "400", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+            "pool_id": pool.id, "operator_user_ids": [1],
+        })
+        assert sale.status_code == 201, sale.text
+        assert order_cashflow_profit_by_order(seeded_db, order_ids=[new_order_id])[new_order_id] == Decimal("-100.00")
+        dispositions = seeded_client.get(f"/api/installments/{contract.id}/dispositions", headers=headers).json()
+        assert sum(row["action"] == "RESELL" and row["related_order_id"] == new_order_id for row in dispositions) == 1

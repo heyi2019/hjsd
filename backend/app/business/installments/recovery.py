@@ -49,12 +49,19 @@ from ._shared import (
     get_installment,
 )
 from app.shared.installment_amounts import total_receivable
+from app.business.inventory.profile import create_account
+from app.settings.field_definitions.order_types import require_order_type_by_code
+from app.settings.field_definitions.sequences import next_order_no
+from app.shared.business_numbering import event_no as next_event_no
+from app.core.time import now_second
+
 
 def recover_account(
     session: Session,
     installment_id: int,
     *,
     occurred_on: date,
+    recovery_cost: Decimal,
     actor: str,
     note: str,
     form_extra: Mapping[str, Any] | None = None,
@@ -63,10 +70,13 @@ def recover_account(
 ) -> InstallmentDisposition:
     """登记账号回收并关闭原分期，不改写原分期应收。"""
     text_note = _required_text(note, field="note", message="回收必须填写说明")
+    cost = to_money(recovery_cost, field="recovery_cost")
+    if cost < 0:
+        raise Validation("回收成本不能为负数")
     installment = get_installment(session, installment_id, user, for_update=True)
     _merge_form_extra(
         session, installment, scope="INSTRECOVER", values=form_extra,
-        context={"occurred_on": occurred_on, "note": note, "operator_user_ids": operator_user_ids},
+        context={"occurred_on": occurred_on, "recovery_cost": cost, "note": note, "operator_user_ids": operator_user_ids},
     )
     if installment.status not in {
         InstallmentStatus.OVERDUE.value,
@@ -89,10 +99,55 @@ def recover_account(
     )
     if existing is not None:
         raise Conflict("该分期合约已登记回收")
-    account.status = transition(
-        ACCOUNT_TRANSITIONS, account.status, "RECOVER", entity="账号"
+    # 原库存保留已售状态，回收形成独立的库存和订单，避免重售改写原账。
+    transition(ACCOUNT_TRANSITIONS, account.status, "RECOVER", entity="账号")
+    new_account = create_account(
+        session, actor=actor, game_account=account.game_account,
+        game_type=account.game_type, business_mode=account.business_mode,
+        inventory_type=account.inventory_type, game_password=account.game_password,
+        camp_account=account.camp_account, channel_region=account.channel_region,
+        bound_phone=account.bound_phone, has_secondary=account.has_secondary,
+        secondary_images=account.secondary_images, wallet_realname=account.wallet_realname,
+        wallet_realname_images=account.wallet_realname_images,
+        account_description=account.account_description, account_images=account.account_images,
+        note=account.note, extra_values=account.form_extra,
     )
-    account.updated_by = actor
+    new_account.cost_amount = cost
+    new_account.buy_date = occurred_on
+    order_type = require_order_type_by_code(session, order.order_type)
+    account_snapshot = {
+        **(order.account_snapshot or {}),
+        "game_account": account.game_account,
+        "game_type": account.game_type,
+        "game_password": account.game_password,
+        "camp_account": account.camp_account,
+        "channel_region": account.channel_region,
+        "bound_phone": account.bound_phone,
+        "has_secondary": account.has_secondary,
+        "wallet_realname": account.wallet_realname,
+        "note": account.note,
+    }
+    new_order = Order(
+        order_no=next_order_no(session, order_type), order_type=order.order_type,
+        trade_date=occurred_on, account_snapshot=account_snapshot,
+        account_id=new_account.id, status="ACTIVE", owner_id=order.owner_id,
+        created_by=actor, updated_by=actor,
+    )
+    session.add(new_order)
+    session.flush()
+    record_audit(
+        session, action=AuditAction.ORDER_CREATE, entity_type="order", entity_id=new_order.order_no,
+        actor=actor, after={"order_type": new_order.order_type, "status": new_order.status,
+                            "recovered_from_installment": installment.inst_no},
+    )
+    session.add(OrderEvent(
+        event_no=next_event_no(session, order_no=new_order.order_no,
+                               order_id=new_order.id, event_type=EventType.BUY.value),
+        order_id=new_order.id, event_type=EventType.BUY.value, amount=cost,
+        portion="GROSS", occurred_on=occurred_on, is_posted=True, posted_at=now_second(),
+        source_type="INSTALLMENT_RECOVERY", source_id=installment.inst_no,
+        note="逾期回收成本（非现金）", created_by=actor, updated_by=actor,
+    ))
     installment.status = transition(
         INSTALLMENT_TRANSITIONS, installment.status, "CLOSE", entity="分期合约"
     )
@@ -106,6 +161,7 @@ def recover_account(
         account_id=account.id,
         action=InstallmentDispositionAction.RECOVER.value,
         occurred_on=occurred_on,
+        related_order_id=new_order.id,
         note=text_note,
         created_by=actor,
         updated_by=actor,
@@ -120,6 +176,8 @@ def recover_account(
         actor=actor,
         after={
             "account_id": account.id,
+            "recovered_order_id": new_order.id,
+            "recovery_cost": str(cost),
             "occurred_on": occurred_on.isoformat(),
             "status": installment.status,
             "bad_debt_amount": str(to_money(installment.bad_debt_amount)),
@@ -170,8 +228,6 @@ def record_sale(
         raise Validation("分期合约没有可出售的账号")
     if sale_order is None or sale_order.id == original_order.id:
         raise Validation("出售必须关联新的售出订单")
-    if sale_order.account_id != original_order.account_id:
-        raise Validation("出售订单必须关联同一个账号")
     recovered = session.scalar(
         select(InstallmentDisposition).where(
             InstallmentDisposition.installment_id == installment.id,
@@ -180,6 +236,8 @@ def record_sale(
     )
     if recovered is None:
         raise Validation("出售前必须先登记回收")
+    if recovered.related_order_id != sale_order.id:
+        raise Validation("出售订单必须是该合约回收产生的订单")
     posted_sell = session.scalar(
         select(OrderEvent.id).where(
             OrderEvent.order_id == sale_order.id,

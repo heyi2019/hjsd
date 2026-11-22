@@ -166,7 +166,7 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
                     if ("for update" in sql and "installments" in sql) or "update installments" in sql or "update accounts" in sql:
                         waiting.set()
                 event.listen(connection, "before_cursor_execute", observe)
-                recover_account(session, contract_id, occurred_on=date(2026, 11, 2), actor="pytest", note="违约回收")
+                recover_account(session, contract_id, occurred_on=date(2026, 11, 2), actor="pytest", note="违约回收", recovery_cost=0)
                 amount = session.get(Installment, contract_id).bad_debt_amount
                 session.commit()
                 return amount
@@ -188,7 +188,7 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
         waiting.clear()
         payment_amount = "50"
         with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
-            recover_account(first, contract_id, occurred_on=date(2026, 11, 2), actor="pytest", note="违约回收")
+            recover_account(first, contract_id, occurred_on=date(2026, 11, 2), actor="pytest", note="违约回收", recovery_cost=0)
             future = executor.submit(second_payment)
             assert waiting.wait(10)
             first.commit()

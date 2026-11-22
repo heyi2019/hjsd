@@ -404,7 +404,7 @@ def test_list_dispositions_endpoint_returns_records(seeded_client, seeded_db, he
     )
     seeded_client.post(
         f"/api/installments/{contract.id}/recover",
-        json={"occurred_on": TODAY.isoformat(), "note": "逾期回收"},
+        json={"occurred_on": TODAY.isoformat(), "note": "逾期回收", "recovery_cost": "0"},
         headers=headers,
     )
     response = seeded_client.get(
@@ -432,8 +432,6 @@ def test_available_actions_match_business_rules():
             acts += ["cancel", "settle_early"]
         if status == "OVERDUE":
             acts.append("default")
-        if status in {"CLOSED", "OVERDUE", "DEFAULTED"} and has_rec and not has_resell:
-            acts.append("resale")
         return acts
 
     for status in InstallmentStatus:
@@ -525,7 +523,7 @@ def test_recovered_installment_schedules_cannot_be_waived_or_extended(seeded_cli
     contract = _contract(seeded_db, order.id, contract_type="STOCK_SALE", principal="200", down_payment="0", periods=1, per_period="200")
     contract.status = "OVERDUE"
     seeded_db.flush()
-    recover_account(seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="违约回收")
+    recover_account(seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="违约回收", recovery_cost=0)
     row = next(row for row in seeded_client.get("/api/installments", headers=headers).json()["items"] if row["id"] == contract.id)
     assert all(not schedule["available_actions"] for schedule in row["schedules"])
     base = f"/api/installments/{contract.id}/schedules/1"

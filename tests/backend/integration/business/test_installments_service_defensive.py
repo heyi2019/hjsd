@@ -151,7 +151,7 @@ def _recovered(seeded_db, game_account: str):
     """返回 (order, contract)：已完成账号回收、合约 CLOSED。"""
     order, contract = _pickup_overdue(seeded_db, game_account)
     inst_recovery.recover_account(
-        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
+        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收", recovery_cost=0
     )
     seeded_db.refresh(order)
     seeded_db.refresh(contract)
@@ -202,20 +202,20 @@ def test_recover_rejects_order_without_account(seeded_db):
     seeded_db.flush()
     with pytest.raises(Validation, match="分期合约没有可回收的账号"):
         inst_recovery.recover_account(
-            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收", recovery_cost=0
         )  # 1062-1065
 
 def test_recover_rejects_duplicate_recovery(seeded_db):
     order, contract = _pickup_overdue(seeded_db, "recover-dup-account")
     inst_recovery.recover_account(
-        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
+        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收", recovery_cost=0
     )
     seeded_db.refresh(contract)
     contract.status = InstallmentStatus.OVERDUE.value  # 回到可回收状态再登记一次
     seeded_db.flush()
     with pytest.raises(Conflict, match="该分期合约已登记回收"):
         inst_recovery.recover_account(
-            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收", recovery_cost=0
         )  # 1069-1076
 
 # ------------------------------------------------------- 回收账号出售登记全流程
@@ -394,7 +394,7 @@ def test_recover_rejects_dangling_order(seeded_db):
     )
     with pytest.raises(Validation, match="分期合约没有所属订单"):
         inst_recovery.recover_account(
-            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据", recovery_cost=0
         )
 def test_recover_rejects_dangling_account(seeded_db):
     """orders.account_id 悬空 → 回收账号报「关联账号不存在」（L1068）。"""
@@ -411,5 +411,5 @@ def test_recover_rejects_dangling_account(seeded_db):
     _raw_sql(seeded_db, "UPDATE orders SET account_id = 999168 WHERE id = ?", (order.id,))
     with pytest.raises(NotFound, match="分期合约关联账号不存在"):
         inst_recovery.recover_account(
-            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据"
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="脏数据", recovery_cost=0
         )

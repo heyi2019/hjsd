@@ -108,6 +108,7 @@ export function useContractActions(params: {
     if (!recoverTarget) return;
     await runAction(async (isCurrent) => {
         await installmentsApi.recover(recoverTarget.id, {
+          recovery_cost: String(values.recovery_cost),
           occurred_on: values.occurred_on as string,
           note: values.note as string,
           operator_user_ids: values.operator_user_ids as number[] | undefined,

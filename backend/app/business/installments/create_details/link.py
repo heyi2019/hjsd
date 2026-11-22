@@ -24,7 +24,7 @@ def link_recovered_sale(
         select(InstallmentDisposition)
         .join(Installment, Installment.id == InstallmentDisposition.installment_id)
         .where(
-            InstallmentDisposition.account_id == order.account_id,
+            InstallmentDisposition.related_order_id == order.id,
             InstallmentDisposition.action == InstallmentDispositionAction.RECOVER.value,
             Installment.order_id != order.id,
         )

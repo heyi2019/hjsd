@@ -23,7 +23,6 @@ RECOVER = "recover"
 CANCEL = "cancel"
 SETTLE_EARLY = "settle_early"
 DEFAULT = "default"
-RESALE = "resale"
 WAIVE = "waive"
 EXTEND = "extend"
 
@@ -48,7 +47,6 @@ _SETTLE_ALLOWED = frozenset(_CANCEL_ALLOWED)  # 与终止退款同口径
 _DEFAULT_ALLOWED = frozenset({
     InstallmentStatus.OVERDUE.value,
 })  # disabled = status ∉ 此集合
-_RESALE_ALLOWED = frozenset({InstallmentStatus.CLOSED.value, *_RECOVER_ALLOWED})  # 需已有回收、无出售
 
 # 期次级：仅看期次状态，与改造前一致（不额外看 received_amount）
 _SCHEDULE_BLOCKED = frozenset({
@@ -57,7 +55,6 @@ _SCHEDULE_BLOCKED = frozenset({
 })
 
 _RECOVER_ACTION = InstallmentDispositionAction.RECOVER.value
-_RESELL_ACTION = InstallmentDispositionAction.RESELL.value
 
 
 def available_installment_actions(
@@ -76,7 +73,6 @@ def available_installment_actions(
 
     existing = set(disposition_actions)
     has_recover = _RECOVER_ACTION in existing
-    has_resell = _RESELL_ACTION in existing
     if status in _RECOVER_ALLOWED and not has_recover:
         actions.append(RECOVER)
     if status in _CANCEL_ALLOWED:
@@ -85,8 +81,7 @@ def available_installment_actions(
         actions.append(SETTLE_EARLY)
     if status in _DEFAULT_ALLOWED:
         actions.append(DEFAULT)
-    if status in _RESALE_ALLOWED and has_recover and not has_resell:
-        actions.append(RESALE)
+    # 回收库存售出时自动关联原合约，无需手动选择出售订单。
     return actions
 
 
@@ -99,6 +94,6 @@ def available_schedule_actions(status: str, contract_status: str | None = None) 
 
 __all__ = [
     "PAY", "DELIVER", "RECOVER", "CANCEL", "SETTLE_EARLY", "DEFAULT",
-    "RESALE", "WAIVE", "EXTEND",
+    "WAIVE", "EXTEND",
     "available_installment_actions", "available_schedule_actions",
 ]

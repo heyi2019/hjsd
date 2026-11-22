@@ -11,7 +11,7 @@
 - PROFIT（2026-11-05 用户裁决）：该订单**收入大类 − 支出大类**，可正、可负、可为 0。
   **只有收入、支出两个大类**；业务名词都是大类下的子类型，地位平等、同类同规则：
   · 收入大类：售出价（SELL）、返点、其他一切流入；
-  · 支出大类：提号价 / 回收价（BUY）、其他费用、分期坏账、其他一切流出。
+  · 支出大类：提号价 / 回收价（BUY）、其他费用、分期坏账、非现金回收成本。
   子类型只在报表里作「其中项」展示（如「其中返点」「其中账号成本」），不是独立的钱，
   绝不再加回净利。
   资金走向不以「有没有生成 cashflow 行」为界：生成流水走流水汇总；不生成流水的
@@ -146,9 +146,8 @@ def _profit_flow_rows(
 
     - 返点记录 = 收入，金额取返点金额 `amount`，按 `collected_on` 归期；
       与库存详情「资金明细」的返点收入行同源（前端标为「收入」）。
-    - 分期坏账 = 支出，金额取 `Installment.bad_debt_amount`，按回收处置
-      `InstallmentDisposition.occurred_on` 归期；一份合约只有一次 RECOVER，
-      连接不会放大金额。
+    - 分期坏账 = 支出，金额取 `Installment.bad_debt_amount`，按回收处置归期。
+    - 分期回收的非现金库存成本 = 新订单支出，按回收入库日期归期。
 
     结算进度状态（OPEN / PARTIALLY_SETTLED / SETTLED）不过滤、登记即计入收入；
     VOID 是作废、不代表资金走向，排除（与新模型返点作废 reverse_cashflow 后净额归零同口径）。
@@ -209,6 +208,21 @@ def _profit_flow_rows(
     for order_id, occurred_on, amount in session.execute(bad_debt_stmt).all():
         rows.append((int(order_id), occurred_on, ZERO, to_money_or_zero(amount)))
 
+    # 回收估值不是付款，按入库日期计入成本及利润，但不生成资金流水。
+    recovery_stmt = select(OrderEvent.order_id, OrderEvent.occurred_on, OrderEvent.amount).where(
+        OrderEvent.source_type == "INSTALLMENT_RECOVERY",
+        OrderEvent.event_type == EventType.BUY.value,
+        OrderEvent.is_posted.is_(True),
+    )
+    if order_ids is not None:
+        recovery_stmt = recovery_stmt.where(OrderEvent.order_id.in_(order_ids))
+    if from_date is not None:
+        recovery_stmt = recovery_stmt.where(OrderEvent.occurred_on >= from_date)
+    if to_date is not None:
+        recovery_stmt = recovery_stmt.where(OrderEvent.occurred_on <= to_date)
+    for order_id, occurred_on, amount in session.execute(recovery_stmt).all():
+        rows.append((int(order_id), occurred_on, ZERO, to_money_or_zero(amount)))
+
     return rows
 
 
@@ -225,7 +239,7 @@ def order_profit_flow_by_order(
     from_date: date | None = None,
     to_date: date | None = None,
 ) -> dict[int, tuple[Decimal, Decimal]]:
-    """按订单汇总返点收入 / 坏账支出：`{order_id: (收入, 支出)}`。"""
+    """按订单汇总非现金收入和支出：`{order_id: (收入, 支出)}`。"""
     ids = _resolved_ids(order_ids)
     if ids is not None and not ids:
         return {}
@@ -288,12 +302,25 @@ def cashflow_buckets_by_order(
         int(order_id): [to_money_or_zero(income), to_money_or_zero(expense), to_money_or_zero(cost)]
         for order_id, income, expense, cost in session.execute(stmt).all()
     }
-    for order_id, (rebate_income, bad_debt_expense) in order_profit_flow_by_order(
+    for order_id, (rebate_income, noncash_expense) in order_profit_flow_by_order(
         session, order_ids=ids, from_date=from_date, to_date=to_date
     ).items():
         row = buckets.setdefault(order_id, [ZERO, ZERO, ZERO])
         row[0] += rebate_income
-        row[1] += bad_debt_expense
+        row[1] += noncash_expense
+    recovery_costs = select(OrderEvent.order_id, func.sum(OrderEvent.amount)).where(
+        OrderEvent.source_type == "INSTALLMENT_RECOVERY",
+        OrderEvent.event_type == EventType.BUY.value,
+        OrderEvent.is_posted.is_(True),
+    ).group_by(OrderEvent.order_id)
+    if ids is not None:
+        recovery_costs = recovery_costs.where(OrderEvent.order_id.in_(ids))
+    if from_date is not None:
+        recovery_costs = recovery_costs.where(OrderEvent.occurred_on >= from_date)
+    if to_date is not None:
+        recovery_costs = recovery_costs.where(OrderEvent.occurred_on <= to_date)
+    for order_id, amount in session.execute(recovery_costs).all():
+        buckets.setdefault(int(order_id), [ZERO, ZERO, ZERO])[2] += to_money_or_zero(amount)
     return {key: tuple(value) for key, value in buckets.items()}
 
 
@@ -327,7 +354,7 @@ def order_profit_flow_by_date(
     from_date: date | None = None,
     to_date: date | None = None,
 ) -> dict[date, tuple[Decimal, Decimal]]:
-    """按发生日汇总返点收入 / 坏账支出：`{date: (收入, 支出)}`（R2 按月聚合用）。"""
+    """按发生日汇总非现金收入和支出（R2 按月聚合用）。"""
     ids = _resolved_ids(order_ids)
     if ids is not None and not ids:
         return {}

@@ -152,7 +152,7 @@ def _recovered(seeded_db, game_account: str):
     """返回 (order, contract)：已完成账号回收、合约 CLOSED。"""
     order, contract = _pickup_overdue(seeded_db, game_account)
     inst_recovery.recover_account(
-        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
+        seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收", recovery_cost=0
     )
     seeded_db.refresh(order)
     seeded_db.refresh(contract)
@@ -350,5 +350,5 @@ def test_recover_rejects_contract_not_overdue(seeded_db):
     }
     with pytest.raises(Validation, match="只有逾期或违约合约可以回收账号"):
         inst_recovery.recover_account(
-            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收"
+            seeded_db, contract.id, occurred_on=TODAY, actor="pytest", note="回收", recovery_cost=0
         )  # 1054-1058

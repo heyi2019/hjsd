@@ -67,7 +67,7 @@ def cancellable_by_event(events: list[OrderEvent]) -> dict[int, Decimal]:
             cancelled[item.offset_event_id] = cancelled.get(item.offset_event_id, Decimal("0.00")) + to_money(item.amount)
     amounts: dict[int, Decimal] = {}
     for item in events:
-        if item.event_type == "CANCEL":
+        if item.event_type == "CANCEL" or item.source_type == "INSTALLMENT_RECOVERY":
             amounts[item.id] = Decimal("0.00")
             continue
         remaining = to_money(item.amount) - cancelled.get(item.id, Decimal("0.00"))

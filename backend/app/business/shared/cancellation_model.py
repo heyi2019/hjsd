@@ -86,6 +86,8 @@ def get_cancellation_offset(
             "只能冲销已登记事件",
             details={"offset_event_id": offset_event_id},
         )
+    if offset.source_type == "INSTALLMENT_RECOVERY":
+        raise Validation("分期回收成本不产生资金流水，不能按付款冲销")
     if offset.event_type not in _CANCELLABLE_EVENT_TYPES:
         raise Validation(
             "只能冲销有金额的业务事件",

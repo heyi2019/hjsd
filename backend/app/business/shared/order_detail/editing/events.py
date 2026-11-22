@@ -116,6 +116,14 @@ def validate_event_edits(
         order = get_order(db, event.order_id, user) if event else None
         if event is None or order is None or order.id != order_id or order.account_id != account.id or not event.is_posted:
             raise NotFound("执行记录不存在")
+        if event.source_type == "INSTALLMENT_RECOVERY":
+            if (item.expected_amount != Decimal(str(event.amount)) or item.amount != Decimal(str(event.amount))
+                or (item.occurred_at is not None and item.occurred_at.replace(tzinfo=None) != (event.posted_at or event.created_at))
+                or ("note" in item.model_fields_set and item.note != event.note)
+                or (item.form_extra is not None and item.form_extra != (event.form_extra or {}))
+                or (item.operator_user_ids is not None and item.operator_user_ids != (event.operator_user_ids or []))):
+                raise Validation("分期回收成本不能通过订单事件直接修改")
+            continue
         if Decimal(str(event.amount)) != item.expected_amount:
             raise Conflict("执行记录已被修改，请刷新后重试")
         original_extra = event.form_extra or {}

@@ -235,6 +235,10 @@ class DispositionIn(RequestModel):
     operator_user_ids: list[int] | None = Field(default=None, min_length=1, max_length=30)
 
 
+class RecoverIn(DispositionIn):
+    recovery_cost: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
+
+
 class ResaleIn(DispositionIn):
     resale_order_id: int
 

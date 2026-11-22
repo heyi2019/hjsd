@@ -27,8 +27,7 @@ def build_finance_summary(
 ) -> ExecutionFinanceSummaryOut:
     """按详情明细计算收入、支出与净额。
 
-    押金损失流水仍保留在列表中，但不重复计入支出；分期坏账从订单利润口径取数，
-    不生成第二笔资金明细。
+    押金损失流水不重复计入支出；分期坏账和非现金回收成本从订单利润口径取数。
     """
     zero = Decimal("0.00")
     cashflow_income = zero
@@ -52,8 +51,8 @@ def build_finance_summary(
     )
     profit_flows = (profit_flows_by_order if profit_flows_by_order is not None
                     else order_profit_flow_by_order(db, order_ids=order_ids)) if order_ids else {}
-    bad_debt_expense = sum((profit_flows[order_id][1] for order_id in set(order_ids) if order_id in profit_flows), zero)
-    total_expense += bad_debt_expense
+    noncash_expense = sum((profit_flows[order_id][1] for order_id in set(order_ids) if order_id in profit_flows), zero)
+    total_expense += noncash_expense
     total_income = cashflow_income + rebate_income
     return ExecutionFinanceSummaryOut(
         cashflow_income=cashflow_income,

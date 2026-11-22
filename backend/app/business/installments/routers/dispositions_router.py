@@ -41,7 +41,7 @@ from ._router_shared import _installment_output
 )
 def recover_installment_account(
     installment_id: int,
-    payload: schemas.DispositionIn,
+    payload: schemas.RecoverIn,
     db: Session = Depends(get_db),
     user: CurrentUser = default_manage,
 ) -> schemas.DispositionOut:
@@ -49,6 +49,7 @@ def recover_installment_account(
         db,
         installment_id,
         occurred_on=payload.occurred_on,
+        recovery_cost=payload.recovery_cost,
         actor=_actor(user),
         note=payload.note,
         form_extra=payload.form_extra,

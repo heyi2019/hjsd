@@ -668,11 +668,12 @@ describe("InstallmentsPanel：剩余动作流加深", () => {
       const modal = openModal("逾期回收");
       await ui.clear(within(modal).getByLabelText("回收日期"));
       await ui.type(within(modal).getByLabelText("回收日期"), "2026-10-15");
+      await ui.type(within(modal).getByLabelText("回收成本"), "200");
       await ui.type(within(modal).getByLabelText("回收说明"), "逾期未付");
       await ui.click(within(modal).getByRole("button", { name: /确认回收/ }));
       await waitFor(() => expect(vi.mocked(installmentsApi.recover)).toHaveBeenCalledWith(
         1,
-        { occurred_on: "2026-10-15", note: "逾期未付", form_extra: undefined, operator_user_ids: [1] },
+        { occurred_on: "2026-10-15", recovery_cost: "200", note: "逾期未付", form_extra: undefined, operator_user_ids: [1] },
       ));
       expect(successSpy).toHaveBeenCalledWith("逾期账号已登记回收");
     });

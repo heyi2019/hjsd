@@ -184,18 +184,6 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
     const session = getAllocationSession();
     await write.run(async () => {
       try {
-        const sourceFormExtra = {
-          ...formExtraOrUndefined(values.form_extra),
-          business_responsible_ids: [...new Set(rows
-            .filter((item) => item.allocation_type === "BUY")
-            .flatMap((item) => item.employee_ids ?? []))],
-          sell_delivery_responsible_ids: [...new Set(rows
-            .filter((item) => item.allocation_type === "SELL")
-            .flatMap((item) => item.employee_ids ?? []))],
-          operation_responsible_ids: [...new Set(rows
-            .filter((item) => item.allocation_type === "OPERATION")
-            .flatMap((item) => item.employee_ids ?? []))],
-        };
         // 零利润时金额不能表达原人员权重；未修改金额则保留已有比例。
         const preserveRates = Number(allocationOrderProfit) === 0
           && rows.some((item) => Number(item.allocation_rate || 0) !== 0)
@@ -209,7 +197,7 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
             ? null
             : (item.allocation_amount?.trim() ? item.allocation_amount : null),
         }));
-        await profitAllocationApi.set(actionOrder.id, payloadRows, sourceFormExtra);
+        await profitAllocationApi.set(actionOrder.id, payloadRows, formExtraOrUndefined(values.form_extra));
         appMessage.success("分润已保存");
         const savedOrder = actionOrder;
         if (getAllocationSession() === session) closeAllocations();

@@ -103,13 +103,23 @@ def set_allocations(
     )) or 0
     pending_sale = pending_id > allocated_id
 
-    checked_extra = validate_form_extra(session, order_type_code="ALLOCATION", values=form_extra)
+    normalized_items = [_normalize_allocation_item(item) for item in items]
+    typed = [item for item in normalized_items if item.get("allocation_type")]
+    submitted_extra = dict(form_extra or {})
+    if typed and any(item.get("employee_ids") for item in typed):
+        # 责任人由本次分润选择派生，不信任客户端重复提交的人员字段。
+        for kind, key in (("BUY", "business_responsible_ids"),
+                          ("SELL", "sell_delivery_responsible_ids"),
+                          ("OPERATION", "operation_responsible_ids")):
+            submitted_extra[key] = list(dict.fromkeys(
+                uid for item in typed if str(item.get("allocation_type")).upper() == kind
+                for uid in item.get("employee_ids", [])
+            ))
+    checked_extra = validate_form_extra(session, order_type_code="ALLOCATION", values=submitted_extra)
     original_form_extra = order.form_extra
     if checked_extra:
         order.form_extra = {**(order.form_extra or {}), **checked_extra}
     try:
-        normalized_items = [_normalize_allocation_item(item) for item in items]
-        typed = [item for item in normalized_items if item.get("allocation_type")]
         if typed and len(typed) != len(normalized_items):
             raise Validation("按动作分润与按人分润不能混用，请统一为其中一种")
         if typed:

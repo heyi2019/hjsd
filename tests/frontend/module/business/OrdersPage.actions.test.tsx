@@ -583,7 +583,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
       expect.objectContaining({ allocation_type: "BUY", allocation_rate: "60.00", allocation_amount: null }),
-    ]), expect.any(Object)));
+    ]), undefined));
   });
 
   it("公司比例为 100% 但订单有利润时，仍按金额提交", async () => {
@@ -596,7 +596,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await clickModalOk(await modalOf(/分润 · HS-2026-0001/));
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
       expect.objectContaining({ allocation_type: "BUY", allocation_rate: null, allocation_amount: "0.00" }),
-    ]), expect.any(Object)));
+    ]), undefined));
   });
 
   it("打开分润配置直接展示后端汇总金额与比例，不逐行换算", async () => {
@@ -793,7 +793,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalled());
     const [, payload, extra] = vi.mocked(profitAllocationApi.set).mock.calls[0];
-    expect(extra).toEqual(expect.objectContaining({ sell_delivery_responsible_ids: [22] }));
+    expect(extra).toBeUndefined();
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
     expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: null, allocation_amount: "300.00" }]);
     expect(payload).toHaveLength(4);

@@ -114,6 +114,19 @@ def test_allocation_view_returns_grouped_rates_for_display(seeded_db, buy, sell,
     assert view["totals_by_type"]["SELL"]["allocation_rate"] == Decimal(sell_rate)
 
 
+def test_grouped_allocation_derives_responsible_ids_on_server(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": "100"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": "200"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+    ], form_extra={"business_responsible_ids": [999], "sell_delivery_responsible_ids": [999]})
+    assert order.form_extra["business_responsible_ids"] == [1]
+    assert order.form_extra["sell_delivery_responsible_ids"] == [1]
+    assert order.form_extra["operation_responsible_ids"] == [1]
+
+
 def test_zero_profit_grouped_rates_survive_resaving(seeded_db):
     order_id = _order_with_profit(seeded_db, buy="1000", sell="1000")
     seeded_db.get(Order, order_id).form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}

@@ -34,7 +34,7 @@
 - **迁移/发布**：活动链只剩基线 0001（create_all + seed_catalog），改 ORM 即改基线，**不加增量迁移**，落后库绝不 stamp；上线走原地增量。`push origin/main` = 上线，须单独确认；分支只留 main/dev；发布记录统一维护于 `docs/版本管理.md`。
 - **分层**：`core`(L0，零 ORM) → `domain`(L1) → `shared`(L2，跨域原语) → 业务域(L3)。`backend/.importlinter` 的 3 条契约必须全绿；改 import 前先查 `app/shared/`；环检测必须用 AST，正则会漏。
 - **拆分纪律**：拆测试文件须同步 4 处元数据（`tests/manifest.json`、`tests/config/catalog.py::BACKEND_FILE_TO_FUNC`、`docs/testing/测试元数据台账.csv`、`backend/run_regression.py::GROUPS`）。
-- 前端：antd Modal 禁嵌受控 Modal children；`.login-card` 固定深色；≤640px 按列 key 打标 `ui-col-mobile-hide`，禁 nth-child；控件高 36px；`useSession()` user→role+username。
+- 前端：antd Modal 禁嵌受控 Modal children；`.login-card` 固定浅色；≤640px 按列 key 打标 `ui-col-mobile-hide`，禁 nth-child；控件高 36px；`useSession()` user→role+username。
 - 提交：先 `git status --short`；只 pathspec 暂存；禁 `git add -A` / `--no-verify`；不 push 除非明确要求。
 
 ## 3. GitHub CI 闭环（验收场）

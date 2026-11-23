@@ -20,23 +20,52 @@ const API_BASE =
 const ADMIN_USER = "admin";
 const ADMIN_PASS = "12345678";
 
-test("登录卡片固定深色，控件高度和版本一致", async ({ page }) => {
+test("登录卡片保持浅色，控件高度和版本一致", async ({ page }) => {
+  await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 204 }));
   await page.goto("/#/workbench");
-  await page.getByRole("button", { name: "退出登录", exact: true }).click();
-  await page.locator(".ant-popconfirm").getByRole("button", { name: "退出", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
-  const card = page.locator(".login-card");
   const version = readFileSync(resolve(__dirname, "../../../VERSION"), "utf8").trim();
-  await expect(card.getByText(`V${version}`)).toBeVisible();
   for (const theme of ["light", "dark"]) {
-    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
-    await expect(card).toHaveCSS("background-color", "rgb(22, 34, 54)");
+    await page.evaluate((value) => { localStorage.setItem("heijin-theme-mode", value); }, theme);
+    await page.reload();
+    await page.getByRole("button", { name: "退出登录", exact: true }).click();
+    await page.locator(".ant-popconfirm").getByRole("button", { name: "退出", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
+    const card = page.locator(".login-card");
+    await expect(card.getByText(`V${version}`)).toBeVisible();
+    const appearance = await card.evaluate((element) => {
+      const luminance = (value: string) => {
+        const channels = value.match(/[\d.]+/g)!.slice(0, 3).map((part) => Number(part) / 255);
+        const [r, g, b] = channels.map((part) => part <= 0.04045 ? part / 12.92 : ((part + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const contrast = (foreground: string, background: string) => {
+        const [a, b] = [luminance(foreground), luminance(background)].sort((x, y) => y - x);
+        return (a + 0.05) / (b + 0.05);
+      };
+      const cardColor = getComputedStyle(element).backgroundColor;
+      const titleColor = getComputedStyle(element.querySelector("h2")!).color;
+      const username = element.querySelector('input[autocomplete="username"]')!;
+      const password = element.querySelector('input[autocomplete="current-password"]')!;
+      const usernameStyle = getComputedStyle(username);
+      const passwordStyle = getComputedStyle(password);
+      const passwordBackground = getComputedStyle(password.closest(".ant-input-affix-wrapper")!).backgroundColor;
+      return {
+        background: luminance(cardColor),
+        titleContrast: contrast(titleColor, cardColor),
+        usernameContrast: contrast(usernameStyle.color, usernameStyle.backgroundColor),
+        passwordContrast: contrast(passwordStyle.color, passwordBackground),
+      };
+    });
+    expect(appearance.background).toBeGreaterThan(0.8);
+    expect(appearance.titleContrast).toBeGreaterThanOrEqual(4.5);
+    expect(appearance.usernameContrast).toBeGreaterThanOrEqual(4.5);
+    expect(appearance.passwordContrast).toBeGreaterThanOrEqual(4.5);
     await expect(card.getByLabel("用户名")).toHaveCSS("height", "36px");
     await expect(card.locator(".ant-input-affix-wrapper")).toHaveCSS("height", "36px");
     await expect(card.getByRole("button", { name: "登录" })).toHaveCSS("height", "36px");
   }
   await page.setViewportSize({ width: 375, height: 812 });
-  await expect(card).toBeVisible();
+  await expect(page.locator(".login-card")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

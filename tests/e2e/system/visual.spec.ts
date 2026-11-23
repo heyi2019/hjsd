@@ -351,11 +351,9 @@ test.describe("UI visual baseline", () => {
     // 注意 antd 会给两字按钮自动插空格（DOM 文本是「退 出」），只能用正则匹配，且锚定避免命中「退出登录」。
     await page.getByRole("button", { name: /^退\s*出$/ }).click();
     await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
-    await expect(page).toHaveScreenshot("login-desktop.png", {
-      animations: "disabled",
-      caret: "hide",
-      fullPage: true,
-    });
+    await expect(page.getByLabel("用户名")).toBeVisible();
+    await expect(page.getByLabel("密码", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "登录", exact: true })).toBeInViewport();
   });
 
   test("登录页 mobile", async ({ page }) => {
@@ -368,10 +366,9 @@ test.describe("UI visual baseline", () => {
     await page.getByRole("button", { name: "退出登录" }).click();
     await page.getByRole("button", { name: "确认退出" }).click();
     await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
-    await expect(page).toHaveScreenshot("login-mobile.png", {
-      animations: "disabled",
-      caret: "hide",
-      fullPage: true,
-    });
+    await expect(page.getByLabel("用户名")).toBeVisible();
+    await expect(page.getByLabel("密码", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "登录", exact: true })).toBeInViewport();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

@@ -307,11 +307,69 @@ it("订单详情编辑账号自定义字段时保留配置的类型", async () =
     .toEqual({ rank: 12, verified: false, labels: ["A", "B"], region: "S", joined_on: "2026-11-01" }));
 });
 
+it("订单详情显示账号自定义选项和已删除字段的历史值", async () => {
+  const creationFields = [
+    ...allFormFields(),
+    { id: 9001, order_type_code: "HS", field_key: "region", label: "地区", field_type: "SELECT", options: [{ value: "N", label: "北区" }], required: false, is_active: true, sort_order: 90, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+    { id: 9002, order_type_code: "HS", field_key: "labels", label: "标签", field_type: "MULTI_SELECT", options: [{ value: "A", label: "甲" }, { value: "B", label: "乙" }], required: false, is_active: true, sort_order: 91, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+    { id: 9003, order_type_code: "HS", field_key: "old_note", label: "旧备注", field_type: "TEXT", options: [], required: false, is_active: false, sort_order: 92, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+  ];
+  vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "INVEDIT" ? [{
+    id: 9004, order_type_code: "INVEDIT", field_key: "inventory_grade", label: "库存评级", field_type: "SELECT",
+    options: [{ value: "TOP", label: "特级" }], required: false, is_active: true, sort_order: 1, locked: false, is_custom: true, section: "EXTRA",
+  }] : creationFields);
+  vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+  const props = {
+    meta: { sourceOrderNo: "HS-2026-0001" } as never,
+    detail: { orders: [{ order_no: "HS-2026-0001", order_type: "HS" }] } as never,
+    account: { ...accounts[0], extra_values: { region: "N", labels: ["A", "B"], old_note: "停用历史", removed_note: "删除历史", inventory_grade: "TOP" } } as Account,
+  };
+  const view = renderLight(<OrderDetailProfileSection {...props} />);
+  expect(await screen.findByText("北区")).toBeInTheDocument();
+  expect(screen.getByText("甲、乙")).toBeInTheDocument();
+  expect(screen.getByText("旧备注（已停用）")).toBeInTheDocument();
+  expect(screen.getByText("停用历史")).toBeInTheDocument();
+  expect(screen.getByText("removed_note（已删除）")).toBeInTheDocument();
+  expect(screen.getByText("删除历史")).toBeInTheDocument();
+  expect(screen.getByText("库存评级")).toBeInTheDocument();
+  expect(screen.getByText("特级")).toBeInTheDocument();
+  view.rerender(<OrderDetailProfileSection {...props} editing />);
+  expect(screen.queryByRole("textbox", { name: "编辑旧备注" })).toBeNull();
+  expect(screen.queryByRole("textbox", { name: "编辑removed_note" })).toBeNull();
+  expect(screen.queryByRole("combobox", { name: "编辑库存评级" })).toBeNull();
+  expect(screen.getByText("停用历史")).toBeInTheDocument();
+  expect(screen.getByText("删除历史")).toBeInTheDocument();
+});
+
 // —— 原 OrderDetailDeliverySection.test.tsx ——
 // 订单详情「交付明细」区块：只读 props + 字段定义，无页面级挂载。
 describe("OrderDetailDeliverySection", () => {
   beforeEach(() => {
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+  });
+  it("交付自定义字段展示配置的选项名称", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "HS" ? [{
+      id: 9900, order_type_code: "HS", field_key: "delivery_tags", label: "交付标签", field_type: "MULTI_SELECT",
+      options: [{ value: "A", label: "甲" }, { value: "B", label: "乙" }, { value: "C", label: "丙" }], required: false, is_active: true,
+      sort_order: 1, locked: false, is_custom: true, section: "DELIVER",
+    }, {
+      id: 9901, order_type_code: "HS", field_key: "old_delivery", label: "旧交付记录", field_type: "TEXT",
+      options: [], required: false, is_active: false, sort_order: 2, locked: false, is_custom: true, section: "DELIVER",
+    }] : []);
+    const props = {
+      meta: { sourceOrderNo: "HS-0001" } as never,
+      detail: { orders: [{ order_id: 21, order_no: "HS-0001", order_type: "HS", extra_values: { delivery_tags: ["A", "B"], old_delivery: "历史交付" }, events: [] }] } as never,
+    };
+    const view = renderLight(<OrderDetailDeliverySection {...props} />);
+    expect(await screen.findByText("交付标签")).toBeInTheDocument();
+    expect(screen.getByText("甲、乙")).toBeInTheDocument();
+    const onOrderExtraChange = vi.fn();
+    view.rerender(<OrderDetailDeliverySection {...props} editing onOrderExtraChange={onOrderExtraChange} />);
+    expect(screen.queryByRole("textbox", { name: "编辑旧交付记录" })).toBeNull();
+    expect(screen.getByText("历史交付")).toBeInTheDocument();
+    await ui.click(screen.getByRole("combobox", { name: "编辑交付标签" }));
+    await ui.click(await screen.findByText("丙", { selector: ".ant-select-item-option-content" }));
+    expect(onOrderExtraChange).toHaveBeenCalledWith(21, "delivery_tags", ["A", "B", "C"]);
   });
   it("FE-265：订单详情回显交易平台、中介类型和包赔类型", async () => {
     const detail = {

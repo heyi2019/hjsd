@@ -1,10 +1,8 @@
 import { CopyOutlined } from "@ant-design/icons";
-import { DatePicker, Descriptions, Input, InputNumber, Switch, Tooltip } from "antd";
-import dayjs from "dayjs";
+import { Descriptions, Input, Tooltip } from "antd";
 import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../../shared/api/types/account-execution";
 import type { Account } from "../../../shared/api/types/accounts";
-import type { OrderFormField } from "../../../shared/api/types/forms";
 import type { OrderDraft } from "./editing/editor-types";
 import {
   OrderSectionHeading,
@@ -12,11 +10,11 @@ import {
   type OrderDetailMeta,
 } from "./OrderDetail.shared";
 import { OrderDetailImageGallery } from "./OrderDetailImageGallery";
+import { OrderDetailCustomFieldInput } from "./OrderDetailCustomFieldInput";
 import {
   buildFormExtraDisplay,
   fieldLabel,
   formatExtraDisplayValue,
-  resolveOptionItems,
   isFieldActive,
   useOrderFormConfig,
   useOrderFormSectionLabels,
@@ -171,6 +169,12 @@ export function OrderDetailProfileSection({
   // 编辑态必须以本地草稿 account 为唯一受控源；详情快照只用于只读展示。
   // 否则每次输入都会被 detail.account 的旧值覆盖，表现为输入框无法编辑。
   const profileAccount = account;
+  const hasOtherFields = Object.keys(profileAccount?.extra_values ?? {}).some((key) => !creationConfig[key]);
+  const inventoryFields = useOrderFormConfig(configReady && hasOtherFields ? "INVEDIT" : undefined);
+  const extraDefinitions = useMemo(
+    () => ({ ...inventoryFields.config, ...creationConfig }),
+    [creationConfig, inventoryFields.config],
+  );
   const profileSource = useMemo(() => profileAccount ? ({ account: profileAccount }) : null, [profileAccount]);
   const accountProfileFields = useMemo(
     () => profileSource ? buildAccountProfileFields(profileSource) : [],
@@ -183,10 +187,13 @@ export function OrderDetailProfileSection({
   const images = useMemo(() => profileAccount ? accountImages(profileAccount) : { secondary: [], walletRealname: [] }, [profileAccount]);
 
   const accountExtraItems = useMemo(() => {
+    if (!configReady || (hasOtherFields && !inventoryFields.ready)) return [];
     const extraValues = profileAccount?.extra_values ?? {};
-    const existing = buildFormExtraDisplay(extraValues, Object.values(creationConfig)).filter(
-      (item) => (creationConfig[item.key]?.section ?? "EXTRA") === "ACCOUNT_PRODUCT",
-    );
+    const existing = buildFormExtraDisplay(extraValues, Object.values(extraDefinitions)).filter((item) => {
+      const creationField = creationConfig[item.key];
+      return creationField ? creationField.section === "ACCOUNT_PRODUCT"
+        : !inventoryFields.config[item.key] || inventoryFields.config[item.key].is_custom;
+    });
     const existingByKey = new Map(existing.map((item) => [item.key, item]));
     const configured = Object.values(creationConfig)
       .filter((field) => field.is_custom && field.is_active && field.section === "ACCOUNT_PRODUCT")
@@ -195,12 +202,13 @@ export function OrderDetailProfileSection({
         ?? { key: field.field_key, label: field.label, value: "", status: "active" as const });
     const configuredKeys = new Set(configured.map((item) => item.key));
     return [...configured, ...existing.filter((item) => !configuredKeys.has(item.key))];
-  }, [creationConfig, profileAccount]);
+  }, [configReady, creationConfig, extraDefinitions, hasOtherFields, inventoryFields.config, inventoryFields.ready, profileAccount]);
 
   return (
     <div className="order-detail__section order-detail__section--profile">
       <OrderSectionHeading title={sectionLabels["ACCOUNT_PRODUCT"] ?? "游戏账号信息"} />
       {!editing ? <FieldConfigStatus scope="PROFILE" ready={configReady} error={configError} retry={retryConfig} /> : null}
+      {configReady && hasOtherFields ? <FieldConfigStatus scope="PROFILE_HISTORY" ready={inventoryFields.ready} error={inventoryFields.error} retry={inventoryFields.retry} /> : null}
       <div className="order-detail__meta">
         <div className="order-detail__meta-group">
           <div className="order-detail__meta-group-title">账号资料</div>
@@ -235,8 +243,8 @@ export function OrderDetailProfileSection({
             <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
               {accountExtraItems.map((item) => (
                 <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
-                  {editing ? (
-                    <EditableAccountExtra
+                  {editing && item.status === "active" && creationConfig[item.key] ? (
+                    <OrderDetailCustomFieldInput
                       label={item.label}
                       definition={creationConfig[item.key]}
                       value={profileAccount?.extra_values?.[item.key]}
@@ -247,7 +255,7 @@ export function OrderDetailProfileSection({
                         },
                       })}
                     />
-                  ) : formatExtraDisplayValue(item.value) || "-"}
+                  ) : formatExtraDisplayValue(item.value, extraDefinitions[item.key]?.options) || "-"}
                 </Descriptions.Item>
               ))}
             </Descriptions>
@@ -256,32 +264,6 @@ export function OrderDetailProfileSection({
       </div>
     </div>
   );
-}
-
-function EditableAccountExtra({ label, definition, value, onChange }: {
-  label: string;
-  definition?: OrderFormField;
-  value: unknown;
-  onChange: (value: unknown) => void;
-}) {
-  const ariaLabel = `编辑${label}`;
-  switch (definition?.field_type) {
-    case "NUMBER":
-      return <InputNumber aria-label={ariaLabel} value={typeof value === "number" ? value : null} onChange={onChange} />;
-    case "BOOLEAN":
-      return <Switch aria-label={ariaLabel} checked={value === true} onChange={onChange} />;
-    case "DATE":
-      return <DatePicker aria-label={ariaLabel} value={typeof value === "string" && dayjs(value).isValid() ? dayjs(value) : null}
-        onChange={(date) => onChange(date ? date.format("YYYY-MM-DD") : null)} />;
-    case "SELECT":
-      return <Select aria-label={ariaLabel} value={typeof value === "string" ? value : undefined}
-        options={resolveOptionItems(definition.options)} allowClear onChange={onChange} />;
-    case "MULTI_SELECT":
-      return <Select aria-label={ariaLabel} mode="multiple" value={Array.isArray(value) ? value : []}
-        options={resolveOptionItems(definition.options)} allowClear onChange={onChange} />;
-    default:
-      return <Input aria-label={ariaLabel} value={formatExtraDisplayValue(value)} onChange={(event) => onChange(event.target.value)} />;
-  }
 }
 
 function EditableProfileField({

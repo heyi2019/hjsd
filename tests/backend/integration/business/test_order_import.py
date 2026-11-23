@@ -18,12 +18,13 @@ def test_imports_and_updates_configured_order_columns_with_typed_values(seeded_c
     from app.domain.lists import ListCustomColumn
     from app.domain.trade import Order, OrderFormField
 
-    for key, label, kind, options in (
-        ("priority_note", "备注级别", "TEXT", []),
-        ("priority_level", "优先等级", "SELECT", [{"value": "HIGH", "label": "高"}, {"value": "LOW", "label": "低"}]),
+    for key, label, kind, options, section in (
+        ("priority_note", "备注级别", "TEXT", [], "BUSINESS"),
+        ("priority_level", "优先等级", "SELECT", [{"value": "HIGH", "label": "高"}, {"value": "LOW", "label": "低"}], "BUSINESS"),
+        ("account_tag", "账号标签", "TEXT", [], "ACCOUNT_PRODUCT"),
     ):
         seeded_db.add(OrderFormField(order_type_code="DG", field_key=key, label=label,
-                                     field_type=kind, options=options, section="BUSINESS",
+                                     field_type=kind, options=options, section=section,
                                      is_custom=True, is_active=True, required=False, sort_order=950))
         seeded_db.add(ListCustomColumn(scope="LEDGER", column_key=f"extra:{key}", source_key=key,
                                       label=label, field_type=kind,
@@ -31,7 +32,7 @@ def test_imports_and_updates_configured_order_columns_with_typed_values(seeded_c
     seeded_db.commit()
 
     def submit(choice, note, level):
-        content = f"订单号,业务日期,业务类型,备注级别,优先等级\nDG0950,2026-10-17,代挂,{note},{level}\n".encode()
+        content = f"订单号,业务日期,业务类型,游戏账号/产品,备注级别,优先等级,账号标签\nDG0950,2026-10-17,代挂,历史账号,{note},{level},账号历史标签\n".encode()
         return seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": choice},
                                   files={"file": ("订单.csv", content, "text/csv")})
 
@@ -41,16 +42,60 @@ def test_imports_and_updates_configured_order_columns_with_typed_values(seeded_c
     seeded_db.refresh(order)
     assert order.form_extra["priority_note"] == "普通"
     assert order.form_extra["priority_level"] == "HIGH"
+    fetched = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
+    assert fetched.status_code == 200, fetched.text
+    assert fetched.json()["form_extra"]["priority_level"] == "HIGH"
+    assert fetched.json()["account_snapshot"]["extra_values"]["account_tag"] == "账号历史标签"
 
     updated = submit("update", "已复核", "低")
     assert updated.status_code == 200, updated.text
     seeded_db.refresh(order)
     assert order.form_extra["priority_note"] == "已复核"
     assert order.form_extra["priority_level"] == "LOW"
+    listed = seeded_client.get("/api/orders", headers=headers, params={"keyword": "DG0950"})
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["items"][0]["extra_values"]["account_tag"] == "账号历史标签"
+    for extension in ("csv", "xlsx"):
+        exported = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": "DG0950"})
+        assert exported.status_code == 200, exported.text
+        table = parse_order_import(f"订单.{extension}", exported.content)["main"]
+        row = dict(zip(table.headers, table.rows[0].values))
+        assert row["账号标签"] == "账号历史标签"
+        assert row["优先等级"] == "低"
     audit = seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "order", AuditLog.entity_id == order.order_no,
                                                     AuditLog.action == "ORDER_UPDATE").order_by(AuditLog.id.desc()))
     assert audit.before_json["form_extra"] == {"priority_note": "普通", "priority_level": "HIGH"}
     assert audit.after_json["form_extra"] == {"priority_note": "已复核", "priority_level": "LOW"}
+
+
+def test_ledger_custom_account_field_uses_current_inventory_value(seeded_client, seeded_db, headers):
+    from datetime import date
+    from app.business.orders.create import create_order
+    from app.domain.lists import ListCustomColumn
+    from app.domain.trade import Account, OrderFormField
+
+    seeded_db.add(OrderFormField(order_type_code="DG", field_key="account_tag", label="账号标签",
+                                 field_type="TEXT", options=[], section="ACCOUNT_PRODUCT",
+                                 is_custom=True, is_active=True, required=False, sort_order=950))
+    seeded_db.add(ListCustomColumn(scope="LEDGER", column_key="extra:account_tag", source_key="account_tag",
+                                  label="账号标签", field_type="TEXT"))
+    seeded_db.flush()
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest",
+                         account_snapshot={"game_account": "库存自定义字段", "extra_values": {"account_tag": "旧标签"}})
+    account = seeded_db.get(Account, order.account_id)
+    account.form_extra = {"account_tag": "库存当前标签"}
+    seeded_db.commit()
+
+    listed = seeded_client.get("/api/orders", headers=headers, params={"keyword": order.order_no})
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["items"][0]["extra_values"]["account_tag"] == "库存当前标签"
+    inventory = seeded_client.get("/api/stocks/inventory/ledger", headers=headers, params={"keyword": "库存自定义字段", "include_images": False})
+    assert inventory.status_code == 200, inventory.text
+    assert inventory.json()["items"][0]["order"]["extra_values"]["account_tag"] == "库存当前标签"
+    exported = seeded_client.get("/api/orders/export.csv", headers=headers, params={"keyword": order.order_no})
+    assert exported.status_code == 200, exported.text
+    table = parse_order_import("订单.csv", exported.content)["main"]
+    assert dict(zip(table.headers, table.rows[0].values))["账号标签"] == "库存当前标签"
 
 
 @pytest.mark.parametrize(("kind", "raw", "expected"), [

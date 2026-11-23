@@ -43,9 +43,12 @@ export function buildFormExtraDisplay(
 }
 
 /** 历史扩展字段值的通用格式化（与展示兜底共用，避免各页面重复实现）。 */
-export function formatExtraDisplayValue(value: unknown): string {
+export function formatExtraDisplayValue(value: unknown, options?: OrderFormField["options"]): string {
   if (value === null || value === undefined || value === "") return "";
-  if (Array.isArray(value)) return value.map((item) => String(item)).join("、");
+  const label = (item: unknown) => typeof item === "string"
+    ? options?.find((option) => option.value === item)?.label ?? item
+    : item;
+  if (Array.isArray(value)) return value.map((item) => String(label(item))).join("、");
   if (typeof value === "boolean") return value ? "是" : "否";
-  return String(value);
+  return String(label(value));
 }

@@ -4,6 +4,7 @@ import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { ordersApi } from "../../shared/api/orders.api";
 import type { Order, OrderCashflow, OrderRebate } from "../../shared/api/types/orders";
 import type { OrderEvent } from "../../shared/api/types/order-events";
+import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } from "../../shared/forms/ConfigurableField";
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { money } from "../../shared/lib/format";
 import { DataTable, ErrorBanner } from "../../shared/ui";
@@ -13,6 +14,7 @@ export function UnboundOrderDetail({ orderId }: { orderId: number }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<NormalizedError | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const fields = useOrderFormConfig(order?.order_type);
   useEffect(() => {
     let active = true;
     setOrder(null);
@@ -28,6 +30,14 @@ export function UnboundOrderDetail({ orderId }: { orderId: number }) {
   if (error) return <ErrorBanner error={error} onRetry={() => setAttempt((value) => value + 1)} />;
   if (!order) return <Spin size="small" />;
   const snapshot = order.account_snapshot;
+  const orderValues = order.form_extra ?? order.extra_values;
+  const accountValues = snapshot?.extra_values;
+  const hasExtras = Boolean(Object.keys(orderValues ?? {}).length || Object.keys(accountValues ?? {}).length);
+  const definitions = Object.values(fields.config);
+  const extras = fields.ready ? [
+    ...buildFormExtraDisplay(orderValues, definitions).map((item) => ({ ...item, source: "order" })),
+    ...buildFormExtraDisplay(accountValues, definitions).map((item) => ({ ...item, source: "account" })),
+  ].filter((item) => !fields.config[item.key] || fields.config[item.key].is_custom) : [];
   return <div className="order-detail">
     <Typography.Text type="secondary">该订单未关联库存账号，以下为订单记录。</Typography.Text>
     <Descriptions size="small" column={2}>
@@ -40,6 +50,16 @@ export function UnboundOrderDetail({ orderId }: { orderId: number }) {
       <Descriptions.Item label="账号描述" span={2}>{snapshot?.account_description || "-"}</Descriptions.Item>
       <Descriptions.Item label="订单备注">{order.note || "-"}</Descriptions.Item>
     </Descriptions>
+    {hasExtras && fields.loading ? <div role="status">正在加载字段配置…</div> : null}
+    {hasExtras && fields.error ? <ErrorBanner error={{ ...fields.error, message: `字段配置加载失败：${fields.error.message}` }} onRetry={fields.retry} /> : null}
+    {extras.length ? <>
+      <Typography.Text strong>自定义信息</Typography.Text>
+      <Descriptions size="small" column={2}>
+        {extras.map((item) => <Descriptions.Item key={`${item.source}:${item.key}`} label={item.label}>
+          {formatExtraDisplayValue(item.value, fields.config[item.key]?.options)}
+        </Descriptions.Item>)}
+      </Descriptions>
+    </> : null}
     <Typography.Text strong>操作明细</Typography.Text>
     <DataTable<OrderEvent> size="small" rowKey="event_no" rows={order.events ?? []} page={1} pageSize={10} total={order.events?.length ?? 0} onPageChange={() => undefined} columns={[
       { title: "动作", dataIndex: "event_type", render: (value: string) => configurableLabel("ORDER_EVENT_TYPE", value) },

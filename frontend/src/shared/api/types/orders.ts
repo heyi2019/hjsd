@@ -59,8 +59,9 @@ export interface Order {
   installment_schedule?: OrderScheduleRow[];
   audit?: OrderAuditEntry[];
   attachments?: OrderAttachment[];
+  extra_values?: Record<string, unknown>;
   /** 自定义扩展字段历史值（按 field_key 归集）；删除/停用字段的值仍保留在此，详情展示时兜底。 */
-  form_extra?: Record<string, unknown>;
+  form_extra?: Record<string, unknown> | null;
   /** 建单时的账号文本快照。 */
   account_snapshot?: {
     game_account: string;
@@ -72,6 +73,7 @@ export interface Order {
     bound_phone_owner?: string | null;
     has_secondary?: boolean | null;
     account_description?: string | null;
+    extra_values?: Record<string, unknown> | null;
     /** 二次验证佐证图（data URL，最多 3 张）；仅「有无二次」为有时的上传结果。 */
     secondary_images?: string[] | null;
     wallet_realname?: string | null;

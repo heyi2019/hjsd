@@ -17,6 +17,7 @@ import {
   FieldConfigStatus,
 } from "../../../shared/forms/ConfigurableField";
 import { useOptionSet } from "../../../shared/lib/optionSets";
+import { OrderDetailCustomFieldInput } from "./OrderDetailCustomFieldInput";
 import {
   OrderSectionHeading,
   type OrderEventDraft,
@@ -208,15 +209,16 @@ function DeliverySubSection({
         <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
           {deliveryItems.map((item) => (
             <Descriptions.Item key={item.key} label={`${item.label}${item.status === "deleted" ? "（已删除）" : item.status === "inactive" ? "（已停用）" : ""}`}>
-              {editing ? (
-                <Input
-                  aria-label={`编辑${item.label}`}
-                  value={formatExtraDisplayValue(customValues[item.key] ?? item.value)}
-                  onChange={(event) => direction === "SELL"
-                    ? onSaleEventExtraChange?.(item.key, event.target.value)
-                    : onExtraChange?.(item.key, event.target.value)}
+              {editing && item.status === "active" ? (
+                <OrderDetailCustomFieldInput
+                  label={item.label}
+                  definition={config[item.key]}
+                  value={customValues[item.key] ?? item.value}
+                  onChange={(value) => direction === "SELL"
+                    ? onSaleEventExtraChange?.(item.key, value)
+                    : onExtraChange?.(item.key, value)}
                 />
-              ) : formatExtraDisplayValue(item.value) || "-"}
+              ) : formatExtraDisplayValue(item.value, config[item.key]?.options) || "-"}
             </Descriptions.Item>
           ))}
         </Descriptions>

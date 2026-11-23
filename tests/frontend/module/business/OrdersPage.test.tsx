@@ -3,11 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
+import { UnboundOrderDetail } from "@/business/orders/UnboundOrderDetail";
 import { useLedgerList } from "@/business/orders/useLedgerList";
 
 import { installmentsApi } from "@/shared/api/installments.api";
 const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
-import { orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { orderFormFieldsApi, orderTypesApi, ordersApi } from "@/shared/api/orders.api";
+import { notifyReferenceDataChanged } from "@/shared/state/referenceDataEvents";
 import { employeesApi } from "@/shared/api/org.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { stocksApi } from "@/shared/api/stocks.api";
@@ -1151,6 +1153,16 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
   });
 
   it("未绑定库存的历史订单展开时仍可查看订单与资金明细", async () => {
+    const seededFields = vi.mocked(orderFormFieldsApi.list).getMockImplementation()!;
+    let renamed = false;
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope, includeInactive) => {
+      const defaults = await seededFields(scope, includeInactive);
+      return scope === "HS" ? [...defaults,
+        { id: 901, order_type_code: "HS", field_key: "priority_level", label: renamed ? "调整后优先等级" : "优先等级", field_type: "SELECT", options: [{ value: "HIGH", label: "高" }], required: false, is_active: true, sort_order: 901, locked: false, is_custom: true, section: "BUSINESS" },
+        { id: 902, order_type_code: "HS", field_key: "account_tag", label: "账号标签", field_type: "TEXT", required: false, is_active: true, sort_order: 902, locked: false, is_custom: true, section: "ACCOUNT_PRODUCT" },
+        { id: 903, order_type_code: "HS", field_key: "legacy_flag", label: "历史标记", field_type: "BOOLEAN", required: false, is_active: false, sort_order: 903, locked: false, is_custom: true, section: "BUSINESS" },
+      ] : defaults;
+    });
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
       { id: 2, order_no: "HS-2026-0002", order_type: "HS", trade_date: "2026-10-02", status: "ACTIVE", account_id: null },
     ]) as never);
@@ -1158,8 +1170,9 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
       id: 2, order_no: "HS-2026-0002", order_type: "HS", trade_date: "2026-10-02", status: "ACTIVE",
       account_id: null, note: "导入订单备注", account_snapshot: {
         game_account: "历史账号", channel_region: "历史区服", bound_phone: "13800000000",
-        has_secondary: false, account_description: "历史账号描述",
+        has_secondary: false, account_description: "历史账号描述", extra_values: { account_tag: "账号历史标签" },
       },
+      form_extra: { priority_level: "HIGH", legacy_flag: false, removed_field: "已删除字段历史值", business_responsible_ids: [1] },
       events: [], cashflows: [{ flow_no: "SR00123", pool_id: 1, occurred_on: "2026-10-03", direction: "IN", category: "OTHER", amount: "25.00", operator: "admin" }], rebates: [],
     } as never);
     renderLight(<OrdersPage />, { user: "admin" });
@@ -1172,7 +1185,36 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     expect(screen.getByText("13800000000")).toBeInTheDocument();
     expect(screen.getByText("无")).toBeInTheDocument();
     expect(screen.getByText("历史账号描述")).toBeInTheDocument();
+    expect(await screen.findByText("优先等级")).toBeInTheDocument();
+    expect(screen.getByText("高")).toBeInTheDocument();
+    expect(screen.getByText("账号标签")).toBeInTheDocument();
+    expect(screen.getByText("账号历史标签")).toBeInTheDocument();
+    expect(screen.getByText("历史标记")).toBeInTheDocument();
+    expect(screen.getByText("否")).toBeInTheDocument();
+    expect(screen.getByText("removed_field")).toBeInTheDocument();
+    expect(screen.getByText("已删除字段历史值")).toBeInTheDocument();
+    expect(screen.queryByText("business_responsible_ids")).toBeNull();
     expect(screen.getByText("SR00123")).toBeInTheDocument();
     expect(ordersApi.executionDetail).not.toHaveBeenCalled();
+    renamed = true;
+    act(() => notifyReferenceDataChanged("formFields"));
+    expect(await screen.findByText("调整后优先等级")).toBeInTheDocument();
+  });
+
+  it("历史订单字段配置加载失败时保留订单信息并可重试", async () => {
+    vi.mocked(ordersApi.get).mockResolvedValue({
+      id: 2, order_no: "HS-2026-0002", order_type: "HS", trade_date: "2026-10-02", status: "ACTIVE",
+      account_id: null, account_snapshot: { game_account: "历史账号" }, form_extra: { priority_note: "已核对" },
+      events: [], cashflows: [], rebates: [],
+    } as never);
+    vi.mocked(orderFormFieldsApi.list).mockRejectedValueOnce(new Error("配置暂不可用")).mockResolvedValueOnce([
+      { id: 901, order_type_code: "HS", field_key: "priority_note", label: "核对状态", field_type: "TEXT", required: false, is_active: true, sort_order: 901, locked: false, is_custom: true },
+    ]);
+    renderLight(<UnboundOrderDetail orderId={2} />, { user: "admin" });
+    expect(await screen.findByText("历史账号")).toBeInTheDocument();
+    expect(await screen.findByText(/字段配置加载失败/)).toBeInTheDocument();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("核对状态")).toBeInTheDocument();
+    expect(screen.getByText("已核对")).toBeInTheDocument();
   });
 });

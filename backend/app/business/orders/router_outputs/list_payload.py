@@ -22,10 +22,6 @@ from app.business.orders.router_outputs._shared import _operator_names
 
 def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | None = None) -> list[dict]:
     """组装工作台摘要，避免列表页为每一行再请求详情。"""
-    # 表单字段自定义值落订单 form_extra 列，列表直接从行数据回显。
-    extra_values = {
-        item.id: dict(item.form_extra or {}) for item in orders
-    }
     order_ids = [item.id for item in orders]
     amount_summaries, events_by_order = order_amount_summaries(db, orders)
     account_ids = [item.account_id for item in orders if item.account_id is not None]
@@ -35,7 +31,8 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         else {
             item.id: item for item in db.execute(
                 select(Account.id, Account.stock_no, Account.game_type, Account.game_account,
-                       Account.channel_region, Account.business_mode, Account.status, Account.inventory_entry_at)
+                       Account.channel_region, Account.business_mode, Account.status, Account.inventory_entry_at,
+                       Account.form_extra)
                 .where(Account.id.in_(account_ids))
             ).all()
         }
@@ -97,6 +94,12 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
     for order in orders:
         account = accounts_by_id.get(order.account_id)
         snapshot = order.account_snapshot or {}
+        account_values = account.form_extra if account else snapshot.get("extra_values")
+        # 账号字段以当前库存为准；未绑定库存的导入订单从订单快照读取。
+        extra_values = {
+            **(order.form_extra or {}),
+            **(account_values if isinstance(account_values, dict) else {}),
+        }
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
         amounts = amount_summaries[order.id]
@@ -127,7 +130,7 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             "status": order.status,
             "owner_id": order.owner_id,
             "note": order.note,
-            "extra_values": extra_values.get(order.id, {}),
+            "extra_values": extra_values,
             "created_at": order.created_at,
             # HS / TH / DG 从库存实体展示安全的业务字段，
             # 不把快照中的 game_password 原样带入列表响应。

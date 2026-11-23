@@ -369,6 +369,7 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "fixtures.test.ts":                    "SYS10",
     "vite.config.test.ts":                 "SYS10",
     "P0P1Round20261101.test.tsx":          "SYS11",
+    "release-workflow.test.ts":           "SYS11",
     "manifest-parity.test.ts":             "SYS12",
     "mock-specifier.test.ts":              "SYS12",
 }

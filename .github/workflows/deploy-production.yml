@@ -1,6 +1,6 @@
 name: deploy-production
 
-# 仅由 main-ci-cd 在三个门禁全绿后 dispatch；也保留手动触发用于补发/回滚验证。
+# main-ci-cd 的三道门禁全绿后调用；也保留手动触发用于补发/回滚验证。
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,24 @@ on:
         type: string
         default: ""
       wait_for_gates:
-        description: "Wait for the three CI gates before uploading to ECS (set by main-ci-cd)"
+        description: "Wait for three separately triggered CI gates before uploading to ECS"
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      reset_database:
+        required: false
+        type: boolean
+        default: false
+      release_sha:
+        required: true
+        type: string
+      wait_for_gates:
+        required: false
+        type: boolean
+        default: false
+      gates_verified:
         required: false
         type: boolean
         default: false
@@ -34,9 +51,7 @@ jobs:
   deploy:
     name: Build and deploy to ECS
     runs-on: ubuntu-latest
-    # 自动发布轮把「等三道 gate」搬进本 job（上限 20 分钟），加上冷缓存构建、
-    # 上传与 ECS 校验可能接近 25 分钟；放宽到 30 分钟，避免被 job 级硬超时误杀，
-    # 让失败原因始终落在明确的 gate 状态上。
+    # 手动触发可选择等待独立门禁；超时也需覆盖构建、上传和 ECS 校验。
     timeout-minutes: 30
     env:
       ECS_HOST: ${{ secrets.ECS_HOST }}
@@ -56,6 +71,16 @@ jobs:
           # 发布成功后要确认部署提交仍是 main 的祖先，再写回发布记录。
           fetch-depth: 0
           ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Verify release commit
+        if: ${{ inputs.release_sha }}
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
+
+      - name: Validate caller gate state
+        if: ${{ inputs.gates_verified }}
+        run: test '${{ inputs.wait_for_gates }}' = 'true'
 
       - name: Validate deployment secrets
         shell: bash
@@ -176,11 +201,10 @@ jobs:
           fi
           echo "DEPLOY_PACKAGE_SHA256=$(shasum -a 256 output/heijin-deploy.tgz | awk '{print $1}')" >> "$GITHUB_ENV"
 
-      # 自动发布轮由 main-ci-cd 与三道 gate 同时启动：走到这里镜像构建与打包已完成，
-      # 但「上传 ECS」必须等门禁全绿。未过门禁的包只留在 runner，不落 ECS；
-      # 手动补发 / 回滚（wait_for_gates=false）跳过本步，行为与改动前一致。
+      # 自动发布依赖调用方的三个成功门禁，无需再占用 runner 轮询。
+      # 手动选择等待时，继续检查同一提交上单独触发的三道门禁。
       - name: Wait for required CI gates
-        if: ${{ inputs.wait_for_gates == true || inputs.wait_for_gates == 'true' }}
+        if: ${{ inputs.wait_for_gates && !inputs.gates_verified }}
         shell: bash
         env:
           SHA: ${{ inputs.release_sha || github.sha }}
@@ -313,7 +337,7 @@ jobs:
           {
             echo "### Production deployment"
             echo
-            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Commit: \`$(git rev-parse HEAD)\`"
             echo "- Version: \`${APP_VERSION}\`"
             echo "- Target: ECS"
             echo "- Health check: passed"
@@ -333,7 +357,7 @@ jobs:
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "Remote tag ${TAG} already exists, skipping"
           else
-            git tag -a "${TAG}" -m "Production release ${APP_VERSION} (${GITHUB_SHA})"
+            git tag -a "${TAG}" -m "Production release ${APP_VERSION} ($(git rev-parse HEAD))"
             git push origin "${TAG}"
           fi
 

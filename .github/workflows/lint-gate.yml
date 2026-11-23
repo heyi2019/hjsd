@@ -5,6 +5,11 @@ on:
     branches: [main, master, dev]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_sha:
+        required: true
+        type: string
 
 concurrency:
   group: lint-gate-${{ github.ref }}
@@ -13,12 +18,19 @@ concurrency:
 jobs:
   lint:
     # 与后端门禁保持一致：python:3.12
-    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
-    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
-    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
+    # main/master 由 main-ci-cd 调用；PR、dev push 和手动触发照常执行。
+    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Verify release commit
+        if: ${{ inputs.release_sha }}
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5

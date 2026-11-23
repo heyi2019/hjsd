@@ -12,10 +12,12 @@
 4. 同一组内无重复路径；
 5. ``all`` / ``ci`` 的取值必须覆盖全部分组。
 
-设计约束：本文件不连数据库，属 unit 组，毫秒级。它只做静态解析。
+设计约束：本文件不连数据库，属 unit 组；变更范围测试使用临时隔离 Git 仓库。
 """
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -91,6 +93,75 @@ def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
     assert len(calls) == 2
     assert all(command[:3] == ["test-python", "-m", "pytest"] and kwargs["env"]["PYTHONPATH"] == "isolated"
                for command, kwargs in calls)
+
+
+def _ci_scope(repo: Path, **overrides: str) -> dict[str, str]:
+    env = {**os.environ, "CI_EVENT_NAME": "push", "CI_FULL_SUITE": "false", "CI_CHANGED_PATHS": "",
+           "CI_BASE_SHA": "", "CI_HEAD_SHA": "", **overrides}
+    result = subprocess.run([sys.executable, str(REPO / "scripts/ops/ci_test_scope.py")],
+                            cwd=repo, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+    return dict(line.split("=", 1) for line in result.stdout.splitlines())
+
+
+def test_ci_scope_includes_all_commits_and_both_sides_of_renames(tmp_path):
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "CI Test")
+    git("config", "user.email", "ci-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "backend/original.py").write_text("original\n")
+    git("add", "backend/original.py")
+    git("commit", "-qm", "test: base")
+    base = git("rev-parse", "HEAD")
+    (tmp_path / "frontend").mkdir()
+    git("mv", "backend/original.py", "frontend/moved.py")
+    git("commit", "-qm", "test: rename")
+    (tmp_path / "notes.md").write_text("changed\n")
+    git("add", "notes.md")
+    git("commit", "-qm", "test: second change")
+    head = git("rev-parse", "HEAD")
+
+    scope = _ci_scope(tmp_path, CI_BASE_SHA=base, CI_HEAD_SHA=head)
+    assert scope["mode"] == "changed" and scope["full_suite"] == "false"
+    assert set(scope["changed_paths"].split(",")) == {"backend/original.py", "frontend/moved.py", "notes.md"}
+    pr_scope = _ci_scope(tmp_path, CI_EVENT_NAME="pull_request", CI_BASE_SHA=base, CI_HEAD_SHA=head)
+    assert pr_scope == scope
+    git("commit", "--allow-empty", "-qm", "test: empty")
+    empty_scope = _ci_scope(tmp_path, CI_BASE_SHA=head, CI_HEAD_SHA=git("rev-parse", "HEAD"))
+    assert empty_scope["mode"] == "changed" and empty_scope["changed_paths"] == "VERSION"
+    (tmp_path / "unsafe,name.py").write_text("changed\n")
+    git("add", "unsafe,name.py")
+    git("commit", "-qm", "test: unsafe path")
+    unsafe = _ci_scope(tmp_path, CI_BASE_SHA=head, CI_HEAD_SHA=git("rev-parse", "HEAD"))
+    assert unsafe["mode"] == "full" and unsafe["full_suite"] == "true"
+
+
+@pytest.mark.parametrize(("event", "full", "paths", "expected_mode"), [
+    ("push", "false", "backend/app/funds/balances.py", "changed"),
+    ("workflow_dispatch", "false", "backend/app/funds/balances.py", "changed"),
+    ("workflow_dispatch", "false", "", "full"),
+    ("push", "true", "backend/app/funds/balances.py", "full"),
+    ("push", "false", "", "full"),
+    ("pull_request", "false", "", "full"),
+    ("push", "false", "bad\npath", "full"),
+])
+def test_ci_scope_requires_full_suite_when_change_range_is_unknown(tmp_path, event, full, paths, expected_mode):
+    scope = _ci_scope(tmp_path, CI_EVENT_NAME=event, CI_FULL_SUITE=full, CI_CHANGED_PATHS=paths)
+    assert scope["mode"] == expected_mode
+    assert scope["full_suite"] == ("true" if expected_mode == "full" else "false")
+    if expected_mode == "changed":
+        assert scope["changed_paths"] == paths
+    else:
+        assert scope["groups"] == "ci"
+
+
+@pytest.mark.parametrize("path", [".github/workflows/main-ci-cd.yml", "scripts/ops/auto_release.sh", "tests/manifest.json"])
+def test_ci_configuration_changes_require_full_backend_regression(path):
+    assert rr.is_structural_change([path])
 
 
 @pytest.mark.parametrize("path", [

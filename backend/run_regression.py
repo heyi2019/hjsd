@@ -456,6 +456,7 @@ def _groups_for_source_path(path: str) -> set[str]:
 
 # 核心 / 共享 / 配置 / 测试基建 / 跨模块取数口：启发式选测不许碰，一律降级全量。
 STRUCTURAL_PREFIXES = (
+    ".github/workflows/", "scripts/ops/", "tests/manifest.json",
     "backend/app/core/", "backend/app/domain/", "backend/app/shared/", "backend/app/main.py",
     "backend/app/config", "backend/app/settings", "backend/app/db",
     "backend/requirements", "backend/alembic/", "backend/run_regression.py",

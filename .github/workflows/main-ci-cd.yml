@@ -7,7 +7,7 @@ on:
 
 concurrency:
   # 自动发版推回的 chore(release) 提交会再次触发本工作流；不能让它取消
-  # 正在进行中的发版轮次（否则 wait-and-deploy 被掐断，生产会漏部署）。
+  # 正在进行中的发版轮次，避免生产漏部署。
   group: main-ci-cd-${{ github.ref }}
   cancel-in-progress: false
 
@@ -25,9 +25,9 @@ jobs:
     outputs:
       sha: ${{ steps.release.outputs.sha }}
       version: ${{ steps.release.outputs.version }}
-    env:
-      GH_TOKEN: ${{ github.token }}
-      REPO: ${{ github.repository }}
+      reset_database: ${{ steps.release.outputs.reset_database }}
+      full_suite: ${{ steps.release.outputs.full_suite }}
+      changed_paths: ${{ steps.release.outputs.changed_paths }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,85 +67,48 @@ jobs:
           release_sha="$(git rev-parse HEAD)"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "sha=$release_sha" >> "$GITHUB_OUTPUT"
+          echo "reset_database=$reset_database" >> "$GITHUB_OUTPUT"
+          CI_EVENT_NAME=push CI_FULL_SUITE="$reset_database" CI_CHANGED_PATHS='' \
+            CI_BASE_SHA="$BASE_SHA" CI_HEAD_SHA="$HEAD_SHA" \
+            python3 scripts/ops/ci_test_scope.py >> "$GITHUB_OUTPUT"
           release_duration=$(( $(date +%s) - release_started ))
           echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] automatic release preparation finished in ${release_duration}s"
           echo "- 自动发版准备耗时：${release_duration}s" >> "$GITHUB_STEP_SUMMARY"
-          # 三道 gate 的 push 触发已跳过 main/master：只保留本轮（release sha）门禁，
-          # 避免同一批代码被校验两遍；wait-and-deploy 等待的正是本轮 run。
-          # 先算「原始 push 范围」的变更路径集：release 提交是 GITHUB_TOKEN 推回的，
-          # gate checkout 到 release sha 后 git status 恒为空，必须显式传路径集。
-          # 不把自动发版产生的版本文件混进业务变更集，保持门禁选测口径稳定。
-          diff_base="$BASE_SHA"
-          if [[ -z "$diff_base" || "$diff_base" =~ ^0{40}$ ]] \
-            || ! git cat-file -e "${diff_base}^{commit}" 2>/dev/null; then
-            diff_base="${HEAD_SHA}^"
-          fi
-          changed_paths="$(git diff --name-only "$diff_base" "$HEAD_SHA" | paste -sd, -)"
-          echo "release dispatch changed_paths_chars=${#changed_paths} value=${changed_paths:-<none>}"
 
-          gh api --method POST "repos/$REPO/actions/workflows/lint-gate.yml/dispatches" -f ref=main
-          # 前端 / 后端按变更选测：路径集是「原始 push 范围」，天然不含自动发版改的版本文件。
-          # V1.0.0 重建生产库时必须跑前后端全量门禁，普通发布仍按范围选测。
-          for wf in frontend-gate.yml backend-gate.yml; do
-            jq -n --arg ref main --arg paths "$changed_paths" --arg full "$reset_database" \
-              '{ref:$ref, inputs:{changed_paths:$paths, full_suite:$full}}' \
-              | gh api --method POST "repos/$REPO/actions/workflows/$wf/dispatches" --input -
-          done
+  lint:
+    needs: [prepare-release]
+    uses: ./.github/workflows/lint-gate.yml
+    permissions:
+      contents: read
+    with:
+      release_sha: ${{ needs.prepare-release.outputs.sha }}
 
-          # 生产部署与三道 gate 同时启动：镜像构建 + 打包（上次实测 166s）不依赖门禁结果，
-          # 提前跑完即可从发布关键路径上摘掉。deploy-production 内部仍要在「上传 ECS 之前」
-          # 等三道 gate 全绿；门禁不过的包只留在 runner，不落 ECS。手动补发/回滚不传
-          # wait_for_gates，行为完全不变。
-          jq -n --arg ref main --arg sha "$release_sha" --arg reset "$reset_database" \
-            '{ref:$ref, inputs:{release_sha:$sha, wait_for_gates:"true", reset_database:$reset}}' \
-            | gh api --method POST "repos/$REPO/actions/workflows/deploy-production.yml/dispatches" --input -
-          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] deploy-production dispatched alongside gates at sha $release_sha"
+  frontend:
+    needs: [prepare-release]
+    uses: ./.github/workflows/frontend-gate.yml
+    permissions:
+      contents: read
+    with:
+      release_sha: ${{ needs.prepare-release.outputs.sha }}
+      changed_paths: ${{ needs.prepare-release.outputs.changed_paths }}
+      full_suite: ${{ fromJSON(needs.prepare-release.outputs.full_suite) }}
 
-  wait-and-deploy:
-    needs: prepare-release
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
-    runs-on: ubuntu-latest
-    # 批量轮询上限 20 分钟；25 分钟 job 兜底避免 gh api 异常挂住时整轮无限等待。
-    timeout-minutes: 25
-    env:
-      SHA: ${{ needs.prepare-release.outputs.sha }}
-      REPO: ${{ github.repository }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - name: Wait for required CI gates
-        run: |
-          set -euo pipefail
-          workflow_started=$(date +%s)
-          # 一次 API 取三道 gate 在 release sha 上的最新 run，按 path 分组只判每组最新一条，
-          # 避免旧版「每个 wf 各查一次列表 + 各查一次详情」的 6 次/轮串行请求。
-          # 表达式与 deploy-production.yml 的 Wait 步骤必须逐字一致，改动须两处同步。
-          # 三道 gate 并行 dispatch，实测最慢约 400s，5s×240 的 20 分钟上限充足。
-          for i in $(seq 1 240); do
-            state="$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
-              --jq '
-                [.workflow_runs[]
-                  | select((.path | split("/") | last) as $n
-                    | ["lint-gate.yml", "frontend-gate.yml", "backend-gate.yml"]
-                      | index($n) != null)]
-                | group_by(.path)
-                | map(sort_by(.created_at) | last)
-                | if length < 3 then "pending"
-                  elif any(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")
-                    then "failed:" + ([.[]
-                      | select(.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out")
-                      | .path] | join(","))
-                  elif all(.conclusion == "success") then "success"
-                  else "pending" end
-              ' 2>/dev/null || echo pending)"
-            echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] attempt=$i gates=$state"
-            case "$state" in
-              success) break ;;
-              failed:*) echo "CI gate(s) not green: $state" >&2; exit 1 ;;
-            esac
-            sleep 5
-          done
-          [ "$state" = success ] || { echo "CI gates timed out" >&2; exit 1; }
-          echo "[$(TZ=Asia/Shanghai date +%Y-%m-%dT%H:%M:%S%z)] all CI gates passed in $(( $(date +%s) - workflow_started ))s"
+  backend:
+    needs: [prepare-release]
+    uses: ./.github/workflows/backend-gate.yml
+    permissions:
+      contents: read
+    with:
+      release_sha: ${{ needs.prepare-release.outputs.sha }}
+      changed_paths: ${{ needs.prepare-release.outputs.changed_paths }}
+      full_suite: ${{ fromJSON(needs.prepare-release.outputs.full_suite) }}
 
-      # 部署 run 已由 prepare-release 与三道 gate 同时 dispatch；本 job 只把门禁结果
-      # 反映到 main-ci-cd 的 run 结论（任一 gate 失败即判红），不再二次触发部署。
+  deploy:
+    needs: [prepare-release, lint, frontend, backend]
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      release_sha: ${{ needs.prepare-release.outputs.sha }}
+      reset_database: ${{ fromJSON(needs.prepare-release.outputs.reset_database) }}
+      wait_for_gates: true
+      gates_verified: true
+    secrets: inherit

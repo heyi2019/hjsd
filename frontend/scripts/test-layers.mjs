@@ -18,6 +18,7 @@ export const fastTests = [
   "tests/frontend/unit/system/mock-specifier.test.ts",
   // 结构一致性守卫（TESTING-06）：扫盘 + 读 manifest，纯静态，与 mock 守卫同理放快速档。
   "tests/frontend/unit/system/manifest-parity.test.ts",
+  "tests/frontend/unit/system/release-workflow.test.ts",
   // 构建/测试配置守卫（别名、define、project 结构）
   "tests/frontend/unit/system/vite.config.test.ts",
   // 全量回归层调度守卫：确认轻量层并行且保留失败结果。

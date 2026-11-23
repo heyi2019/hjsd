@@ -1,12 +1,12 @@
 name: frontend-gate
 
 # 前端门禁三档（2026-11-11 裁决，替代「每次 push 都跑全量」）：
-#   ① full_suite=true（手动 workflow_dispatch）→ 前端全量含 deep + 真实后端浏览器联动
+#   ① full_suite=true → 前端全量含 deep + 真实后端浏览器联动
 #   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；命中公共层/分层配置自动降级 quick
 #   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过
 # 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，
 # 不能靠脚本自己读工作区，必须显式喂「本次 commit diff」。
-# main/master 的 push 不跑本门禁：由 main-ci-cd 在 release sha 上统一 dispatch 一轮，
+# main/master 的 push 不重复跑：由 main-ci-cd 在 release sha 上统一调用一轮，
 # 并由它把「原始 push 范围」的变更路径集经 changed_paths 传入，天然不含自动发版改的版本文件。
 on:
   push:
@@ -24,6 +24,19 @@ on:
         required: false
         type: string
         default: ""
+  workflow_call:
+    inputs:
+      release_sha:
+        required: true
+        type: string
+      full_suite:
+        required: false
+        type: boolean
+        default: false
+      changed_paths:
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -31,9 +44,7 @@ permissions:
 jobs:
   frontend-tests:
     name: Frontend checks and tests
-    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
-    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
-    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
+    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -43,6 +54,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Verify release commit
+        if: ${{ inputs.release_sha }}
+        working-directory: .
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -54,43 +73,34 @@ jobs:
         working-directory: .
         run: npm ci
 
+      - name: Verify release workflow safety
+        run: npm run test:fast -- --maxWorkers=4 tests/frontend/unit/system/release-workflow.test.ts
+
       - name: Resolve changed paths
         working-directory: .
         shell: bash
         env:
-          INJECTED_PATHS: ${{ inputs.changed_paths || '' }}
+          CI_CHANGED_PATHS: ${{ inputs.changed_paths || '' }}
+          CI_FULL_SUITE: ${{ inputs.full_suite || 'false' }}
+          CI_EVENT_NAME: ${{ github.event_name }}
+          CI_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+          CI_HEAD_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [[ -n "${INJECTED_PATHS:-}" ]]; then
-            # main-ci-cd 在 release dispatch 时算好「原始 push 范围」原样传入：不含自动
-            # 发版产生的版本文件，避免把升版改动混进变更集导致选测误降级。
-            paths="$INJECTED_PATHS"
-            echo "source=main-ci-cd"
-          else
-            base="${{ github.event.before || '' }}"
-            pr_base="${{ github.event.pull_request.base.sha || '' }}"
-            if [[ -n "$pr_base" ]]; then
-              base="$pr_base"
-            elif [[ -z "$base" || "$base" =~ ^0{40}$ ]]; then
-              base="HEAD^"
-            fi
-            if ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
-              base="HEAD^"
-            fi
-            paths="$(git diff --name-only "$base" "${{ github.sha }}" | paste -sd, -)"
-            echo "source=local git diff base=$base"
-          fi
+          scope="$(python3 scripts/ops/ci_test_scope.py)"
+          printf '%s\n' "$scope"
+          paths="$(printf '%s\n' "$scope" | sed -n 's/^changed_paths=//p')"
+          full="$(printf '%s\n' "$scope" | sed -n 's/^full_suite=//p')"
           printf 'TEST_CHANGED_PATHS=%s\n' "$paths" >> "$GITHUB_ENV"
+          printf 'TEST_FULL_SUITE=%s\n' "$full" >> "$GITHUB_ENV"
           fe="$(printf '%s' "$paths" | tr ',' '\n' | grep -cE '^(frontend/|tests/)' || true)"
           echo "frontend_related=$fe paths=${paths:-<none>}"
 
       - name: Check and test frontend
-        env:
-          FULL_SUITE: ${{ inputs.full_suite || 'false' }}
         run: |
           set -euo pipefail
           npm run check
-          if [[ "$FULL_SUITE" == "true" ]]; then
+          if [[ "${TEST_FULL_SUITE:-true}" == "true" ]]; then
             echo "全量 CI 档（full_suite=true）"
             npm run test:ci
           elif [[ -n "${TEST_CHANGED_PATHS:-}" ]] \
@@ -104,9 +114,7 @@ jobs:
 
   frontend-build:
     name: Frontend build
-    # main/master 的 push 由 main-ci-cd 在 release sha 上统一 dispatch 门禁；
-    # 这里再跑一遍只是重复计算。PR 与手动 dispatch 仍照常执行。
-    if: ${{ github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
+    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -114,6 +122,15 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Verify release commit
+        if: ${{ inputs.release_sha }}
+        working-directory: .
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -130,7 +147,7 @@ jobs:
 
   browser-e2e:
     name: Browser tests with isolated backend
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_suite }}
+    if: ${{ inputs.full_suite && (github.event_name == 'workflow_dispatch' || inputs.release_sha) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -162,6 +179,14 @@ jobs:
       CUSTOMER_RATE_LIMIT_REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha || github.sha }}
+
+      - name: Verify release commit
+        if: ${{ inputs.release_sha }}
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
 
       - uses: actions/setup-python@v5
         with:

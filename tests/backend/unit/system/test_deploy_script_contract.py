@@ -19,7 +19,8 @@ def test_frontend_full_cloud_gate_includes_isolated_browser_tests():
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "frontend-gate.yml").read_text(encoding="utf-8")
     assert "  browser-e2e:" in workflow
     job = workflow.split("  browser-e2e:", 1)[1]
-    assert "github.event_name == 'workflow_dispatch' && inputs.full_suite" in job
+    assert "inputs.full_suite" in job and "inputs.release_sha" in job
+    assert "github.event_name == 'workflow_dispatch'" in job
     assert "heijin_erp_e2e" in job and "E2E_DATABASE_URL:" in job
     assert "npx playwright install --with-deps chromium" in job
     assert "npm run test:e2e" in job
@@ -342,9 +343,9 @@ def test_only_explicit_v1_release_request_enables_database_reset(tmp_path):
     ("version", "reset_marker", "expected"),
     [("1.0.0", "\nReset-Production-Database: empty", "true"), ("1.0.1", "", "false")],
 )
-def test_release_workflow_dispatches_the_requested_database_mode(tmp_path, version, reset_marker, expected):
-    """隔离 Git 仓库中，V1 重建走全量门禁，普通发布不重建。"""
-    import json
+def test_release_workflow_outputs_the_requested_database_mode(tmp_path, version, reset_marker, expected):
+    """隔离 Git 仓库中，V1 重建走全量门禁，普通发布按变更选测。"""
+    import re
     import textwrap
 
     repo = tmp_path / "repo"
@@ -354,7 +355,7 @@ def test_release_workflow_dispatches_the_requested_database_mode(tmp_path, versi
     fake_bin.mkdir()
     scripts = repo / "scripts" / "ops"
     scripts.mkdir(parents=True)
-    for name in ("auto_release.sh", "bump_version.sh", "release_reset_requested.py"):
+    for name in ("auto_release.sh", "bump_version.sh", "release_reset_requested.py", "ci_test_scope.py"):
         source = PROJECT_ROOT / "scripts" / "ops" / name
         if source.exists():
             shutil.copy2(source, scripts / name)
@@ -381,36 +382,35 @@ def test_release_workflow_dispatches_the_requested_database_mode(tmp_path, versi
     git("init", "--bare", "-q", str(remote), cwd=tmp_path)
     git("remote", "add", "origin", str(remote))
     git("push", "-q", "origin", "HEAD:main")
-    git("commit", "--allow-empty", "-qm", f"release: v{version}", "-m",
+    changed = repo / "backend" / "app" / "business" / "orders" / "sample.py"
+    changed.parent.mkdir(parents=True)
+    changed.write_text("example = True\n", encoding="utf-8")
+    git("add", str(changed.relative_to(repo)))
+    git("commit", "-qm", f"release: v{version}", "-m",
         f"Release-Version: {version}{reset_marker}")
     head = git("rev-parse", "HEAD")
     fake_gh = fake_bin / "gh"
-    fake_gh.write_text(
-        '#!/usr/bin/env bash\nif [[ "$*" == *"--input -"* ]]; then '
-        'jq -c . >> "$FAKE_GH_REQUESTS"; fi\n', encoding="utf-8",
-    )
+    fake_gh.write_text("#!/usr/bin/env bash\nexit 90\n", encoding="utf-8")
     fake_gh.chmod(0o755)
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "main-ci-cd.yml").read_text(encoding="utf-8")
     step = workflow.split("      - name: Bump version and summarize changes\n", 1)[1]
-    commands = textwrap.dedent(step.split("        run: |\n", 1)[1].split("\n  wait-and-deploy:", 1)[0])
-    requests = tmp_path / "requests.jsonl"
+    commands = textwrap.dedent(re.split(r"\n  [a-zA-Z][a-zA-Z0-9_-]*:\s*\n", step.split("        run: |\n", 1)[1], maxsplit=1)[0])
     env = {
         **os.environ, "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
         "BASE_SHA": base, "HEAD_SHA": head, "RUNNER_TEMP": str(tmp_path),
         "GITHUB_STEP_SUMMARY": str(tmp_path / "summary"), "GITHUB_OUTPUT": str(tmp_path / "output"),
-        "REPO": "local/test", "FAKE_GH_REQUESTS": str(requests),
+        "REPO": "local/test",
     }
 
     result = subprocess.run(["bash", "-c", commands], cwd=repo, env=env, capture_output=True, text=True)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    payloads = [json.loads(line) for line in requests.read_text(encoding="utf-8").splitlines()]
-    deploy = next(payload for payload in payloads if "release_sha" in payload["inputs"])
-    assert deploy["inputs"]["wait_for_gates"] == "true"
-    assert deploy["inputs"]["reset_database"] == expected
-    gates = [payload for payload in payloads if "changed_paths" in payload["inputs"]]
-    assert len(gates) == 2
-    assert all(payload["inputs"]["full_suite"] == expected for payload in gates)
+    outputs = dict(line.split("=", 1) for line in (tmp_path / "output").read_text(encoding="utf-8").splitlines())
+    assert outputs["sha"] == git("rev-parse", "HEAD")
+    assert outputs["reset_database"] == expected
+    assert outputs["full_suite"] == expected
+    if expected == "false":
+        assert outputs["changed_paths"] == "backend/app/business/orders/sample.py"
 
 
 def test_explicit_app_version_overrides_deploy_env_file(tmp_path):

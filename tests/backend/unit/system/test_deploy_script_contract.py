@@ -15,6 +15,245 @@ SOURCE_SCRIPT = PROJECT_ROOT / "deploy" / "scripts" / "deploy.sh"
 COMPOSE_FILE = PROJECT_ROOT / "deploy" / "docker-compose.yml"
 
 
+def test_local_release_rejects_same_version_or_different_commit():
+    import importlib.util
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
+    spec = importlib.util.spec_from_file_location("local_release_candidate", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    commit = "a" * 40
+    module.validate_candidate("dev", commit, commit, False, "1.0.1", "1.0.0")
+    with pytest.raises(ValueError, match="版本"):
+        module.validate_candidate("dev", commit, commit, False, "1.0.0", "1.0.0")
+    with pytest.raises(ValueError, match="远端"):
+        module.validate_candidate("dev", commit, "b" * 40, False, "1.0.1", "1.0.0")
+    with pytest.raises(ValueError, match="未提交"):
+        module.validate_candidate("dev", commit, commit, True, "1.0.1", "1.0.0")
+
+
+def test_local_cd_refuses_modified_artifact(tmp_path):
+    import importlib.util
+    import json
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
+    spec = importlib.util.spec_from_file_location("local_release_bundle", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    (tmp_path / "images.tar.gz").write_bytes(b"modified")
+    (tmp_path / "deployment.tar.gz").write_bytes(b"source")
+    (tmp_path / "manifest.json").write_text(json.dumps({
+        "version": "1.0.1", "commit": "a" * 40,
+        "production": {"version": "1.0.0", "backend_image": "sha256:" + "b" * 64,
+                       "frontend_image": "sha256:" + "c" * 64},
+        "images": ["heijin-local-backend:1.0.1-aaaaaaaaaaaa", "heijin-local-frontend:1.0.1-aaaaaaaaaaaa"],
+        "gates": module.required_gates(),
+        "schema_sha256": "d" * 64,
+        "sha256": {"images.tar.gz": "0" * 64, "deployment.tar.gz": "0" * 64},
+    }))
+    with pytest.raises(ValueError, match="校验"):
+        module.validate_bundle(tmp_path)
+
+
+def test_local_cd_accepts_intact_bundle_then_rejects_tampering(tmp_path):
+    import hashlib
+    import importlib.util
+    import io
+    import json
+    import tarfile
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
+    spec = importlib.util.spec_from_file_location("local_release_valid_bundle", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    images = tmp_path / "images.tar.gz"
+    images.write_bytes(b"images")
+    source = tmp_path / "deployment.tar.gz"
+    with tarfile.open(source, "w:gz") as data:
+        for name in ("VERSION", "deploy/docker-compose.yml", "deploy/scripts/deploy.sh",
+                     "deploy/scripts/backup_daily.sh", "frontend/nginx.conf"):
+            body = b"1.0.1\n" if name == "VERSION" else b"contents\n"
+            entry = tarfile.TarInfo(name)
+            entry.size = len(body)
+            data.addfile(entry, io.BytesIO(body))
+    manifest = {
+        "version": "1.0.1", "commit": "a" * 40,
+        "production": {"version": "1.0.0", "backend_image": "sha256:" + "b" * 64,
+                       "frontend_image": "sha256:" + "c" * 64},
+        "images": ["heijin-local-backend:1.0.1-aaaaaaaaaaaa", "heijin-local-frontend:1.0.1-aaaaaaaaaaaa"],
+        "gates": module.required_gates(), "schema_sha256": "d" * 64,
+        "sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in (images, source)},
+    }
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    assert module.validate_bundle(tmp_path)["commit"] == "a" * 40
+    images.write_bytes(b"altered")
+    with pytest.raises(ValueError, match="校验"):
+        module.validate_bundle(tmp_path)
+
+
+def test_local_release_requires_a_pending_version_record():
+    import importlib.util
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
+    spec = importlib.util.spec_from_file_location("local_release_record", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    record = "## 版本发布记录\n\n### V1.0.1\n**发布日期：** 待发布\n**发布时间：** 待发布\n**发布状态：** 待发布\n#### 本次更新内容\n- 修复登录页面\n"
+    module.validate_pending_record(record, "1.0.1")
+    with pytest.raises(ValueError, match="待发布"):
+        module.validate_pending_record(record.replace("待发布", "已发布"), "1.0.1")
+    with pytest.raises(ValueError, match="更新内容"):
+        module.validate_pending_record(record.replace("- 修复登录页面", ""), "1.0.1")
+
+
+def test_local_cd_rejects_archive_path_escape(tmp_path):
+    import importlib.util
+    import io
+    import tarfile
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release_apply.py"
+    spec = importlib.util.spec_from_file_location("local_release_apply", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    archive = tmp_path / "deployment.tar.gz"
+    with tarfile.open(archive, "w:gz") as data:
+        entry = tarfile.TarInfo("deploy/scripts/../../.env")
+        entry.size = 1
+        data.addfile(entry, io.BytesIO(b"x"))
+    with pytest.raises(ValueError, match="发布包"):
+        module.verify_source_archive(archive, "1.0.1")
+
+
+def test_schema_fingerprint_ignores_dump_tokens_but_detects_schema_changes():
+    import importlib.util
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
+    spec = importlib.util.spec_from_file_location("local_release_schema", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    first = b"\\restrict random_a\nCREATE TABLE t (id int);\n\\unrestrict random_a\n"
+    second = b"\\restrict random_b\nCREATE TABLE t (id int);\n\\unrestrict random_b\n"
+    changed = b"\\restrict random_c\nCREATE TABLE t (id bigint);\n\\unrestrict random_c\n"
+    assert module.schema_digest_bytes(first) == module.schema_digest_bytes(second)
+    assert module.schema_digest_bytes(first) != module.schema_digest_bytes(changed)
+    apply_spec = importlib.util.spec_from_file_location("local_release_apply_schema", PROJECT_ROOT / "scripts" / "ops" / "local_release_apply.py")
+    assert apply_spec and apply_spec.loader
+    apply_module = importlib.util.module_from_spec(apply_spec)
+    apply_spec.loader.exec_module(apply_module)
+    assert module.schema_digest_bytes(first) == apply_module.schema_digest_bytes(first)
+
+
+@pytest.mark.parametrize("backup_fails", [True, False])
+def test_local_cd_stops_before_changes_without_backup_and_deploys_after_backup(tmp_path, monkeypatch, backup_fails):
+    """备份失败不能导入镜像或覆盖配置；成功后才允许切换版本。"""
+    import gzip
+    import hashlib
+    import importlib.util
+    import io
+    import json
+    import secrets
+    import tarfile
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release_apply.py"
+    spec = importlib.util.spec_from_file_location("local_release_apply_drill", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    root = tmp_path / "heijin"
+    deploy = root / "deploy"
+    (deploy / "scripts").mkdir(parents=True)
+    (root / "frontend").mkdir()
+    (root / "VERSION").write_text("1.0.0\n")
+    (deploy / "docker-compose.yml").write_text("old compose\n")
+    (root / "frontend/nginx.conf").write_text("old nginx\n")
+    (deploy / ".env").write_text("APP_VERSION=1.0.0\n")
+    (deploy / "scripts/deploy.sh").write_text("#!/bin/sh\nexit 0\n")
+    (deploy / "scripts/backup_daily.sh").write_text(
+        '#!/bin/sh\ntouch "$MARK_BACKUP"\n[ "$FAIL_BACKUP" != 1 ]\n'
+    )
+    monkeypatch.setattr(module, "ROOT", root)
+    monkeypatch.setattr(module, "DEPLOY", deploy)
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    backend_id, frontend_id = "sha256:" + "a" * 64, "sha256:" + "b" * 64
+    docker = fake_bin / "docker"
+    docker.write_text('''#!/usr/bin/env python3
+import os, sys
+a=sys.argv[1:]
+with open(os.environ['CALL_LOG'],'a') as log: log.write(' '.join(a)+'\\n')
+if a[:3]==['compose','ps','-q']: print(a[3]+'-cid')
+elif a[:2]==['inspect','--format']:
+ print(('true' if 'Running' in a[2] else os.environ['BACKEND_ID'] if a[3]=='backend-cid' else os.environ['FRONTEND_ID']))
+elif a[:3]==['image','inspect','--format']:
+ print(('amd64' if 'Architecture' in a[3] else os.environ['BACKEND_ID'] if 'backend' in a[4] else os.environ['FRONTEND_ID']))
+elif a[:2]==['image','inspect']: sys.exit(1)
+elif a[:4]==['compose','exec','-T','db']: print('CREATE TABLE t (id int);')
+elif a[:4]==['compose','exec','-T','rate-limit']: print('PONG')
+elif a[:4]==['compose','ps','--status','running']: print('backend\\nfrontend\\ndb\\nrate-limit')
+elif a[:1]==['load']: sys.stdin.buffer.read()
+elif a[:1]==['tag']: pass
+else: sys.exit(2)
+''')
+    docker.chmod(0o755)
+    curl = fake_bin / "curl"
+    curl.write_text('''#!/usr/bin/env python3
+import json, os
+print(json.dumps({'status':'ok','database_status':'ok','app_version':'1.0.1' if os.path.exists(os.environ['MARK_DEPLOY']) else '1.0.0'}))
+''')
+    curl.chmod(0o755)
+    monkeypatch.setenv("PATH", str(fake_bin) + os.pathsep + os.environ["PATH"])
+    monkeypatch.setenv("BACKEND_ID", backend_id)
+    monkeypatch.setenv("FRONTEND_ID", frontend_id)
+    monkeypatch.setenv("MARK_BACKUP", str(tmp_path / "backed-up"))
+    monkeypatch.setenv("MARK_DEPLOY", str(tmp_path / "deployed"))
+    monkeypatch.setenv("CALL_LOG", str(tmp_path / "docker.log"))
+    monkeypatch.setenv("FAIL_BACKUP", "1" if backup_fails else "0")
+    stage = Path("/tmp") / ("heijin-local-cd." + secrets.token_hex(5))
+    stage.mkdir(mode=0o700)
+    try:
+        images = stage / "images.tar.gz"
+        with gzip.open(images, "wb") as out:
+            out.write(b"fake image archive")
+        source = stage / "deployment.tar.gz"
+        files = {
+            "VERSION": b"1.0.1\n",
+            "deploy/docker-compose.yml": b"new compose\n",
+            "deploy/scripts/deploy.sh": b'#!/bin/sh\ntest -f "$MARK_BACKUP"\ntouch "$MARK_DEPLOY"\n',
+            "deploy/scripts/backup_daily.sh": b"#!/bin/sh\nexit 0\n",
+            "frontend/nginx.conf": b"new nginx\n",
+        }
+        with tarfile.open(source, "w:gz") as data:
+            for name, body in files.items():
+                entry = tarfile.TarInfo(name)
+                entry.mode = 0o755 if name.endswith(".sh") else 0o644
+                entry.size = len(body)
+                data.addfile(entry, io.BytesIO(body))
+        hashes = [hashlib.sha256(p.read_bytes()).hexdigest() for p in (images, source)]
+        args = (stage, "1.0.1", "c" * 40, "1.0.0", backend_id, frontend_id,
+                *hashes, module.schema_digest_bytes(b"CREATE TABLE t (id int);\n"))
+        if backup_fails:
+            with pytest.raises(subprocess.CalledProcessError):
+                module.apply(*args)
+            assert (root / "VERSION").read_text() == "1.0.0\n"
+            assert "load" not in (tmp_path / "docker.log").read_text().splitlines()
+            assert not (tmp_path / "deployed").exists()
+        else:
+            module.apply(*args)
+            assert (root / "VERSION").read_text() == "1.0.1\n"
+            assert (deploy / ".env").read_text() == "APP_VERSION=1.0.1\n"
+            assert (tmp_path / "backed-up").exists() and (tmp_path / "deployed").exists()
+            record = json.loads((root / ("releases/local-1.0.1-" + "c" * 12) / "release.json").read_text())
+            assert record["version"] == "1.0.1" and record["previous_version"] == "1.0.0"
+    finally:
+        shutil.rmtree(stage)
+
+
 def test_frontend_full_cloud_gate_includes_isolated_browser_tests():
     workflow = (PROJECT_ROOT / ".github" / "workflows" / "frontend-gate.yml").read_text(encoding="utf-8")
     assert "  browser-e2e:" in workflow

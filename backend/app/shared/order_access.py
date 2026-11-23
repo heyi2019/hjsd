@@ -14,6 +14,7 @@ installments 四个域直接引用。放在 orders 下导致 policy 反向依赖
 """
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
@@ -37,4 +38,13 @@ def get_order(session: Session, order_id: int, user: CurrentUser | None = None) 
     return order
 
 
-__all__ = ["get_order"]
+def lock_order_reference(session: Session, order_id: int) -> None:
+    """在修改关联记录前锁住订单引用，与订单日期平移保持一致的锁顺序。"""
+    found = session.execute(
+        select(Order.id).where(Order.id == order_id).with_for_update(read=True, key_share=True)
+    ).scalar_one_or_none()
+    if found is None:
+        raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
+
+
+__all__ = ["get_order", "lock_order_reference"]

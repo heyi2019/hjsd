@@ -1,4 +1,6 @@
 """按上架事件和平台计算当前有效寄售记录。"""
+from collections.abc import Iterable
+from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,10 +15,9 @@ def validate_unique_platforms(platforms: object) -> None:
             raise Validation("同一上架记录不能重复选择平台")
 
 
-def active_listings(db: Session, order_id: int) -> set[tuple[int, str]]:
-    events = list(db.scalars(select(OrderEvent).where(
-        OrderEvent.order_id == order_id, OrderEvent.event_type == "OPERATE", OrderEvent.is_posted.is_(True)
-    )).all())
+def active_listings_from_events(events: Iterable[Any]) -> set[tuple[int, str]]:
+    """统一写入校验与详情读取的上架状态，接受已查询的 ORM 或响应事件。"""
+    events = [event for event in events if event.event_type == "OPERATE" and event.is_posted]
     listings: set[tuple[int, str]] = set()
     for event in events:
         extra = event.form_extra or {}
@@ -38,7 +39,7 @@ def active_listings(db: Session, order_id: int) -> set[tuple[int, str]]:
             platforms = extra.get("consignment_platforms")
             if isinstance(platforms, list):
                 unlisted_platforms.setdefault(event_id, set()).update(
-                    value for value in platforms if isinstance(value, str)
+                    value.strip() for value in platforms if isinstance(value, str) and value.strip()
                 )
     active = set()
     for listing_id, platform in listings:
@@ -46,3 +47,10 @@ def active_listings(db: Session, order_id: int) -> set[tuple[int, str]]:
         if key not in system_unlisted and platform not in unlisted_platforms.get(key, ()):
             active.add((listing_id, platform))
     return active
+
+
+def active_listings(db: Session, order_id: int) -> set[tuple[int, str]]:
+    events = db.scalars(select(OrderEvent).where(
+        OrderEvent.order_id == order_id, OrderEvent.event_type == "OPERATE", OrderEvent.is_posted.is_(True)
+    )).all()
+    return active_listings_from_events(events)

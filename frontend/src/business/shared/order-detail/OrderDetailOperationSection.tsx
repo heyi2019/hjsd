@@ -4,7 +4,7 @@ import type { ColumnsType } from "antd/es/table";
 import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { DataTable, DateField, PermissionButton, Select } from "../../../shared/ui";
-import type { AccountExecutionEvent, AccountExecutionOrder } from "../../../shared/api/types/account-execution";
+import type { AccountExecutionEvent } from "../../../shared/api/types/account-execution";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import type { Account } from "../../../shared/api/types/accounts";
 import type { OrderEventDraft, OrderOperationDraft, OrderOperationKey, OrderOperationRow } from "./OrderDetail.shared";
@@ -14,7 +14,7 @@ import { money } from "../../../shared/lib/format";
 import { OrderSectionHeading, OPERATION_KEY_BY_TYPE, OPERATION_TYPE_BY_KEY, type OrderDetailMeta } from "./OrderDetail.shared";
 import { defaultOperatorUserIds } from "./editing/editor-utils";
 import { currentDevUser } from "../../../shared/api/client";
-import { activeConsignmentListings } from "../operations/consignment-logic";
+import type { ConsignmentListing } from "../operations/consignment-logic";
 import "../../../shared/ui/AdaptiveFormGrid/MoneyInput.css";
 
 const OPERATION_COLUMNS: ColumnsType<OrderOperationRow> = [
@@ -114,7 +114,7 @@ export function resolveOperationEventContent(
 
 /** 运营信息展示四类动作；上架/下架允许同一账号拥有多条平台记录。 */
 export function OrderDetailOperationSection({
-  meta, editing, account, orderType, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents, operatorUsername = currentDevUser(),
+  meta, editing, account, orderType, eventDrafts, operationDrafts, onEventEdit, onOperationEdit, onAddOperationRow, onRemoveOperationRow, onProfileChange, employees = [], operationEvents, activeListings = [], operatorUsername = currentDevUser(),
 }: {
   meta: OrderDetailMeta;
   editing?: boolean;
@@ -129,14 +129,11 @@ export function OrderDetailOperationSection({
   onProfileChange?: (changes: Partial<Account>) => void;
   employees?: EmployeeOption[];
   operationEvents?: Record<string, AccountExecutionEvent[]>;
+  activeListings?: ConsignmentListing[];
   operatorUsername?: string;
 }) {
   const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
   const defaultOperatorIds = defaultOperatorUserIds(employees, operatorUsername) ?? [];
-  const activeListings = activeConsignmentListings({
-    order_id: meta.orderId ?? 0, order_no: "", status: "ACTIVE",
-    events: [...(operationEvents?.consignment ?? []), ...(operationEvents?.unlist ?? [])],
-  } as AccountExecutionOrder);
   const rows = useMemo<OrderOperationRow[]>(() => {
     const makeRows = (operationKey: OrderOperationKey, action: string, content: OrderOperationRow["content"], occurredAt: string, operator: string) => {
       const events = operationEvents?.[operationKey] ?? [];
@@ -193,7 +190,7 @@ function editableOperationColumns(
   employees: EmployeeOption[],
   platformOptions: Array<{ value: string; label: string }>,
   defaultOperatorIds: number[],
-  activeListings: ReturnType<typeof activeConsignmentListings>,
+  activeListings: ConsignmentListing[],
 ): ColumnsType<OrderOperationRow> {
   const isPlatformTaken = buildOperationPlatformUsage(activeListings, operationDrafts ?? {});
   const unlistingOptions = buildUnlistingOptions(activeListings);

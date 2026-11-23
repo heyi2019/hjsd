@@ -27,7 +27,7 @@ from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.errors import Validation
+from app.core.errors import Conflict, ErrorCode, Validation
 from app.shared.form_field_rules import validate_form_extra
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
@@ -157,6 +157,8 @@ def prepare_form_allocations(
     *,
     items: list[dict[str, Any]],
     amounts_changed: bool,
+    rates_changed: bool = False,
+    expected_order_profit: Decimal | None = None,
     user: CurrentUser | None = None,
 ) -> list[dict[str, Any]]:
     """根据最新订单利润与表单修改状态，确定金额或比例写入口径。"""
@@ -165,7 +167,9 @@ def prepare_form_allocations(
     session.refresh(order, with_for_update=True)
     order = get_order(session, order_id, user)
     profit = order_profit_of(session, order)
-    preserve_rates = (profit == 0 and not amounts_changed
+    if expected_order_profit is not None and expected_order_profit != profit:
+        raise Conflict("订单利润已变化，请重新打开分润配置", code=ErrorCode.VERSION_CONFLICT)
+    preserve_rates = ((profit == 0 or rates_changed) and not amounts_changed
                       and any(Decimal(str(item.get("allocation_rate") or 0)) != 0 for item in items))
     return [
         {**item,

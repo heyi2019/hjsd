@@ -23,6 +23,7 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
   const columns: ColumnsType<MonthlyPnlRow> = [
     { title: "月份", dataIndex: "month", width: 110 },
     { title: "销售收入", dataIndex: "sales_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
+    { title: "工作室其他收入", dataIndex: "studio_other_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "成本", dataIndex: "cost", align: "right", render: (v: string) => <MoneyText value={v} />},
     { title: "运营费用", dataIndex: "operating_expense", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "返点收益", dataIndex: "rebate_income", align: "right", render: (v: string) => <MoneyText value={v} />},
@@ -36,7 +37,7 @@ export function MonthlyPnl({ range, showPicker = true }: { range: ReportRange; s
   return (
     <Card className="glass" title="月度经营损益">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{showPicker && picker}<TimeOrderControl descending={sortDesc} onChange={setSortDesc} /><ReportExportButton name="monthly-pnl" params={params} /></Space>
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{showPicker && picker}<TimeOrderControl descending={sortDesc} onChange={setSortDesc} /><ReportExportButton name="monthly-pnl" params={{ ...params, sort_desc: sortDesc }} /></Space>
       <StatRow
         items={[
           { label: "销售收入", amount: data?.total.sales_income ?? "-" },

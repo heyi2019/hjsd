@@ -13,6 +13,7 @@ from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
 from app.funds import transfers
+from app.funds.balances import pool_balance
 
 
 def _pools(seeded_db):
@@ -87,18 +88,25 @@ def test_create_transfer_rejects_same_pool(seeded_db):
         )
 
 
-def test_create_transfer_rejects_amount_above_source_available(seeded_db):
+def test_create_transfer_allows_negative_source_balance(seeded_db):
     invest, profit = _pools(seeded_db)
+    _seed_available_cash(seeded_db, invest)
 
-    with pytest.raises(Validation, match="转出资金账户可用余额不足"):
-        transfers.create_transfer(
-            seeded_db,
-            source_pool_id=invest.id,
-            target_pool_id=profit.id,
-            amount=Decimal("999999999"),
-            occurred_on=date(2026, 10, 17),
-            actor="pytest",
-        )
+    result = transfers.create_transfer(
+        seeded_db,
+        source_pool_id=invest.id,
+        target_pool_id=profit.id,
+        amount=Decimal("150"),
+        occurred_on=date(2026, 10, 17),
+        actor="pytest",
+    )
+
+    outgoing, incoming = result["cashflows"]
+    assert outgoing.source_id == incoming.source_id == result["transfer_id"]
+    assert (outgoing.direction, incoming.direction) == (Direction.OUT.value, Direction.IN.value)
+    assert outgoing.amount == incoming.amount == Decimal("150.00")
+    assert pool_balance(seeded_db, invest.id)["cash_balance"] == Decimal("-50.00")
+    assert pool_balance(seeded_db, profit.id)["cash_balance"] == Decimal("150.00")
 
 
 def test_repair_transfer_rejects_unknown(seeded_db):

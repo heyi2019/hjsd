@@ -7,13 +7,14 @@ import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
 import type { Order } from "../../shared/api/types/orders";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { type ActionAllocationCandidates } from "./allocationHelpers";
+import { convertAllocationValue, type ActionAllocationCandidates } from "./allocationHelpers";
 
 export function useProfitAllocation(selectedOrder: Order | null, actionRequest: LatestRequest) {
   const [allocationOpen, setAllocationOpen] = useState(false);
   const [allocationForm] = Form.useForm();
   /** 扣除公司配置比例后的可分配利润，负数表示可分配的亏损分担额。 */
   const [allocationProfit, setAllocationProfit] = useState<string>("0");
+  const [allocationOrderProfit, setAllocationOrderProfit] = useState<string>("0");
   /** 按操作分配时的动作执行人候选，来自建单/售出操作人和运营信息中的操作人。 */
   const [allocationCandidates, setAllocationCandidates] = useState<ActionAllocationCandidates>({ BUY: [], SELL: [], OPERATION: [], COMPANY: [] });
   const [actionOrder, setActionOrder] = useState<Order | null>(null);
@@ -27,19 +28,20 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
     { value: "COMPANY" as number | "COMPANY", label: "公司（不绑定人员）" },
   ];
   /** 亏损单（总利润 < 0）：顶部提示改口径，金额分润后端也会拒绝。 */
-  const allocationIsLoss = Number(allocationProfit) < 0;
-  const openAllocations = async (sourceOrder?: Order) => {
+  const allocationIsLoss = Number(allocationOrderProfit) < 0;
+  const openAllocations = async (sourceOrder?: Order | number) => {
     const session = actionRequest.start();
     try {
       const target = sourceOrder ?? selectedOrder;
       if (!target) return;
+      const orderId = typeof target === "number" ? target : target.id;
       const [order, result, userResult] = await Promise.all([
-        sourceOrder ? ordersApi.get(target.id) : Promise.resolve(target),
-        profitAllocationApi.allocations(target.id),
+        sourceOrder ? ordersApi.get(orderId) : Promise.resolve(target as Order),
+        profitAllocationApi.allocations(orderId),
         employeesApi.list(),
       ]);
       if (!actionRequest.isCurrent(session)) return;
-      if (typeof result.order_profit !== "string" || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type || !Array.isArray(result.form_rows) || !result.action_candidates
+      if (typeof result.order_profit !== "string" || convertAllocationValue(result.order_profit, "RATE_TO_AMOUNT", "0") === null || typeof result.company_rate !== "string" || typeof result.allocatable_profit !== "string" || !result.totals_by_type || !Array.isArray(result.form_rows) || !result.action_candidates
         || !(["BUY", "SELL", "OPERATION", "COMPANY"] as const).every((key) => Array.isArray(result.action_candidates[key]))) {
         appMessage.error("分润数据不完整，请刷新后重试");
         return;
@@ -54,6 +56,7 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
       setUsers(userResult.filter((item) => item.is_active));
       setAllocationCandidates(candidates);
       setAllocationProfit(result.allocatable_profit);
+      setAllocationOrderProfit(result.order_profit);
       setAllocationOpen(true);
     } catch (error) {
       if (actionRequest.isCurrent(session)) appMessage.error(normalizeError(error).message);
@@ -69,7 +72,7 @@ export function useProfitAllocation(selectedOrder: Order | null, actionRequest: 
 
   return {
     actionOrder, allocationCandidates, allocationForm, allocationIsLoss,
-    allocationOpen, allocationProfit, closeAllocations,
+    allocationOpen, allocationProfit, allocationOrderProfit, closeAllocations,
     getAllocationSession, employeeOptions, openAllocations,
   };
 }

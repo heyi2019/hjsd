@@ -9,11 +9,15 @@ import { buildOperationPlatformUsage, buildUnlistingOptions, createOperationPlat
 import { OrderDetailFinanceSection } from "@/business/shared/order-detail/OrderDetailFinanceSection";
 import { OrderDetailExecutionSection } from "@/business/shared/order-detail/OrderDetailExecutionSection";
 import { OrderDetailMoneyInput } from "@/business/shared/order-detail/OrderDetailMoneyInput";
+import { findCurrentSaleEvent } from "@/business/shared/order-detail/OrderDetailDeliverySection";
 import { buildCustomerOptions, getPartySelectionDelta, groupCustomerIdsByRole, mergeCustomerSearch } from "@/business/shared/order-detail/OrderDetailPartySection";
 import type { OrderDetailMeta } from "@/business/shared/order-detail/OrderDetail.shared";
 import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { renderApp, renderLight } from "@fixtures/render";
+import { appMessage } from "@/shared/ui/appFeedback";
+import { OrderAttachments } from "@/business/shared/order-detail/OrderAttachments";
+import { attachmentsApi } from "@/shared/api/misc.api";
 
 const account = {
   id: 1,
@@ -58,6 +62,11 @@ async function settleFieldConfig() {
 }
 
 describe("OrderDetail", () => {
+  it("卖号交付使用后端指定的售出事件", () => {
+    const order = { latest_sale_event_id: 1, events: [{ id: 1, event_type: "SELL" }, { id: 2, event_type: "SELL" }] };
+    expect(findCurrentSaleEvent(order as never)?.id).toBe(1);
+    expect(findCurrentSaleEvent({ ...order, latest_sale_event_id: null } as never)).toBeUndefined();
+  });
   it("参与方初始选择按角色去重并保留每个角色首次出现顺序", () => {
     const customers = [
       { id: 2, role: "SELLER" }, { id: 1, role: "BUYER" }, { id: 1, role: "SELLER" },
@@ -217,7 +226,7 @@ describe("OrderDetail", () => {
   it("新增下架行选择具体上架事件并保存关联编号", async () => {
     const onOperationEdit = vi.fn();
     const listing = { id: 7, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: "2026-10-01T10:00:00", form_extra: { consignment_platforms: ["平台甲"], listed_at: "2026-10-01T10:00" } } as never;
-    renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} editing orderType="HS" operationEvents={{ consignment: [listing] }} onOperationEdit={onOperationEdit} />);
+    renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} editing orderType="HS" operationEvents={{ consignment: [listing] }} activeListings={[{ id: "1:7:平台甲", orderId: 1, orderNo: "HS0001", eventId: 7, platform: "平台甲", price: null, listedAt: "2026-10-01 10:00" }]} onOperationEdit={onOperationEdit} />);
     fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);
     fireEvent.click(await screen.findByText(/平台甲.*2026-10-01/, { selector: ".ant-select-item-option-content" }));
     expect(onOperationEdit).toHaveBeenCalledWith("unlist", expect.objectContaining({ form_extra: expect.objectContaining({ consignment_event_id: 7, consignment_platforms: ["平台甲"], platform_unlist_scope: "PLATFORM" }) }));
@@ -226,7 +235,7 @@ describe("OrderDetail", () => {
   it("同平台多次上架时按上架时间和事件编号区分下架目标", async () => {
     const onOperationEdit = vi.fn();
     const makeListing = (id: number, time: string) => ({ id, event_type: "OPERATE", operation_type: "CONSIGNMENT", amount: "0", occurred_at: time, form_extra: { consignment_platforms: ["平台甲"], listed_at: time } }) as never;
-    renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} editing orderType="HS" operationEvents={{ consignment: [makeListing(7, "2026-10-01T10:00:00"), makeListing(8, "2026-10-02T10:00:00")] }} onOperationEdit={onOperationEdit} />);
+    renderLight(<OrderDetailOperationSection meta={emptyMeta} account={account} editing orderType="HS" operationEvents={{ consignment: [makeListing(7, "2026-10-01T10:00:00"), makeListing(8, "2026-10-02T10:00:00")] }} activeListings={[{ id: "1:7:平台甲", orderId: 1, orderNo: "HS0001", eventId: 7, platform: "平台甲", price: null, listedAt: "2026-10-01 10:00" }, { id: "1:8:平台甲", orderId: 1, orderNo: "HS0001", eventId: 8, platform: "平台甲", price: null, listedAt: "2026-10-02 10:00" }]} onOperationEdit={onOperationEdit} />);
     fireEvent.mouseDown(screen.getByRole("combobox", { name: "编辑下架平台" }).closest(".ant-select-selector")!);
     fireEvent.click(await screen.findByText(/平台甲.*2026-10-02.*事件 8/, { selector: ".ant-select-item-option-content" }));
     expect(onOperationEdit).toHaveBeenCalledWith("unlist", expect.objectContaining({ form_extra: expect.objectContaining({ consignment_event_id: 8, consignment_platforms: ["平台甲"] }) }));
@@ -279,6 +288,20 @@ describe("OrderDetail", () => {
   it("加载中没有明细时显示加载状态", () => {
     render(<OrderDetail row={account} loading />);
     expect(document.querySelector(".ant-spin")).toBeTruthy();
+  });
+
+  it("后端未返回或返回无效资金合计时显示不可用，真实零值仍显示零", () => {
+    const detail = {
+      account, orders: [],
+      detail_view: { operation_rows: [], execution_rows: [], finance_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+      finance_summary: { total_expense: "0.00" },
+    } as unknown as AccountExecutionDetail;
+    const view = renderLight(<OrderDetail row={account} detail={detail} loading={false} />);
+    expect(screen.getByText("总收入").parentElement).toHaveTextContent("不可用");
+    expect(screen.getByText("总支出").parentElement).toHaveTextContent("0.00");
+    view.rerender(<OrderDetail row={account} detail={{ ...detail, finance_summary: { ...detail.finance_summary, total_income: "32.50", total_expense: "错误" } }} loading={false} />);
+    expect(screen.getByText("总收入").parentElement).toHaveTextContent("32.50");
+    expect(screen.getByText("总支出").parentElement).toHaveTextContent("不可用");
   });
 
   it("按动作和资金明细展示操作人、方向与汇总", () => {
@@ -417,6 +440,7 @@ describe("OrderDetail", () => {
           operator: "何一、何二",
           operator_user_ids: [1, 2],
           extra_values: { business_responsible_ids: [1, 2], delivery_responsible_ids: [3] },
+          latest_sale_event_id: 1,
           events: [{ id: 1, event_type: "SELL", operator: "售出人员" }],
         },
       ],
@@ -1145,6 +1169,7 @@ describe("OrderDetail", () => {
         order_no: "HS0032",
         order_type: "HS",
         created_at: "2026-10-15T10:19:00",
+        latest_sale_event_id: 3202,
         events: [
           { id: 3201, event_type: "BUY", amount: "100.00", occurred_at: "2026-10-15T10:20:00" },
           { id: 3202, event_type: "SELL", amount: "200.00", occurred_at: "2026-10-15T11:20:00" },
@@ -1457,6 +1482,7 @@ describe("OrderDetailImageGallery", () => {
   it("编辑时可以一次追加多张图片，并受图片数量上限约束", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const onChange = vi.fn();
+    const warning = vi.spyOn(appMessage, "warning").mockImplementation(() => undefined as never);
     const first = new File(["first"], "first.svg", { type: "image/svg+xml" });
     const second = new File(["second"], "second.svg", { type: "image/svg+xml" });
     const third = new File(["third"], "third.svg", { type: "image/svg+xml" });
@@ -1469,5 +1495,80 @@ describe("OrderDetailImageGallery", () => {
     const [nextImages] = onChange.mock.calls[0] as [string[]];
     expect(nextImages).toHaveLength(2);
     expect(nextImages.every((image) => image.startsWith("data:image/svg+xml;base64,"))).toBe(true);
+    expect(warning).toHaveBeenCalledWith("最多添加 2 张图片，1 张未添加");
+  });
+
+  it("部分图片读取失败时保留成功图片并提示失败数量", async () => {
+    const readers: FileReader[] = [];
+    vi.spyOn(globalThis, "FileReader").mockImplementation(function () {
+      const reader = { readAsDataURL: () => undefined, result: "data:image/png;base64,ok" } as unknown as FileReader;
+      readers.push(reader);
+      return reader;
+    });
+    const error = vi.spyOn(appMessage, "error").mockImplementation(() => undefined as never);
+    const onChange = vi.fn();
+    renderLight(<OrderDetailImageGallery images={[]} altPrefix="图片" editing onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText("上传图片"), { target: { files: [new File(["1"], "1.png"), new File(["2"], "2.png")] } });
+    await act(async () => {
+      readers[0].onload?.(new ProgressEvent("load") as ProgressEvent<FileReader>);
+      readers[1].onerror?.(new ProgressEvent("error") as ProgressEvent<FileReader>);
+    });
+    expect(onChange).toHaveBeenCalledWith(["data:image/png;base64,ok"]);
+    expect(error).toHaveBeenCalledWith("1 张图片读取失败，请重新选择");
+  });
+
+  it("替换图片读取失败时保留原图并提示", async () => {
+    let reader!: FileReader;
+    vi.spyOn(globalThis, "FileReader").mockImplementation(function () {
+      reader = { readAsDataURL: () => undefined } as unknown as FileReader;
+      return reader;
+    });
+    const error = vi.spyOn(appMessage, "error").mockImplementation(() => undefined as never);
+    const onChange = vi.fn();
+    renderLight(<OrderDetailImageGallery images={["old"]} altPrefix="图片" editing onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText("替换图片 1"), { target: { files: [new File(["1"], "1.png")] } });
+    await act(async () => reader.onerror?.(new ProgressEvent("error") as ProgressEvent<FileReader>));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("图片读取失败，请重新选择");
+  });
+});
+
+describe("订单附件", () => {
+  it("重复内容提示后可确认继续上传", async () => {
+    vi.spyOn(attachmentsApi, "list").mockResolvedValue({ items: [] });
+    const create = vi.spyOn(attachmentsApi, "create").mockRejectedValueOnce({
+      isAxiosError: true, response: { status: 409, data: { code: "DUPLICATE_ATTACHMENT", message: "附件内容重复" } },
+    }).mockResolvedValueOnce({ id: 1, attachment_no: "ATT0001", file_name: "凭证.txt", size_bytes: 5, created_by: "admin" } as never);
+    renderLight(<OrderAttachments orderNo="HS0001" />, { user: "admin" });
+    await userEvent.click(screen.getByRole("button", { name: "查看订单附件" }));
+    await userEvent.upload(screen.getByLabelText("上传订单附件"), new File(["proof"], "凭证.txt", { type: "text/plain" }));
+    expect(await screen.findByText(/已有相同内容的附件/)).toBeVisible();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0]).toMatchObject({ entity_type: "order", entity_id: "HS0001", allow_duplicate: false });
+    await userEvent.click(screen.getByRole("button", { name: "继续上传" }));
+    await waitFor(() => expect(create).toHaveBeenCalledTimes(2));
+    expect(create.mock.calls[1][0]).toMatchObject({ entity_id: "HS0001", allow_duplicate: true });
+    await waitFor(() => expect(screen.queryByText(/已有相同内容的附件/)).not.toBeInTheDocument());
+  });
+
+  it("重复内容提示后取消，不会再提交上传", async () => {
+    vi.spyOn(attachmentsApi, "list").mockResolvedValue({ items: [] });
+    const create = vi.spyOn(attachmentsApi, "create").mockRejectedValue({
+      isAxiosError: true, response: { status: 409, data: { code: "DUPLICATE_ATTACHMENT", message: "附件内容重复" } },
+    });
+    renderLight(<OrderAttachments orderNo="HS0001" />, { user: "admin" });
+    await userEvent.click(screen.getByRole("button", { name: "查看订单附件" }));
+    await userEvent.upload(screen.getByLabelText("上传订单附件"), new File(["proof"], "凭证.txt", { type: "text/plain" }));
+    await screen.findByText(/已有相同内容的附件/);
+    await userEvent.click(screen.getByRole("button", { name: "取消" }));
+    await waitFor(() => expect(screen.queryByText(/已有相同内容的附件/)).not.toBeInTheDocument());
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it("无写权限时附件可读但不显示上传入口", async () => {
+    vi.spyOn(attachmentsApi, "list").mockResolvedValue({ items: [] });
+    renderLight(<OrderAttachments orderNo="HS0001" />, { user: "viewer" });
+    await userEvent.click(screen.getByRole("button", { name: "查看订单附件" }));
+    expect(screen.queryByLabelText("上传订单附件")).not.toBeInTheDocument();
   });
 });

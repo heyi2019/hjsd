@@ -1,14 +1,17 @@
 import { SearchInput } from "../../shared/ui/SearchInput";
 import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
-import { Card, DatePicker, Dropdown, Segmented, Space, Spin, Tag, Typography } from "antd";
+import { Card, Dropdown, Segmented, Space, Spin, Tag } from "antd";
 import type { BusinessCenterEntryTab } from "../businessCenter";
 import { DataTable, ExportButton, StatRow } from "../../shared/ui";
 import { OrderDetail } from "../shared/order-detail/OrderDetail";
+import { BusinessDateRangeFilter } from "../shared/BusinessDateRangeFilter";
+import { ReferenceDataErrors } from "../shared/order-detail/editing/ReferenceDataErrors";
+import { UnboundOrderDetail } from "./UnboundOrderDetail";
 import type { OrderPartyLink } from "../shared/order-detail/OrderDetail.shared";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 import type { OrdersPageController } from "./useOrdersPageController";
-import { markMobileHiddenColumns } from "../../shared/lib/listColumns";
+import { markMobileHiddenColumns, markMobileIdentityColumn } from "../../shared/lib/listColumns";
 import { ORDER_STATUS_LABEL } from "../../shared/lib/format";
 import { ToolbarMultiSelect } from "../../shared/ui/ToolbarMultiSelect";
 import "../shared/BusinessLedger.css";
@@ -90,10 +93,10 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
     openLedgerEditor,
   } = controller;
 
-  const statValue = (value: number | undefined) => (summaryLoading ? "—" : summaryError ? "不可用" : String(value ?? 0));
-  const typeCount = (key: BusinessFilterKey) => summaryLoading || summaryError ? "—" : key === "all"
-    ? Object.values(ledgerSummary?.type_counts ?? {}).reduce((sum, count) => sum + count, 0)
-    : ledgerSummary?.type_counts[key] ?? 0;
+  const statValue = (value: number | undefined) => (summaryLoading ? "—" : summaryError || typeof value !== "number" || !Number.isFinite(value) ? "不可用" : String(value));
+  const typeCount = (key: BusinessFilterKey) => summaryLoading || summaryError || !ledgerSummary ? "—" : key === "all"
+    ? ledgerSummary.type_total ?? "—"
+    : ledgerSummary.type_counts[key] ?? 0;
   const operatorOptions = [
     ...employees.filter((employee) => employee.is_active).map((employee) => ({ value: employee.id, label: employee.display_name })),
     ...(myOperator && !employees.some((employee) => employee.id === myOperator.id)
@@ -113,18 +116,13 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
             value={keyword}
             placeholder="搜索订单号 / 账号 / 对方 / 备注 / 买入价 / 售出价"
             aria-label="搜索订单"
-            className="ui-ledger-search"
+            className="ui-ledger-search ui-filter-search"
             onChange={(event) => { setKeyword(event.target.value); setPage(1); }}
           />
-          <DatePicker.RangePicker
-            aria-label="订单日期区间"
-            placeholder={["开始日期", "结束日期"]}
-            format="YYYY-MM-DD"
-            size="small"
-            placement="bottomLeft"
-            classNames={{ popup: { root: "compact-date-range-picker" } }}
+          <BusinessDateRangeFilter
+            label="订单日期区间"
             value={dateRange}
-            onChange={(value) => { setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null); setPage(1); }}
+            onChange={(value) => { setDateRange(value); setPage(1); }}
           />
           {orderStatusFilter !== "all" ? (
             <Tag
@@ -184,18 +182,18 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
               },
             }}
           >
-            <ExportButton permission="finance.read" loading={ledgerExporting} />
+            <ExportButton permission="report.export" loading={ledgerExporting} />
           </Dropdown>
 
         </Space>
         <StatRow items={[
           { label: "订单总量", kind: "count", amount: statValue(ledgerSummary?.total_count) },
-          { label: "进行中订单", kind: "count", amount: statValue((ledgerSummary?.status_counts.ACTIVE ?? 0) + (ledgerSummary?.status_counts.INSTALLMENT ?? 0)) },
-          { label: "完成订单量", kind: "count", amount: statValue(ledgerSummary?.status_counts.COMPLETED) },
-          { label: "已取消订单", kind: "count", amount: statValue(ledgerSummary?.status_counts.CANCELLED) },
+          { label: "进行中订单", kind: "count", amount: statValue(ledgerSummary?.in_progress_count) },
+          { label: "完成订单量", kind: "count", amount: statValue(ledgerSummary?.completed_count) },
+          { label: "已取消订单", kind: "count", amount: statValue(ledgerSummary?.cancelled_count) },
         ]} />
         <DataTable
-          columns={markMobileHiddenColumns(arrangeLedgerColumns(ledgerColumns), LEDGER_MOBILE_HIDDEN_KEYS)}
+          columns={markMobileIdentityColumn(markMobileHiddenColumns(arrangeLedgerColumns(ledgerColumns), LEDGER_MOBILE_HIDDEN_KEYS), "order_no")}
           rows={filteredOrders}
           loading={loading}
           page={page}
@@ -210,10 +208,11 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
             onExpand: handleLedgerExpand,
             expandedRowRender: (order) => {
               const accountId = order.account_id ?? null;
-              if (accountId === null) return <Typography.Text type="secondary">该订单未关联库存账号，暂无库存详情。</Typography.Text>;
+              if (accountId === null) return <UnboundOrderDetail orderId={order.id} />;
               const detail = ledgerOrderDetails[order.id];
               if (!detail) return <Spin size="small" />;
-              return (
+              return (<>
+                {inlineEditId === detail.account.id ? <ReferenceDataErrors employeeError={controller.employeeError} poolError={controller.poolError} retryEmployees={controller.retryEmployees} retryPools={controller.retryPools} /> : null}
                 <OrderDetail
                   row={detail.account}
                   detail={detail}
@@ -242,7 +241,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
                   onCancel={cancelInlineEdit}
                   saving={savingAccount}
                 />
-              );
+              </>);
             },
           }}
           onPageChange={(nextPage, nextSize) => { setPage(nextPage); setPageSize(nextSize); }}

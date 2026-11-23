@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import csv
 import sys
 from pathlib import Path
 
@@ -42,6 +43,20 @@ GUARD_AREA = {
     "test_group_coverage.py": "SYS11",
     "test_db_channel.py": "SYS10",
 }
+
+
+def test_feature_catalog_columns_and_risk_are_aligned():
+    path = REPO / "docs" / "testing" / "测试元数据台账.csv"
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        reader.fieldnames = [name.lstrip("\ufeff") for name in reader.fieldnames or []]
+        features = [row for row in reader if row["记录类型"] == "FEATURE"]
+    assert features
+    for row in features:
+        assert row["代码域/路由"] and row["说明"], row["功能编号"]
+        assert row["风险等级"] in {"高", "中", "低"}, row["功能编号"]
+        assert not row.get(None), row["功能编号"]
+        assert row["关联旧编号(BIZ)"] not in {"高", "中", "低"}, row["功能编号"]
 
 
 def test_backend_result_does_not_claim_missing_log(tmp_path, monkeypatch):

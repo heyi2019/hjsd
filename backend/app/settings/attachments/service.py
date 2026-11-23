@@ -5,14 +5,15 @@ import base64
 import binascii
 import hashlib
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
-from app.core.errors import NotFound, PermissionDenied, Validation
+from app.core.errors import Conflict, ErrorCode, NotFound, PermissionDenied, Validation
 from app.core.time import now_second
 from app.core.security import (
     PERM_DEPOSIT_POST,
@@ -33,6 +34,7 @@ from app.shared.numbering import allocate_number
 from app.domain.attachments import Attachment
 from app.domain.enums import AuditAction, SequenceKey
 from app.domain.trade import Cashflow, Installment, Order, OrderEvent
+from app.settings.attachments.storage import track_file
 
 
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
@@ -124,8 +126,7 @@ def _assert_visible(session: Session, user: CurrentUser, target: _Target) -> Non
             select(Order.id).where(Order.id == target.order.id, scope)
         ) is None:
             raise NotFound("附件不存在")
-        return
-    if target.pool_id is not None and not user.can_see_pool(target.pool_id):
+    if (target.entity_type == "cashflow" or target.order is None) and target.pool_id is not None and not user.can_see_pool(target.pool_id):
         raise NotFound("附件不存在")
     if target.entity_type == "cashflow" and target.pool_id is None:
         raise NotFound("附件不存在")
@@ -188,6 +189,21 @@ def list_attachments(
     )
 
 
+def _has_visible_duplicate(session: Session, digest: str, user: CurrentUser) -> bool:
+    """Only disclose a duplicate when its existing attachment is readable by this user."""
+    for existing in session.scalars(select(Attachment).where(
+        Attachment.sha256 == digest, Attachment.deleted_at.is_(None),
+    )):
+        try:
+            target = _load_target(session, existing.entity_type, existing.entity_id)
+            _assert_permission(user, target, write=False)
+            _assert_visible(session, user, target)
+        except (NotFound, PermissionDenied, Validation):
+            continue
+        return True
+    return False
+
+
 def create_attachment(
     session: Session,
     *,
@@ -197,17 +213,33 @@ def create_attachment(
     content_type: str,
     content_base64: str,
     user: CurrentUser,
+    allow_duplicate: bool = False,
 ) -> Attachment:
     target = _load_target(session, entity_type, entity_id)
     _assert_permission(user, target, write=True)
     _assert_visible(session, user, target)
     name, content = _validate_file(file_name, content_type)
     payload = _decode_content(content_base64)
+    digest = hashlib.sha256(payload).hexdigest()
+    # Serialize identical uploads so two simultaneous requests cannot both skip the warning.
+    lock_key = int.from_bytes(bytes.fromhex(digest[:16]), "big", signed=True)
+    session.execute(select(func.pg_advisory_xact_lock(lock_key)))
+    if not allow_duplicate and _has_visible_duplicate(session, digest, user):
+        raise Conflict("已存在相同内容的附件，是否继续上传？", code=ErrorCode.DUPLICATE_ATTACHMENT)
     attachment_no = allocate_number(session, SequenceKey.ATTACHMENT)
-    suffix = Path(name).suffix.lower()
-    storage_key = f"{attachment_no}{suffix}"
-    path = _storage_root() / storage_key
-    path.write_bytes(payload)
+    with tempfile.NamedTemporaryFile(prefix=f"{attachment_no}-", dir=_storage_root(), delete=False) as output:
+        path = Path(output.name)
+        try:
+            output.write(payload)
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
+    storage_key = path.name
+    try:
+        track_file(session, path)
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
     item = Attachment(
         attachment_no=attachment_no,
         entity_type=target.entity_type,
@@ -216,7 +248,7 @@ def create_attachment(
         storage_key=storage_key,
         content_type=content,
         size_bytes=len(payload),
-        sha256=hashlib.sha256(payload).hexdigest(),
+        sha256=digest,
         created_by=user.username,
         updated_by=user.username,
     )

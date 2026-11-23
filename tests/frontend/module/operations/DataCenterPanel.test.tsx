@@ -2,8 +2,8 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { DataCenterPanel } from "@/reporting/DataCenterPanel";
-import { ReportsActiveContext } from "@/reporting/reports/shared";
+import { DataCenterPanel } from "@/operations/DataCenterPanel";
+import { ReportsActiveContext } from "@/operations/reports/shared";
 import { reportsApi } from "@/shared/api/reports.api";
 import { dataCenterSummary } from "@fixtures/api-responses";
 
@@ -18,7 +18,7 @@ const summary = dataCenterSummary({
   studio_cost: "30.00",
   account_sale_profit: "60.00",
   studio_other_income: "20.00",
-  profit: "80.00",
+  profit: "50.00",
 });
 
 beforeEach(() => {
@@ -55,7 +55,9 @@ describe("DataCenterPanel：经营指标", () => {
     expect(screen.getByText("工作室成本").closest(".ui-stat")?.textContent).toContain("30.00");
     expect(screen.getByText("账号售出利润").closest(".ui-stat")?.textContent).toContain("60.00");
     expect(screen.getByText("工作室其他收入").closest(".ui-stat")?.textContent).toContain("20.00");
-    expect(screen.getByText("利润").closest(".ui-stat")?.textContent).toContain("80.00");
+    expect(screen.getByText("利润").closest(".ui-stat")?.textContent).toContain("50.00");
+    expect(screen.getByText(/利润 = 账号售出利润/)).toHaveTextContent("− 工作室成本");
+    expect(screen.getByText(/在途成本为所选期间入库/)).toHaveTextContent("押金占用为当前值");
   });
 
   it("日期范围只传给经营指标接口", async () => {

@@ -93,6 +93,40 @@ def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
                for command, kwargs in calls)
 
 
+@pytest.mark.parametrize("path", [
+    "backend/app/business/orders/mutations.py",
+    "backend/app/business/orders/events.py",
+    "backend/app/business/orders/importing/cashflows.py",
+    "backend/app/business/shared/order_detail/editing/cashflows.py",
+])
+def test_order_financial_changes_select_order_and_funds_regressions(path):
+    assert {"orders", "finance"}.issubset(rr.groups_for_changes([path]))
+
+
+def test_funds_regressions_include_cross_domain_import_and_installment_flows():
+    assert {
+        "tests/backend/integration/business/test_order_import.py",
+        "tests/backend/integration/business/test_installments_funds_integration.py",
+    }.issubset(rr.GROUPS["finance"])
+
+
+@pytest.mark.parametrize("path", [
+    "backend/app/funds/cashflow_writes/reverse.py",
+    "backend/app/funds/deposits/writes.py",
+    "backend/app/funds/rebates.py",
+])
+def test_funds_writes_select_order_and_reporting_regressions(path):
+    assert {"finance", "orders", "reporting"}.issubset(rr.groups_for_changes([path]))
+
+
+def test_studio_summary_changes_select_finance_and_reporting_regressions():
+    assert {"finance", "reporting"}.issubset(rr.groups_for_changes(["backend/app/funds/cashflow_reads/studio.py"]))
+
+
+def test_shared_order_amounts_are_structural_for_test_selection():
+    assert rr.is_structural_change(["backend/app/shared/order_amounts.py"])
+
+
 def test_runtime_check_detects_missing_and_stale_locked_dependencies(tmp_path):
     from scripts.setup_test_environment import runtime_mismatches
 

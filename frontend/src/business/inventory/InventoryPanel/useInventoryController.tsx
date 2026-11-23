@@ -9,9 +9,7 @@ import { useInventoryColumns } from "./useInventoryColumns";
 import { mergeInventoryAccount } from "./types";
 
 export function useInventoryController({ refreshKey = 0, active = true, initialAgeGtDays, onNavigate }: { refreshKey?: number; active?: boolean; initialAgeGtDays?: number; onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void }) {
-  // 删除不可逆：按钮按系统角色显隐，后端仍做管理员二次鉴权。
-  const { role, username } = useSession();
-  const canDelete = role === "admin";
+  const { username } = useSession();
 
   // —— 列表域：加载 / 筛选 / 分页 / 排序 / 统计 / 派生行 / 导出 ——
   const list = useInventoryList({ active, refreshKey, initialAgeGtDays });
@@ -49,7 +47,6 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   load,
   countInventoryRows,
   totalCount,
-  setTotalCount,
   handleExport,
   exporting,
   locallyRemovedIdsRef,
@@ -72,10 +69,14 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   setOrderExecutionDetails,
   dropExecutionCache,
   dropOrderExecutionCache,
-  removeFromInventory,
+  removeFromInventory: removeFromCache,
   refreshExecution,
   expandTo,
   } = cache;
+  const removeFromInventory = (accountId: number, orderId?: number) => {
+    markLocallyRemoved(accountId);
+    removeFromCache(accountId, orderId);
+  };
 
   // —— 订单详情内联编辑状态机（onSaved 回写详情缓存与列表行）——
   const orderDetailEditor = useOrderDetailEditor({
@@ -127,17 +128,11 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     invEditExtraForm,
     savingAccount,
   } = orderDetailEditor;
-  // —— 业务动作域：open* / submit* / 删除下架 / 运营动作 ——
+  // —— 业务动作域：open* / submit* / 取消下架 / 运营动作 ——
   const actions = useInventoryActions({
     load, setRows, setError,
     loadExecution, loadOrderExecution, loadActionExecution, loadEditorExecution, dropExecutionCache,
-    expandTo, expandedOrderIds,
-    removeFromInventory: (accountId, orderId) => {
-      const wasVisible = rows.some((row) => row.account.id === accountId);
-      markLocallyRemoved(accountId);
-      removeFromInventory(accountId, orderId);
-      if (wasVisible) setTotalCount((current) => Math.max(0, current - 1));
-    },
+    expandTo,
     editorOpenEditor: orderDetailEditor.openEditor,
     editorCancelInlineEdit: orderDetailEditor.cancelInlineEdit,
     editorCancelPendingOpen: orderDetailEditor.cancelPendingOpen,
@@ -169,10 +164,6 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   submitVoid,
   platformOffsaleTarget,
   setPlatformOffsaleTarget,
-  deleteTarget,
-  setDeleteTarget,
-  deleting,
-  submitDelete,
   openProfile,
   openEditor,
   cancelInlineEdit,
@@ -188,11 +179,10 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
 
   // —— 台账列定义域：15 列 + 移动端列编排（回调依赖注入）——
   const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
-    canDelete, editingAccount, executionDetails, loadExecution,
+    editingAccount, executionDetails, loadExecution,
     setSaleTarget: (value) => { actions.invalidatePendingActions(); setSaleTarget(value); },
     setConsignmentTarget: (value) => { actions.invalidatePendingActions(); setConsignmentTarget(value); },
     setRebateTarget: (value) => { actions.invalidatePendingActions(); setRebateTarget(value); },
-    setDeleteTarget: (value) => { actions.invalidatePendingActions(); setDeleteTarget(value); },
     openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   });
 
@@ -201,7 +191,6 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     arrangeColumns,
     businessMode,
     businessOptions,
-    canDelete,
     cancelInlineEdit,
     cashflowPools,
     cashflowUsers,
@@ -210,13 +199,15 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     consignmentTarget,
     countInventoryRows,
     dateRange,
-    deleteTarget,
-    deleting,
     detailTarget,
     dropExecutionCache,
     editingAccount,
     employees,
     pools,
+    employeeError: orderDetailEditor.employeeError,
+    poolError: orderDetailEditor.poolError,
+    retryEmployees: orderDetailEditor.retryEmployees,
+    retryPools: orderDetailEditor.retryPools,
     error,
     eventDrafts,
     operationDrafts,
@@ -269,7 +260,6 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     closeCashflow,
     setConsignmentTarget,
     setDateRange,
-    setDeleteTarget,
     setDetailTarget,
     setError,
     setExecutionDetails,
@@ -289,7 +279,6 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
     setSortDesc,
     closeVoid,
     sortDesc,
-    submitDelete,
     submitVoid,
     updateEventDraft,
     updateOperationDraft,

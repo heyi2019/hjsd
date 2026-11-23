@@ -87,6 +87,7 @@ const consignmentDetail = {
     status: "ACTIVE",
     created_at: "2026-10-29T03:54:00",
     trade_date: "2026-10-29",
+    active_consignments: [{ event_id: 801, platform: "千寻", price: null, listed_at: "2026-10-29T03:54:00" }],
     events: [{
       id: 801,
       event_type: "OPERATE",
@@ -236,6 +237,12 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await waitFor(() => expect(vi.mocked(stocksApi.inventoryLedger)).toHaveBeenLastCalledWith(
       expect.objectContaining({ inventory_operator_ids: [1] }),
     ));
+  });
+
+  it("库存类型数量标明搜索和日期不影响分类数", async () => {
+    await openPanel([inStockRow]);
+    await ui.hover(screen.getByLabelText("库存类型数量说明"));
+    expect(await screen.findByText(/分类数量不受关键词和日期筛选影响/)).toBeVisible();
   });
 
   it("库存超期深链按库龄筛选", async () => {
@@ -500,6 +507,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
       ...consignmentDetail,
       orders: [{
         ...consignmentDetail.orders[0],
+        active_consignments: [],
         events: [
           ...consignmentDetail.orders[0].events,
           { id: 802, event_type: "OPERATE", operation_type: "UNLIST", reason: "平台停售", form_extra: { consignment_event_id: 801, consignment_platforms: ["千寻"], platform_unlist_scope: "PLATFORM" } },
@@ -571,7 +579,8 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
       failedDetailCount: 1,
     });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
-    await waitFor(() => expect(stocksApi.inventoryLedgerExport).toHaveBeenCalled());
+    await ui.click(await screen.findByRole("menuitem", { name: "导出完整明细" }));
+    await waitFor(() => expect(stocksApi.inventoryLedgerExport).toHaveBeenCalledWith(expect.objectContaining({ mode: "full" })));
     await waitFor(() => expect(message.warning).toHaveBeenCalledWith("1 条明细读取失败，已导出其余可用字段"));
   });
 
@@ -579,6 +588,8 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await openPanel([inStockRow]);
     vi.mocked(stocksApi.inventoryLedgerExport).mockResolvedValueOnce({ blob: new Blob(["csv"]), failedDetailCount: 0 });
     await ui.click(screen.getByRole("button", { name: /导出/ }));
+    await ui.click(await screen.findByRole("menuitem", { name: "导出页面可见列" }));
+    await waitFor(() => expect(stocksApi.inventoryLedgerExport).toHaveBeenCalledWith(expect.objectContaining({ mode: "visible" })));
     await waitFor(() => expect(message.success).toHaveBeenCalledWith("库存数据已导出"));
   });
 

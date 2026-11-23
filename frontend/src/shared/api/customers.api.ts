@@ -46,7 +46,7 @@ export const customersApi = {
     api.patch<Customer>(`/customers/${id}/status`, { status }).then((r) => r.data),
   merge: (id: number, target_customer_id: number, reason: string) =>
     api.post<Customer>(`/customers/${id}/merge`, { target_customer_id, reason }).then((r) => r.data),
-  exportCsv: (params?: CustomerFilterParams) =>
+  exportCsv: (params?: CustomerFilterParams & { sort_desc?: boolean }) =>
     api
       .get<Blob>("/customers/export.csv", {
         params: { ...params, _t: Date.now() },

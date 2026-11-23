@@ -23,10 +23,44 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 from typing import Any
 
 
 ROW_TYPE_KEY = "row_type"
+_NUMBER_TEXT = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\Z")
+
+
+def _formula_like_csv_text(value: str) -> bool:
+    if not value:
+        return False
+    stripped = value.lstrip(" \t\r\n\0")
+    leading = value[:len(value) - len(stripped)]
+    if any(char in "\t\r\n\0" for char in leading):
+        return True
+    if not stripped or stripped in {"+", "-"}:
+        return False
+    if stripped[0] in "+-" and _NUMBER_TEXT.fullmatch(stripped.strip()):
+        return False
+    return stripped[0] in "=+-@＝＋－＠"
+
+
+def spreadsheet_csv_cell(value: Any) -> Any:
+    """CSV 没有单元格类型，为公式样式文本加引号标记；数值保持原样。"""
+    if not isinstance(value, str):
+        return value
+    # 已有的前导单引号也转义一层，以便导入时可无歧义恢复原文。
+    without_quotes = value.lstrip("'")
+    if _formula_like_csv_text(value) or (without_quotes != value and _formula_like_csv_text(without_quotes)):
+        return "'" + value
+    return value
+
+
+def restore_spreadsheet_csv_text(value: str) -> str:
+    """恢复本系统 CSV 导出添加的单引号，供兼容导入使用。"""
+    if value.startswith("'") and _formula_like_csv_text(value.lstrip("'")):
+        return value[1:]
+    return value
 
 
 def report_csv(
@@ -96,8 +130,8 @@ def report_csv(
     def cell(key: str, value: Any) -> Any:
         mapping = value_labels.get(key) if value_labels else None
         if mapping and isinstance(value, str) and value in mapping:
-            return mapping[value]
-        return normalize(value)
+            value = mapping[value]
+        return spreadsheet_csv_cell(normalize(value))
 
     stream = io.StringIO(newline="")
     writer = csv.DictWriter(
@@ -108,10 +142,10 @@ def report_csv(
     )
     # 表头手工写：fieldnames 是字段键（取值用），首行要中文
     if include_header:
-        writer.writerow(dict(zip(fieldnames, header)))
+        writer.writerow(dict(zip(fieldnames, map(spreadsheet_csv_cell, header))))
     for row in rows:
         writer.writerow({key: cell(key, row.get(key)) for key in fieldnames})
     return ("\ufeff" if include_header else "") + stream.getvalue()
 
 
-__all__ = ["report_csv"]
+__all__ = ["report_csv", "spreadsheet_csv_cell", "restore_spreadsheet_csv_text"]

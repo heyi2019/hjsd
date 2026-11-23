@@ -88,7 +88,8 @@ def set_allocations(
     items = [item.model_dump() for item in payload.items]
     if payload.amounts_changed is not None:
         items = service.prepare_form_allocations(
-            db, order_id, items=items, amounts_changed=payload.amounts_changed, user=user,
+            db, order_id, items=items, amounts_changed=payload.amounts_changed,
+            rates_changed=payload.rates_changed, expected_order_profit=payload.expected_order_profit, user=user,
         )
     service.set_allocations(
         db,

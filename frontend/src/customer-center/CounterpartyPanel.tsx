@@ -3,7 +3,7 @@ import { TimeOrderControl } from "../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../shared/ui/ToolbarSelect";
 import { Card, Descriptions, Drawer, Form, Input, Space, Spin, Typography } from "antd";
 import { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { buildFormExtraDisplay, CfgItem, CustomFieldSection, FieldConfigScope, formatExtraDisplayValue, useOrderFormConfig } from "../shared/forms/ConfigurableField";
 import { counterpartiesApi } from "../shared/api/customers.api";
@@ -20,23 +20,15 @@ import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { collectExtras } from "./CustomersPage.fragments";
+import { useCounterpartyList } from "./useCounterpartyList";
 
 export function CounterpartyPanel({ active = true, focusId, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
   const counterpartyTypeOptions = useOptionSet("COUNTERPARTY_TYPE");
   const counterpartyStatusOptions = useOptionSet("COUNTERPARTY_STATUS");
-  const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
-  const [searchInput, setSearchInput] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
+  const { statusFilter, setStatusFilter, searchInput, setSearchInput, setKeyword, creatorFilter, setCreatorFilter,
+    rows, total, loading, error, sortDesc, setSortDesc, page, setPage, pageSize, setPageSize, load } = useCounterpartyList(active, createdPeriod);
   const { activeEmployees, settled: employeesSettled } = useEmployeeOptions();
   const creatorOptions = employeesSettled ? activeEmployees.map((item) => ({ label: item.display_name || item.username, value: item.username })) : null;
-  const requestRef = useRef(0);
-  const [rows, setRows] = useState<Counterparty[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
-  const [sortDesc, setSortDesc] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const { config: fieldConfig, ready: fieldConfigReady, error: fieldConfigError, retry: retryFieldConfig } = useOrderFormConfig("COUNTERPARTY");
   const fieldDefs = Object.values(fieldConfig).filter((field) => field.is_custom);
   const [open, setOpen] = useState(false);
@@ -47,7 +39,6 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
   const [detailData, setDetailData] = useState<Counterparty | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const detailRequest = useLatestRequest();
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const write = useAsyncAction();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
@@ -59,46 +50,6 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
       : {};
     return collectExtras(nestedValues, fieldDefs, { includeEmpty });
   };
-
-  const load = useCallback(async () => {
-    const request = ++requestRef.current;
-    setLoading(true);
-    try {
-      const response = await counterpartiesApi.page({
-        ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
-        ...(statusFilter ? { status: statusFilter } : {}),
-        ...(creatorFilter.length > 0 ? { created_by: creatorFilter } : {}),
-        ...(createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {}),
-        ...(sortDesc ? {} : { sort_desc: false }),
-        limit: pageSize,
-        offset: (page - 1) * pageSize,
-      });
-      if (request !== requestRef.current) return;
-      setRows(response.items);
-      setTotal(response.total);
-      setError(null);
-    } catch (err) {
-      if (request === requestRef.current) setError(normalizeError(err));
-    } finally {
-      if (request === requestRef.current) setLoading(false);
-    }
-  }, [creatorFilter, keyword, page, pageSize, sortDesc, statusFilter, createdPeriod?.from, createdPeriod?.to]);
-
-  const resetKey = JSON.stringify([createdPeriod?.from, createdPeriod?.to]);
-  const previousResetKey = useRef(resetKey);
-  // 周期变化时先回到第一页，避免请求新周期的旧页码。
-  useEffect(() => {
-    if (!active) return;
-    if (previousResetKey.current !== resetKey) {
-      previousResetKey.current = resetKey;
-      if (page !== 1) {
-        setPage(1);
-        return;
-      }
-    }
-    void load();
-    return () => { requestRef.current += 1; };
-  }, [active, load, page, resetKey]);
 
   const openDetail = async (id: number, row?: Counterparty) => {
     const request = detailRequest.start();
@@ -230,7 +181,7 @@ export function CounterpartyPanel({ active = true, focusId, createdPeriod, creat
     >
       <ErrorBanner error={error} onRetry={() => void load()} />
       <Space wrap className="ui-filter-bar counterparty-filter-bar">
-        <SearchInput type="search" aria-label="搜索合作方" maxLength={128} allowClear value={searchInput}
+        <SearchInput type="search" className="ui-filter-search" aria-label="搜索合作方" maxLength={128} allowClear value={searchInput}
           placeholder="搜索合作方编号 / 名称 / 联系方式"
           onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}
           onSearch={(value) => { setKeyword(value); setPage(1); }} />

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -23,7 +23,7 @@ beforeEach(() => {
 
 /** 探针组件：把 session 暴露成可断言的文本，避免在测试里重复写 Context 样板。 */
 function Probe() {
-  const { role, username, permissions, can, switchUser, authenticated, mustChangePassword, login } = useSession();
+  const { role, username, permissions, can, switchUser, authenticated, mustChangePassword, login, sessionError } = useSession();
   return (
     <div>
       <span data-testid="role">{role}</span>
@@ -33,6 +33,7 @@ function Probe() {
       <span data-testid="can-update">{String(can("order.update"))}</span>
       <span data-testid="authenticated">{String(authenticated)}</span>
       <span data-testid="must-change-password">{String(mustChangePassword)}</span>
+      <span data-testid="session-error">{sessionError}</span>
       <button type="button" onClick={() => switchUser("finance")}>
         切到财务
       </button>
@@ -152,6 +153,28 @@ describe("角色与用户分离", () => {
 });
 
 describe("useSession 边界", () => {
+  it("会话过期事件回到登录状态并保留提示", () => {
+    renderLight(<Probe />, { user: "admin" });
+    act(() => window.dispatchEvent(new CustomEvent("erp:session-expired", { detail: { message: "登录已过期，请重新登录" } })));
+    expect(screen.getByTestId("authenticated")).toHaveTextContent("false");
+    expect(screen.getByTestId("session-error")).toHaveTextContent("登录已过期，请重新登录");
+  });
+
+  it("返回页面时从后端刷新当前角色", async () => {
+    vi.stubEnv("DEV", false);
+    localStorage.setItem(ACCESS_TOKEN_KEY, "token");
+    vi.mocked(client.currentUser).mockResolvedValueOnce({ id: 5, username: "xiaoxuan", role: "OPERATOR", display_name: "小轩" }).mockResolvedValueOnce({ id: 5, username: "xiaoxuan", role: "VIEWER", display_name: "小轩" });
+    try {
+      renderLight(<Probe />, { user: "admin", syncDevUser: true });
+      await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("operator"));
+      act(() => window.dispatchEvent(new Event("focus")));
+      await waitFor(() => expect(screen.getByTestId("role")).toHaveTextContent("viewer"));
+      expect(screen.getByTestId("can-create")).toHaveTextContent("false");
+    } finally {
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      vi.unstubAllEnvs();
+    }
+  });
   it("脱离 Provider 使用会明确报错（而不是静默给空权限）", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const errorEvent = (event: ErrorEvent) => {

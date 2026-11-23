@@ -9,6 +9,7 @@ import { OrderDetailDeliverySection } from "./OrderDetailDeliverySection";
 import { OrderDetailExecutionSection } from "./OrderDetailExecutionSection";
 import { OrderDetailFinanceSection } from "./OrderDetailFinanceSection";
 import { OrderDetailOperationSection } from "./OrderDetailOperationSection";
+import { activeConsignmentListings } from "../operations/consignment-logic";
 import { OrderDetailProfileSection } from "./OrderDetailProfileSection";
 import { OrderDetailPartySection } from "./OrderDetailPartySection";
 import type {
@@ -33,8 +34,8 @@ type OrderDetailViewProps = {
   financeRows: OrderFinanceRow[];
   expenseCount: number;
   incomeCount: number;
-  totalExpense: string;
-  totalIncome: string;
+  totalExpense: string | null;
+  totalIncome: string | null;
   editing?: Account | null;
   eventDrafts?: Record<number, OrderEventDraft>;
   operationDrafts?: Partial<Record<string, OrderOperationDraft>>;
@@ -111,7 +112,7 @@ export function OrderDetailView({
               <FieldConfigStatus scope="PROFILE" ready={profileConfig.ready} error={profileConfig.error} retry={profileConfig.retry} />
               <FieldConfigScope scope="INVEDIT" active={Boolean(editing)}>
                 <OrderDetailDeliverySection meta={meta} detail={detail} account={editing ?? account} employees={employees} editing orderDrafts={orderDrafts} onOrderExtraChange={onOrderExtraChange} onOrderEdit={onOrderEdit} onProfileChange={onProfileChange} eventDrafts={eventDrafts} onEventEdit={onEventEdit} operatorUsername={operatorUsername} />
-                <OrderDetailOperationSection meta={meta} editing account={editing ?? account} orderType={detail?.orders.find((order) => order.order_id === meta.orderId)?.order_type ?? detail?.orders[0]?.order_type} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} operatorUsername={operatorUsername} />
+                <OrderDetailOperationSection meta={meta} editing account={editing ?? account} orderType={detail?.orders.find((order) => order.order_id === meta.orderId)?.order_type ?? detail?.orders[0]?.order_type} eventDrafts={eventDrafts} operationDrafts={operationDrafts} onEventEdit={onEventEdit} onOperationEdit={onOperationEdit} onAddOperationRow={onAddOperationRow} onRemoveOperationRow={onRemoveOperationRow} onProfileChange={onProfileChange} employees={employees} operationEvents={operationEvents} activeListings={(detail?.orders ?? []).flatMap(activeConsignmentListings)} operatorUsername={operatorUsername} />
                 <CustomFieldSections testIdSuffix="inventory-edit" />
               </FieldConfigScope>
             </BusinessRegistrationForm>

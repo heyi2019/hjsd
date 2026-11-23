@@ -15,6 +15,17 @@ SOURCE_SCRIPT = PROJECT_ROOT / "deploy" / "scripts" / "deploy.sh"
 COMPOSE_FILE = PROJECT_ROOT / "deploy" / "docker-compose.yml"
 
 
+def test_frontend_full_cloud_gate_includes_isolated_browser_tests():
+    workflow = (PROJECT_ROOT / ".github" / "workflows" / "frontend-gate.yml").read_text(encoding="utf-8")
+    assert "  browser-e2e:" in workflow
+    job = workflow.split("  browser-e2e:", 1)[1]
+    assert "github.event_name == 'workflow_dispatch' && inputs.full_suite" in job
+    assert "heijin_erp_e2e" in job and "E2E_DATABASE_URL:" in job
+    assert "npx playwright install --with-deps chromium" in job
+    assert "npm run test:e2e" in job
+    assert "E2E_RESET" not in job
+
+
 def _release_tree(
     tmp_path: Path,
     *,

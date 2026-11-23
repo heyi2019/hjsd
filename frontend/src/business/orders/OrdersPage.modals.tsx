@@ -3,7 +3,6 @@ import { normalizeError } from "../../shared/api/client";
 import { CashflowModal } from "../../finance/cashflow";
 import { InventoryRebateModal } from "../shared/rebate";
 import { OrderProfileModal, OrderPlatformOffsaleModal } from "../shared/operations";
-import { OrderDeleteDialog } from "./OrderDeleteDialog";
 import { type OrdersPageController } from "./useOrdersPageController";
 import { SharedCancellationDialog, CancelTransactionModal } from "./OrderCancellationModals";
 import { AllocationModal } from "../profit_allocation/OrderAllocationModal";
@@ -23,15 +22,9 @@ export function OrderModals({ controller, onNavigate }: { controller: OrdersPage
         showDetails
         currentOperator={controller.currentOperator}
         onClose={controller.closeCashflow}
-        onCreated={async () => {
-          await controller.load();
+        onCreated={async (target) => {
+          await Promise.all([controller.load(), controller.refreshCachedLedgerDetail(target.orderId)]);
         }}
-      />
-      <OrderDeleteDialog
-        order={controller.orderDeleteTarget}
-        submitting={controller.orderDeleteSubmitting}
-        onCancel={controller.closeOrderDelete}
-        onConfirm={controller.submitOrderDelete}
       />
       <OrderProfileModal
         target={controller.profileTarget}
@@ -56,8 +49,11 @@ export function OrderModals({ controller, onNavigate }: { controller: OrdersPage
       <InventoryRebateModal
         account={controller.orderRebateTarget}
         onClose={controller.closeOrderRebate}
-        onCreated={async () => {
-          await controller.load();
+        onCreated={async (account) => {
+          await Promise.all([
+            controller.load(),
+            account.source_order_id == null ? undefined : controller.refreshCachedLedgerDetail(account.source_order_id, account.id),
+          ]);
         }}
       />
       <OrderAccountActionModals controller={controller} />

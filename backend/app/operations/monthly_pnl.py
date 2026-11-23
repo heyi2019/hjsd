@@ -25,6 +25,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 from app.domain.enums import (
     AccountingAttribute,
+    CashflowLedgerType,
     CashflowSourceType,
     Direction,
 )
@@ -34,6 +35,7 @@ from app.domain.trade import (
     RebateRecord,
 )
 from app.shared.order_amounts import business_cashflow_filter, order_profit_flow_by_date
+from app.funds.cashflow_reads.studio import studio_totals_by_date
 
 from app.core.money import to_money_or_zero
 from ._shared import (
@@ -45,7 +47,7 @@ from ._shared import (
     _visible_pool_ids,
 )
 
-def r2_monthly_pnl(
+def monthly_pnl_report(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:
@@ -122,9 +124,14 @@ def r2_monthly_pnl(
         for occurred_on, amount in session.execute(rebate_stmt):
             rebate_income[_month_key(occurred_on)] += to_money_or_zero(amount)
 
-    # 运营费用只认核算属性，避免依赖自由填写的流水类别。
+    # 押金损失是已占用押金的重分类，不是第二笔经营支出；无论费用分类如何，
+    # 都不能作为独立运营费用重复计入。
     op_stmt = select(Cashflow).where(
-        Cashflow.source_type != CashflowSourceType.ORDER_EVENT.value,
+        Cashflow.ledger_type != CashflowLedgerType.STUDIO.value,
+        Cashflow.source_type.notin_((
+            CashflowSourceType.ORDER_EVENT.value,
+            CashflowSourceType.DEPOSIT.value,
+        )),
         # 挂订单的支出归该单「支出大类」（成本），不再重复进期间运营费用。
         Cashflow.order_id.is_(None),
         or_(
@@ -170,11 +177,18 @@ def r2_monthly_pnl(
         ):
             operating[_month_key(occurred_on)] += amount
 
-    for bucket in (revenue, cost, operating, rebate_income):
+    studio_income: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    for occurred_on, (income, expense) in studio_totals_by_date(
+        session, occurred_from=from_date, occurred_to=to_date, user=user,
+    ).items():
+        studio_income[_month_key(occurred_on)] += income
+        operating[_month_key(occurred_on)] += expense
+
+    for bucket in (revenue, cost, operating, rebate_income, studio_income):
         for month in list(bucket):
             if bucket[month] == ZERO:
                 del bucket[month]
-    months = sorted(set(revenue) | set(cost) | set(operating) | set(rebate_income))
+    months = sorted(set(revenue) | set(cost) | set(operating) | set(rebate_income) | set(studio_income))
     items = []
     for month in months:
         income = revenue[month]
@@ -185,17 +199,19 @@ def r2_monthly_pnl(
             {
                 "month": month,
                 "sales_income": income,
+                "studio_other_income": studio_income[month],
                 "cost": month_cost,
                 "operating_expense": op,
                 # 返点收入已计入 sales_income，此处只作其中项展示，不重复加回利润。
                 "rebate_income": rebate,
-                "operating_profit": income - month_cost - op,
+                "operating_profit": income + studio_income[month] - month_cost - op,
             }
         )
     return {
         "items": items,
         "total": {
             "sales_income": _sum_report_field(items, "sales_income"),
+            "studio_other_income": _sum_report_field(items, "studio_other_income"),
             "cost": _sum_report_field(items, "cost"),
             "operating_expense": _sum_report_field(items, "operating_expense"),
             "rebate_income": _sum_report_field(items, "rebate_income"),

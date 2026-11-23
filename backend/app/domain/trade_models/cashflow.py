@@ -160,7 +160,7 @@ class Reconciliation(Base, AuditMixin):
 
 
 class BalanceSnapshot(Base, AuditMixin):
-    """资金账户日终余额快照（FIN-01-05）：随日对账固化，不可篡改。
+    """资金账户对账时点余额快照（FIN-01-05）：随对账固化，不可篡改。
 
     同一资金账户同一天只固化一份系统余额（与 account_label 无关）；同日多账户
     对账保留首次快照，不回改——快照是历史台账而非可变投影。余额可为负

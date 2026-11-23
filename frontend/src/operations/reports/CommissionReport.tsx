@@ -2,7 +2,7 @@ import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
 /** Commission：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
-import { Card, Space } from "antd";
+import { Card, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useState } from "react";
 import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
@@ -14,12 +14,14 @@ import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
 import { Note, type ReportRange, useReport } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 import { CommissionDetailsTable } from "./CommissionDetailsTable";
+import { useSession } from "../../shared/state/session";
 
-export function Commission({ range, mine = false }: { range: ReportRange; mine?: boolean }) {
+export function Commission({ range, mine = false, onMineChange }: { range: ReportRange; mine?: boolean; onMineChange?: (mine: boolean) => void }) {
   const { params, picker } = range;
+  const { can } = useSession();
   const [sortDesc, setSortDesc] = useState(true);
-  const { employees, error: employeeCause } = useEmployeeOptions();
-  const employeeError = employeeCause ? normalizeError(employeeCause) : null;
+  const { employees, error: employeeCause, reloadFresh: reloadEmployees } = useEmployeeOptions();
+  const employeeError = employeeCause ? { ...normalizeError(employeeCause), message: `员工目录加载失败：${normalizeError(employeeCause).message}` } : null;
   const [selectedUserId, setSelectedUserId] = useState<number>(0);
   const commissionParams = {
     ...(params.from ? { from: params.from } : {}),
@@ -49,7 +51,7 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
     { title: "订单号", key: "order_no", dataIndex: "order_no", width: 160 },
     { title: "入库日期", key: "inventory_date", dataIndex: "inventory_date", width: 120, render: (v: string | null) => dateText(v) },
     { title: "出库日期", key: "outbound_date", dataIndex: "outbound_date", width: 120, render: (v: string | null) => dateText(v) },
-    { title: "分润人员", key: "people", width: 180, render: (_value, row) => peopleText(row) || "—" },
+    { title: "分润人员", key: "user_name", width: 180, render: (_value, row) => peopleText(row) || "—" },
     { title: "分润合计", key: "profit_base", dataIndex: "profit_base", align: "right", render: (v: string) => <MoneyText value={v} /> },
   ];
   return (
@@ -57,6 +59,9 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced">
         {picker}
+        {onMineChange && can("report.read") ? <Segmented aria-label="分润范围" value={mine ? "mine" : "all"}
+          options={[{ label: "我的收益", value: "mine" }, { label: "全员分润", value: "all" }]}
+          onChange={(value) => onMineChange(value === "mine")} /> : null}
         {!mine ? (
           <ToolbarSelect
             value={selectedUserId}
@@ -65,9 +70,9 @@ export function Commission({ range, mine = false }: { range: ReportRange; mine?:
           />
         ) : null}
         <TimeOrderControl descending={sortDesc} onChange={setSortDesc} />
-        <ReportExportButton name="commission" params={commissionParams} />
+        <ReportExportButton name="commission" params={{ ...commissionParams, sort_desc: sortDesc }} />
       </Space>
-      <ErrorBanner error={employeeError} />
+      <ErrorBanner error={employeeError} onRetry={() => { void reloadEmployees().catch(() => undefined); }} />
       {mine ? <Note>仅展示当前登录用户在分润配置中获得的收益。</Note> : null}
       <StatRow
         items={[

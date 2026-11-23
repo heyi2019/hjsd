@@ -22,18 +22,17 @@ from app.settings.auth.session import (
     get_current_user,
     require_permissions,
 )
-from app.business.inventory._common import scope_filter as account_scope_filter
 from app.domain.notifications import Notification
-from app.domain.trade import Account, Order
+from app.domain.trade import Order
 from app.shared.scope import owner_scope_filter
 from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.settings.lists.scopes import report_scope
 from app.operations.export import report_for_export
 from app.operations.profit import order_profit_detail
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
-from app.operations.r3_commission import r3_commission_reconciliation
-from app.operations.r5_business_pnl import r5_business_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
+from app.operations.commission import commission_reconciliation
+from app.operations.business_pnl import business_pnl_report
 from app.operations.data_center import data_center_summary
 from app.operations.schemas import (
     BusinessPnlOut,
@@ -56,7 +55,7 @@ def monthly_pnl(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> MonthlyPnlOut:
     """月度经营损益（账号成本不进运营费用）。"""
-    return r2_monthly_pnl(db, from_date=from_date, to_date=to_date, user=user)
+    return monthly_pnl_report(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/commission", response_model=CommissionOut)
@@ -74,18 +73,18 @@ def commission(
     if notification_id is not None:
         if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ, PERM_REPORT_READ)):
             raise PermissionDenied("当前角色无权查看分润通知")
-        stmt = select(Order.id).join(Account, Account.id == Order.account_id).join(
+        stmt = select(Order.id).join(
             Notification, Notification.entity_id == Order.order_no,
         ).where(Notification.id == notification_id, Notification.recipient_user_id == user.id,
                 Notification.notification_type == "PROFIT_ALLOCATED", Notification.entity_type == "order")
-        for scope in (owner_scope_filter(Order.owner_id, user, db), account_scope_filter(db, user)):
-            if scope is not None:
-                stmt = stmt.where(scope)
+        scope = owner_scope_filter(Order.owner_id, user, db)
+        if scope is not None:
+            stmt = stmt.where(scope)
         target_order_id = db.scalar(stmt)
         if target_order_id is None:
             raise NotFound("分润通知不可用")
         can_view_all = user.has_any((PERM_ORDER_CREATE, PERM_REPORT_READ))
-        report = r3_commission_reconciliation(
+        report = commission_reconciliation(
             db, user=user, order_id=target_order_id,
             user_id=None if can_view_all else user.id,
         )
@@ -94,7 +93,7 @@ def commission(
         return report
     if not user.has(PERM_REPORT_READ):
         raise PermissionDenied("当前角色无权查看分润报表")
-    return r3_commission_reconciliation(
+    return commission_reconciliation(
         db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, user_id=user_id
     )
 
@@ -107,7 +106,7 @@ def business_pnl(
     to_date: date | None = Query(default=None, alias="to"),
 ) -> BusinessPnlOut:
     """业务级损益：主营收入 / 成本 / 毛利均按订单资金明细收支差。"""
-    return r5_business_pnl(db, from_date=from_date, to_date=to_date, user=user)
+    return business_pnl_report(db, from_date=from_date, to_date=to_date, user=user)
 
 
 @router.get("/reports/data-center", response_model=DataCenterOut)
@@ -143,6 +142,7 @@ def export_report(
     mine: bool = Query(default=False),
     all_people: bool = Query(default=False),
     user_id: int | None = Query(default=None, gt=0),
+    sort_desc: bool | None = Query(default=None),
 ) -> Response:
     """导出当前权限范围内的报表；导出动作写入审计日志。
     mine/all_people/user_id 仅作用于分润对账，与 /reports/commission 列表同口径。
@@ -156,6 +156,7 @@ def export_report(
         mine=mine,
         all_people=all_people,
         user_id=user_id,
+        sort_desc=sort_desc,
         user=user,
     )
     # 导出列 = 该报表在「设置 → 列表字段」里的可见列：隐藏的列不导，表头用中文列名。
@@ -182,6 +183,7 @@ def export_report(
             "mine": mine,
             "all_people": all_people,
             "user_id": user_id,
+            "sort_desc": sort_desc,
             "column_count": export_meta["column_count"],
             "translated_columns": export_meta["translated_columns"],
         },

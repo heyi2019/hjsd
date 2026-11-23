@@ -42,6 +42,7 @@ def create_attachment(
         file_name=payload.file_name,
         content_type=payload.content_type,
         content_base64=payload.content_base64,
+        allow_duplicate=payload.allow_duplicate,
         user=user,
     )
     return schemas.AttachmentOut.model_validate(item)

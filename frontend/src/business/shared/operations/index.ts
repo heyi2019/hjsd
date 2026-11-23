@@ -29,6 +29,11 @@ export function orderOperationMenuItems(
   return items;
 }
 
+export function authorizedOrderOperationItems(items: OrderOperationItem[], can: (permission: string) => boolean) {
+  if (!can("order.event.post")) return [];
+  return items.filter((item) => item.key === "consignment" || can("order.update"));
+}
+
 export { OrderConsignmentModal } from "./consignment";
 export { CONSIGNMENT_OPERATION } from "./consignment";
 export { OrderPlatformOffsaleModal, consignmentRecords } from "./offsale";

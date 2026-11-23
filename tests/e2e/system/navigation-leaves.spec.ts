@@ -13,9 +13,7 @@ import { navItem } from "../support/api-stub";
  * business-write / finance-write-ui 等写路径 spec 负责，本 spec 只守
  * 「每个叶子都能开」这条主干。
  *
- * 维护提示：业务/客户/资金/经营中心的 Tab 文案来自各页面源码；「设置」中心不硬编码，
- * 改由 readSettingsTabs 从 SettingsPage 真实渲染动态读取（含权限门控与溢出收纳的 Tab），
- * 设置页增删 Tab 当天即自动覆盖，无需手动同步。
+ * 设置页保留固定的管理员入口断言，同时动态遍历实际渲染的页签。
  */
 
 const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
@@ -29,10 +27,7 @@ const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
   },
   {
     nav: "资金中心",
-    // 与 FundsPage.tsx 的 Tabs items 保持一致：原「返点」已更名「返点明细」、
-    // 新增「工作室支出」页签；「押金」已从一级 Tab 移除（押金占用现归到总览/异常）。
-    // 增删 Tab 时需同步此列表（当前 6 个）。
-    tabs: ["总览", "流水", "对账", "异常", "返点明细", "工作室支出"],
+    tabs: ["总览", "资金明细", "工作室运营", "押金", "对账"],
   },
   {
     nav: "经营中心",
@@ -44,8 +39,6 @@ const CENTERS: Array<{ nav: string; tabs?: string[]; dynamic?: boolean }> = [
     ],
   },
   {
-    // 设置页 Tab 不硬编码：从 SettingsPage 真实渲染的 Tab（含溢出收纳到「更多」的）
-    // 动态读取，单一事实源，增删 Tab 当天即被走查覆盖。
     nav: "设置",
     dynamic: true,
   },
@@ -156,6 +149,9 @@ for (const center of CENTERS) {
     await expect(page.locator(".topbar__page")).toHaveText(center.nav);
 
     const labels = center.dynamic ? await readSettingsTabs(page) : center.tabs!;
+    if (center.nav === "设置") {
+      expect(labels).toEqual(expect.arrayContaining(["业务字典", "配置中心", "订单导入", "人员与团队", "审计记录", "外观"]));
+    }
     for (const label of labels) {
       await clickTab(page, label);
       const tab = tabByName(page, label);

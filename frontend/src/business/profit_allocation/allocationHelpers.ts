@@ -17,6 +17,40 @@ export type AllocationFormRow = {
 
 export type ActionAllocationCandidates = Record<AllocationType, number[]>;
 
+function hundredths(value: string): bigint | null {
+  const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(value.trim());
+  if (!match) return null;
+  const result = BigInt(match[2]) * 100n + BigInt((match[3] ?? "").padEnd(2, "0"));
+  return match[1] ? -result : result;
+}
+
+function roundedDivision(numerator: bigint, denominator: bigint): bigint {
+  const negative = (numerator < 0n) !== (denominator < 0n);
+  const dividend = numerator < 0n ? -numerator : numerator;
+  const divisor = denominator < 0n ? -denominator : denominator;
+  const quotient = dividend / divisor;
+  const rounded = quotient + ((dividend % divisor) * 2n >= divisor ? 1n : 0n);
+  return negative ? -rounded : rounded;
+}
+
+function formatHundredths(value: bigint): string {
+  const absolute = value < 0n ? -value : value;
+  return `${value < 0n ? "-" : ""}${absolute / 100n}.${String(absolute % 100n).padStart(2, "0")}`;
+}
+
+/** 使用后端总利润做输入联动；以整数分计算并与后端一样四舍五入。 */
+export function convertAllocationValue(profit: string, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string): string | null {
+  const base = hundredths(profit);
+  const input = hundredths(value);
+  if (base === null || input === null) return null;
+  if (direction === "RATE_TO_AMOUNT") {
+    if (input < 0n || input > 10000n) return null;
+    return formatHundredths(roundedDivision(base * input, 10000n));
+  }
+  if (base === 0n) return null;
+  return formatHundredths(roundedDivision(input * 10000n, base));
+}
+
 export function buildAllocationOptionGroups<T extends { value: number | "COMPANY" }>(
   candidates: ActionAllocationCandidates,
   options: T[],

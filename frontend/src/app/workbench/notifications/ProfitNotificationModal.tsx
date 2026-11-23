@@ -5,7 +5,7 @@ import type { ProfitNotificationDetail } from "../../../shared/api/notifications
 import type { CommissionOrderGroup } from "../../../shared/api/types/reporting";
 import type { NotificationItem } from "../../../shared/api/types/common";
 import { formatDateTimeMinute, money } from "../../../shared/lib/format";
-import { CommissionDetailsTable } from "../../../reporting/reports/CommissionDetailsTable";
+import { CommissionDetailsTable } from "../../../operations/reports/CommissionDetailsTable";
 import { OrderDetailDialog } from "../../../business/shared/order-detail/OrderDetailDialog";
 
 export function ProfitNotificationModal({ selected, summary, onClose, onPartyNavigate }: { selected: NotificationItem; summary?: ProfitNotificationDetail; onClose: () => void; onPartyNavigate?: (path: string) => void }) {

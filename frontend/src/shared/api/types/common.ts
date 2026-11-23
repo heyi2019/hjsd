@@ -35,6 +35,8 @@ export interface DocumentSequence {
   padding: number;
   current_value: number;
   next_number: string;
+  remaining?: number | null;
+  near_exhaustion?: boolean;
 }
 
 export interface AttachmentItem { id: number; attachment_no: string; file_name: string; size_bytes: number; created_by: string }

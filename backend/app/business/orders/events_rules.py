@@ -14,7 +14,7 @@ from app.shared.business_numbering import event_no as next_event_no
 from app.core.money import to_money
 from app.domain.foundation import Pool
 from app.settings.field_definitions.order_types import get_order_type_by_code
-from app.settings.field_definitions.pools import require_default_pool
+from app.settings.field_definitions.pools import assert_pool_usable, require_default_pool
 from ..shared.validation import _required_text
 from ..shared.cancellation_model import (
     apply_cancellation_account_effect,
@@ -38,7 +38,6 @@ from app.domain.enums import (
     AuditAction,
     EventType,
     OrderStatus,
-    PoolStatus,
 )
 from app.domain.trade import (
     Account,
@@ -47,7 +46,7 @@ from app.domain.trade import (
     OrderEvent,
 )
 
-def _assert_sellable_order(session: Session, order: Order) -> None:
+def _assert_sellable_order(session: Session, order: Order, *, allow_unbound_import: bool = False) -> None:
     """库存账号售出必须建立在已采购入库之上。"""
     if order.order_type != "HS":
         if order.order_type == "TH":
@@ -78,6 +77,14 @@ def _assert_sellable_order(session: Session, order: Order) -> None:
     ) is not None:
         raise Validation("HS 已建立分期合约，必须通过分期收款并在结清后交付")
     if order.account_id is None:
+        if allow_unbound_import:
+            purchased = session.scalar(select(OrderEvent.id).where(
+                OrderEvent.order_id == order.id, OrderEvent.event_type == EventType.BUY.value,
+                OrderEvent.is_posted.is_(True),
+            ).limit(1))
+            if purchased is not None:
+                return
+            raise Validation("历史回收售出前须导入对应的买入事件")
         raise Validation(
             "回收账号售出必须关联已回收的库存账号",
             details={"order_type": order.order_type, "account_id": None},
@@ -115,9 +122,10 @@ def _assert_event_allowed(
     *,
     offset_event_id: int | None = None,
     reason: str | None = None,
+    allow_unbound_import: bool = False,
 ) -> None:
     """按业务类型限制事件组合，避免只依赖资金账户解析间接拦截非法动作。"""
-    if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None:
+    if order.order_type == "HS" and event_type == EventType.BUY.value and order.account_id is None and not allow_unbound_import:
         # 回收订单在建单时必须已完成账号绑定；事件登记不再补建库存账号。
         if not (order.account_snapshot or {}).get("game_account"):
             raise Validation(
@@ -164,7 +172,9 @@ def _assert_event_allowed(
                 ).limit(1))
                 last_sell = session.get(OrderEvent, last_sell_id)
                 cancelled_installment_sale = cancelled_installment is not None and last_sell is not None and (last_sell.form_extra or {}).get("sale_mode") == "INSTALLMENT"
-                if account is None or account.status != AccountStatus.WAITING.value or (cancelled_sale is None and not cancelled_installment_sale):
+                historical_resale = (allow_unbound_import and account is None
+                                     and order.status == OrderStatus.ACTIVE.value and cancelled_sale is not None)
+                if not historical_resale and (account is None or account.status != AccountStatus.WAITING.value or (cancelled_sale is None and not cancelled_installment_sale)):
                     raise Validation("每张订单只能登记一次 SELL；重开 BUY 或取消售出并回到库存后可再次售出")
     if event_type == EventType.CANCEL.value:
         _required_text(reason, field="reason", message="CANCEL 必须填写冲销原因")
@@ -380,16 +390,7 @@ def _resolve_pool(
 
 def _assert_pool_active(session: Session, pool_id: int) -> Pool:
     """停用池不得用于新记录（QLT-01-04：主数据一致性校验）。"""
-    pool = session.get(Pool, pool_id)
-    if pool is None:
-        raise NotFound(f"资金账户 {pool_id} 不存在", details={"pool_id": pool_id})
-    if pool.status != PoolStatus.ACTIVE.value:
-        raise Validation(
-            f"资金账户 {pool.code} 已停用，不能登记新流水",
-            code=ErrorCode.POOL_DISABLED,
-            details={"pool_code": pool.code, "status": pool.status},
-        )
-    return pool
+    return assert_pool_usable(session, pool_id)
 
 
 def _apply_account_effect(

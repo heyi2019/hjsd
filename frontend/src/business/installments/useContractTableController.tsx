@@ -22,7 +22,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [pageTotal, setPageTotal] = useState(0);
-  const { activeEmployees: employees, error: employeeError } = useEmployeeOptions();
+  const { activeEmployees: employees, error: employeeError, settled: employeesSettled, reloadFresh: reloadEmployees } = useEmployeeOptions();
   const { can } = useSession();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
@@ -117,16 +117,12 @@ export function useContractTableController(params: { contractType: string; reloa
   const {
     exportCsv, submitPay, submitDeliver, openDeliver, submitRecover,
     submitCancel, submitSettleEarly, submitDefault, submitWaive,
-    submitExtend, updateOperationOperators,
+    submitExtend, updateOperationOperators, isOperatorUpdating,
   } = useContractActions({
     modal,
     load: reloadAfterAction, setExporting,
     filters: { contract_type: contractType, status: status || undefined, trade_date_from: dateFrom || undefined, trade_date_to: dateTo || undefined },
   });
-
-  useEffect(() => {
-    if (employeeError) setError(normalizeError(employeeError));
-  }, [employeeError]);
 
   // 总应收 / 剩余应收都只采用后端下发值（含「不小于 0」的 clamp），前端不再自行推导。
   const totalReceivable = totals?.total_receivable ?? "0.00";
@@ -198,11 +194,15 @@ export function useContractTableController(params: { contractType: string; reloa
     submitWaive,
     submitExtend,
     updateOperationOperators,
+    isOperatorUpdating,
     totalReceivable,
     totalPaid,
     totalCount: totals?.total_count ?? 0,
     overdueCount,
     employees,
+    employeeError: employeeError ? normalizeError(employeeError) : null,
+    employeesSettled,
+    reloadEmployees,
     arrangeColumns,
     columns,
     scheduleColumns,

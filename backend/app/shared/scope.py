@@ -1,4 +1,4 @@
-"""shared.scope：数据范围（owner scope）口径——可见哪些负责人名下���记录。
+"""shared.scope：数据范围（owner scope）口径——可见哪些负责人名下的记录。
 
 2026-11-18 架构归位：`owner_scope_ids` / `owner_scope_filter` 原在
 `app/core/security.py`，后因需要查 `User`（TEAM 成员关系）上移到

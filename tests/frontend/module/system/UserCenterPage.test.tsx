@@ -7,6 +7,7 @@ import { renderLight } from "@fixtures/render";
 import { UserCenterPage } from "@/auth/UserCenterPage";
 import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi } from "@/shared/api/client";
 import * as client from "@/shared/api/client";
+import { useSession } from "@/shared/state/session";
 
 vi.mock("@/shared/api/client", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/api/client")>()),
@@ -37,6 +38,22 @@ afterEach(async () => {
 });
 
 describe("UserCenterPage：账号信息与修改密码", () => {
+  it("旧退出请求结束不会覆盖新登录会话", async () => {
+    let finish!: () => void;
+    vi.mocked(client.logout).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    vi.mocked(client.login).mockResolvedValueOnce({ id: 2, username: "alice", role: "OPERATOR", display_name: "Alice" });
+    function Probe() {
+      const session = useSession();
+      return <><span>{session.authenticated ? session.username : "已退出"}</span><button onClick={() => void session.logout()}>退出</button><button onClick={() => void session.login("alice", "password")}>登录新用户</button></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    fireEvent.click(screen.getByRole("button", { name: "退出" }));
+    expect(await screen.findByText("已退出")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "登录新用户" }));
+    expect(await screen.findByText("alice")).toBeInTheDocument();
+    await act(async () => { finish(); });
+    expect(screen.getByText("alice")).toBeInTheDocument();
+  });
   it("展示当前角色与权限点列表", () => {
     renderLight(<UserCenterPage />, { user: "admin" });
     expect(screen.getByText("系统管理员", { exact: true })).toBeTruthy();

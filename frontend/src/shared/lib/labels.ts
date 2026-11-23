@@ -192,6 +192,7 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   GAME_TYPE_UPDATE: "编辑游戏类型",
   GAME_TYPE_DISABLE: "停用游戏类型",
   GAME_TYPE_DEFAULT: "设置默认游戏类型",
+  GAME_TYPE_DELETE: "删除游戏类型",
   LIST_COLUMNS_UPDATE: "列表列显示配置变更",
   LIST_COLUMNS_RESET: "列表列配置恢复默认",
   LIST_COLUMN_ADD: "列表新增自定义列",

@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from collections.abc import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
-from app.domain.trade import OrderEvent
+from app.domain.trade import Cashflow, OrderEvent
 from app.domain.users import User
 from app.business.orders import schemas
 from app.business.orders.output_labels import _selected_operator_label
@@ -26,7 +27,7 @@ def _order_output(order) -> schemas.OrderOut:
     return _apply_common_output(output, order)
 
 
-def _operator_names(db: Session, events: list[OrderEvent]) -> dict[int, str]:
+def _operator_names(db: Session, events: Sequence[OrderEvent | Cashflow]) -> dict[int, str]:
     ids = {user_id for event in events for user_id in (event.operator_user_ids or [])}
     if not ids:
         return {}

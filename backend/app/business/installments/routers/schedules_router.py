@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
 from app.core.database import get_db
-from app.core.errors import NotFound
+from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
     PERM_FINANCE_READ,
@@ -20,8 +20,8 @@ from app.core.security import (
 from app.settings.auth.session import (
     require_permissions,
 )
-from app.domain.enums import AuditAction
-from app.domain.trade import InstallmentSchedule
+from app.domain.enums import AuditAction, CashflowSourceType
+from app.domain.trade import Cashflow, InstallmentSchedule
 from app.business.installments import schemas
 from app.business.installments import _shared as inst__shared
 from app.business.installments.repayments.waive import waive_schedule as inst_waive
@@ -57,7 +57,8 @@ def update_installment_operation_operators(
     user: CurrentUser = default_manage,
 ) -> schemas.InstallmentOut:
     """详情页只更新动作操作人，不改建单人和动作发生时间。"""
-    item = inst__shared.get_installment(db, installment_id, user)
+    # 与同一合约的收款及其他操作人修改串行，避免并发覆盖及错误审计前值。
+    item = inst__shared.get_installment(db, installment_id, user, for_update=True)
     existing = get_operation_operators(
         db,
         entity_type="installment",
@@ -66,6 +67,19 @@ def update_installment_operation_operators(
     )
     if existing is None:
         raise NotFound("业务动作操作人记录不存在")
+    parts = operation_key.split(":")
+    flow = None
+    if parts[0] == "PAY":
+        if len(parts) != 3:
+            raise Validation("历史收款汇总无法定位单笔流水，不能修改操作人")
+        flow = db.scalar(select(Cashflow).where(
+            Cashflow.flow_no == parts[2], Cashflow.source_type == CashflowSourceType.INSTALLMENT.value,
+            Cashflow.source_id == item.inst_no, Cashflow.order_id == item.order_id,
+        ).with_for_update())
+        if flow is None:
+            raise Conflict("关联的收款流水不存在，不能修改操作人")
+        if not user.can_see_pool(flow.pool_id):
+            raise NotFound("收款流水不存在")
     before = list(existing.operator_user_ids)
     upsert_operation_operators(
         db,
@@ -76,6 +90,9 @@ def update_installment_operation_operators(
         operator_user_ids=payload.operator_user_ids,
         occurred_at=existing.occurred_at,
     )
+    if flow is not None:
+        flow.operator_user_ids = list(payload.operator_user_ids)
+        flow.updated_by = _actor(user)
     record_audit(
         db,
         action=AuditAction.ORDER_UPDATE,

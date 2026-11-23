@@ -23,12 +23,12 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 136,
-        "cases": 1961,
+        "files": 137,
+        "cases": 2140,
         "kinds": {
           "unit": {
             "files": 30,
-            "cases": 353,
+            "cases": 367,
             "byArea": {
               "business": 7,
               "customer": 1,
@@ -39,14 +39,14 @@
             }
           },
           "integration": {
-            "files": 106,
-            "cases": 1608,
+            "files": 107,
+            "cases": 1773,
             "byArea": {
-              "business": 42,
+              "business": 44,
               "customer": 8,
               "finance": 20,
               "operations": 7,
-              "settings": 13,
+              "settings": 12,
               "system": 10,
               "workbench": 6
             }
@@ -73,10 +73,10 @@
           "deep": 12
         },
         "cases": {
-          "fast": 182,
-          "quick": 128,
-          "react": 906,
-          "deep": 113
+          "fast": 205,
+          "quick": 140,
+          "react": 959,
+          "deep": 114
         },
         "byArea": {
           "unit": {
@@ -152,11 +152,11 @@
       "config": "frontend/playwright.config.ts",
       "expected": {
         "files": 16,
-        "cases": 57,
+        "cases": 78,
         "byArea": {
           "system": 7,
           "finance": 1,
-          "cross": 7
+          "cross": 8
         }
       },
       "budgets": {

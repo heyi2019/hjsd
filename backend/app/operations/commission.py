@@ -99,7 +99,7 @@ def personal_commission_total(
     return sum((bases[allocation.id] for allocation, _ in rows if allocation.user_id == user.id), ZERO)
 
 
-def r3_commission_reconciliation(
+def commission_reconciliation(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
     user_id: int | None = None, order_id: int | None = None,

@@ -58,6 +58,111 @@ def _scoped_user() -> CurrentUser:
 
 
 class TestGetAndListOrders:
+    def test_order_reader_receives_plaintext_password_within_data_scope(self, seeded_client, seeded_db):
+        from app.settings.auth.session import get_current_user
+
+        order = create_order(seeded_db, order_type="DG", trade_date=D, actor="pytest", owner_id=2,
+                             account_snapshot={"game_account": "scope-account", "game_password": "secret-value"})
+        seeded_db.commit()
+        app = seeded_client.app
+        reader = CurrentUser.build(id=3, username="finance", roles=["FINANCE"], owner_scope="ALL")
+        app.dependency_overrides[get_current_user] = lambda: reader
+        try:
+            detail = seeded_client.get(f"/api/orders/{order.id}")
+            assert detail.status_code == 200, detail.text
+            assert detail.json()["account_snapshot"]["game_account"] == "scope-account"
+            assert detail.json()["account_snapshot"]["game_password"] == "secret-value"
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+        admin = seeded_client.get(f"/api/orders/{order.id}", headers={"X-Dev-User": "admin"})
+        assert admin.json()["account_snapshot"]["game_password"] == "secret-value"
+
+    def test_order_and_execution_details_limit_financial_rows_to_authorized_pools(self, seeded_db):
+        from app.business.orders.router_outputs.detail import _order_detail_output
+        from app.business.shared.order_detail.view.execution import load_order_execution_detail
+        from app.domain.foundation import Pool
+        from app.funds.cashflow_writes.create import create_cashflow
+
+        allowed = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+        hidden = Pool(code="scope-hidden", name="未授权账户", created_by="pytest", updated_by="pytest")
+        seeded_db.add(hidden)
+        seeded_db.flush()
+        order = _order(seeded_db, owner_id=2)
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=D, actor="pytest", pool_id=allowed.id)
+        sell, _ = post_event(seeded_db, order.id, event_type="SELL", amount="200", occurred_on=D, actor="pytest", pool_id=hidden.id)
+        create_cashflow(seeded_db, pool_id=allowed.id, occurred_on=D, direction="IN", category="SELL",
+                        amount="30", actor="pytest", order_id=order.id, source_type="ORDER_EVENT", source_id=sell.event_no)
+        user = CurrentUser.build(id=2, username="operator", roles=["OPERATOR"], owner_scope="SELF", pool_ids=frozenset({allowed.id}))
+
+        ordinary = _order_detail_output(seeded_db, order, user)
+        assert {flow.pool_id for flow in ordinary.cashflows} == {allowed.id}
+        execution = load_order_execution_detail(seeded_db, order.id, user)
+        event_flows = [event.cashflow for event in execution.orders[0].events if event.cashflow is not None]
+        assert {flow.pool_id for flow in event_flows} == {allowed.id}
+        assert len(event_flows) == 2
+        assert all(row.pool_id == allowed.id for row in execution.detail_view.finance_rows)
+        assert len(execution.detail_view.finance_rows) == 2
+        # 用户已确认：整单利润仍包含不可见账户上的流水。
+        assert execution.finance_summary.net_amount == Decimal("130.00")
+
+        admin = load_order_execution_detail(seeded_db, order.id, DEV_USERS["admin"])
+        assert len(admin.detail_view.finance_rows) == 3
+        assert admin.finance_summary.net_amount == Decimal("130.00")
+
+    def test_rebate_details_and_exports_follow_pool_scope_without_changing_whole_profit(self, seeded_db, seeded_client):
+        from io import BytesIO
+        from openpyxl import load_workbook
+        from app.business.orders.router_outputs.detail import _order_detail_output
+        from app.business.shared.order_detail.view.execution import load_order_execution_detail
+        from app.domain.foundation import Pool
+        from app.funds.rebates import create_rebate
+        from app.settings.auth.session import get_current_user
+
+        default = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+        other = Pool(code="rebate-hidden", name="其他账户", created_by="pytest", updated_by="pytest")
+        seeded_db.add(other)
+        seeded_db.flush()
+        order = create_order(seeded_db, order_type="DG", trade_date=D, actor="pytest", owner_id=2,
+                             account_snapshot={"game_account": "rebate-scope"})
+        rebate = create_rebate(seeded_db, source_order_id=order.id, amount="12", collected_on=D,
+                               actor="pytest", rebate_type="SELL")
+        seeded_db.commit()
+        visible = CurrentUser.build(id=2, username="operator", roles=["OPERATOR"], owner_scope="SELF", pool_ids=frozenset({default.id}))
+        restricted = CurrentUser.build(id=2, username="operator", roles=["OPERATOR"], owner_scope="SELF", pool_ids=frozenset({other.id}))
+        assert [item.rebate_no for item in _order_detail_output(seeded_db, order, visible).rebates] == [rebate.rebate_no]
+        assert not _order_detail_output(seeded_db, order, restricted).rebates
+        detail = load_order_execution_detail(seeded_db, order.id, restricted)
+        assert not detail.orders[0].rebates and not detail.detail_view.finance_rows
+        assert detail.finance_summary.net_amount == Decimal("12.00")
+
+        app = seeded_client.app
+        app.dependency_overrides[get_current_user] = lambda: restricted
+        try:
+            response = seeded_client.get("/api/orders/export.xlsx", params={"keyword": order.order_no})
+            assert response.status_code == 200, response.text
+            workbook = load_workbook(BytesIO(response.content), read_only=True)
+            assert workbook["资金明细"].max_row == 1
+            assert workbook["返点明细"].max_row == 1
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    def test_ledger_cards_are_aggregated_by_backend_and_respect_type_filter(self, seeded_client, seeded_db, headers):
+        _order(seeded_db)
+        installment = _order(seeded_db)
+        completed = _order(seeded_db)
+        cancelled = _order(seeded_db, order_type="TH")
+        installment.status = "INSTALLMENT"
+        completed.status = "COMPLETED"
+        cancelled.status = "CANCELLED"
+        seeded_db.flush()
+        result = seeded_client.get("/api/orders/ledger-summary", headers=headers, params={"order_type": "HS"})
+        assert result.status_code == 200, result.text
+        body = result.json()
+        assert body["total_count"] == 3
+        assert (body["in_progress_count"], body["completed_count"], body["cancelled_count"]) == (2, 1, 0)
+        assert body["type_counts"] == {"HS": 3, "TH": 1}
+        assert body["type_total"] == 4
+
     def test_keyword_matches_buy_and_sale_prices(self, seeded_client, seeded_db, headers):
         order = _order(seeded_db)
         post_event(seeded_db, order.id, event_type="BUY", amount="5432.10", occurred_on=D, actor="pytest")

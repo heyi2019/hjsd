@@ -18,7 +18,7 @@ import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 const OrdersPage = lazy(() => import("../business/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customer-center/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
 const FundsPage = lazy(() => import("../pools/FundsPage").then(({ FundsPage }) => ({ default: FundsPage })));
-const ReportsPage = lazy(() => import("../reporting/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
+const ReportsPage = lazy(() => import("../operations/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
 const SettingsPage = lazy(() => import("../settings/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
 const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
 
@@ -30,6 +30,7 @@ type PageProps = {
   initialMine?: boolean;
   initialLedgerFilters?: InitialLedgerFilters;
   initialAllocationOrderId?: number;
+  initialAllocationNotificationId?: number;
   initialInventoryAgeGtDays?: number;
   initialInstallmentStatus?: string;
   initialReportTab?: "commission" | "my-earnings";
@@ -88,6 +89,10 @@ export function AppShell() {
   const initialAllocationOrderId = active === "business" && rawBizTab === "ledger"
     && Number.isInteger(parsedAllocationOrderId) && parsedAllocationOrderId > 0
     ? parsedAllocationOrderId
+    : undefined;
+  const parsedAllocationNotificationId = Number(query.get("notification_id"));
+  const initialAllocationNotificationId = initialAllocationOrderId && Number.isInteger(parsedAllocationNotificationId) && parsedAllocationNotificationId > 0
+    ? parsedAllocationNotificationId
     : undefined;
   const parsedInventoryAgeGtDays = Number(query.get("age_gt_days"));
   const initialInventoryAgeGtDays = active === "business" && rawBizTab === "inventory"
@@ -300,6 +305,7 @@ export function AppShell() {
                         initialMine={key === "business" && active === "business" ? businessMine : undefined}
                         initialLedgerFilters={key === "business" && active === "business" ? initialLedgerFilters : undefined}
                         initialAllocationOrderId={key === "business" && active === "business" ? initialAllocationOrderId : undefined}
+                        initialAllocationNotificationId={key === "business" && active === "business" ? initialAllocationNotificationId : undefined}
                         initialInventoryAgeGtDays={key === "business" && active === "business" ? initialInventoryAgeGtDays : undefined}
                         initialInstallmentStatus={key === "business" && active === "business" ? initialInstallmentStatus : undefined}
                         initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}

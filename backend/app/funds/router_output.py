@@ -92,20 +92,45 @@ def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None, ope
     )
 
 
+def _deposit_action_histories(db: Session, deposit_ids: list[int]) -> dict[str, list[schemas.DepositActionOut]]:
+    if not deposit_ids:
+        return {}
+    rows = db.scalars(select(Cashflow).where(
+        Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
+        Cashflow.source_id.in_([str(deposit_id) for deposit_id in deposit_ids]),
+    ).order_by(Cashflow.id)).all()
+    histories: dict[str, list[schemas.DepositActionOut]] = {}
+    for flow in rows:
+        action = {"DEPOSIT_HOLD": "HOLD", "DEPOSIT_RELEASE": "RETURN", "DEPOSIT_CANCEL": "CANCEL"}.get(flow.category)
+        if action is None and flow.direction == "OUT":
+            action = "LOSS"
+        if action is None:
+            continue
+        histories.setdefault(flow.source_id, []).append(schemas.DepositActionOut(
+            flow_no=flow.flow_no, action=action, occurred_on=flow.occurred_on,
+            amount=flow.amount, operator_user_ids=flow.operator_user_ids or [], operator=flow.created_by,
+        ))
+    return histories
+
+
 def _deposit_out(
     item: Deposit, db: Session, *,
     operation_operators: list[BusinessOperationOperator] | None = None,
+    action_history: list[schemas.DepositActionOut] | None = None,
 ) -> schemas.DepositOut:
     if operation_operators is None:
         operation_operators = list_operation_operators(
             db, entity_type="deposit", entity_id=item.id
         )
+    if action_history is None:
+        action_history = _deposit_action_histories(db, [item.id]).get(str(item.id), [])
     return schemas.DepositOut.model_validate(
         {
             **vars(item),
             "created_at": item.created_at,
             "operator": item.created_by,
             "operation_operators": operation_operators,
+            "action_history": action_history,
         }
     )
 

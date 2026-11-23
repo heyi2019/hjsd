@@ -3,8 +3,18 @@ from __future__ import annotations
 
 import base64
 from datetime import date
+from pathlib import Path
+
+import pytest
 
 from app.business.orders.create import create_order
+
+
+@pytest.fixture(autouse=True)
+def isolate_attachment_files(monkeypatch, tmp_path):
+    from app.settings.attachments import service
+
+    monkeypatch.setattr(service, "get_settings", lambda: type("Settings", (), {"attachment_storage_path": tmp_path})())
 
 
 def test_order_attachment_can_be_uploaded_listed_downloaded_and_deleted(
@@ -87,3 +97,22 @@ def test_attachment_requires_existing_entity_and_read_permission(seeded_client, 
         params={"entity_type": "order", "entity_id": "HS9999"},
     )
     assert no_auth.status_code == 401, no_auth.text
+
+
+def test_duplicate_attachment_prompts_before_upload_and_can_continue(seeded_client, seeded_db, headers, monkeypatch, tmp_path):
+    from app.settings.attachments import service
+
+    monkeypatch.setattr(service, "get_settings", lambda: type("Settings", (), {"attachment_storage_path": Path(tmp_path)})())
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 17), actor="pytest")
+    payload = {"entity_type": "order", "entity_id": order.order_no, "file_name": "receipt.txt",
+        "content_type": "text/plain", "content_base64": base64.b64encode(b"same content").decode()}
+    first = seeded_client.post("/api/attachments", json=payload, headers=headers)
+    assert first.status_code == 201, first.text
+    second = seeded_client.post("/api/attachments", json=payload, headers=headers)
+    assert second.status_code == 409, second.text
+    assert second.json()["code"] == "DUPLICATE_ATTACHMENT"
+    assert len(list(tmp_path.iterdir())) == 1
+    confirmed = seeded_client.post("/api/attachments", json={**payload, "allow_duplicate": True}, headers=headers)
+    assert confirmed.status_code == 201, confirmed.text
+    assert confirmed.json()["attachment_no"] != first.json()["attachment_no"]
+    assert len(list(tmp_path.iterdir())) == 2

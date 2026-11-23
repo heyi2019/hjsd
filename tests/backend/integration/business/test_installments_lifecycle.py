@@ -22,6 +22,7 @@ from app.business.installments.settlement import settle_early
 from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.installments.repayments.pay import _pick_schedule as inst_pick
 from app.business.installments.repayments.waive import waive_schedule as inst_waive
+from app.business.installments.repayments.extend import extend_schedule as inst_extend
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 
@@ -254,6 +255,17 @@ class TestPayGuards:
         )
         assert second.period_no == 1
         assert second.status == ScheduleStatus.PARTIAL.value
+
+    def test_pay_without_period_uses_due_date_after_extension(self, seeded_db):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, down_payment="0", periods=2, per_period="300")
+        inst_extend(
+            seeded_db, contract.id, period_no=1, new_due_on=date(2027, 1, 1),
+            reason="客户申请", actor="pytest",
+        )
+        _, schedule = inst_pay(seeded_db, contract.id, amount=Decimal("50"), paid_on=TODAY, actor="pytest")
+        assert schedule.period_no == 2
+        assert schedule.received_amount == Decimal("50.00")
 
     def test_pick_schedule_all_paid_is_defensive(self, seeded_db):
         # 收满后 remaining_total=0，pay() 在 _pick_schedule 之前即被"超收"拦下；

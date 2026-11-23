@@ -15,6 +15,7 @@ class ReportModel(BaseModel):
 class MonthlyPnlItemOut(ReportModel):
     month: str
     sales_income: Decimal
+    studio_other_income: Decimal
     cost: Decimal
     operating_expense: Decimal
     rebate_income: Decimal
@@ -23,6 +24,7 @@ class MonthlyPnlItemOut(ReportModel):
 
 class MonthlyPnlTotalOut(ReportModel):
     sales_income: Decimal
+    studio_other_income: Decimal
     cost: Decimal
     operating_expense: Decimal
     rebate_income: Decimal

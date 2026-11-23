@@ -4,7 +4,7 @@ import { appMessage } from "../shared/ui/appFeedback";
 /** 客户需求池：记录需求事实，支持转单或关闭，不自动生成订单（CUS-02）。 */
 import { Card, Form, Input, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { customersApi, leadsApi } from "../shared/api/customers.api";
 import type { CustomerOption } from "../shared/api/customers.api";
@@ -19,23 +19,13 @@ import { ResponsibleEmployeeSelect } from "../shared/forms/ResponsibleEmployeeSe
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
 import { useLatestRequest } from "../shared/hooks/useLatestRequest";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
+import { useCustomerLeadList } from "./useCustomerLeadList";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = { FIND_ACCOUNT: "找号", SELL_ACCOUNT: "卖号", SPECIFIC_SEARCH: "指定搜索" };
 
 export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker }: { active?: boolean; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
-  const [rows, setRows] = useState<Lead[]>([]);
-  const [summary, setSummary] = useState<{ total_count: number; open_count: number } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState<{ message: string; code?: string } | null>(null);
-  const [total, setTotal] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [sortDesc, setSortDesc] = useState(true);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const requestRef = useRef(0);
-  const summaryRequestRef = useRef(0);
+  const { rows, total, summary, loading, summaryLoading, error, summaryError, searchInput, setSearchInput,
+    setKeyword, sortDesc, setSortDesc, page, setPage, pageSize, setPageSize, setError, load, loadList, loadSummary } = useCustomerLeadList(active, createdPeriod);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const customerSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const failedCustomerSearch = useRef("");
@@ -44,7 +34,6 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(createOpen ? "LEAD" : undefined);
   const [closeTarget, setCloseTarget] = useState<Lead | null>(null);
   const [convertTarget, setConvertTarget] = useState<Lead | null>(null);
-  const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const write = useAsyncAction();
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState<{ message: string; code?: string } | null>(null);
@@ -53,51 +42,6 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
   const [createForm] = Form.useForm();
   const [closeForm] = Form.useForm();
   const [convertForm] = Form.useForm();
-
-  const loadList = useCallback(async () => {
-    const request = ++requestRef.current;
-    setLoading(true);
-    const dates = createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {};
-    await leadsApi.page({ ...dates, ...(keyword.trim() ? { keyword: keyword.trim() } : {}), ...(sortDesc ? {} : { sort_desc: false }), limit: pageSize, offset: (page - 1) * pageSize }).then((leadPage) => {
-      if (request !== requestRef.current) return;
-      setRows(leadPage.items);
-      setTotal(leadPage.total);
-      setError(null);
-    }).catch((err) => { if (request === requestRef.current) setError(normalizeError(err)); })
-      .finally(() => { if (request === requestRef.current) setLoading(false); });
-  }, [keyword, page, pageSize, sortDesc, createdPeriod?.from, createdPeriod?.to]);
-  const loadSummary = useCallback(async () => {
-    const request = ++summaryRequestRef.current;
-    setSummaryLoading(true);
-    setSummaryError(null);
-    const dates = createdPeriod ? { created_from: createdPeriod.from, created_to: createdPeriod.to } : {};
-    await leadsApi.summary({ ...dates, ...(keyword.trim() ? { keyword: keyword.trim() } : {}) }).then((leadSummary) => {
-      if (request === summaryRequestRef.current) setSummary(leadSummary);
-    }).catch((err) => { if (request === summaryRequestRef.current) setSummaryError(normalizeError(err)); })
-      .finally(() => { if (request === summaryRequestRef.current) setSummaryLoading(false); });
-  }, [keyword, createdPeriod?.from, createdPeriod?.to]);
-  const load = useCallback(async () => {
-    await Promise.all([loadList(), loadSummary()]);
-  }, [loadList, loadSummary]);
-  const resetKey = JSON.stringify([createdPeriod?.from, createdPeriod?.to]);
-  const previousResetKey = useRef(resetKey);
-  useEffect(() => {
-    if (!active) return;
-    if (previousResetKey.current !== resetKey) {
-      previousResetKey.current = resetKey;
-      if (page !== 1) {
-        setPage(1);
-        return;
-      }
-    }
-    void loadList();
-    return () => { requestRef.current += 1; };
-  }, [active, loadList, page, resetKey]);
-  useEffect(() => {
-    if (!active) return;
-    void loadSummary();
-    return () => { summaryRequestRef.current += 1; };
-  }, [active, loadSummary]);
 
   const searchCustomers = async (keyword: string) => {
     const request = customersRequest.start();
@@ -170,10 +114,10 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       title="客户需求池"
       extra={<PermissionButton permission="customer.create" type="primary" loading={customersLoading} disabled={Boolean(error)} onClick={() => void openCreate()}>新增需求</PermissionButton>}
     >
-      <ErrorBanner error={error} onRetry={() => void load()} />
-      <ErrorBanner error={summaryError} onRetry={() => void load()} />
+      <ErrorBanner error={error} onRetry={() => void loadList()} />
+      <ErrorBanner error={summaryError} onRetry={() => void loadSummary()} />
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced customer-list-filters">
-        <SearchInput type="search" aria-label="搜索客户需求" maxLength={128} allowClear value={searchInput}
+        <SearchInput type="search" className="ui-filter-search" aria-label="搜索客户需求" maxLength={128} allowClear value={searchInput}
           placeholder="搜索需求编号 / 客户 / 需求目标"
           onChange={(event) => { setSearchInput(event.target.value); if (!event.target.value) { setKeyword(""); setPage(1); } }}
           onSearch={(value) => { setKeyword(value); setPage(1); }} />
@@ -198,7 +142,9 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       title="新增客户需求"
       fieldCount={5}
       open={createOpen}
-      onCancel={() => { if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); customersRequest.invalidate(); setCustomersLoading(false); write.clearError(); setCreateOpen(false); }}
+      closable={!write.pending}
+      maskClosable={!write.pending}
+      onCancel={() => { if (write.isPending()) return; if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); customersRequest.invalidate(); setCustomersLoading(false); write.clearError(); createForm.resetFields(); setCreateOpen(false); }}
       footer={null}
     >
       <InlineError error={write.error} />
@@ -206,10 +152,10 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
       <FieldConfigContext.Provider value={config}>
         <BusinessRegistrationForm scope="LEAD" form={createForm} onFinish={createLead}>
           <FieldConfigStatus scope="LEAD" ready={configReady} error={configError} retry={retryConfig} />
-          <CfgItem name="customer_id" label="客户" rules={[{ required: true }]}><Select showSearch placeholder="输入客户编号、姓名或联系方式搜索" filterOption={false} loading={customersLoading} onSearch={(value) => { customersRequest.invalidate(); if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); customerSearchTimer.current = setTimeout(() => void searchCustomers(value), 300); }} options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
-          <CfgItem name="request_type" label="需求类型" rules={[{ required: true }]}><Select /></CfgItem>
+          <CfgItem name="customer_id" label="客户" alwaysActive alwaysRequired rules={[{ required: true, message: "请选择客户" }]}><Select showSearch placeholder="输入客户编号、姓名或联系方式搜索" filterOption={false} loading={customersLoading} onSearch={(value) => { customersRequest.invalidate(); if (customerSearchTimer.current) clearTimeout(customerSearchTimer.current); customerSearchTimer.current = setTimeout(() => void searchCustomers(value), 300); }} options={customers.map((customer) => ({ value: customer.id, label: `${customer.customer_no} · ${customer.display_name}` }))} /></CfgItem>
+          <CfgItem name="request_type" label="需求类型" alwaysActive alwaysRequired rules={[{ required: true, message: "请选择需求类型" }]}><Select /></CfgItem>
           <CfgItem name="budget" label="预算" rules={moneyRules("预算")}><MoneyInput /></CfgItem>
-          <CfgItem name="target" label="需求目标" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
+          <CfgItem name="target" label="需求目标" alwaysActive alwaysRequired rules={[{ required: true, whitespace: true, message: "请输入需求目标" }]}><Input.TextArea rows={3} /></CfgItem>
           <CfgItem name="note" label="备注"><Input.TextArea rows={2} /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-create" />
@@ -217,7 +163,7 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
         </BusinessRegistrationForm>
       </FieldConfigContext.Provider>
     </BusinessActionModal> : null}
-    <BusinessActionModal size="compact" title="关闭客户需求" open={Boolean(closeTarget)} onCancel={() => { write.clearError(); setCloseTarget(null); }} footer={null}>
+    {closeTarget ? <BusinessActionModal size="compact" title="关闭客户需求" open closable={!write.pending} maskClosable={!write.pending} onCancel={() => { if (write.isPending()) return; write.clearError(); closeForm.resetFields(); setCloseTarget(null); }} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="LEADCLOSE" active={Boolean(closeTarget)}>
         <BusinessRegistrationForm
@@ -225,16 +171,16 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCLOSE" form={closeForm} onFinish={closeLead}>
-          <CfgItem name="reason" label="关闭原因" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
+          <CfgItem name="reason" label="关闭原因" alwaysActive alwaysRequired rules={[{ required: true, whitespace: true, message: "请输入关闭原因" }]}><Input.TextArea rows={3} /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-close" />
-          <CompactActions>
+          <CompactActions cancelDisabled={write.pending}>
             <PermissionButton permission="customer.update" type="primary" htmlType="submit" loading={write.pending}>确认关闭</PermissionButton>
           </CompactActions>
         </BusinessRegistrationForm>
       </FieldConfigScope>
-    </BusinessActionModal>
-    <BusinessActionModal size="compact" title="需求转单" open={Boolean(convertTarget)} onCancel={() => { write.clearError(); setConvertTarget(null); }} footer={null}>
+    </BusinessActionModal> : null}
+    {convertTarget ? <BusinessActionModal size="compact" title="需求转单" open closable={!write.pending} maskClosable={!write.pending} onCancel={() => { if (write.isPending()) return; write.clearError(); convertForm.resetFields(); setConvertTarget(null); }} footer={null}>
       <InlineError error={write.error} />
       <FieldConfigScope scope="LEADCONVERT" active={Boolean(convertTarget)}>
         <BusinessRegistrationForm
@@ -242,14 +188,14 @@ export function CustomerLeadPanel({ active = true, createdPeriod, createdPicker 
           labelAlign="left"
           labelCol={{ flex: "108px" }}
           wrapperCol={{ flex: "auto" }} scope="LEADCONVERT" form={convertForm} onFinish={convertLead}>
-          <CfgItem name="order_id" label="订单编号" rules={[{ required: true, whitespace: true, message: "请输入订单编号" }]}><Input placeholder="例如 HS0001" /></CfgItem>
+          <CfgItem name="order_id" label="订单编号" alwaysActive alwaysRequired rules={[{ required: true, whitespace: true, message: "请输入订单编号" }]}><Input placeholder="例如 HS0001" /></CfgItem>
           <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
           <CustomFieldSection testIdSuffix="lead-convert" />
-          <CompactActions>
+          <CompactActions cancelDisabled={write.pending}>
             <PermissionButton permission="customer.create" type="primary" htmlType="submit" loading={write.pending}>确认转单</PermissionButton>
           </CompactActions>
         </BusinessRegistrationForm>
       </FieldConfigScope>
-    </BusinessActionModal>
+    </BusinessActionModal> : null}
   </section>;
 }

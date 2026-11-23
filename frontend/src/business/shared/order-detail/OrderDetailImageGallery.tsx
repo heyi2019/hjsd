@@ -68,20 +68,26 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(reader.error ?? new Error("图片读取失败"));
+    reader.onabort = () => reject(new Error("图片读取中断"));
     reader.readAsDataURL(file);
   });
 
   const appendImages = async (files: FileList | null) => {
     if (!files?.length) return;
     const token = session.current();
-    try {
-      const nextImages = await Promise.all(Array.from(files).map(readImageData));
-      if (!session.isCurrent(token)) return;
-      const next = [...(currentImages.current ?? []), ...nextImages.map((src) => ({ id: ++nextImageId.current, src }))].slice(0, limit);
+    const results = await Promise.allSettled(Array.from(files).map(readImageData));
+    if (!session.isCurrent(token)) return;
+    const nextImages = results.filter((result): result is PromiseFulfilledResult<string> => result.status === "fulfilled").map((result) => result.value);
+    const failed = results.length - nextImages.length;
+    if (failed) appMessage.error(`${failed} 张图片读取失败，请重新选择`);
+    const remaining = Math.max(0, limit - (currentImages.current?.length ?? 0));
+    const omitted = Math.max(0, nextImages.length - remaining);
+    if (omitted) appMessage.warning(`最多添加 ${limit} 张图片，${omitted} 张未添加`);
+    const added = nextImages.slice(0, remaining);
+    if (added.length) {
+      const next = [...(currentImages.current ?? []), ...added.map((src) => ({ id: ++nextImageId.current, src }))];
       currentImages.current = next;
       onChange?.(next.map((entry) => entry.src));
-    } catch {
-      // 文件读取失败由浏览器直接阻止，不改变当前草稿。
     }
   };
 
@@ -101,7 +107,10 @@ export function OrderDetailImageGallery({ images, altPrefix, limit = 3, editing 
       currentImages.current = nextImages;
       onChange?.(nextImages.map((entry) => entry.src));
     } catch {
-      // 文件读取失败由浏览器直接阻止，不改变当前草稿。
+      if (session.isCurrent(token) && replacements.isCurrent(original.id, version)
+          && currentImages.current?.some((entry) => entry.id === original.id)) {
+        appMessage.error("图片读取失败，请重新选择");
+      }
     }
   };
 

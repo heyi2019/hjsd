@@ -235,6 +235,10 @@ class OrderLedgerSummaryOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     total_count: int
+    in_progress_count: int
+    completed_count: int
+    cancelled_count: int
+    type_total: int
     status_counts: dict[str, int] = Field(default_factory=dict)
     type_counts: dict[str, int] = Field(default_factory=dict)
     game_types: list[str] = Field(default_factory=list)
@@ -292,6 +296,14 @@ class EventOut(BaseModel):
     operator_user_ids: list[int] | None = None
     note: str | None = None
     form_extra: dict[str, object] | None = None
+    import_form_extra: str | None = None
+    import_parent_no: str | None = None
+    import_sequence: int | None = None
+    import_pool_code: str | None = None
+    import_offset_no: str | None = None
+    import_is_posted: str | None = None
+    import_source_type: str | None = None
+    import_source_id: str | None = None
     created_at: datetime
     operator: str
     # 该事件还能被冲销多少：amount − Σ已冲销 CANCEL，夹底 0；CANCEL 自身恒 0。
@@ -319,10 +331,15 @@ class OrderCashflowOut(BaseModel):
     pool_id: int
     occurred_on: date
     category: str
+    import_category: str | None = None
     direction: str
     amount: Decimal
     source_type: str
     source_id: str | None = None
+    import_source_type: str | None = None
+    import_source_id: str | None = None
+    accounting_attribute: str | None = None
+    pool_code: str | None = None
     note: str | None = None
     operator: str
 
@@ -336,6 +353,7 @@ class OrderRebateOut(BaseModel):
     channel: str | None = None
     amount: Decimal
     collected_on: date
+    pool_code: str | None = None
     note: str | None = None
     created_at: datetime
     operator: str

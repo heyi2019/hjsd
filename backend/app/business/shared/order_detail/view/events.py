@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from ..timestamps import business_timestamp
 
 from app.domain.enums import CashflowSourceType, EventType
 from app.domain.foundation import Pool
@@ -19,11 +22,29 @@ from .execution_schemas import ExecutionCashflowOut, ExecutionEventOut
 @dataclass(frozen=True)
 class DetailEventContext:
     events_by_order: dict[int, list[ExecutionEventOut]]
-    event_cashflows: dict[int, ExecutionCashflowOut]
+    event_cashflows: dict[str, list[ExecutionCashflowOut]]
     order_cashflows: dict[int, list[ExecutionCashflowOut]]
     deposit_loss_flow_nos: set[str]
     action_model_rebate_nos_by_order: dict[int, set[str]] = field(default_factory=dict)
     duplicate_event_cashflow_sources: set[str] = field(default_factory=set)
+    rebate_no_by_event_no: dict[str, str] = field(default_factory=dict)
+
+
+def _event_occurrence(event: OrderEvent) -> tuple[datetime, dict[str, object]]:
+    extra = dict(event.form_extra or {})
+    operation_type = extra.get("operation_type")
+    key = {"CONSIGNMENT": "listed_at", "UNLIST": "platform_unlisted_at"}.get(operation_type) if isinstance(operation_type, str) else None
+    value = extra.get(key) if key else None
+    if isinstance(value, str):
+        try:
+            explicit = datetime.fromisoformat(value)
+            occurred_at = business_timestamp(event.occurred_on, explicit)
+            if occurred_at != explicit:
+                extra[key] = occurred_at.isoformat()
+            return occurred_at, extra
+        except ValueError:
+            pass
+    return business_timestamp(event.occurred_on, event.posted_at or event.created_at), extra
 
 
 def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
@@ -38,11 +59,13 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
         ).all()
     )
     action_model_rebate_nos_by_order: dict[int, set[str]] = {}
+    rebate_no_by_event_no: dict[str, str] = {}
     for event in events:
         if event.event_type == EventType.REBATE.value and event.source_type == CashflowSourceType.REBATE.value and event.source_id:
             action_model_rebate_nos_by_order.setdefault(event.order_id, set()).add(event.source_id)
+            rebate_no_by_event_no[event.event_no] = event.source_id
     event_nos = [event.event_no for event in events]
-    event_cashflows: dict[int, ExecutionCashflowOut] = {}
+    event_cashflows: dict[str, list[ExecutionCashflowOut]] = {}
     duplicate_event_cashflow_sources: set[str] = set()
     order_cashflows: dict[int, list[ExecutionCashflowOut]] = {}
     deposit_loss_flow_nos: set[str] = set()
@@ -54,6 +77,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 Cashflow.source_type == CashflowSourceType.ORDER_EVENT.value,
                 Cashflow.source_id.in_(event_nos),
             )
+            .order_by(Cashflow.id)
         ).all():
             if is_deposit_loss_flow(
                 accounting_attribute=flow.accounting_attribute,
@@ -63,7 +87,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 deposit_loss_flow_nos.add(flow.flow_no)
             if flow.source_id in event_cashflows:
                 duplicate_event_cashflow_sources.add(flow.source_id)
-            event_cashflows[flow.source_id] = _cashflow_output(flow, pool)
+            event_cashflows.setdefault(flow.source_id, []).append(_cashflow_output(flow, pool))
     for flow, pool in db.execute(
         select(Cashflow, Pool)
         .join(Pool, Pool.id == Cashflow.pool_id)
@@ -84,19 +108,20 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
     operator_ids = {uid for event in events for uid in (event.operator_user_ids or [])}
     operator_ids.update(
         uid
-        for flow in [*event_cashflows.values(), *[item for flows in order_cashflows.values() for item in flows]]
+        for flow in [*[item for flows in event_cashflows.values() for item in flows], *[item for flows in order_cashflows.values() for item in flows]]
         for uid in (flow.operator_user_ids or [])
     )
     operator_names = {
         user.id: user.display_name or user.username
         for user in db.scalars(select(User).where(User.id.in_(operator_ids))).all()
     } if operator_ids else {}
-    for flow in [*event_cashflows.values(), *[item for flows in order_cashflows.values() for item in flows]]:
+    for flow in [*[item for flows in event_cashflows.values() for item in flows], *[item for flows in order_cashflows.values() for item in flows]]:
         flow.operator = "、".join(operator_names.get(uid, f"用户 {uid}") for uid in (flow.operator_user_ids or [])) or "-"
     cancellable_amounts = cancellable_by_event(events)
     events_by_order: dict[int, list[ExecutionEventOut]] = {}
     for event in events:
         selected_operator_names = [operator_names.get(uid, f"用户 {uid}") for uid in (event.operator_user_ids or [])]
+        occurred_at, form_extra = _event_occurrence(event)
         events_by_order.setdefault(event.order_id, []).append(
             ExecutionEventOut(
                 id=event.id,
@@ -107,7 +132,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 amount=event.amount,
                 cancellable_amount=cancellable_amounts[event.id],
                 occurred_on=event.occurred_on,
-                occurred_at=event.posted_at or event.created_at,
+                occurred_at=occurred_at,
                 created_at=event.created_at,
                 posted_at=event.posted_at,
                 pool_id=event.pool_id,
@@ -117,8 +142,9 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
                 is_posted=event.is_posted,
                 reason=event.reason,
                 note=event.note,
-                form_extra=dict(event.form_extra or {}),
-                cashflow=event_cashflows.get(event.event_no),
+                form_extra=form_extra,
+                cashflow=next(iter(event_cashflows.get(event.event_no, [])), None),
+                cashflows=event_cashflows.get(event.event_no, []),
                 operator="、".join(selected_operator_names) or "-",
                 operator_user_ids=event.operator_user_ids,
                 operator_names=selected_operator_names,
@@ -131,6 +157,7 @@ def load_event_context(db: Session, order_ids: list[int]) -> DetailEventContext:
         deposit_loss_flow_nos=deposit_loss_flow_nos,
         action_model_rebate_nos_by_order=action_model_rebate_nos_by_order,
         duplicate_event_cashflow_sources=duplicate_event_cashflow_sources,
+        rebate_no_by_event_no=rebate_no_by_event_no,
     )
 
 
@@ -140,7 +167,7 @@ def _cashflow_output(flow: Cashflow, pool: Pool) -> ExecutionCashflowOut:
         pool_id=pool.id,
         pool_name=pool.name,
         occurred_on=flow.occurred_on,
-        occurred_at=flow.created_at,
+        occurred_at=business_timestamp(flow.occurred_on, flow.created_at),
         direction=flow.direction,
         category=flow.category,
         amount=flow.amount,

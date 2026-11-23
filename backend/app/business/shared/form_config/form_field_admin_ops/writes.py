@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
-from app.domain.form_scopes import FORM_SCOPES, GROUP_SYSTEM
+from app.domain.form_scopes import FORM_SCOPES, GROUP_SYSTEM, REQUIRED_CORE_FIELDS
 from app.domain.trade import OrderFormField
 from app.shared.form_field_rules import (
     FIELD_TYPES, FIELD_KEY_PATTERN, ORDER_TYPE_CODE_PATTERN, _UNSET,
@@ -55,6 +55,8 @@ def create_order_form_field(
             "字段键必须为小写字母开头，仅含小写字母、数字与下划线",
             details={"field": "field_key", "value": field_key},
         )
+    if key in REQUIRED_CORE_FIELDS.get(code, ()):
+        raise Validation("系统必填字段由系统维护，不能重复创建", details={"field_key": key})
     if not isinstance(label, str) or not label.strip():
         raise Validation("字段名称不能为空", details={"field": "label"})
     _validate_section(section)
@@ -136,6 +138,9 @@ def update_order_form_field(
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
         )
+    if definition.field_key in REQUIRED_CORE_FIELDS.get(definition.order_type_code, ()):
+        if required is False or (required_when is not _UNSET and required_when is not None):
+            raise Validation("该业务必填字段不可改为选填或条件必填")
     if definition.locked and any(scope.code == definition.order_type_code and scope.group == GROUP_SYSTEM for scope in FORM_SCOPES):
         if required is False or (required_when is not _UNSET and required_when is not None):
             raise Validation("系统必填字段不可改为选填或条件必填")
@@ -264,6 +269,8 @@ def set_order_form_field_active(
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
         )
+    if not active and definition.field_key in REQUIRED_CORE_FIELDS.get(definition.order_type_code, ()):
+        raise Validation(f"业务必填字段「{definition.label}」不可停用", details={"field_key": definition.field_key})
     # 核心字段(locked)走前端硬编码 Section 渲染，不读 is_active；
     # 若允许停用则界面仍渲染可填、与「停用=不出现」语义矛盾，故禁止停用。
     if not active and definition.locked:

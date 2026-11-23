@@ -5,7 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.trade import Order
+from app.domain.trade import InstallmentSchedule, Order
 from app.business.installments import schemas
 from app.business.installments import queries as inst_queries
 from app.business.installments import action_availability as actions
@@ -28,7 +28,26 @@ INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
 def _schedule_output(row, contract_status: str) -> schemas.ScheduleOut:
     return schemas.ScheduleOut.model_validate({
         **row.__dict__,
-        "available_actions": actions.available_schedule_actions(row.status, contract_status),
+        "available_actions": actions.available_schedule_actions(
+            row.status, contract_status, due_amount=row.due_amount,
+            received_amount=row.received_amount, waived_amount=row.waived_amount,
+        ),
+    })
+
+
+def _operation_output(row, installment_id: int, historical_periods: dict[tuple[int, int], int]) -> schemas.OperationOperatorOut:
+    parts = row.operation_key.split(":")
+    period_no = None
+    flow_no = None
+    historical_summary = False
+    if parts[0] == "PAY" and len(parts) == 3 and parts[1].isdigit():
+        period_no, flow_no = int(parts[1]), parts[2]
+    elif parts[0] == "PAY" and len(parts) == 2 and parts[1].isdigit():
+        period_no = historical_periods.get((installment_id, int(parts[1])))
+        historical_summary = True
+    return schemas.OperationOperatorOut.model_validate({
+        **row.__dict__, "period_no": period_no, "flow_no": flow_no,
+        "historical_summary": historical_summary,
     })
 
 
@@ -60,6 +79,19 @@ def _installment_outputs(
         entity_type="installment",
         entity_ids=[item.inst_no for item in items],
     )
+    historical_schedule_ids = {
+        int(parts[1])
+        for rows in operator_rows_by_installment.values()
+        for row in rows
+        if len(parts := row.operation_key.split(":")) == 2 and parts[0] == "PAY" and parts[1].isdigit()
+    }
+    historical_periods = {
+        (installment_id, schedule_id): period_no
+        for installment_id, schedule_id, period_no in db.execute(
+            select(InstallmentSchedule.installment_id, InstallmentSchedule.id, InstallmentSchedule.period_no)
+            .where(InstallmentSchedule.id.in_(historical_schedule_ids))
+        ).all()
+    } if historical_schedule_ids else {}
     return [
         schemas.InstallmentOut.model_validate({
             **item.__dict__,
@@ -72,7 +104,7 @@ def _installment_outputs(
             ],
             "dispositions": [schemas.DispositionOut.model_validate(row) for row in dispositions_by_installment.get(item.id, [])],
             "operation_operators": [
-                schemas.OperationOperatorOut.model_validate(row)
+                _operation_output(row, item.id, historical_periods)
                 for row in operator_rows_by_installment.get(item.inst_no, [])
             ],
             "available_actions": actions.available_installment_actions(

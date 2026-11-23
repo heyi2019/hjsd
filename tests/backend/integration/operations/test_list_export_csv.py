@@ -8,6 +8,7 @@
 """
 from __future__ import annotations
 
+import csv
 import io
 from datetime import date
 
@@ -84,6 +85,29 @@ def test_orders_export_uses_chinese_visible_columns(seeded_client, headers, seed
     assert "游戏/产品类型" in header
     assert "操作" not in header  # UI 列不导出
     assert "HS9801" in body  # 明细行带订单号
+
+
+@pytest.mark.parametrize("descending", [True, False])
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_orders_export_follows_ledger_sort(seeded_client, headers, seeded_db, descending, extension):
+    first = _seed_order(seeded_db, order_no="HS-SORT-1")
+    second = _seed_order(seeded_db, order_no="HS-SORT-2")
+    third = _seed_order(seeded_db, order_no="HS-SORT-3")
+    first.trade_date, second.trade_date, third.trade_date = date(2026, 12, 1), date(2026, 1, 1), date(2026, 6, 1)
+    seeded_db.flush()
+    params = {"sort_desc": str(descending).lower()}
+    listing = seeded_client.get("/api/orders", params=params, headers=headers)
+    expected = [item["order_no"] for item in listing.json()["items"]]
+    response = seeded_client.get(f"/api/orders/export.{extension}", params=params, headers=headers)
+    assert response.status_code == 200
+    if extension == "csv":
+        rows = csv.DictReader(io.StringIO(response.text.lstrip("\ufeff")))
+        assert [row["订单号"] for row in rows] == expected
+    else:
+        workbook = openpyxl.load_workbook(io.BytesIO(response.content), read_only=True)
+        for title in ("主订单信息", "详情信息"):
+            actual = [value for row in workbook[title].values for value in row if value in expected]
+            assert actual == expected
 
 
 @pytest.mark.parametrize("extension", ["csv", "xlsx"])
@@ -363,9 +387,9 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
         assert moved not in detail_labels
 
     expected = {
-        "操作明细": ["订单号", "操作分类", "动作", "平台", "动作时间", "操作人", "金额", "备注"],
-            "资金明细": ["订单号", "业务类别", "方向", "金额", "时间", "操作人", "资金账户", "备注"],
-        "返点明细": ["订单号", "返点单号", "返点类型", "渠道", "返点金额", "收到日期", "操作人", "备注"],
+        "操作明细": ["订单号", "事件号", "事件顺序", "操作分类", "动作", "运营动作", "结算方式", "交付方向", "金额归属", "资金账户编码", "冲销来源事件号", "来源类型", "来源编号", "已过账", "平台", "动作时间", "操作人", "金额", "备注", "原因", "运营详情(JSON)", "关联上架事件号"],
+        "资金明细": ["订单号", "流水号", "业务类别", "业务类别编码", "方向", "金额", "时间", "操作人", "资金账户", "资金账户编码", "核算属性", "来源类型", "来源编号", "备注"],
+        "返点明细": ["订单号", "返点单号", "返点类型", "渠道", "返点金额", "收到日期", "资金账户编码", "操作人", "备注"],
     }
     for title, columns in expected.items():
         sheet = workbook[title]
@@ -374,8 +398,8 @@ def test_orders_export_xlsx_splits_detail_json_into_columns(seeded_client, heade
         # 明细 sheet 单行表头，数据从第 2 行起
         assert sheet.freeze_panes == "B2"
 
-    # 系统内部字段不得混进业务明细表：它们在界面上看不到，导出里也没有对应用户语义
-    system_only = {"事件号", "流水号", "是否过账", "比例", "金额归属", "portion"}
+    # 事件号与流水号用于回流去重和来源关联；无导入用途的内部字段仍不输出。
+    system_only = {"是否过账", "比例", "portion"}
     for title in ("操作明细", "资金明细"):
         header = {
             workbook[title].cell(row=1, column=index).value

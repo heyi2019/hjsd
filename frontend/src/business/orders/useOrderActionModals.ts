@@ -10,7 +10,6 @@ import type { EmployeeOption } from "../../shared/api/types/org";
 import type { Order } from "../../shared/api/types/orders";
 import { appMessage } from "../../shared/ui/appFeedback";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
-import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 import { consignmentRecords, type ActiveConsignment } from "../shared/operations";
 import type { OrderProfileTarget } from "../shared/operations";
 import { buildCashflowDisplayItems } from "../../finance/cashflow";
@@ -36,9 +35,6 @@ export function useOrderActionModals({
   const [orderRebateTarget, setOrderRebateTarget] = useState<Account | null>(null);
   const [orderSaleTarget, setOrderSaleTarget] = useState<Account | null>(null);
   const [orderConsignmentTarget, setOrderConsignmentTarget] = useState<{ account: Account; orderId: number } | null>(null);
-  const [orderDeleteTarget, setOrderDeleteTarget] = useState<Order | null>(null);
-  const deleteWrite = useAsyncAction();
-  const orderDeleteSubmitting = deleteWrite.pending;
   const [cashflowTarget, setCashflowTarget] = useState<CashflowTarget | null>(null);
   const [cashflowPools, setCashflowPools] = useState<Pool[]>([]);
   const [cashflowUsers, setCashflowUsers] = useState<EmployeeOption[]>([]);
@@ -115,16 +111,11 @@ export function useOrderActionModals({
     }
   };
 
-  const openOrderDelete = (sourceOrder: Order) => {
-    actionRequest.start();
-    setOrderDeleteTarget(sourceOrder);
-  };
   const closeOrderSale = () => { actionRequest.invalidate(); setOrderSaleTarget(null); };
   const closeOrderConsignment = () => { actionRequest.invalidate(); setOrderConsignmentTarget(null); };
   const closeOrderRebate = () => { actionRequest.invalidate(); setOrderRebateTarget(null); };
   const closeOrderProfile = () => { actionRequest.invalidate(); setProfileTarget(null); };
   const closeOrderOffsale = () => { actionRequest.invalidate(); setOrderOffsaleTarget(null); };
-  const closeOrderDelete = () => { actionRequest.invalidate(); setOrderDeleteTarget(null); };
 
   const openOrderProfile = async (sourceOrder: Order, mode: "description" | "images") => {
     const request = actionRequest.start();
@@ -186,23 +177,6 @@ export function useOrderActionModals({
     await refreshOffsale(orderOffsaleTarget);
   };
 
-  const submitOrderDelete = async (reason: string) => {
-    const target = orderDeleteTarget;
-    if (!target) return;
-    const session = actionRequest.current();
-    await deleteWrite.run(async () => {
-      try {
-        await ordersApi.deleteOrder(target.id, reason);
-        appMessage.success("已删除");
-        if (actionRequest.isCurrent(session)) closeOrderDelete();
-        void Promise.resolve().then(load).catch(() => appMessage.warning("已删除，但刷新失败，请手动刷新"));
-      } catch (error) {
-        const message = normalizeError(error).message;
-        appMessage.error(actionRequest.isCurrent(session) ? message : `${target.order_no}：${message}`);
-      }
-    });
-  };
-
   return {
     ...allocation,
     cashflowPools,
@@ -212,16 +186,12 @@ export function useOrderActionModals({
     handleOrderOffsaleChanged,
     handleOrderSystemOffsale,
     openOrderConsignment,
-    openOrderDelete,
     openOrderOffsale,
     openOrderRebate,
     openOrderSale,
     openRefund,
     orderConsignmentTarget,
     closeOrderConsignment,
-    orderDeleteSubmitting,
-    orderDeleteTarget,
-    closeOrderDelete,
     orderOffsaleTarget,
     closeOrderOffsale,
     orderRebateTarget,
@@ -230,7 +200,6 @@ export function useOrderActionModals({
     closeOrderSale,
     profileTarget,
     closeOrderProfile,
-    submitOrderDelete,
     openOrderProfile,
   };
 }

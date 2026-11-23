@@ -123,6 +123,27 @@ beforeEach(() => {
   }));
 });
 describe("CustomersPage：客户档案", () => {
+  it("合作方末页拉黑后回到仍有数据的页", async () => {
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
+    let changed = false;
+    const last = { ...counterparties[0], id: 12, counterparty_no: "CP-LAST" };
+    vi.mocked(counterpartiesApi.page).mockImplementation(async (params) => {
+      const offset = params?.offset ?? 0;
+      return pageResponse(offset ? (changed ? [] : [last]) : [counterparties[0]], { total: changed ? 10 : 11, offset, limit: 10 });
+    });
+    vi.mocked(counterpartiesApi.setStatus).mockImplementation(async () => { changed = true; return last; });
+    renderLight(<CustomersPage />, { user: "admin" });
+    await screen.findByText("CUS-0001");
+    await user.click(screen.getByRole("tab", { name: /合作方/ }));
+    await screen.findByText("CP-0001");
+    await user.click(screen.getByTitle("2"));
+    const row = (await screen.findByText("CP-LAST")).closest("tr")!;
+    await user.click(within(row).getByRole("button", { name: /拉\s*黑/ }));
+    await user.click(await screen.findByRole("button", { name: /确\s*定|确\s*认/ }));
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 })));
+    expect(await screen.findByText("CP-0001")).toBeVisible();
+  });
+
   it("切换创建日期只刷新当前客户页签", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<CustomersPage />, { user: "admin" });
@@ -951,8 +972,10 @@ describe("CustomersPage：行内动作", () => {
 
     await screen.findByText("CUS-0001");
     expect(screen.getByRole("button", { name: "导出客户数据" }).closest(".customer-list-filters")).not.toBeNull();
+    await keeper.click(screen.getByRole("button", { name: "最旧在前" }));
     await keeper.click(screen.getByRole("button", { name: "导出客户数据" }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户数据已导出"));
+    expect(customersApi.exportCsv).toHaveBeenCalledWith(expect.objectContaining({ sort_desc: false }));
     createObjectURLSpy.mockRestore();
     revokeObjectURLSpy.mockRestore();
     clickSpy.mockRestore();

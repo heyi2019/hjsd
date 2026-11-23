@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from app.settings.attachments import service as svc
-from app.core.errors import NotFound, PermissionDenied, Validation
+from app.core.errors import Conflict, NotFound, PermissionDenied, Validation
 from app.core.money import to_money
 from app.core.security import (
     PERM_DEPOSIT_POST,
@@ -200,6 +200,37 @@ def test_assert_visible_pool_not_visible(seeded_db):
         svc._assert_visible(seeded_db, _user(pool_ids=()), target)
 
 
+def test_order_linked_cashflow_attachment_requires_both_order_and_pool_visibility(seeded_db):
+    order = _order(seeded_db, owner_id=2)
+    target = svc._Target("cashflow", "SR-TEST", order=order, pool_id=1)
+    with pytest.raises(NotFound, match="附件不存在"):
+        svc._assert_visible(seeded_db, _user(uid=2, pool_ids=()), target)
+    with pytest.raises(NotFound, match="附件不存在"):
+        svc._assert_visible(seeded_db, _user(uid=9, pool_ids=(1,)), target)
+    svc._assert_visible(seeded_db, _user(uid=2, pool_ids=(1,)), target)
+
+
+def test_order_detail_does_not_expose_cashflow_attachment_outside_pool_scope(seeded_db):
+    from app.business.orders.router_outputs.detail import _order_detail_output, _order_details_output
+
+    order = _order(seeded_db, owner_id=2)
+    flow = Cashflow(
+        flow_no="SR-ATTACH-SCOPE", order_id=order.id, pool_id=1, occurred_on=D,
+        direction="IN", amount=to_money("10"), accounting_attribute="REBATE_INCOME", category="REBATE",
+    )
+    seeded_db.add(flow)
+    seeded_db.add(Attachment(attachment_no="ATT-SCOPE", entity_type="cashflow", entity_id=flow.flow_no,
+        file_name="x.txt", storage_key="ATT-SCOPE.txt", content_type="text/plain", size_bytes=1,
+        sha256="a" * 64, created_by="pytest", updated_by="pytest"))
+    seeded_db.flush()
+    hidden = _user(uid=2, perms=(PERM_FINANCE_READ,), pool_ids=())
+    visible = _user(uid=2, perms=(PERM_FINANCE_READ,), pool_ids=(1,))
+    for output in (_order_detail_output(seeded_db, order, hidden), _order_details_output(seeded_db, [order], hidden)[0]):
+        assert not any(item.attachment_no == "ATT-SCOPE" for item in output.attachments)
+    for output in (_order_detail_output(seeded_db, order, visible), _order_details_output(seeded_db, [order], visible)[0]):
+        assert any(item.attachment_no == "ATT-SCOPE" for item in output.attachments)
+
+
 def test_assert_visible_cashflow_without_pool(seeded_db):
     target = svc._Target("cashflow", "x", pool_id=None)
     with pytest.raises(NotFound, match="附件不存在"):
@@ -242,4 +273,86 @@ def test_create_attachment_unlinks_file_on_audit_error(seeded_db, monkeypatch, t
             content_base64=base64.b64encode(b"hi").decode(),
             user=ADMIN,
         )
-    assert list(tmp_path.glob("*.txt")) == []
+    assert list(tmp_path.iterdir()) == []
+
+
+def _upload_for_transaction(session, order):
+    return svc.create_attachment(
+        session, entity_type="order", entity_id=order.order_no, file_name="proof.txt",
+        content_type="text/plain", content_base64=base64.b64encode(b"proof").decode(), user=ADMIN, allow_duplicate=True,
+    )
+
+
+def test_attachment_file_follows_rollback_and_commit(seeded_db, monkeypatch, tmp_path):
+    monkeypatch.setattr(svc, "get_settings", lambda: _Settings(str(tmp_path)))
+    order = _order(seeded_db)
+    seeded_db.commit()
+    rolled_back = _upload_for_transaction(seeded_db, order)
+    rolled_back_path = tmp_path / rolled_back.storage_key
+    assert rolled_back_path.read_bytes() == b"proof"
+    seeded_db.rollback()
+    assert not rolled_back_path.exists()
+    committed = _upload_for_transaction(seeded_db, order)
+    committed_path = tmp_path / committed.storage_key
+    seeded_db.commit()
+    assert committed_path.read_bytes() == b"proof"
+    assert committed_path != rolled_back_path
+
+
+def test_attachment_savepoint_rollback_does_not_remove_outer_file(seeded_db, monkeypatch, tmp_path):
+    monkeypatch.setattr(svc, "get_settings", lambda: _Settings(str(tmp_path)))
+    order = _order(seeded_db)
+    seeded_db.commit()
+    outer = _upload_for_transaction(seeded_db, order)
+    outer_path = tmp_path / outer.storage_key
+    nested = seeded_db.begin_nested()
+    inner = _upload_for_transaction(seeded_db, order)
+    inner_path = tmp_path / inner.storage_key
+    nested.rollback()
+    assert outer_path.exists()
+    assert not inner_path.exists()
+    seeded_db.commit()
+    assert outer_path.exists()
+
+
+def test_attachment_savepoint_commit_then_outer_rollback_removes_file(seeded_db, monkeypatch, tmp_path):
+    monkeypatch.setattr(svc, "get_settings", lambda: _Settings(str(tmp_path)))
+    order = _order(seeded_db)
+    seeded_db.commit()
+    nested = seeded_db.begin_nested()
+    inner = _upload_for_transaction(seeded_db, order)
+    inner_path = tmp_path / inner.storage_key
+    nested.commit()
+    assert inner_path.exists()
+    seeded_db.rollback()
+    assert not inner_path.exists()
+
+
+def test_attachment_session_close_without_commit_removes_file(seeded_db, monkeypatch, tmp_path):
+    from sqlalchemy.orm import Session
+    monkeypatch.setattr(svc, "get_settings", lambda: _Settings(str(tmp_path)))
+    order = _order(seeded_db)
+    seeded_db.commit()
+    with Session(seeded_db.get_bind()) as session:
+        item = _upload_for_transaction(session, order)
+        path = tmp_path / item.storage_key
+        assert path.exists()
+    assert not path.exists()
+
+
+def test_duplicate_warning_respects_existing_attachment_visibility(seeded_db, monkeypatch, tmp_path):
+    monkeypatch.setattr(svc, "get_settings", lambda: _Settings(str(tmp_path)))
+    other_order = _order(seeded_db, owner_id=9)
+    my_order = _order(seeded_db, owner_id=2)
+    _upload_for_transaction(seeded_db, other_order)
+    user = _user(uid=2, perms=(PERM_ORDER_CREATE, PERM_ORDER_UPDATE))
+    kwargs = dict(entity_type="order", entity_id=my_order.order_no, file_name="same.txt",
+        content_type="text/plain", content_base64=base64.b64encode(b"proof").decode(), user=user)
+    # An inaccessible attachment must not be disclosed by the duplicate warning.
+    svc.create_attachment(seeded_db, **kwargs)
+    with pytest.raises(Conflict) as error:
+        svc.create_attachment(seeded_db, **kwargs)
+    assert error.value.code == "DUPLICATE_ATTACHMENT"
+    # An administrator can see the same content across distinct business objects.
+    with pytest.raises(Conflict):
+        svc.create_attachment(seeded_db, **{**kwargs, "user": ADMIN})

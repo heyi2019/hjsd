@@ -350,6 +350,36 @@ def test_cancel_reverses_direct_installment_cashflows(seeded_db):
         )
     ) is not None
 
+
+def test_installment_payment_cannot_be_reversed_via_generic_cashflow_api(
+    seeded_client, seeded_db, headers,
+):
+    order = _order(seeded_db, order_type="TH")
+    contract = _contract(seeded_db, order.id, principal="1000", down_payment="100", periods=1, per_period="900")
+    _, schedule = inst_pay(
+        seeded_db, contract.id, amount=Decimal("100"), paid_on=TODAY,
+        period_no=0, actor="pytest",
+    )
+    payment = seeded_db.scalar(select(Cashflow).where(
+        Cashflow.order_id == order.id,
+        Cashflow.source_type == "INSTALLMENT",
+        Cashflow.category == "INSTALLMENT_PAYMENT",
+    ))
+    assert payment is not None
+
+    response = seeded_client.post(
+        f"/api/cashflows/{payment.id}/reverse",
+        json={"reversed_on": TODAY.isoformat(), "reason": "测试直接冲销"},
+        headers=headers,
+    )
+
+    assert response.status_code == 422, response.text
+    assert seeded_db.scalar(select(Cashflow.id).where(
+        Cashflow.source_type == "REVERSAL", Cashflow.source_id == payment.flow_no,
+    )) is None
+    assert contract.paid_amount == Decimal("100.00")
+    assert schedule.received_amount == Decimal("100.00")
+
 # ------------------------------------------------------------- 减免：期次守卫
 def test_waive_rejects_missing_period(seeded_db):
     order = _order(seeded_db, order_type="TH")

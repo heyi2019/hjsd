@@ -8,7 +8,6 @@ from app.core.errors import NotFound
 from app.core.security import (
     PERM_DEPOSIT_POST,
     PERM_FINANCE_READ,
-    PERM_ORDER_CREATE,
     PERM_TRANSFER_POST,
     CurrentUser,
 )
@@ -31,7 +30,7 @@ from app.shared.operation_operators import list_operation_operators_bulk
 from ..router_output import _actor, _reconciliation_out, _transfer_out
 
 router = APIRouter(tags=["资金对账与划转"])
-read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
+read_access = require_permissions(PERM_FINANCE_READ)
 post_deposit = require_permissions(PERM_DEPOSIT_POST)
 post_transfer = require_permissions(PERM_TRANSFER_POST)
 
@@ -77,7 +76,7 @@ def list_balance_snapshots(
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
 ) -> list[schemas.BalanceSnapshotOut]:
-    """FIN-01-05：查询随对账固化的日终余额快照（只读历史台账）。"""
+    """FIN-01-05：查询对账时即时固化的余额快照（只读历史台账）。"""
     if pool_id is not None and not user.can_see_pool(pool_id):
         return []
     items = finance_list_balance_snapshots(db, pool_id=pool_id, user=user)

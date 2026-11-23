@@ -15,6 +15,7 @@ describe("设置导航注册表", () => {
   it("设置页与配置中心共用单一导航顺序", () => {
     expect(SETTINGS_TAB_ORDER).toEqual([
       "business-dictionary",
+      "order-import",
       "organization",
       "audit",
       "appearance",

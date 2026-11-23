@@ -7,6 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.business.shared.listing_state import active_listings_from_events
+
+from ..timestamps import business_timestamp
 from .execution_schemas import AccountExecutionOrderOut
 
 
@@ -24,6 +27,9 @@ def build_order_outputs(
 ) -> list[AccountExecutionOrderOut]:
     outputs: list[AccountExecutionOrderOut] = []
     for order in orders:
+        events = events_by_order.get(order.id, [])
+        events_by_id = {event.id: event for event in events}
+        active = active_listings_from_events(events) if order.status != "CANCELLED" else set()
         definitions = field_defs_by_type.get(order.order_type, {})
         extra_values = order_extra_values.get(order.id, {})
         extra_fields = [
@@ -43,6 +49,7 @@ def build_order_outputs(
                 order_type=order.order_type,
                 trade_date=order.trade_date,
                 created_at=order.created_at,
+                occurred_at=business_timestamp(order.trade_date, order.created_at),
                 status=order.status,
                 note=order.note,
                 extra_values=extra_values,
@@ -51,7 +58,14 @@ def build_order_outputs(
                 customers=customers_by_order.get(order.id, []),
                 counterparties=counterparties_by_order.get(order.id, []),
                 rebates=rebates_by_order.get(order.id, []),
-                events=events_by_order.get(order.id, []),
+                events=events,
+                latest_sale_event_id=max((event.id for event in events if event.event_type == "SELL"), default=None),
+                active_consignments=[{
+                    "event_id": event_id,
+                    "platform": platform,
+                    "price": (events_by_id[event_id].form_extra or {}).get("consignment_price"),
+                    "listed_at": events_by_id[event_id].occurred_at,
+                } for event_id, platform in sorted(active)],
                 operator="、".join((operator_names_by_order or {}).get(order.id, [])) or "-",
                 operator_user_ids=(
                     list(extra_values["business_responsible_ids"])

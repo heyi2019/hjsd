@@ -93,6 +93,36 @@ async function pickDirection(modal: HTMLElement, label: "支出" | "收入") {
 }
 
 describe("StudioExpensePanel：工作室支出", () => {
+  it.each(["登记", "冲销"])("工作室%s表单提示员工目录错误并可重试", async (action) => {
+    vi.mocked(employeesApi.list).mockRejectedValueOnce(new Error("员工服务不可用"));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+    if (action === "登记") {
+      await ui.click(screen.getByRole("button", { name: "记一笔" }));
+    } else {
+      const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
+      await ui.click(within(row).getByRole("button", { name: "冲销" }));
+    }
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/员工目录加载失败/)).toBeInTheDocument();
+    await ui.click(within(dialog).getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(within(dialog).queryByText(/员工目录加载失败/)).toBeNull());
+    expect(employeesApi.list).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["income", "expense", "net", "count"] as const)("工作室汇总缺少 %s 时提示错误并可重试", async (field) => {
+    const incomplete = { ...studioExpenseSummary(expenseFlows as never) } as Awaited<ReturnType<typeof studioExpensesApi.summary>>;
+    delete (incomplete as unknown as Record<string, unknown>)[field];
+    vi.mocked(studioExpensesApi.summary)
+      .mockResolvedValueOnce(incomplete)
+      .mockResolvedValueOnce(studioExpenseSummary(expenseFlows as never));
+    renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
+
+    expect(await screen.findByText(/工作室收支汇总数据不完整/)).toBeInTheDocument();
+    expect(screen.queryByText("CF-001")).toBeNull();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("CF-001")).toBeInTheDocument();
+  });
+
   it("费用科目尚未返回时，收支汇总仍同时开始加载", async () => {
     let finishOptions!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof optionSetsApi.get>>>((resolve) => { finishOptions = resolve; });
@@ -266,7 +296,7 @@ describe("StudioExpensePanel：工作室支出", () => {
       expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("columnheader", { name: "状态" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "冲销" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "冲销" })).toHaveLength(2);
   });
 
   it("工作室收支可编辑并回填原记录", async () => {
@@ -328,47 +358,63 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(employeesApi.list).toHaveBeenCalled();
   });
 
-  it("工作室收支删除需要二次确认", async () => {
-    resolveMockOnce(vi.mocked(cashflowsApi.remove), undefined);
+  it("工作室收支通过填写原因冲销，保留原流水", async () => {
+    resolveMockOnce(vi.mocked(cashflowsApi.reverse), { id: 61 });
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     await screen.findByText("房租");
     const row = screen.getByText("CF-001").closest("tr") as HTMLElement;
-    await ui.click(within(row).getByRole("button", { name: "删除" }));
-    expect(await screen.findByText("删除工作室收支")).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "删除" })).toBeNull();
+    await ui.click(within(row).getByRole("button", { name: "冲销" }));
+    const modal = await screen.findByRole("dialog", { name: /冲销工作室收支/ });
     expect(cashflowsApi.remove).not.toHaveBeenCalled();
-    await ui.click(screen.getByRole("button", { name: "确认删除" }));
-    await waitFor(() => expect(vi.mocked(cashflowsApi.remove)).toHaveBeenCalledWith(51));
+    await ui.type(within(modal).getByLabelText("冲销原因"), "登记错误");
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    await waitFor(() => expect(cashflowsApi.reverse).toHaveBeenCalledWith(51, expect.objectContaining({
+      reason: "登记错误", reversed_on: expect.any(String), form_extra_scope: "STUDIOREV",
+    })));
   });
 
-  it("删除期间切换科目，完成后仍按最新科目刷新", async () => {
-    let finishDelete!: () => void;
-    const pending = new Promise<never>((resolve) => { finishDelete = () => resolve(undefined as never); });
-    vi.mocked(cashflowsApi.remove).mockReturnValueOnce(pending);
+  it("冲销请求未完成时不能关闭弹窗，完成后按当前科目刷新", async () => {
+    let finishReverse!: () => void;
+    const pending = new Promise<never>((resolve) => { finishReverse = () => resolve(undefined as never); });
+    vi.mocked(cashflowsApi.reverse).mockReturnValueOnce(pending);
     vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>
       studioExpenseSummary(params?.category === "日用" ? [expenseFlows[1]] as never : expenseFlows as never));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
-    await ui.click(within(row).getByRole("button", { name: "删除" }));
-    await ui.click(await screen.findByRole("button", { name: "确认删除" }));
+    await ui.click(within(row).getByRole("button", { name: "冲销" }));
+    const modal = await screen.findByRole("dialog", { name: /冲销工作室收支/ });
+    await ui.type(within(modal).getByLabelText("冲销原因"), "登记错误");
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    await waitFor(() => expect(cashflowsApi.reverse).toHaveBeenCalled());
+    expect(vi.mocked(cashflowsApi.reverse).mock.results[0].value).toBe(pending);
+    await ui.keyboard("{Escape}");
+    expect(modal).toBeVisible();
+    await act(async () => { finishReverse(); await pending; });
+    expect(within(modal).queryByRole("alert")).toBeNull();
+    await waitFor(() => expect(within(modal).getByLabelText("冲销原因")).toHaveValue(""));
     await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
     await ui.click(await screen.findByText("日用", { selector: ".ant-select-item-option-content" }));
-    await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ category: "日用" })));
-    await act(async () => { finishDelete(); await pending; });
     await waitFor(() => expect(studioExpensesApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ category: "日用" })));
     expect(await screen.findByText("CF-002")).toBeInTheDocument();
     expect(screen.queryByText("CF-001")).toBeNull();
   });
 
-  it("删除失败在列表显示原因，打开登记时不残留错误", async () => {
-    vi.mocked(cashflowsApi.remove).mockRejectedValueOnce(new Error("删除失败，请重试"));
+  it("冲销失败保留原因，关闭后打开登记不残留错误", async () => {
+    vi.mocked(cashflowsApi.reverse).mockRejectedValueOnce(new Error("冲销失败，请重试"));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
     const row = (await screen.findByText("CF-001")).closest("tr") as HTMLElement;
-    await ui.click(within(row).getByRole("button", { name: "删除" }));
-    await ui.click(await screen.findByRole("button", { name: "确认删除" }));
-    expect(await screen.findByText(/删除失败，请重试/)).toBeVisible();
+    await ui.click(within(row).getByRole("button", { name: "冲销" }));
+    const modal = await screen.findByRole("dialog", { name: /冲销工作室收支/ });
+    await ui.type(within(modal).getByLabelText("冲销原因"), "登记错误");
+    await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+    expect(await within(modal).findByText(/冲销失败，请重试/)).toBeVisible();
+    expect(within(modal).getByLabelText("冲销原因")).toHaveValue("登记错误");
+    await ui.click(within(modal).getByRole("button", { name: "Close" }));
     expect(screen.getByText("CF-001")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: "记一笔" }));
-    expect(screen.queryByText(/删除失败，请重试/)).toBeNull();
+    const registration = (await screen.findByText("工作室收支登记")).closest(".ant-modal") as HTMLElement;
+    expect(within(registration).queryByText(/冲销失败，请重试/)).toBeNull();
   });
 
   it("编辑失败后关闭并重新打开时不残留错误", async () => {

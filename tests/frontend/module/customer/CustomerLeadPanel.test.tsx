@@ -1,10 +1,13 @@
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, renderHook, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { CustomerLeadPanel } from "@/customer-center/CustomerLeadPanel";
 import { CounterpartyPanel } from "@/customer-center/CounterpartyPanel";
+import { useCounterpartyList } from "@/customer-center/useCounterpartyList";
+import { useCustomerLeadList } from "@/customer-center/useCustomerLeadList";
+import { useCustomerController } from "@/customer-center/useCustomerController";
 import { counterpartiesApi, customersApi, leadsApi } from "@/shared/api/customers.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
@@ -54,6 +57,27 @@ beforeEach(() => {
 });
 
 describe("客户中心工具栏搜索", () => {
+  it("客户、合作方与需求保存完成后刷新当前筛选条件", async () => {
+    vi.mocked(customersApi.page).mockResolvedValue(pageResponse([]));
+    vi.mocked(customersApi.summary).mockResolvedValue({ month_count: 0, today_count: 0 });
+    vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
+    const customer = renderHook(() => useCustomerController({ active: true }));
+    const counterparty = renderHook(() => useCounterpartyList(true));
+    const lead = renderHook(() => useCustomerLeadList(true));
+    const oldRefresh = [customer.result.current.load, counterparty.result.current.load, lead.result.current.load];
+    act(() => {
+      customer.result.current.setKeyword("新客户筛选");
+      counterparty.result.current.setKeyword("新合作方筛选");
+      lead.result.current.setKeyword("新需求筛选");
+    });
+    await waitFor(() => expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "新需求筛选" })));
+    await act(async () => { await Promise.all(oldRefresh.map((refresh) => refresh())); });
+    expect(customersApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "新客户筛选" }));
+    expect(counterpartiesApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "新合作方筛选" }));
+    expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "新需求筛选" }));
+    expect(leadsApi.summary).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: "新需求筛选" }));
+  });
+
   it("合作方按关键词查询，并将日历放在搜索之后", async () => {
     vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
     renderLight(<CounterpartyPanel createdPicker={<span data-testid="toolbar-date">日期</span>} />, { user: "admin" });
@@ -88,6 +112,23 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await ui.type(within(modal).getByLabelText("客户"), "后续客户");
     await ui.click(await screen.findByText("C-LATER · 后续客户", { selector: ".ant-select-item-option-content" }));
     expect(within(modal).getByText("C-LATER · 后续客户", { selector: ".ant-select-selection-item" })).toBeInTheDocument();
+  });
+
+  it("新增需求核心字段在旧配置停用时仍展示并必填", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
+      { id: 1, order_type_code: "LEAD", field_key: "customer_id", label: "关联客户", field_type: "SELECT", required: false, is_active: false },
+      { id: 2, order_type_code: "LEAD", field_key: "request_type", label: "需求类别", field_type: "SELECT", required: false, is_active: false },
+      { id: 3, order_type_code: "LEAD", field_key: "target", label: "具体目标", field_type: "TEXT", required: false, is_active: false },
+    ] as never);
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "新增需求" }));
+    const modal = (await screen.findByText("新增客户需求")).closest(".ant-modal-content") as HTMLElement;
+    expect(await within(modal).findByLabelText("关联客户")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("需求类别")).toBeInTheDocument();
+    expect(within(modal).getByLabelText("具体目标")).toBeInTheDocument();
+    await ui.click(within(modal).getByRole("button", { name: "创建需求" }));
+    await waitFor(() => expect(within(modal).getAllByText(/必填|请选择|请输入/).length).toBeGreaterThan(0));
+    expect(leadsApi.create).not.toHaveBeenCalled();
   });
   it("新增需求时立即打开表单并等待客户名单", async () => {
     let finish!: (value: Customer[]) => void;
@@ -132,6 +173,26 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(leadsApi.summary).toHaveBeenCalledTimes(1);
     await act(async () => { finish({ total_count: 11, open_count: 3 }); await pending; });
     expect(screen.getByText("待跟进").closest(".ui-stat")).toHaveTextContent("3");
+  });
+
+  it("当前末页的数据被移除后回到仍有数据的页", async () => {
+    let closed = false;
+    const last = { ...leads[0], id: 3, lead_no: "LD-LAST" };
+    vi.mocked(leadsApi.page).mockImplementation(async (params) => {
+      const offset = params?.offset ?? 0;
+      return pageResponse(offset ? (closed ? [] : [last]) : [leads[0]], { total: closed ? 10 : 11, offset, limit: 10 });
+    });
+    vi.mocked(leadsApi.close).mockImplementation(async () => { closed = true; return last; });
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    await screen.findByText("LD-1");
+    await ui.click(screen.getByTitle("2"));
+    const row = (await screen.findByText("LD-LAST")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: "关闭" }));
+    const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("关闭原因"), "客户取消");
+    await ui.click(within(modal).getByRole("button", { name: "确认关闭" }));
+    await waitFor(() => expect(leadsApi.page).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 0 })));
+    expect(await screen.findByText("LD-1")).toBeVisible();
   });
 
   it("统计失败时保留需求列表并允许重试", async () => {
@@ -355,7 +416,9 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(within(modal).getByLabelText(field)).toHaveValue(value);
     await ui.click(within(modal).getByRole("button", { name: "Close" }));
     await ui.click(within(row).getByRole("button", { name: action }));
-    expect(within(screen.getByText(title).closest(".ant-modal-content") as HTMLElement).queryByText(/操作未完成/)).toBeNull();
+    const reopened = screen.getByText(title).closest(".ant-modal-content") as HTMLElement;
+    expect(within(reopened).queryByText(/操作未完成/)).toBeNull();
+    expect(within(reopened).getByLabelText(field)).toHaveValue("");
   });
 
   it("点击行内关闭打开弹窗并提交调用 leadsApi.close", async () => {
@@ -366,6 +429,20 @@ describe("CustomerLeadPanel：客户需求池", () => {
     await ui.type(within(modal).getByLabelText("关闭原因"), "已成交");
     await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
     await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, "已成交", undefined, [1]));
+  });
+
+  it("取消后重开关闭需求仍默认当前操作人", async () => {
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: "关闭" }));
+    let modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("关闭原因"), "草稿");
+    await ui.click(within(modal).getByRole("button", { name: "取消" }));
+    await ui.click(within(row).getByRole("button", { name: "关闭" }));
+    modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText("关闭原因"), "重新填写");
+    await ui.click(within(modal).getByRole("button", { name: "确认关闭" }));
+    await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, "重新填写", undefined, [1]));
   });
 
   it("点击行内转单打开弹窗并提交调用 leadsApi.convert", async () => {
@@ -389,17 +466,41 @@ describe("CustomerLeadPanel：客户需求池", () => {
     expect(vi.mocked(leadsApi.convert)).not.toHaveBeenCalled();
   });
 
-  it("配置停用后关闭弹窗不渲染「关闭原因」字段", async () => {
+  it.each([
+    { action: "关闭", title: "关闭客户需求", field: "关闭原因", value: "已结束", submit: "确认关闭", method: "close" as const },
+    { action: "转单", title: "需求转单", field: "订单编号", value: "HS0001", submit: "确认转单", method: "convert" as const },
+  ])("$action 提交期间不能切换目标", async ({ action, title, field, value, submit, method }) => {
+    let finish!: (value: Lead) => void;
+    vi.mocked(leadsApi[method]).mockReturnValueOnce(new Promise<Lead>((resolve) => { finish = resolve; }));
+    renderLight(<CustomerLeadPanel />, { user: "admin" });
+    const row = (await screen.findByText("LD-1")).closest("tr")!;
+    await ui.click(within(row).getByRole("button", { name: action }));
+    const modal = screen.getByText(title).closest(".ant-modal-content") as HTMLElement;
+    await ui.type(within(modal).getByLabelText(field), value);
+    await ui.click(within(modal).getByRole("button", { name: submit }));
+    await waitFor(() => expect(leadsApi[method]).toHaveBeenCalledTimes(1));
+    expect(within(modal).getByRole("button", { name: "取消" })).toBeDisabled();
+    expect(screen.getByText(title)).toBeVisible();
+    await act(async () => finish(leads[0]));
+    await waitFor(() => expect(message.success).toHaveBeenCalledWith(method === "close" ? "需求已关闭" : "需求已转单"));
+  });
+
+  it.each([
+    { scope: "LEADCLOSE", key: "reason", label: "结案原因", action: "关闭", title: "关闭客户需求", submit: "确认关闭", method: "close" as const },
+    { scope: "LEADCONVERT", key: "order_id", label: "关联订单号", action: "转单", title: "需求转单", submit: "确认转单", method: "convert" as const },
+  ])("$scope 的核心字段即使旧配置停用且选填仍须填写", async ({ scope, key, label, action, title, submit, method }) => {
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
-      { id: 1, order_type_code: "LEADCLOSE", field_key: "reason", label: "关闭原因", field_type: "TEXT", options: null, required: true, is_active: false, sort_order: 10, locked: false, is_custom: false, note: null },
+      { id: 1, order_type_code: scope, field_key: key, label, field_type: "TEXT", options: null, required: false, is_active: false, sort_order: 10, locked: false, is_custom: false, note: null },
     ] as never);
     renderLight(<CustomerLeadPanel />, { user: "admin" });
     const row = (await screen.findByText("LD-1")).closest("tr")!;
-    await ui.click(within(row).getByRole("button", { name: /关闭/ }));
-    const modal = screen.getByText("关闭客户需求").closest(".ant-modal-content") as HTMLElement;
-    await waitFor(() => expect(within(modal).queryByLabelText("关闭原因")).toBeNull());
-    await ui.click(within(modal).getByRole("button", { name: /确认关闭/ }));
-    await waitFor(() => expect(leadsApi.close).toHaveBeenCalledWith(1, undefined, undefined, [1]));
+    await ui.click(within(row).getByRole("button", { name: action }));
+    const modal = screen.getByText(title).closest(".ant-modal-content") as HTMLElement;
+    const input = await within(modal).findByLabelText(label);
+    await ui.type(input, "   ");
+    await ui.click(within(modal).getByRole("button", { name: submit }));
+    await waitFor(() => expect(within(modal).getByText(/请输入/)).toBeVisible());
+    expect(leadsApi[method]).not.toHaveBeenCalled();
   });
 
   it("转单弹窗「订单编号」标签取配置值", async () => {

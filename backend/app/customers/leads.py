@@ -29,9 +29,16 @@ from .customer_merge import assert_customer_usable
 from app.shared.form_values import _validate_required_extras, set_extra_values
 
 def _get_lead_for_user(
-    session: Session, lead_id: int, user: CurrentUser | None = None
+    session: Session, lead_id: int, user: CurrentUser | None = None, *, for_update: bool = False
 ) -> CustomerLead:
-    lead = session.get(CustomerLead, lead_id)
+    if for_update:
+        stmt = select(CustomerLead).where(CustomerLead.id == lead_id)
+        scope = owner_scope_filter(CustomerLead.owner_id, user, session) if user is not None else None
+        if scope is not None:
+            stmt = stmt.where(scope)
+        lead = session.scalar(stmt.with_for_update().execution_options(populate_existing=True))
+    else:
+        lead = session.get(CustomerLead, lead_id)
     if lead is None:
         raise NotFound("客户需求不存在", details={"lead_id": lead_id})
     if user is not None:
@@ -195,7 +202,7 @@ def update_lead(
     operator_user_ids: list[int] | None = None,
     **fields: Any,
 ) -> CustomerLead:
-    lead = _get_lead_for_user(session, lead_id, user)
+    lead = _get_lead_for_user(session, lead_id, user, for_update=True)
     if lead.status != LeadStatus.OPEN.value:
         raise Conflict("已转单或关闭的需求不可编辑", details={"lead_no": lead.lead_no})
     allowed = {"budget", "target", "owner_id", "note"}
@@ -277,7 +284,7 @@ def convert_lead(
     extra_values: Mapping[str, Any] | None = None,
     operator_user_ids: list[int] | None = None,
 ) -> CustomerLead:
-    lead = _get_lead_for_user(session, lead_id, user)
+    lead = _get_lead_for_user(session, lead_id, user, for_update=True)
     if lead.status != LeadStatus.OPEN.value:
         raise Conflict("只有 OPEN 需求可以转单", details={"lead_no": lead.lead_no})
     normalized_order_no = _required_text(order_no, message="订单编号不能为空", field="order_no").upper()
@@ -324,7 +331,7 @@ def close_lead(
     extra_values: Mapping[str, Any] | None = None,
     operator_user_ids: list[int] | None = None,
 ) -> CustomerLead:
-    lead = _get_lead_for_user(session, lead_id, user)
+    lead = _get_lead_for_user(session, lead_id, user, for_update=True)
     if lead.status != LeadStatus.OPEN.value:
         raise Conflict("只有 OPEN 需求可以关闭", details={"lead_no": lead.lead_no})
     normalized = _required_text(reason, message="关闭需求必须填写原因", field="reason")

@@ -3,7 +3,7 @@ import type { AuditEntityStat, AuditLogRow } from "./types/ops";
 import type { BusinessPnlReport, CommissionReport, DataCenterSummary, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
 type ReportPeriodParams = { from?: string; to?: string };
-export type ReportExportParams = ReportPeriodParams & { mine?: boolean; all_people?: boolean; user_id?: number };
+export type ReportExportParams = ReportPeriodParams & { mine?: boolean; all_people?: boolean; user_id?: number; sort_desc?: boolean };
 
 function getFreshReport<T>(url: string, params?: ReportPeriodParams): Promise<T> {
   const config: CacheAwareRequestConfig = { params, refreshCache: true };

@@ -6,8 +6,11 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import ErrorCode
+from app.domain.foundation import Pool
 from app.settings.field_definitions.pools import get_pool_by_code
 
 POOLS = "/api/pools"
@@ -53,6 +56,43 @@ def test_create_pool_can_set_default(client, headers):
     listed = {item["code"]: item for item in client.get(POOLS, headers=headers).json()}
     assert listed["HJ_DEFAULT"]["is_default"] is True
     assert sum(item["is_default"] for item in listed.values()) == 1
+
+
+def test_database_rejects_multiple_default_pools(seeded_db):
+    pools = seeded_db.scalars(select(Pool).order_by(Pool.id)).all()
+    assert sum(pool.is_default for pool in pools) == 1
+    other = next(pool for pool in pools if not pool.is_default)
+    with pytest.raises(IntegrityError, match="uq_pools_single_default"):
+        with seeded_db.begin_nested():
+            other.is_default = True
+            seeded_db.flush()
+
+
+def test_existing_database_constraint_repair_checks_data_and_is_idempotent(seeded_db):
+    from app.business.orders.create import create_order
+    from app.funds.deposits.writes import create_deposit
+    from scripts.ensure_funds_constraints import ensure_funds_constraints
+    from datetime import date
+
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest")
+    deposit = create_deposit(seeded_db, pool_id=1, amount="10", paid_on=date(2026, 10, 1),
+                             actor="pytest", source_order_id=order.id)
+    connection = seeded_db.connection()
+    connection.execute(text('ALTER TABLE deposits DROP CONSTRAINT "ck_deposits_studio_deposit_no_order"'))
+    connection.execute(text('DROP INDEX "uq_pools_single_default"'))
+    pools = seeded_db.scalars(select(Pool).order_by(Pool.id)).all()
+    other = next(pool for pool in pools if not pool.is_default)
+    other.is_default = True
+    deposit.ledger_type = "STUDIO"
+    seeded_db.flush()
+    with pytest.raises(RuntimeError, match="历史数据") as error:
+        ensure_funds_constraints(connection)
+    assert "默认资金账户" in str(error.value) and "工作室押金" in str(error.value)
+    other.is_default = False
+    deposit.ledger_type = "BUSINESS"
+    seeded_db.flush()
+    assert ensure_funds_constraints(connection) == {"default_pool_index": "created", "studio_deposit_check": "created"}
+    assert ensure_funds_constraints(connection) == {"default_pool_index": "present", "studio_deposit_check": "present"}
 
 
 def test_custom_pool_type_is_supported_as_registry_value(client, headers):

@@ -24,8 +24,10 @@ export type CacheAwareRequestConfig = AxiosRequestConfig & {
 
 api.interceptors.request.use((config) => {
   const token = import.meta.env.DEV ? null : localStorage.getItem(ACCESS_TOKEN_KEY);
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  else config.headers["X-Dev-User"] = currentDevUser();
+  if (!config.headers.has("Authorization")) {
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    else config.headers["X-Dev-User"] = currentDevUser();
+  }
   return config;
 });
 
@@ -42,6 +44,7 @@ api.interceptors.request.use((config) => {
 const GET_CACHE_TTL_MS = 3_000;
 // 陈旧容忍窗口：超过 TTL 但在该窗口内仍先返回缓存值并后台重验，避免「切走稍久再切回」也卡网络。
 const GET_CACHE_MAX_STALE_MS = 30_000;
+const GET_CACHE_MAX_ENTRIES = 256;
 
 interface CacheEntry {
   data: unknown;
@@ -53,8 +56,21 @@ interface CacheEntry {
 const responseCache = new Map<string, CacheEntry>();
 const pending = new Map<string, Promise<CacheEntry>>();
 const refreshPending = new Map<string, Promise<CacheEntry>>();
-const keyVersions = new Map<string, number>();
 let cacheGeneration = 0;
+
+function cacheResponse(key: string, entry: CacheEntry): void {
+  const cutoff = Date.now() - GET_CACHE_MAX_STALE_MS;
+  for (const [cachedKey, cached] of responseCache) {
+    if (cached.expireAt <= cutoff) responseCache.delete(cachedKey);
+  }
+  responseCache.delete(key);
+  responseCache.set(key, entry);
+  while (responseCache.size > GET_CACHE_MAX_ENTRIES) {
+    const oldest = responseCache.keys().next().value;
+    if (oldest === undefined) break;
+    responseCache.delete(oldest);
+  }
+}
 
 // 纯传输层：复用相同 baseURL 与默认 xhr adapter，但不挂载本项目拦截器，
 // 供缓存层直接发起真实网络请求（避免与缓存拦截器相互递归）。
@@ -115,10 +131,10 @@ function dedupAdapter(key: string, config: InternalAxiosRequestConfig): AxiosAda
 
 function startCachedRequest(key: string, config: InternalAxiosRequestConfig): Promise<CacheEntry> {
   const generation = cacheGeneration;
-  const version = keyVersions.get(key) ?? 0;
   const request = realSend(config)
     .then((entry) => {
-      if (generation === cacheGeneration && version === (keyVersions.get(key) ?? 0)) responseCache.set(key, entry);
+      // 只有当前请求能写缓存，强制刷新、清空缓存或更新的请求会使旧请求失效。
+      if (generation === cacheGeneration && pending.get(key) === request) cacheResponse(key, entry);
       return entry;
     })
     .finally(() => {
@@ -130,14 +146,14 @@ function startCachedRequest(key: string, config: InternalAxiosRequestConfig): Pr
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const method = String(config.method || "get").toUpperCase();
-  if (method !== "GET" || (config as InternalAxiosRequestConfig & CacheAwareRequestConfig).bypassCache) return config;
+  if (method !== "GET" || config.responseType === "blob" || config.responseType === "arraybuffer"
+    || (config as InternalAxiosRequestConfig & CacheAwareRequestConfig).bypassCache) return config;
   const key = buildCacheKey(config);
   if ((config as InternalAxiosRequestConfig & CacheAwareRequestConfig).refreshCache) {
     let request = refreshPending.get(key);
     if (!request) {
       responseCache.delete(key);
       pending.delete(key);
-      keyVersions.set(key, (keyVersions.get(key) ?? 0) + 1);
       request = startCachedRequest(key, config);
       refreshPending.set(key, request);
       const current = request;
@@ -150,6 +166,12 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   }
   const now = Date.now();
   const cached = responseCache.get(key);
+  if (cached && cached.expireAt > now - GET_CACHE_MAX_STALE_MS) {
+    responseCache.delete(key);
+    responseCache.set(key, cached);
+  } else if (cached) {
+    responseCache.delete(key);
+  }
   if (cached && cached.expireAt > now) {
     config.adapter = async () => fakeResponse(cached);
     return config;
@@ -174,19 +196,22 @@ export function clearApiCache(): void {
   responseCache.clear();
   pending.clear();
   refreshPending.clear();
-  keyVersions.clear();
 }
 
 export type SessionUser = { id: number; username: string; role: string; display_name: string; must_change_password?: boolean };
+let authGeneration = 0;
 
 export async function login(username: string, password: string) {
+  const generation = ++authGeneration;
   const response = await api.post<{ access_token: string; user: SessionUser }>("/auth/login", { username, password });
+  if (generation !== authGeneration) throw new Error("登录请求已失效，请重试");
   localStorage.setItem(ACCESS_TOKEN_KEY, response.data.access_token);
+  clearApiCache();
   return response.data.user;
 }
 
 export async function currentUser(): Promise<SessionUser> {
-  return (await api.get<SessionUser>("/auth/me")).data;
+  return (await api.get<SessionUser>("/auth/me", { bypassCache: true } as CacheAwareRequestConfig)).data;
 }
 
 /** 启动/登录前置检查：确认后端和数据库已就绪。 */
@@ -196,13 +221,24 @@ export async function checkBackendHealth(): Promise<void> {
 
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
   if (!oldPassword.trim()) throw new Error("当前密码不能为空");
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const generation = authGeneration;
   const body = { old_password: oldPassword, new_password: newPassword };
   // 会话安全操作不能沿用普通请求的 15 秒等待；失败或旧密码错误时应尽快回到可重试状态。
-  await api.post("/auth/change-password", body, { timeout: 5_000 });
+  const response = await api.post<{ access_token?: string }>("/auth/change-password", body, { timeout: 5_000 });
+  if (token && generation === authGeneration && localStorage.getItem(ACCESS_TOKEN_KEY) === token) {
+    if (!response.data?.access_token) throw new Error("改密成功但未能更新登录凭证，请重新登录");
+    localStorage.setItem(ACCESS_TOKEN_KEY, response.data.access_token);
+    clearApiCache();
+  }
 }
 
 export async function logout(): Promise<void> {
-  try { await api.post("/auth/logout"); } finally { localStorage.removeItem(ACCESS_TOKEN_KEY); }
+  authGeneration += 1;
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  clearApiCache();
+  await api.post("/auth/logout", undefined, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
 }
 
 
@@ -221,6 +257,20 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      const payload = error.response.data as { code?: string; message?: string } | undefined;
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      const sentAuth = new axios.AxiosHeaders(error.config?.headers).get("Authorization");
+      const path = String(error.config?.url ?? "");
+      const excluded = path.endsWith("/auth/login") || path.endsWith("/auth/logout")
+        || (path.endsWith("/auth/change-password") && payload?.code !== "SESSION_INVALIDATED" && payload?.code !== "TOKEN_EXPIRED");
+      if (token && sentAuth === `Bearer ${token}` && !excluded) {
+        authGeneration += 1;
+        localStorage.removeItem(ACCESS_TOKEN_KEY);
+        clearApiCache();
+        window.dispatchEvent(new CustomEvent("erp:session-expired", { detail: { message: payload?.message || "登录已失效，请重新登录" } }));
+      }
+    }
     if (axios.isAxiosError(error) && !error.response) {
       const url = String(error.config?.url ?? "");
       lastNetworkFailure = {
@@ -256,9 +306,10 @@ export function normalizeError(error: unknown): NormalizedError {
       | { code?: string; message?: string }
       | undefined;
 
-    // 5xx 一律降级为中文兜底：后端业务异常（AppError）全部落在 4xx，其 message 为中文且带可执行
-    // 业务语义，必须原样透出；而 5xx 只可能来自未捕获异常或网关故障，其 message 对终端用户无操作
-    // 价值且可能携带堆栈/英文技术串。此处先行拦截，避免英文原文直接上屏。
+    // 已知的服务依赖错误有明确业务提示；未知 5xx 仍用兜底，避免暴露堆栈。
+    if (error.response?.status === 503 && data?.code === "RATE_LIMIT_STORE_UNAVAILABLE" && data.message) {
+      return { message: data.message, code: data.code };
+    }
     if (error.response && error.response.status >= 500) {
       return error.response.status === 503
         ? {

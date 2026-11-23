@@ -38,6 +38,7 @@ export interface AccountExecutionEvent {
   note?: string | null;
   form_extra?: Record<string, unknown>;
   cashflow?: AccountExecutionCashflow | null;
+  cashflows?: AccountExecutionCashflow[];
   operator: string;
   operator_user_ids?: number[] | null;
   operator_names?: string[];
@@ -73,6 +74,7 @@ export interface AccountExecutionOrder {
   order_type: string;
   trade_date: string;
   created_at?: string | null;
+  occurred_at?: string | null;
   status: string;
   note?: string | null;
   extra_values?: Record<string, unknown>;
@@ -82,6 +84,10 @@ export interface AccountExecutionOrder {
   counterparties?: AccountExecutionCounterparty[];
   rebates?: AccountExecutionRebate[];
   events: AccountExecutionEvent[];
+  /** 最近售出事件由后端按业务登记顺序确定。 */
+  latest_sale_event_id?: number | null;
+  /** 已保存的上架状态由服务端统一计算。 */
+  active_consignments?: Array<{ event_id: number; platform: string; price: string | number | null; listed_at: string }>;
   operator: string;
   operator_user_ids?: number[] | null;
 }

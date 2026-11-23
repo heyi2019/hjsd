@@ -16,9 +16,7 @@ from app.shared.operation_operators import upsert_operation_operators
 from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, AuditAction, CashflowSourceType, Direction
 from app.domain.trade import Cashflow
-from app.domain.foundation import Pool
 from app.shared.form_field_rules import validate_form_extra
-from app.funds.balances import pool_balance
 from app.settings.field_definitions.pools import assert_pool_usable
 
 from ._common import _positive, _text
@@ -46,18 +44,6 @@ def create_transfer(
     money = _positive(amount, field="amount")
     source = assert_pool_usable(session, source_pool_id)
     target = assert_pool_usable(session, target_pool_id)
-    # 同一转出账户的余额校验串行化；NO KEY UPDATE 兼容对端流水的外键锁。
-    session.execute(select(Pool.id).where(Pool.id == source.id).with_for_update(key_share=True)).scalar_one()
-    available = to_money(pool_balance(session, source.id, user=user)["available"])
-    if money > available:
-        raise Validation(
-            "转出资金账户可用余额不足",
-            details={
-                "source_pool_id": source.id,
-                "amount": str(money),
-                "available": str(available),
-            },
-        )
     # 两条流水通过统一来源引用成对关联，流水号按收支方向进入全局序列。
     transfer_id = f"TRF-{uuid4().hex[:20].upper()}"
     common = {

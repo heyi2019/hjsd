@@ -13,6 +13,8 @@ import { useOrderActionModals } from "./useOrderActionModals";
 import { mergeLedgerOrderWithDetail, useLedgerInlineEdit } from "./useLedgerInlineEdit";
 import { useSession } from "../../shared/state/session";
 import { useLatestRequest } from "../../shared/hooks/useLatestRequest";
+import { notificationsApi } from "../../shared/api/notifications.api";
+import { appMessage } from "../../shared/ui/appFeedback";
 
 export function useOrdersPageController(params: {
   active?: boolean;
@@ -20,12 +22,12 @@ export function useOrdersPageController(params: {
   initialMine?: boolean;
   initialLedgerFilters?: InitialLedgerFilters;
   initialAllocationOrderId?: number;
+  initialAllocationNotificationId?: number;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 } = {}) {
-  const { active = true, initialTab, initialMine = false, initialLedgerFilters, initialAllocationOrderId, onNavigate } = params;
+  const { active = true, initialTab, initialMine = false, initialLedgerFilters, initialAllocationOrderId, initialAllocationNotificationId, onNavigate } = params;
   const currentOperator = currentDevUser();
-  const { role, username } = useSession();
-  const canDeleteOrder = role === "admin";
+  const { username } = useSession();
 
   const normalizedInitialTab: BusinessCenterTab = initialTab ?? DEFAULT_BUSINESS_CENTER_TAB;
   const [activeTab, setActiveTab] = useState<BusinessCenterTab>(normalizedInitialTab);
@@ -68,7 +70,7 @@ export function useOrdersPageController(params: {
   }, [active, activeTab]);
 
   // —— 冲销 / 取消域：分笔冲销、原路退款、分期合约取消 ——
-  const cancellation = useOrderCancellation({ selectedOrder, setSelectedOrder, load, actionRequest });
+  const cancellation = useOrderCancellation({ selectedOrder, setSelectedOrder, load, refreshCachedLedgerDetail: inlineEdit.refreshCachedLedgerDetail, actionRequest });
   const {
     cancelEmployees, cancelForm,
     cancelInstallmentTarget, cancelOrderTarget,
@@ -86,18 +88,31 @@ export function useOrdersPageController(params: {
   const { openOrderProfile, ...exposedActionModals } = actionModals;
   const {
     openAllocations, openRefund,
-    openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale, openOrderDelete,
+    openOrderRebate, openOrderSale, openOrderConsignment, openOrderOffsale,
   } = actionModals;
 
   const allocationDeepLinkOpened = useRef<number | null>(null);
   useEffect(() => {
     if (!initialAllocationOrderId) { allocationDeepLinkOpened.current = null; return; }
     if (!active || activeTab !== "ledger" || allocationDeepLinkOpened.current === initialAllocationOrderId) return;
-    const target = orders.find((order) => order.id === initialAllocationOrderId);
-    if (!target) return;
     allocationDeepLinkOpened.current = initialAllocationOrderId;
-    void openAllocations(target);
-  }, [active, activeTab, initialAllocationOrderId, openAllocations, orders]);
+    void openAllocations(initialAllocationOrderId);
+  }, [active, activeTab, initialAllocationOrderId, openAllocations]);
+
+  const allocationNotificationRead = useRef<number | null>(null);
+  useEffect(() => {
+    if (!initialAllocationNotificationId) { allocationNotificationRead.current = null; return; }
+    if (!active || !actionModals.allocationOpen || actionModals.actionOrder?.id !== initialAllocationOrderId
+      || allocationNotificationRead.current === initialAllocationNotificationId) return;
+    const notificationId = initialAllocationNotificationId;
+    allocationNotificationRead.current = notificationId;
+    void notificationsApi.markReadBatch([notificationId], "latest").then((result) => {
+      if (!result.read_ids.includes(notificationId)) throw new Error("消息标记失败");
+    }).catch(() => {
+      allocationNotificationRead.current = null;
+      appMessage.warning("分润已打开，但消息未能标记已读，请稍后重试");
+    });
+  }, [active, actionModals.allocationOpen, actionModals.actionOrder?.id, initialAllocationOrderId, initialAllocationNotificationId]);
 
   const [inventoryRefreshKey, setInventoryRefreshKey] = useState(0);
   const [installmentRefreshKey, setInstallmentRefreshKey] = useState(0);
@@ -105,7 +120,6 @@ export function useOrdersPageController(params: {
 
   // —— 台账列定义域：纯展示配置 + 点击转发 ——
   const { arrangeLedgerColumns, visibleLedgerColumns } = useLedgerColumns({
-    canDeleteOrder,
     ledgerDetails: inlineEdit.ledgerDetails,
     loadLedgerDetail,
     openLedgerEditor,
@@ -117,7 +131,6 @@ export function useOrdersPageController(params: {
     openOrderConsignment,
     openCancelTransaction,
     openOrderOffsale,
-    openOrderDelete,
   });
 
   return {

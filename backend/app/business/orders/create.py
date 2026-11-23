@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import date
+import re
 from typing import Any
 
 from app.shared.audit import record_audit
@@ -56,7 +57,14 @@ def create_order(
     extra_values: Mapping[str, Any] | None = None,
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
+    imported_order_no: str | None = None,
+    bind_inventory: bool = True,
 ) -> Order:
+    if imported_order_no is not None:
+        if bind_inventory or account_id is not None or not re.fullmatch(r"(?:HS|TH|DG)(?!0000)\d{4}", imported_order_no) or not imported_order_no.startswith(order_type):
+            raise Validation("导入订单编号或库存关联无效")
+    elif not bind_inventory:
+        raise Validation("只有导入订单可以跳过库存关联")
     definition = get_order_type_by_code(session, order_type)
     if definition is None:
         raise Validation(
@@ -147,12 +155,12 @@ def create_order(
     _validate_participant_roles(
         definition.code, customer_roles, counterparty_roles
     )
+    customers_by_id = {
+        customer_id: assert_customer_usable(session, customer_id, user=user)
+        for customer_id in sorted({customer_id for customer_id, _role in customer_roles})
+    }
     customer_participants = [
-        (
-            customer_id,
-            role,
-            assert_customer_usable(session, customer_id, user=user),
-        )
+        (customer_id, role, customers_by_id[customer_id])
         for customer_id, role in customer_roles
     ]
     counterparty_participants = [
@@ -210,7 +218,7 @@ def create_order(
         account_note = snap.get("note")
 
     # 建单判重：只在新建库存账号时判，引用已有账号不判。
-    if account_id is None and game_account:
+    if bind_inventory and account_id is None and game_account:
         _assert_no_duplicate_inventory_account(
             session,
             game_account=game_account,
@@ -219,7 +227,7 @@ def create_order(
         )
 
     # 内联建库存账号：建单成功即生成库存编号，不再等 BUY 事件。
-    if definition.code in {"HS", "TH"} and account_id is None and game_account:
+    if bind_inventory and definition.code in {"HS", "TH"} and account_id is None and game_account:
         account_id = _create_inline_inventory_account(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
@@ -230,7 +238,7 @@ def create_order(
             extra_values=(account_snapshot or {}).get("extra_values"),
         ).id
 
-    if definition.code == "DG" and account_id is None and game_account:
+    if bind_inventory and definition.code == "DG" and account_id is None and game_account:
         account_id = _create_inline_inventory_account(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
@@ -252,7 +260,7 @@ def create_order(
             if key not in {"secondary_images", "wallet_realname_images"}
         }
     order = Order(
-        order_no=next_order_no(session, definition),
+        order_no=imported_order_no or next_order_no(session, definition),
         order_type=definition.code,
         trade_date=trade_date,
         account_snapshot=order_account_snapshot,
@@ -299,7 +307,8 @@ def create_order(
         entity_type="order",
         entity_id=order.order_no,
         actor=actor,
-        after={"order_type": order.order_type, "status": order.status, "roles": role_records},
+        after={"order_type": order.order_type, "status": order.status, "roles": role_records,
+               "imported": imported_order_no is not None},
     )
     return order
 

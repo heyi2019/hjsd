@@ -52,6 +52,43 @@ def _studio_scope() -> Any:
     )
 
 
+def _effective_studio_values():
+    """Return the original direction and signed amount for a studio flow."""
+    direction = case(
+        (Cashflow.source_type == CashflowSourceType.REVERSAL.value,
+         case((Cashflow.direction == Direction.OUT.value, Direction.IN.value), else_=Direction.OUT.value)),
+        else_=Cashflow.direction,
+    )
+    amount = case(
+        (Cashflow.source_type == CashflowSourceType.REVERSAL.value, -Cashflow.amount),
+        else_=Cashflow.amount,
+    )
+    return direction, amount
+
+
+def studio_totals_by_date(
+    session: Session, *, occurred_from: date | None = None,
+    occurred_to: date | None = None, user: CurrentUser | None = None,
+) -> dict[date, tuple[Decimal, Decimal]]:
+    """Aggregate studio income and expense by actual flow date, without loading details."""
+    direction, amount = _effective_studio_values()
+    stmt = _apply_cashflow_filters(
+        select(Cashflow.occurred_on, direction, func.sum(amount)).outerjoin(
+            Order, Order.id == Cashflow.order_id
+        ),
+        session=session, occurred_from=occurred_from, occurred_to=occurred_to, user=user,
+    ).where(_studio_scope()).group_by(Cashflow.occurred_on, direction)
+    totals: dict[date, tuple[Decimal, Decimal]] = {}
+    for occurred_on, kind, value in session.execute(stmt):
+        income, expense = totals.get(occurred_on, (Decimal("0.00"), Decimal("0.00")))
+        if kind == Direction.IN.value:
+            income += value
+        elif kind == Direction.OUT.value:
+            expense += value
+        totals[occurred_on] = (income, expense)
+    return totals
+
+
 def studio_summary(
     session: Session,
     *,
@@ -122,20 +159,7 @@ def studio_summary(
     # 「支出冲销」会被算成收入、「收入冲销」被算成支出，净额虽归零但收入/支出两栏
     # 各自虚增。按方案 A：把冲销流水方向取反、金额取负，归到原流水方向做反向扣减，
     # 使冲销真正抵消原流水（净额、收入、支出三栏同时正确）。
-    effective_direction = case(
-        (
-            Cashflow.source_type == CashflowSourceType.REVERSAL.value,
-            case(
-                (Cashflow.direction == Direction.OUT.value, Direction.IN.value),
-                else_=Direction.OUT.value,
-            ),
-        ),
-        else_=Cashflow.direction,
-    )
-    effective_amount = case(
-        (Cashflow.source_type == CashflowSourceType.REVERSAL.value, -Cashflow.amount),
-        else_=Cashflow.amount,
-    )
+    effective_direction, effective_amount = _effective_studio_values()
     # 当前流水登记即生效，工作室汇总直接按统一口径聚合。
     totals_stmt = _apply_cashflow_filters(
         select(effective_direction, func.sum(effective_amount)).outerjoin(

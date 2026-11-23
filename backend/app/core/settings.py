@@ -81,7 +81,7 @@ class Settings(BaseSettings):
 
     # 登录限流（仅生产生效，防 PBKDF2 暴力破解挤占 2 核 CPU）
     # 默认每客户端 IP 每分钟 10 次登录；开发/测试环境（app_env != production）自动绕过，
-    # 避免打断本地开发与 k6 压测。多 worker 下各进程独立计数（登录防暴破足够）。
+    # 避免打断本地开发与 k6 压测；生产的多个 worker 使用同一 Redis 分键计数。
     login_rate_limit_enabled: bool = True
     login_rate_limit_per_minute: int = 10
     customer_rate_limit_redis_url: str = ""

@@ -1,9 +1,112 @@
 """MASTER-01 T20 / 选项词典（option_sets）API：只读查询 + 管理端点 + 死枚举防改。"""
 from __future__ import annotations
 
+from pathlib import Path
+import re
+
 from app.settings.field_definitions.catalog_seed import seed_catalog
+from app.domain.options import OptionSet
+from sqlalchemy import event, select
+from app.domain.trade import OrderFormField
 
 OPTION_SETS = "/api/option-sets"
+
+
+def test_duplicate_option_code_returns_business_error(client, headers):
+    payload = {"code": "CUSTOM_DUPLICATE", "label": "重复测试"}
+    assert client.post(OPTION_SETS, json=payload, headers=headers).status_code == 201
+    duplicate = client.post(OPTION_SETS, json=payload, headers=headers)
+    assert duplicate.status_code == 422
+    assert duplicate.json()["code"] == "DUPLICATE_CODE"
+
+
+def test_builtin_enum_stays_locked_even_if_legacy_editable_flag_was_changed(seeded_client, seeded_db, headers):
+    seed_catalog(seeded_db, actor="pytest")
+    row = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INVENTORY_STATUS"))
+    original = [dict(item) for item in row.options]
+    row.editable = True
+    seeded_db.commit()
+    url = f"{OPTION_SETS}/INVENTORY_STATUS"
+    assert seeded_client.get(url, headers=headers).json()["editable"] is False
+    assert seeded_client.put(url, json={"editable": True}, headers=headers).status_code == 422
+    assert seeded_client.put(url, json={"options": [{"value": "FAKE", "label": "错误"}]}, headers=headers).status_code == 422
+    assert seeded_client.delete(url, headers=headers).status_code == 422
+    assert seeded_client.get(url, headers=headers).json()["options"] == original
+    renamed = [dict(item) for item in original]
+    renamed[0]["label"] = "已更新的显示名"
+    saved = seeded_client.put(url, json={"options": renamed}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["editable"] is False
+    assert saved.json()["options"] == renamed
+
+
+def test_builtin_editable_dictionaries_are_not_deletable(seeded_client, seeded_db, headers):
+    seed_catalog(seeded_db, actor="pytest")
+    assert seeded_client.delete(f"{OPTION_SETS}/INTERMEDIARY_PLATFORM", headers=headers).status_code == 422
+    assert seeded_client.delete(f"{OPTION_SETS}/BUSINESS_OVERVIEW_REMINDERS", headers=headers).status_code == 422
+
+
+def test_allocation_types_are_fixed_even_though_old_seed_marks_them_editable(seeded_client, seeded_db, headers):
+    seed_catalog(seeded_db, actor="pytest")
+    url = f"{OPTION_SETS}/ALLOCATION_TYPE"
+    result = seeded_client.get(url, headers=headers)
+    assert result.json()["editable"] is False
+    assert seeded_client.put(url, json={"options": [{"value": "OTHER", "label": "其他"}]}, headers=headers).status_code == 422
+
+
+def test_accounting_dictionary_uses_current_15_values_without_rewriting_legacy_on_read(seeded_client, seeded_db, headers):
+    from app.domain.enums import AccountingAttribute
+    from app.settings.lists.export_labels import CASHFLOW_VALUE_LABELS
+    seed_catalog(seeded_db, actor="pytest")
+    row = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "FUND_FLOW_ACCOUNTING_ATTRIBUTE"))
+    legacy = [{"value": "ADDITIONAL_INCOME", "label": "旧附加收入"}]
+    row.options = legacy
+    seeded_db.commit()
+    url = f"{OPTION_SETS}/FUND_FLOW_ACCOUNTING_ATTRIBUTE"
+    data = seeded_client.get(url, headers=headers).json()
+    assert {item["value"] for item in data["options"]} == set(AccountingAttribute.values())
+    assert {item["value"]: item["label"] for item in data["options"]} == CASHFLOW_VALUE_LABELS["accounting_attribute"]
+    seeded_db.refresh(row)
+    assert row.options == legacy
+    changed = [dict(item) for item in data["options"]]
+    changed[0]["label"] = "不一致的名称"
+    assert seeded_client.put(url, json={"options": changed}, headers=headers).status_code == 422
+
+
+def test_accounting_dictionary_labels_follow_frontend_authoritative_labels():
+    from app.settings.field_definitions.catalog_seed import accounting_attribute_options
+    source = (Path(__file__).resolve().parents[4] / "frontend/src/shared/lib/labels.ts").read_text(encoding="utf-8")
+    match = re.search(r"export const ACCOUNTING_ATTRIBUTE_LABEL[^=]*=\s*\{(.*?)\};", source, re.S)
+    assert match is not None
+    labels = dict(re.findall(r'^\s*(\w+):\s*"([^"]+)"', match.group(1), re.M))
+    assert {item["value"]: item["label"] for item in accounting_attribute_options()} == labels
+
+
+def test_missing_builtin_enum_cannot_be_recreated_with_arbitrary_values(client, headers):
+    response = client.post(OPTION_SETS, json={"code": "ORDER_STATUS", "label": "订单状态", "options": [{"value": "FAKE", "label": "错误"}]}, headers=headers)
+    assert response.status_code == 422
+
+
+def test_seed_catalog_batches_lookups_and_preserves_existing_configuration(seeded_db):
+    seed_catalog(seeded_db, actor="pytest")
+    dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "CUSTOMER_SOURCE"))
+    field = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == "LEAD", OrderFormField.field_key == "target"))
+    dictionary.label = "管理员名称"
+    field.label = "管理员目标名称"
+    seeded_db.flush()
+    queries = []
+    def capture(_conn, _cursor, statement, _parameters, _context, _many):
+        sql = statement.lower()
+        if sql.lstrip().startswith("select") and ("from option_sets" in sql or "from order_form_fields" in sql):
+            queries.append(sql)
+    connection = seeded_db.connection()
+    event.listen(connection, "before_cursor_execute", capture)
+    try:
+        seed_catalog(seeded_db, actor="pytest")
+    finally:
+        event.remove(connection, "before_cursor_execute", capture)
+    assert len(queries) <= 6, f"配置种子查询次数过多: {len(queries)}"
+    assert dictionary.label == "管理员名称" and field.label == "管理员目标名称"
 
 
 def test_business_reminder_rejects_invalid_inventory_aging_days(client, headers):
@@ -145,11 +248,11 @@ def test_update_options_on_editable_set(client, headers):
 def test_dead_enum_rejects_option_change(client, headers):
     client.post(
         OPTION_SETS,
-        json={"code": "INVENTORY_STATUS", "label": "库存状态", "editable": False, "options": [{"value": "IN_STOCK", "label": "在库"}]},
+        json={"code": "CUSTOM_FIXED", "label": "库存状态", "editable": False, "options": [{"value": "IN_STOCK", "label": "在库"}]},
         headers=headers,
     )
     bad = client.put(
-        f"{OPTION_SETS}/INVENTORY_STATUS",
+        f"{OPTION_SETS}/CUSTOM_FIXED",
         json={"options": [{"value": "X", "label": "越权值"}]},
         headers=headers,
     )
@@ -165,7 +268,7 @@ def test_dead_enum_allows_label_only_change(client, headers):
     client.post(
         OPTION_SETS,
         json={
-            "code": "INVENTORY_STATUS",
+            "code": "CUSTOM_FIXED",
             "label": "库存状态",
             "editable": False,
             "options": [{"value": "IN_STOCK", "label": "在库"}, {"value": "SOLD", "label": "已售"}],
@@ -173,7 +276,7 @@ def test_dead_enum_allows_label_only_change(client, headers):
         headers=headers,
     )
     ok = client.put(
-        f"{OPTION_SETS}/INVENTORY_STATUS",
+        f"{OPTION_SETS}/CUSTOM_FIXED",
         json={"options": [{"value": "IN_STOCK", "label": "在库中"}, {"value": "SOLD", "label": "已售出"}]},
         headers=headers,
     )
@@ -188,7 +291,7 @@ def test_dead_enum_rejects_reorder(client, headers):
     client.post(
         OPTION_SETS,
         json={
-            "code": "ORDER_STATUS",
+            "code": "CUSTOM_FIXED",
             "label": "订单状态",
             "editable": False,
             "options": [{"value": "ACTIVE", "label": "进行中"}, {"value": "DONE", "label": "已完成"}],
@@ -196,7 +299,7 @@ def test_dead_enum_rejects_reorder(client, headers):
         headers=headers,
     )
     bad = client.put(
-        f"{OPTION_SETS}/ORDER_STATUS",
+        f"{OPTION_SETS}/CUSTOM_FIXED",
         json={"options": [{"value": "DONE", "label": "已完成"}, {"value": "ACTIVE", "label": "进行中"}]},
         headers=headers,
     )
@@ -207,7 +310,7 @@ def test_dead_enum_rejects_blank_label(client, headers):
     client.post(
         OPTION_SETS,
         json={
-            "code": "LEAD_STATUS",
+            "code": "CUSTOM_FIXED",
             "label": "需求状态",
             "editable": False,
             "options": [{"value": "OPEN", "label": "未结算"}],
@@ -215,7 +318,7 @@ def test_dead_enum_rejects_blank_label(client, headers):
         headers=headers,
     )
     bad = client.put(
-        f"{OPTION_SETS}/LEAD_STATUS",
+        f"{OPTION_SETS}/CUSTOM_FIXED",
         json={"options": [{"value": "OPEN", "label": "   "}]},
         headers=headers,
     )

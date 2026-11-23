@@ -1,4 +1,4 @@
-"""PROFIT-02 订单利润与 R2 报表归类口径。
+"""PROFIT-02 订单利润与 月度损益 报表归类口径。
 
 口径（勿凭直觉改，详见 orders/amounts.py 顶部）：
 - 只有收入大类、支出大类两个池子；售出价/返点是收入子类型，提号价/回收价/
@@ -6,8 +6,8 @@
 - 返点登记即收入确认；作废走 reverse_cashflow 冲销流水自动减收入。
 
 验证范围：
-- #2 R2 冲销经营收入生成的 OUT 流水不得误记运营费用；
-- #8 挂订单的运营费用流水只进订单支出大类（直接成本），不在 R2 运营费用重复计。
+- #2 月度损益 冲销经营收入生成的 OUT 流水不得误记运营费用；
+- #8 挂订单的运营费用流水只进订单支出大类（直接成本），不在 月度损益 运营费用重复计。
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from app.domain.enums import (
 from app.domain.trade import Cashflow, RebateRecord
 from app.funds.cashflows import create_cashflow, reverse_cashflow
 from app.business.orders.create import create_order
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
 
 D = date(2026, 10, 17)
 
@@ -70,14 +70,14 @@ def _flow(seeded_db, *, direction, amount, accounting_attribute=None,
     return flow
 
 
-# --------------------------------------------------------------- #2 R2 冲销经营收入不串列
-def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
+# --------------------------------------------------------------- #2 月度损益 冲销经营收入不串列
+def test_monthly_reversal_of_business_income_not_counted_as_operating(seeded_db):
     """冲销经营收入生成 OUT 的 REVERSAL 流水，不得凭空记成运营费用。
 
     原经营收入（IN 独立流水）+ 其冲销（反向 OUT，accounting=REVERSAL），
-    两者都不属于 OPERATING_EXPENSE/OPERATING_COST 类；R2 运营费用应保持 0。
+    两者都不属于 OPERATING_EXPENSE/OPERATING_COST 类；月度损益 运营费用应保持 0。
     """
-    start = r2_monthly_pnl(seeded_db)
+    start = monthly_pnl_report(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
     before_op = before["operating_expense"] if before else Decimal("0.00")
 
@@ -89,7 +89,7 @@ def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
         seeded_db, income.id, reversed_on=D, actor="pytest", reason="误收冲销",
     )
 
-    after = r2_monthly_pnl(seeded_db)
+    after = monthly_pnl_report(seeded_db)
     oct_item = next((r for r in after["items"] if r["month"] == "2026-10"), None)
     after_op = oct_item["operating_expense"] if oct_item else Decimal("0.00")
     assert after_op == before_op, (
@@ -97,11 +97,11 @@ def test_r2_reversal_of_business_income_not_counted_as_operating(seeded_db):
     )
 
 
-# --------------------------------------------------------------- #8 R2 挂单运营费不双算
-def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
-    """挂订单的运营费用流水只进订单支出大类（R2 直接成本），不在运营费用重复计。"""
+# --------------------------------------------------------------- #8 月度损益 挂单运营费不双算
+def test_monthly_order_linked_operating_expense_not_double_counted(seeded_db):
+    """挂订单的运营费用流水只进订单支出大类（月度损益 直接成本），不在运营费用重复计。"""
     order_id = _bare_order(seeded_db)
-    start = r2_monthly_pnl(seeded_db)
+    start = monthly_pnl_report(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
     before_cost = before["cost"] if before else Decimal("0.00")
     before_op = before["operating_expense"] if before else Decimal("0.00")
@@ -112,7 +112,7 @@ def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
         order_id=order_id,
     )
 
-    after = r2_monthly_pnl(seeded_db)
+    after = monthly_pnl_report(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     # 直接成本 +300（挂单支出归该单支出大类），运营费用不变（不重复计）。
     assert oct_item["cost"] == before_cost + Decimal("300.00")
@@ -120,9 +120,9 @@ def test_r2_order_linked_operating_expense_not_double_counted(seeded_db):
 
 
 # --------------------------------------------------------------- #8 独立运营费仍计运营费用（守卫）
-def test_r2_standalone_operating_expense_still_counted(seeded_db):
+def test_monthly_standalone_operating_expense_still_counted(seeded_db):
     """守卫：不挂订单的独立运营费用仍进运营费用列（order_id is None 不过滤掉）。"""
-    start = r2_monthly_pnl(seeded_db)
+    start = monthly_pnl_report(seeded_db)
     before = next((r for r in start["items"] if r["month"] == "2026-10"), None)
     before_op = before["operating_expense"] if before else Decimal("0.00")
 
@@ -132,12 +132,12 @@ def test_r2_standalone_operating_expense_still_counted(seeded_db):
         order_id=None,
     )
 
-    after = r2_monthly_pnl(seeded_db)
+    after = monthly_pnl_report(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     assert oct_item["operating_expense"] == before_op + Decimal("250.00")
 
 
-def test_r2_loads_only_period_flows_and_cross_period_reversal_original(seeded_db):
+def test_monthly_loads_only_period_flows_and_cross_period_reversal_original(seeded_db):
     """短周期报表不加载无关历史流水，但须查到区间外的冲销原流水。"""
     original = create_cashflow(
         seeded_db, pool_id=1, occurred_on=date(2026, 9, 20), direction="OUT",
@@ -172,7 +172,7 @@ def test_r2_loads_only_period_flows_and_cross_period_reversal_original(seeded_db
 
     event.listen(seeded_db, "loaded_as_persistent", record_load)
     try:
-        report = r2_monthly_pnl(
+        report = monthly_pnl_report(
             seeded_db, from_date=date(2026, 10, 1), to_date=date(2026, 10, 31),
         )
     finally:

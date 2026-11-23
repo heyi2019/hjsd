@@ -8,7 +8,7 @@ import { employeesApi } from "../../../shared/api/org.api";
 import type { Account } from "../../../shared/api/types/accounts";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { normalizeError } from "../../../shared/api/client";
-import { useOptionSet } from "../../../shared/lib/optionSets";
+import { useOptionSetResource } from "../../../shared/lib/optionSets";
 import { BusinessActionModal, CompactActions, BusinessRegistrationForm, DataTable, ErrorBanner, MoneyText, PermissionButton, Select } from "../../../shared/ui";
 import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../../../shared/forms/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
@@ -44,13 +44,17 @@ export function OrderConsignmentModal(props: {
   const open = Boolean(props.account);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "CONSIGN" : undefined);
   const { labels } = useOrderFormSectionLabels(open ? "CONSIGN" : undefined);
-  const platforms = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
+  const platformResource = useOptionSetResource("INTERMEDIARY_PLATFORM", open);
+  const platforms = platformResource.options ?? [];
   const availablePlatforms = availableConsignmentPlatforms(platforms, listed);
 
   const refreshListed = async (orderId: number, generation: number) => {
     const detail = await ordersApi.executionDetail(orderId);
     if (!requestGeneration.isCurrent(generation)) return;
     const sourceOrder = detail.orders.find((order) => order.order_id === orderId);
+    if (sourceOrder && detail.account.status !== "VOID" && !Array.isArray(sourceOrder.active_consignments)) {
+      throw new Error("上架状态不可用，请重新加载");
+    }
     setSourceOrderId(sourceOrder?.order_id ?? null);
     const current = detail.account.status === "VOID" || !sourceOrder ? [] : activeConsignmentListings(sourceOrder).map((item) => ({
       key: item.eventId ?? item.orderId,
@@ -98,7 +102,7 @@ export function OrderConsignmentModal(props: {
 
   const submit = async (values: { platform_ids?: string; consignment_price?: string | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const account = props.account;
-    if (!account || !configReady) return;
+    if (!account || !configReady || platformResource.loading || platformResource.error) return;
     const listedAt = values.listed_at ?? dayjs();
     if (!values.platform_ids) return;
     if (!sourceOrderId) {
@@ -154,13 +158,14 @@ export function OrderConsignmentModal(props: {
       onCancel={close}
       footer={
         <CompactActions onCancel={close} divider={false}>
-          <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} disabled={!configReady} onClick={() => form.submit()}>
+          <PermissionButton permission="order.create" type="primary" aria-label="确认上架" loading={submitting} disabled={!configReady || platformResource.loading || Boolean(platformResource.error)} onClick={() => form.submit()}>
             确认上架
           </PermissionButton>
         </CompactActions>
       }
     >
       <ErrorBanner error={error} />
+      <ErrorBanner error={platformResource.error} onRetry={platformResource.retry} retrying={platformResource.loading} />
       <ErrorBanner error={listingError} onRetry={sourceOrderId != null ? () => void reloadListed(sourceOrderId) : undefined} retrying={listingLoading} />
       <InventoryAccountSummary account={props.account} />
       <FieldConfigContext.Provider value={config}>
@@ -190,7 +195,7 @@ export function OrderConsignmentModal(props: {
                 popupMatchSelectWidth
                 popupClassName="consignment-platform-pop"
               />
-            ) : (
+            ) : platformResource.loading ? <span className="muted">寄售平台加载中</span> : platformResource.error ? null : (
               <span className="muted">暂无可用寄售平台，请先在中介业务配置中维护经手平台</span>
             )}
           </CfgItem>

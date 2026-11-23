@@ -49,8 +49,8 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   const [creatorFilter, setCreatorFilter] = useState<string[]>([]);
   const { activeEmployees, settled: employeesSettled } = useEmployeeOptions();
   const creatorOptions = employeesSettled ? activeEmployees.map((item) => ({ label: item.display_name || item.username, value: item.username })) : null;
-  const requestRef = useRef(0);
-  const summaryRequestRef = useRef(0);
+  const listRequest = useLatestRequest();
+  const summaryRequest = useLatestRequest();
   const detailRequest = useLatestRequest();
   const candidatesRequest = useLatestRequest();
   useEffect(() => () => { if (mergeSearchTimer.current) clearTimeout(mergeSearchTimer.current); }, []);
@@ -76,6 +76,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       downloadBlob(
         await customersApi.exportCsv({
           ...filters,
+          sort_desc: sortDesc,
         }),
         `客户-${today()}.csv`,
       );
@@ -88,7 +89,7 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
   };
 
   const loadList = useCallback(async () => {
-    const request = ++requestRef.current;
+    const request = listRequest.start();
     setLoading(true);
     const params = {
       ...filters,
@@ -97,19 +98,19 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       ...(sortDesc ? {} : { sort_desc: false }),
     };
     await customersApi.page(params).then((customerPage) => {
-      if (request !== requestRef.current) return;
+      if (!listRequest.isCurrent(request)) return;
       setRows(customerPage.items);
       setTotal(customerPage.total);
       setError(null);
     }).catch((err) => {
-      if (request === requestRef.current) setError(normalizeError(err));
+      if (listRequest.isCurrent(request)) setError(normalizeError(err));
     }).finally(() => {
-      if (request === requestRef.current) setLoading(false);
+      if (listRequest.isCurrent(request)) setLoading(false);
     });
-  }, [filters, page, pageSize, sortDesc]);
+  }, [filters, page, pageSize, sortDesc, listRequest]);
 
   const loadSummary = useCallback(async () => {
-    const request = ++summaryRequestRef.current;
+    const request = summaryRequest.start();
     setSummaryLoading(true);
     setSummaryError(null);
     const params = {
@@ -117,16 +118,19 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       ...filters,
     };
     await customersApi.summary(params).then((customerSummary) => {
-      if (request === summaryRequestRef.current) setSummary(customerSummary);
+      if (summaryRequest.isCurrent(request)) setSummary(customerSummary);
     }).catch((err) => {
-      if (request === summaryRequestRef.current) setSummaryError(normalizeError(err));
+      if (summaryRequest.isCurrent(request)) setSummaryError(normalizeError(err));
     }).finally(() => {
-      if (request === summaryRequestRef.current) setSummaryLoading(false);
+      if (summaryRequest.isCurrent(request)) setSummaryLoading(false);
     });
-  }, [filters]);
-  const load = useCallback(async () => {
-    await Promise.all([loadList(), loadSummary()]);
-  }, [loadList, loadSummary]);
+  }, [filters, summaryRequest]);
+  const latestLoad = useRef<() => Promise<void>>(async () => {});
+  latestLoad.current = async () => {
+    if (active) await Promise.all([loadList(), loadSummary()]);
+  };
+  // 写操作开始后筛选条件可能变化；完成时刷新当前筛选，而不是旧闭包。
+  const load = useCallback(() => latestLoad.current(), []);
 
   const resetKey = JSON.stringify([Boolean(orderFilter), orderFilter?.from, orderFilter?.to, createdPeriod?.from, createdPeriod?.to]);
   const previousResetKey = useRef(resetKey);
@@ -141,13 +145,13 @@ export function useCustomerController({ active = true, focusId, orderFilter, cre
       }
     }
     void loadList();
-    return () => { requestRef.current += 1; };
-  }, [active, loadList, page, resetKey]);
+    return listRequest.invalidate;
+  }, [active, loadList, page, resetKey, listRequest]);
   useEffect(() => {
     if (!active) return;
     void loadSummary();
-    return () => { summaryRequestRef.current += 1; };
-  }, [active, loadSummary]);
+    return summaryRequest.invalidate;
+  }, [active, loadSummary, summaryRequest]);
 
   const openDetail = async (row: Customer) => {
     const request = detailRequest.start();

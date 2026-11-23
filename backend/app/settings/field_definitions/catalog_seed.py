@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from functools import lru_cache
 import json
 import zlib
 
@@ -39,30 +40,29 @@ SYSTEM_FORM_FIELDS = {
 }
 
 
-def seed_system_form_fields(session: Session, *, actor: str = "system") -> None:
+def seed_system_form_fields(session: Session, *, actor: str = "system", existing_fields: dict[tuple[str, str], OrderFormField] | None = None) -> None:
+    if existing_fields is None:
+        existing_fields = {(row.order_type_code, row.field_key): row for row in session.scalars(select(OrderFormField)).all()}
     for code, fields in SYSTEM_FORM_FIELDS.items():
         for index, (key, label, field_type, required) in enumerate(fields):
-            existing = session.scalar(select(OrderFormField).where(OrderFormField.order_type_code == code, OrderFormField.field_key == key))
-            if existing is None:
-                session.add(OrderFormField(order_type_code=code, field_key=key, label=label,
+            if (code, key) not in existing_fields:
+                field = OrderFormField(order_type_code=code, field_key=key, label=label,
                     field_type=field_type, required=required, is_active=True, locked=required,
-                    is_custom=False, sort_order=index * 10, section="EXTRA", created_by=actor, updated_by=actor))
+                    is_custom=False, sort_order=index * 10, section="EXTRA", created_by=actor, updated_by=actor)
+                session.add(field)
+                existing_fields[(code, key)] = field
     session.flush()
 
 
-def seed_business_responsible_fields(session: Session, *, actor: str = "system") -> None:
+def seed_business_responsible_fields(session: Session, *, actor: str = "system", existing_fields: dict[tuple[str, str], OrderFormField] | None = None) -> None:
     """注册三类建单负责人字段；重复执行不覆盖管理员已保存的配置。"""
+    if existing_fields is None:
+        existing_fields = {(row.order_type_code, row.field_key): row for row in session.scalars(select(OrderFormField)).all()}
     for order_type_code, label in BUSINESS_RESPONSIBLE_FIELD_SEEDS:
-        exists = session.scalar(
-            select(OrderFormField).where(
-                OrderFormField.order_type_code == order_type_code,
-                OrderFormField.field_key == "business_responsible_ids",
-            )
-        )
-        if exists:
+        key = (order_type_code, "business_responsible_ids")
+        if key in existing_fields:
             continue
-        session.add(
-            OrderFormField(
+        field = OrderFormField(
                 order_type_code=order_type_code,
                 field_key="business_responsible_ids",
                 label=label,
@@ -80,7 +80,8 @@ def seed_business_responsible_fields(session: Session, *, actor: str = "system")
                 created_by=actor,
                 updated_by=actor,
             )
-        )
+        session.add(field)
+        existing_fields[key] = field
 
 _CATALOG_BLOB = """
 eJztfWtTU1m6/1ehrDqv/jPtdJ+ec2am6v8ikqCZDoROgt2eU1O7Imw1NSGhk9C2Z2qq8IKAEIKKiIIiNIrtJZEWNRAuH2ay905e
@@ -261,6 +262,7 @@ _ORDER_EVENT_OPTIONS = [
     {"value": "REBATE", "label": "返点"},
 ]
 _AUDIT_ACTION_ADDITIONS = {
+    "GAME_TYPE_DELETE": "删除游戏类型",
     "ACCOUNT_DELETE": "删除",
     "ORDER_DELETE": "删除",
     "LIST_COLUMNS_UPDATE": "列表列显示配置变更",
@@ -273,8 +275,30 @@ _AUDIT_ACTION_ADDITIONS = {
 }
 
 
+@lru_cache(maxsize=1)
+def builtin_option_set_policy() -> tuple[frozenset[str], frozenset[str]]:
+    """系统词典不可删除；后端固定取值的词典不受历史 editable 标记影响。"""
+    data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
+    builtins = frozenset(row["code"] for row in data["option_sets"]) | {"BUSINESS_PERIOD"}
+    fixed = frozenset(row["code"] for row in data["option_sets"] if not row.get("editable")) | {
+        "ALLOCATION_TYPE", "BUSINESS_PERIOD",
+    }
+    return builtins, fixed
+
+
+def accounting_attribute_options() -> list[dict[str, str]]:
+    """核算属性展示与导出复用前端统一文案对应表；取值由领域枚举约束。"""
+    from app.domain.enums import AccountingAttribute
+    from app.settings.lists.export_labels import CASHFLOW_VALUE_LABELS
+
+    labels = CASHFLOW_VALUE_LABELS["accounting_attribute"]
+    return [{"value": code, "label": label} for code, label in labels.items() if code in AccountingAttribute.values()]
+
+
 def _normalized_option_set(values: dict) -> dict:
     """Return the current option dictionary without retired business concepts."""
+    if values.get("code") == "FUND_FLOW_ACCOUNTING_ATTRIBUTE":
+        return {**values, "editable": False, "options": accounting_attribute_options()}
     if values.get("code") != "ORDER_EVENT_TYPE":
         if values.get("code") != "AUDIT_ACTION":
             return values
@@ -292,14 +316,19 @@ def _normalized_option_set(values: dict) -> dict:
 
 
 def seed_catalog(session: Session, *, actor: str = "system") -> None:
-    if session.scalar(select(OptionSet).where(OptionSet.code == "BUSINESS_PERIOD")) is None:
-        session.add(OptionSet(code="BUSINESS_PERIOD", label="当期设置", group="BUSINESS", editable=False,
+    session.flush()
+    existing_options = {row.code: row for row in session.scalars(select(OptionSet)).all()}
+    existing_fields = {(row.order_type_code, row.field_key): row for row in session.scalars(select(OrderFormField)).all()}
+    if "BUSINESS_PERIOD" not in existing_options:
+        period = OptionSet(code="BUSINESS_PERIOD", label="当期设置", group="BUSINESS", editable=False,
             options=[{"value": "start_day", "label": "16"}], description="每月周期起始日",
-            created_by=actor, updated_by=actor))
+            created_by=actor, updated_by=actor)
+        session.add(period)
+        existing_options[period.code] = period
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
     for raw_values in data["option_sets"]:
         values = _normalized_option_set(raw_values)
-        existing = session.scalar(select(OptionSet).where(OptionSet.code == values["code"]))
+        existing = existing_options.get(values["code"])
         if existing:
             # 审计动作是只读系统字典，产品文案变更时要修正已有 dev/本地库，
             # 不能只在首次建库时写入，否则旧库会持续覆盖前端固定口径。
@@ -308,7 +337,9 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
                 existing.updated_by = actor
             continue
         values = {**values, "created_by": actor, "updated_by": actor}
-        session.add(OptionSet(**values))
+        item = OptionSet(**values)
+        session.add(item)
+        existing_options[item.code] = item
     for values in data["order_form_fields"]:
         if (
             values["order_type_code"] == "ORDERCANC"
@@ -321,12 +352,8 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
             and not values.get("options")
         ):
             values = {**values, "options": SALE_PAYMENT_METHOD_OPTIONS}
-        exists = session.scalar(
-            select(OrderFormField).where(
-                OrderFormField.order_type_code == values["order_type_code"],
-                OrderFormField.field_key == values["field_key"],
-            )
-        )
+        key = (values["order_type_code"], values["field_key"])
+        exists = existing_fields.get(key)
         if exists:
             # 旧版作用域种子漏掉付款方式选项；仅修复空值，不覆盖管理员配置。
             if (
@@ -337,7 +364,9 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
                 exists.options = SALE_PAYMENT_METHOD_OPTIONS
             continue
         values = {**values, "created_by": actor, "updated_by": actor}
-        session.add(OrderFormField(**values))
-    seed_business_responsible_fields(session, actor=actor)
-    seed_system_form_fields(session, actor=actor)
+        item = OrderFormField(**values)
+        session.add(item)
+        existing_fields[key] = item
+    seed_business_responsible_fields(session, actor=actor, existing_fields=existing_fields)
+    seed_system_form_fields(session, actor=actor, existing_fields=existing_fields)
     session.flush()

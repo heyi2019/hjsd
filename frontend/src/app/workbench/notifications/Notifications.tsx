@@ -30,7 +30,7 @@ export function Notifications(props: Parameters<typeof useNotifications>[0] & { 
                     <span className={item.read_at ? "notification__read" : "notification__unread"}>{item.read_at ? "已读" : "未读"}</span>
                     <span className="notification__details">{isProfit ? (detail
                       ? `成本 ${money(detail.cost_amount)} · 售出 ${money(detail.sale_amount)} · ${item.notification_type === "PROFIT_PENDING" ? "待分配利润" : "可分配利润"} ${money(detail.allocatable_profit)}`
-                      : pendingDetails.includes(item.id) ? "订单详情加载中" : "订单详情暂不可用") : ""}</span>
+                      : pendingDetails.includes(item.id) ? "订单详情加载中" : "订单详情暂不可用") : (item.notification_type === "INVENTORY_AGING" || item.notification_type === "INSTALLMENT_OVERDUE") ? "提醒生成时的记录，当前状态可能已变化" : ""}</span>
                     <span className="notification__time">通知时间 {formatDateTimeMinute(item.created_at)}</span>
                   </button>
                 </List.Item>
@@ -49,7 +49,7 @@ export function Notifications(props: Parameters<typeof useNotifications>[0] & { 
         onClose={() => setSelected(null)}
         onPartyNavigate={props.onPartyNavigate ? (path) => { setSelected(null); props.onPartyNavigate?.(path); } : undefined}
       />}
-      {props.active !== false && dataOwner === username && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}</Modal>}
+      {props.active !== false && dataOwner === username && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}{(selected.notification_type === "INVENTORY_AGING" || selected.notification_type === "INSTALLMENT_OVERDUE") && <p className="muted">提醒生成时的记录，当前状态可能已变化</p>}</Modal>}
     </section>
   );
 }

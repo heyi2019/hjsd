@@ -11,11 +11,12 @@ from app.core.errors import NotFound, Validation
 from app.shared.numbering import allocate_flow_no
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, CashflowSourceType
-from app.domain.trade import Cashflow
+from app.domain.trade import Cashflow, OrderFormField
 from app.funds import cashflows
 from app.funds.deposits.writes import create_deposit, delete_deposit, update_deposit
 from app.funds.deposits.lifecycle import cancel_deposit, return_deposit
 from app.funds.deposits.reads import deposit_held_total, list_deposits
+from app.funds.reconciliation import create_reconciliation, list_reconciliations
 
 
 TODAY = date(2026, 10, 17)
@@ -162,7 +163,7 @@ def test_update_cashflow_rejects_non_studio_flow(seeded_db):
         direction="IN", category="REBATE",
         amount=Decimal("50"), actor="pytest",
     )
-    with pytest.raises(Validation, match="仅工作室手工收支可编辑或删除"):
+    with pytest.raises(Validation, match="仅工作室手工收支可编辑"):
         cashflows.update_cashflow(
             seeded_db, flow.id, pool_id=1, occurred_on=TODAY,
             direction="OUT", category="房租", amount=Decimal("30"),
@@ -174,12 +175,29 @@ def test_update_cashflow_rejects_reversed_studio_flow(seeded_db):
     cashflows.reverse_cashflow(
         seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="错录",
     )
-    with pytest.raises(Validation, match="已冲销的工作室收支不能编辑或删除"):
+    with pytest.raises(Validation, match="已冲销的工作室收支不能编辑"):
         cashflows.update_cashflow(
             seeded_db, flow.id, pool_id=1, occurred_on=TODAY,
             direction="OUT", category="房租", amount=Decimal("30"),
             actor="pytest",
         )
+
+
+def test_studio_reverse_validates_conditional_fields_against_reason(seeded_db):
+    seeded_db.add(OrderFormField(
+        order_type_code="STUDIOREV", field_key="evidence", label="冲销凭据", field_type="TEXT",
+        required=False, required_when={"field": "reason", "op": "filled"},
+        is_custom=True, is_active=True, sort_order=1000, created_by="pytest", updated_by="pytest",
+    ))
+    seeded_db.flush()
+    flow = _studio_flow(seeded_db)
+    with pytest.raises(Validation, match="冲销凭据.*必填"):
+        cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest",
+                                  reason="登记错误", form_extra_scope="FUNDREVERSE")
+    reversal = cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest",
+                                         reason="登记错误", form_extra_scope="STUDIOREV",
+                                         form_extra={"evidence": "凭据编号"})
+    assert reversal.form_extra == {"evidence": "凭据编号"}
 
 def test_delete_cashflow_rejects_non_studio_flow(seeded_db):
     flow = cashflows.create_cashflow(
@@ -187,7 +205,7 @@ def test_delete_cashflow_rejects_non_studio_flow(seeded_db):
         direction="IN", category="REBATE",
         amount=Decimal("50"), actor="pytest",
     )
-    with pytest.raises(Validation, match="仅工作室手工收支可编辑或删除"):
+    with pytest.raises(Validation, match="资金流水不能删除，请使用冲销"):
         cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
 
 
@@ -259,7 +277,7 @@ def test_update_deposit_rejects_after_return(seeded_db):
     return_deposit(
         seeded_db, deposit.id, amount=Decimal("40"), released_on=TODAY, actor="pytest"
     )
-    with pytest.raises(Validation, match="只有未发生退还/损失的押金可编辑或删除"):
+    with pytest.raises(Validation, match="只有未发生退还/损失的押金可编辑"):
         update_deposit(
             seeded_db, deposit.id, pool_id=1, amount=Decimal("10"),
             paid_on=TODAY, actor="pytest",
@@ -336,7 +354,7 @@ def test_delete_deposit_rejects_with_subsequent_flows(seeded_db):
         created_by="pytest", updated_by="pytest",
     ))
     seeded_db.flush()
-    with pytest.raises(Validation, match="押金已产生后续资金流水"):
+    with pytest.raises(Validation, match="押金不能删除，请使用取消"):
         delete_deposit(seeded_db, deposit.id, actor="pytest")
 
 def test_create_deposit_rejects_unknown_counterparty(seeded_db):
@@ -354,6 +372,33 @@ def test_list_deposits_pool_filter_respects_user_scope(seeded_db):
     assert list_deposits(seeded_db, pool_id=1, user=_pool1_user()) == [deposit]
     # pool_ids 过滤：只保留授权内的池
     assert list_deposits(seeded_db, pool_ids=[1, 2], user=_pool1_user()) == [deposit]
+
+def test_deposit_and_reconciliation_scope_preserves_pagination_and_order(seeded_db):
+    deposits = [
+        create_deposit(seeded_db, pool_id=pool, amount=Decimal("10"), paid_on=TODAY, actor="pytest")
+        for pool in (1, 2, 1)
+    ]
+    reconciliations = [
+        create_reconciliation(
+            seeded_db, pool_id=pool, reconciled_on=date(2026, 10, day),
+            account_label=f"scope-{day}", statement_balance=Decimal("0"),
+            reason="范围测试", actor="pytest",
+        )
+        for pool, day in ((1, 15), (2, 16), (1, 17))
+    ]
+    user = _pool1_user()
+    for listing, first, second in (
+        (list_deposits, deposits[0], deposits[2]),
+        (list_reconciliations, reconciliations[2], reconciliations[0]),
+    ):
+        assert listing(seeded_db, user=user, pool_ids=(p for p in (1, 2)), limit=1, offset=0) == ([first], 2)
+        assert listing(seeded_db, user=user, pool_ids=[1, 2], limit=1, offset=1) == ([second], 2)
+        assert listing(seeded_db, user=user, pool_id=2, pool_ids=[1], limit=1) == ([], 0)
+        assert listing(seeded_db, user=user, pool_id=1, pool_ids=[2]) == [first, second]
+        assert listing(seeded_db, user=_restricted_user(), limit=1) == ([], 0)
+        assert listing(seeded_db, user=_all_scope_user(), pool_ids=[2]) == [
+            deposits[1] if listing is list_deposits else reconciliations[1]
+        ]
 
 def test_deposit_held_total_filters_by_pool(seeded_db):
     create_deposit(
@@ -392,3 +437,5 @@ def test_deposit_held_total_scoped_for_operator(seeded_db):
     assert deposit_held_total(seeded_db, user=_pool1_user()) == Decimal("100")
     # 无任何池授权的用户：合计为 0
     assert deposit_held_total(seeded_db, user=_restricted_user()) == Decimal("0")
+    # 指定不可见账户也不能绕过范围过滤。
+    assert deposit_held_total(seeded_db, pool_id=1, user=_restricted_user()) == Decimal("0")

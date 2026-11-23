@@ -13,7 +13,7 @@ export function useFundsResources(active: boolean, periodState: PeriodState, cas
   const poolResources = usePoolResources();
   const depositResources = useDepositResources();
   const reconciliationResources = useReconciliationResources();
-  const { activeEmployees: employees } = useEmployeeOptions();
+  const { activeEmployees: employees, error: employeeError, reloadFresh: reloadEmployees } = useEmployeeOptions();
   const cashflowEnabled = cashflowsActive && periodState.ready;
   const cashflowEnabledRef = useRef(cashflowEnabled);
   cashflowEnabledRef.current = cashflowEnabled;
@@ -44,6 +44,8 @@ export function useFundsResources(active: boolean, periodState: PeriodState, cas
   return {
     pools: poolResources.pools,
     employees,
+    employeeError,
+    reloadEmployees,
     balances: poolResources.balances,
     deposits: depositResources.deposits,
     depositsPaging: depositResources.depositsPaging,

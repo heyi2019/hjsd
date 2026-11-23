@@ -33,6 +33,7 @@ export const stocksApi = {
     inventory_operator_ids?: number[];
     age_gt_days?: number;
     sort_desc?: boolean;
+    mode?: "full" | "visible";
   }): Promise<{ blob: Blob; failedDetailCount: number }> => {
     const config: CacheAwareRequestConfig = {
       params,
@@ -47,7 +48,4 @@ export const stocksApi = {
       failedDetailCount: Number(response.headers["x-inventory-detail-failures"] ?? 0),
     };
   },
-  /** 删除不可恢复：原因必填，由后端写入审计日志（仅管理员可调用）。 */
-  remove: (id: number, reason: string) =>
-    api.delete<void>(`/stocks/${id}`, { data: { reason } }).then(() => undefined),
 };

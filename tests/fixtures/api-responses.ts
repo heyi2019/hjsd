@@ -10,6 +10,10 @@ import type { OptionSet, OptionSetList } from "@/shared/api/types/common";
 
 export type OrderLedgerSummary = {
   total_count: number;
+  in_progress_count: number;
+  completed_count: number;
+  cancelled_count: number;
+  type_total: number;
   status_counts: Record<string, number>;
   type_counts: Record<string, number>;
   game_types: string[];
@@ -156,8 +160,13 @@ export function dataCenterSummary(overrides: Partial<DataCenterSummary> = {}): D
 
 /** 构造完整订单台账汇总，默认值与空列表状态一致。 */
 export function orderLedgerSummary(overrides: Partial<OrderLedgerSummary> = {}): OrderLedgerSummary {
+  const counts = overrides.status_counts ?? {};
   return {
     total_count: 0,
+    in_progress_count: (counts.ACTIVE ?? 0) + (counts.INSTALLMENT ?? 0),
+    completed_count: counts.COMPLETED ?? 0,
+    cancelled_count: counts.CANCELLED ?? 0,
+    type_total: Object.values(overrides.type_counts ?? {}).reduce((sum, count) => sum + count, 0),
     status_counts: {},
     type_counts: {},
     game_types: [],

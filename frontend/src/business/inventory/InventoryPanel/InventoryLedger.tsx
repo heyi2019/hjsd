@@ -1,9 +1,12 @@
 import { SearchInput } from "../../../shared/ui/SearchInput";
 import { TimeOrderControl } from "../../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../../shared/ui/ToolbarSelect";
-import { Card, DatePicker, Segmented, Space } from "antd";
+import { QuestionCircleOutlined } from "@ant-design/icons";
+import { Card, Dropdown, Segmented, Space, Tooltip } from "antd";
 import { DataTable, ExportButton, StatRow } from "../../../shared/ui";
 import { OrderDetail } from "../../shared/order-detail/OrderDetail";
+import { BusinessDateRangeFilter } from "../../shared/BusinessDateRangeFilter";
+import { ReferenceDataErrors } from "../../shared/order-detail/editing/ReferenceDataErrors";
 import type { InventoryController } from "./useInventoryController";
 import { ToolbarMultiSelect } from "../../../shared/ui/ToolbarMultiSelect";
 import type { ReactNode } from "react";
@@ -54,6 +57,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
     operationDrafts,
     financeDrafts,
     employees,
+    pools,
     operatorUsername,
     updateEventDraft,
     updateOperationDraft,
@@ -81,19 +85,14 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           value={keyword}
           placeholder="搜索账号 / 产品 / 游戏类型 / 区服 / 成本"
           aria-label="搜索库存账号"
-          className="ui-ledger-search"
+          className="ui-ledger-search ui-filter-search"
           onChange={(event) => { controller.setKeyword(event.target.value); setPage(1); }}
         />
-        <DatePicker.RangePicker
-          aria-label="库存日期区间"
-          placeholder={["开始日期", "结束日期"]}
-          format="YYYY-MM-DD"
-          size="small"
-          placement="bottomLeft"
-          classNames={{ popup: { root: "compact-date-range-picker" } }}
+        <BusinessDateRangeFilter
+          label="库存日期区间"
           value={dateRange}
           onChange={(value) => {
-            setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null);
+            setDateRange(value);
             setPage(1);
           }}
         />
@@ -129,6 +128,9 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           ]}
           onChange={(value) => { setInventoryType(value === "all" ? undefined : String(value)); setPage(1); }}
         />
+        <Tooltip title="分类数量不受关键词和日期筛选影响，仍受其他筛选和数据权限影响。">
+          <QuestionCircleOutlined aria-label="库存类型数量说明" tabIndex={0} />
+        </Tooltip>
         <Segmented
           aria-label="库存业务筛选"
           value={businessMode ?? "all"}
@@ -136,7 +138,16 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
         />
         <TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} />
-        <ExportButton permission="report.read" aria-label="导出" loading={exporting} onClick={() => void handleExport()} />
+        <Dropdown
+          disabled={exporting}
+          trigger={["click"]}
+          menu={{
+            items: [{ key: "visible", label: "导出页面可见列" }, { key: "full", label: "导出完整明细" }],
+            onClick: ({ key }) => void handleExport(key === "visible" ? "visible" : "full"),
+          }}
+        >
+          <ExportButton permission="report.export" aria-label="导出" loading={exporting} />
+        </Dropdown>
       </Space>
       <StatRow items={[
         { label: "在库账号", kind: "count", amount: !controller.listLoading && controller.inventoryStats ? String(controller.inventoryStats.account_count) : "—" },
@@ -156,7 +167,8 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
         controlledPaging
         expandable={{
           expandedRowKeys: expandedOrderIds,
-          expandedRowRender: (row) => (
+          expandedRowRender: (row) => (<>
+            {inlineEditId === row.account.id ? <ReferenceDataErrors employeeError={controller.employeeError} poolError={controller.poolError} retryEmployees={controller.retryEmployees} retryPools={controller.retryPools} /> : null}
             <OrderDetail
               row={row.account}
               detail={orderExecutionDetails[row.id]}
@@ -178,13 +190,14 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
               onOrderExtraChange={updateOrderDraft && ((orderId, key, value) => updateOrderDraft(orderId, { form_extra: { [key]: value } }))}
               onPartyEdit={updatePartyDraft}
               employees={employees}
+              pools={pools}
               operatorUsername={operatorUsername}
               extraForm={invEditExtraForm}
               onSave={saveInline}
               onCancel={cancelInlineEdit}
               saving={savingAccount}
             />
-          ),
+          </>),
           expandRowByClick: true,
           onExpand: (expanded, row) => void handleExpand(expanded, row),
         }}

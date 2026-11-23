@@ -137,6 +137,8 @@ class SequenceOut(BaseModel):
     padding: int
     current_value: int
     next_number: str
+    remaining: int | None = None
+    near_exhaustion: bool = False
 
 
 __all__ = [

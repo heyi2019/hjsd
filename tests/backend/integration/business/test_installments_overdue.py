@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 import pytest
 from sqlalchemy import select
@@ -80,6 +80,66 @@ def _contract(
 
 
 class TestMarkOverdue:
+    def test_partial_payment_keeps_overdue_then_clearing_last_overdue_restores_active(self, seeded_db):
+        today = date.today()
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, down_payment="0", periods=2, per_period="300",
+            first_due_on=today - timedelta(days=5),
+        )
+        inst_recovery.mark_overdue(seeded_db, as_of=today)
+        assert contract.status == InstallmentStatus.OVERDUE.value
+        _, schedule = inst_pay(
+            seeded_db, contract.id, amount=Decimal("100"), paid_on=today, period_no=1, actor="pytest",
+        )
+        assert schedule.status == ScheduleStatus.OVERDUE.value
+        assert contract.status == InstallmentStatus.OVERDUE.value
+        _, schedule = inst_pay(
+            seeded_db, contract.id, amount=Decimal("200"), paid_on=today, period_no=1, actor="pytest",
+        )
+        assert schedule.status == ScheduleStatus.PAID.value
+        assert contract.status == InstallmentStatus.ACTIVE.value
+
+    def test_extension_restores_pending_only_after_all_overdue_periods_are_cleared(self, seeded_db):
+        today = date.today()
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, down_payment="0", periods=2, per_period="300",
+            first_due_on=today - timedelta(days=45),
+        )
+        inst_recovery.mark_overdue(seeded_db, as_of=today)
+        first = inst_extend(
+            seeded_db, contract.id, period_no=1, new_due_on=today - timedelta(days=10),
+            actor="pytest", reason="部分展期",
+        )
+        assert first.status == ScheduleStatus.OVERDUE.value
+        assert contract.status == InstallmentStatus.OVERDUE.value
+        inst_extend(
+            seeded_db, contract.id, period_no=1, new_due_on=today + timedelta(days=7),
+            actor="pytest", reason="继续展期",
+        )
+        assert contract.status == InstallmentStatus.OVERDUE.value
+        inst_extend(
+            seeded_db, contract.id, period_no=2, new_due_on=today + timedelta(days=14),
+            actor="pytest", reason="二期展期",
+        )
+        assert contract.status == InstallmentStatus.PENDING.value
+
+    def test_waiving_last_overdue_period_restores_unpaid_contract(self, seeded_db):
+        today = date.today()
+        order = _order(seeded_db)
+        contract = _contract(
+            seeded_db, order.id, down_payment="0", periods=2, per_period="300",
+            first_due_on=today - timedelta(days=5),
+        )
+        inst_recovery.mark_overdue(seeded_db, as_of=today)
+        schedule = inst_waive(
+            seeded_db, contract.id, period_no=1, amount=Decimal("300"), waived_on=today,
+            actor="pytest", reason="审批减免",
+        )
+        assert schedule.status == ScheduleStatus.WAIVED.value
+        assert contract.status == InstallmentStatus.PENDING.value
+
     def test_overdue_updates_contract_operator(self, seeded_db):
         order = _order(seeded_db)
         contract = _contract(

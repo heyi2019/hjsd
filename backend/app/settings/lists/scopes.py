@@ -1,6 +1,6 @@
 """lists.scopes：列表列清单注册表（全站单一事实源）。
 
-与 `orders.form_scopes` 同构：设置页「列表字段」的作用域与列中文名只在这里定义，
+与 `domain.form_scopes` 同构：设置页「列表字段」的作用域与列中文名只在这里定义，
 经 GET /list-columns 下发；前端不再维护第二份列名清单，避免三处文案漂移。
 
 `locked` 字段保留备用，但**当前所有列均可隐藏与调序**（含身份列/操作列）；
@@ -226,6 +226,7 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         columns=(
             ListColumn("month", "月份"),
             ListColumn("sales_income", "销售收入"),
+            ListColumn("studio_other_income", "工作室其他收入"),
             ListColumn("cost", "成本"),
             ListColumn("operating_expense", "运营费用"),
             ListColumn("rebate_income", "返点收益"),

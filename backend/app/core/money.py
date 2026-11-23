@@ -80,10 +80,8 @@ def money_equal(left: Any, right: Any, *, tolerance: Decimal = Decimal("0.0001")
 class Amount(TypeDecorator):
     """DECIMAL(18,2) 金额列：对外恒为 Decimal。
 
-    SQLite 无原生定点类型，底层以双精度 REAL 存储，因此：
-    - 写入：Decimal -> float 落库；
-    - 读出：立即 `Decimal(str(value))` 并量化到 2 位。
-    在 18,2 的实际业务量级（远低于 1e13）内往返无损；迁 PostgreSQL 后自动退化为原生 NUMERIC。
+    写入 PostgreSQL 时全程传递 Decimal；不能先转 float，否则大额金额的分位会丢失。
+    SQLite 不具备原生定点数，其存储精度不能作为生产金额精度的依据。
     """
 
     impl = Numeric(PRECISION, SCALE, asdecimal=True)
@@ -93,10 +91,10 @@ class Amount(TypeDecorator):
     def python_type(self) -> type[Decimal]:  # type: ignore[override]
         return Decimal
 
-    def process_bind_param(self, value: Any, dialect: Dialect) -> float | None:
+    def process_bind_param(self, value: Any, dialect: Dialect) -> Decimal | None:
         if value is None:
             return None
-        return float(to_money(value))
+        return to_money(value)
 
     def process_result_value(self, value: Any, dialect: Dialect) -> Decimal | None:
         if value is None:

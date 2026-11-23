@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from app.shared.audit import record_audit
 from app.core.security import CurrentUser
@@ -19,12 +19,12 @@ from app.core.errors import Validation
 from app.domain.trade import (
     Account,
     Cashflow,
+    Deposit,
     Installment,
     InstallmentDisposition,
     Order,
     OrderEvent,
     RebateRecord,
-    Reconciliation,
 )
 from app.domain.enums import (
     AuditAction,
@@ -50,6 +50,10 @@ def _shift_accounting_dates(
     """
     delta = (new_trade_date - order.trade_date).days
     shift = timedelta(days=delta)
+    deposits = session.scalars(
+        select(Deposit).where(Deposit.source_order_id == order.id).order_by(Deposit.id)
+        .with_for_update().execution_options(populate_existing=True)
+    ).all()
     events = session.scalars(
         select(OrderEvent).where(OrderEvent.order_id == order.id)
     ).all()
@@ -57,34 +61,28 @@ def _shift_accounting_dates(
         select(Cashflow).where(Cashflow.order_id == order.id)
     ).all()
 
-    # #14 对账边界：平移会改动流水的 occurred_on；若任一流水所属资金账户在
-    # 「该流水旧日期→新日期」移动区间内已有对账快照（含 OPEN/RESOLVED，对账一旦
-    # 建立即固化当日余额），平移会把流水挪进/挪出已对账期间，破坏快照，必须拒绝。
-    # 用流水实际日期区间而非 trade_date：买入/收款常发生在成交日之前，区间更宽。
-    if delta != 0 and flows:
-        dated = [(f.pool_id, f.occurred_on) for f in flows if f.pool_id is not None and f.occurred_on is not None]
-        for pool_id, old_on in dated:
-            new_on = old_on + shift
-            lo, hi = sorted((old_on, new_on))
-            locked = session.scalars(
-                select(Reconciliation.id).where(
-                    Reconciliation.pool_id == pool_id,
-                    Reconciliation.reconciled_on >= lo,
-                    Reconciliation.reconciled_on <= hi,
-                )
-            ).first()
-            if locked is not None:
-                raise Validation(
-                    "成交日期涉及资金账户已对账期间，不能平移账期",
-                    details={"from": order.trade_date.isoformat(), "to": new_trade_date.isoformat()},
-                )
-
     for event in events:
         event.occurred_on = event.occurred_on + shift
+        if event.event_type == "OPERATE" and event.form_extra:
+            extra = dict(event.form_extra)
+            for key in ("listed_at", "platform_unlisted_at"):
+                value = extra.get(key)
+                if isinstance(value, str):
+                    try:
+                        extra[key] = (datetime.fromisoformat(value) + shift).isoformat()
+                    except ValueError:
+                        pass  # 保留无法识别的历史值，不影响订单其他账期。
+            event.form_extra = extra
         event.updated_by = actor
     for flow in flows:
         flow.occurred_on = flow.occurred_on + shift
         flow.updated_by = actor
+    for deposit in deposits:
+        for field in ("paid_on", "expected_release_on", "released_on", "lost_on"):
+            value = getattr(deposit, field)
+            if value is not None:
+                setattr(deposit, field, value + shift)
+        deposit.updated_by = actor
 
     # #6 分期坏账按回收处置日（InstallmentDisposition.occurred_on）归期；
     # 只平移事件与流水会让坏账留在旧月份，跨期口径撕裂。
@@ -124,6 +122,7 @@ def _shift_accounting_dates(
         "shifted_days": delta,
         "shifted_events": len(events),
         "shifted_cashflows": len(flows),
+        "shifted_deposits": len(deposits),
         "shifted_bad_debts": len(dispositions),
         "shifted_rebates": len(rebates),
     }
@@ -149,6 +148,10 @@ def update_order(
     账号快照、订单编号、业务类型、库存账号关联和状态仍属不可编辑字段。
     """
     order = get_order(session, order_id, user)
+    if trade_date is not _UNSET:
+        order = session.execute(
+            select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)
+        ).scalar_one()
     if trade_date is not _UNSET and trade_date is None:
         raise Validation("订单日期不能清空", details={"field": "trade_date"})
     # trade_date 已放开：不再受「已有登记事件」限制，改日期在下方联动平移账期。
@@ -171,6 +174,14 @@ def update_order(
         "account_snapshot": order.account_snapshot,
         "note": order.note,
     }
+    changed_extra_keys = set()
+    if form_extra is not _UNSET and form_extra:
+        existing_extra = order.form_extra or {}
+        changed_extra_keys = {key for key, value in form_extra.items() if existing_extra.get(key) != value}
+        if changed_extra_keys:
+            before["form_extra"] = {key: existing_extra.get(key) for key in sorted(changed_extra_keys)}
+    if form_extra is not _UNSET and form_extra and "business_responsible_ids" in form_extra:
+        before["business_responsible_ids"] = (order.form_extra or {}).get("business_responsible_ids")
     shift_info: dict[str, int] = {}
     if trade_date is not _UNSET and trade_date != order.trade_date:
         shift_info = _shift_accounting_dates(
@@ -209,6 +220,10 @@ def update_order(
             "trade_date": order.trade_date,
             "account_snapshot": order.account_snapshot,
             "note": order.note,
+            **({"form_extra": {key: (order.form_extra or {}).get(key) for key in sorted(changed_extra_keys)}}
+               if changed_extra_keys else {}),
+            **({"business_responsible_ids": (order.form_extra or {}).get("business_responsible_ids")}
+               if "business_responsible_ids" in before else {}),
                 **shift_info,
         }),
     )

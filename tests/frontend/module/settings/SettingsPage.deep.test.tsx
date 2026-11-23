@@ -73,10 +73,10 @@ async function openConfigCenter() {
 }
 
 describe("SettingsPage.deep", () => {
-  it("管理员可见保留的设置入口，规则清单与导入已下线，人员和团队合并", async () => {
+  it("管理员可在设置中找到订单导入入口，人员和团队合并", async () => {
     renderLight(<SettingsPage />, { user: "admin" });
     await screen.findByRole("tab", { name: "业务字典" });
-    expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
+    expect(screen.getByRole("tab", { name: "订单导入" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "经营规则" })).toBeNull();
     expect(screen.getByRole("tab", { name: "人员与团队" })).toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
@@ -103,7 +103,7 @@ describe("SettingsPage.deep", () => {
   it("查看人(viewer)屏蔽 user.manage 条件 Tab，配置中心仍可见", async () => {
     renderLight(<SettingsPage />, { user: "viewer" });
     await screen.findByRole("tab", { name: "业务字典" });
-    expect(screen.queryByRole("tab", { name: "导入" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "订单导入" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "人员与权限" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "团队管理" })).toBeNull();
     expect(screen.queryByRole("tab", { name: "人员与团队" })).toBeNull();

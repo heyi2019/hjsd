@@ -53,9 +53,9 @@ PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     "AUDIT_LOG": "audit/AuditPanel.tsx",
     # 报表视图已从 ReportsPage.tsx 拆到 ./reports/*.tsx（壳文件只剩 Tab 与批量导出），
     # 列定义在各子文件里，映射必须落到子文件，否则这条守卫对 7 张报表形同不存在。
-    "RPT_MONTHLY_PNL": "reporting/reports/MonthlyPnlReport.tsx",
-    "RPT_BUSINESS_PNL": "reporting/reports/BusinessPnlReport.tsx",
-    "RPT_ORDER_PROFIT": "reporting/reports/OrderProfitReport.tsx",
+    "RPT_MONTHLY_PNL": "operations/reports/MonthlyPnlReport.tsx",
+    "RPT_BUSINESS_PNL": "operations/reports/BusinessPnlReport.tsx",
+    "RPT_ORDER_PROFIT": "operations/reports/OrderProfitReport.tsx",
 }
 
 # 返点仍有 CSV 导出作用域，但前端只在订单详情弹窗中展示关联明细，

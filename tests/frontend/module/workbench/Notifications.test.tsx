@@ -116,6 +116,7 @@ it("合约提醒可查看并标记已读", async () => {
     fireEvent.click(screen.getByRole("tab", { name: "合约消息" }));
     const item = await screen.findByRole("button", { name: /订单 HS12/ });
     expect(within(item).getByText("未读")).toBeInTheDocument();
+    expect(within(item).getByText("提醒生成时的记录，当前状态可能已变化")).toBeInTheDocument();
     fireEvent.click(item);
     expect(await screen.findByText("分期逾期提醒")).toBeInTheDocument();
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([12], "contract");
@@ -246,9 +247,8 @@ it("分润弹窗可重试且切换消息时不显示旧详情", async () => {
 it("连续点击消息均能打开且保持滚动位置", async () => {
     const items = [1, 2].map((id) => ({ id, notification_type: "PROFIT_PENDING", title: "分润", message: `订单 ${id}`, entity_type: "order", entity_id: `${id}`, created_at: "2026-11-20T08:30:00", read_at: null }));
     vi.mocked(notificationsApi.list).mockResolvedValue({ items, next_cursor: null });
-    const pending: Record<number, (value: { read_ids: number[]; read_at: string | null; next_read_id: number | null }) => void> = {};
-    vi.mocked(notificationsApi.markReadBatch).mockImplementation(([id]) => new Promise((resolve) => { pending[id] = resolve; }));
-    const open = vi.fn();
+    const pending: Record<number, () => void> = {};
+    const open = vi.fn((id?: number) => new Promise<void>((resolve) => { if (id) pending[id] = resolve; }));
     renderLight(<Notifications onPendingProfitNotificationsClick={open} />, { user: "admin" });
     fireEvent.click(screen.getByRole("tab", { name: "售出消息" }));
     const first = await screen.findByRole("button", { name: /订单 1/ });
@@ -258,14 +258,14 @@ it("连续点击消息均能打开且保持滚动位置", async () => {
     const listCalls = vi.mocked(notificationsApi.list).mock.calls.length;
     fireEvent.click(first);
     fireEvent.click(second);
-    pending[1]({ read_ids: [1], read_at: "2026-11-21T10:00:00", next_read_id: null });
-    await waitFor(() => expect(open).toHaveBeenCalledWith(1));
-    pending[2]({ read_ids: [2], read_at: "2026-11-21T10:00:00", next_read_id: 1 });
+    expect(open).toHaveBeenCalledWith(1);
     await waitFor(() => expect(open).toHaveBeenCalledWith(2));
+    await act(async () => { pending[1](); pending[2](); });
     expect(scroll.scrollTop).toBe(150);
-    await waitFor(() => expect(within(first).getByText("已读")).toBeInTheDocument());
+    expect(within(first).getByText("未读")).toBeInTheDocument();
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
     expect(notificationsApi.list).toHaveBeenCalledTimes(listCalls);
-    expect(second.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
 it("停留工作台时定时刷新，滚动查看期间不打断", async () => {
@@ -337,10 +337,10 @@ it("点击分润待配置通知跳转到对应订单的分润配置入口", asyn
     expect(within(unread).getByText(/通知时间 2026-11-21 09:30/)).toBeInTheDocument();
     expect(within(read).getByText("已读")).toBeInTheDocument();
     fireEvent.click(unread);
-    await waitFor(() => expect(onWorkbenchNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43&keyword=TH0002"));
+    await waitFor(() => expect(onWorkbenchNavigate).toHaveBeenCalledWith("/business/ledger?allocation_order_id=43&notification_id=2&keyword=TH0002"));
     expect(notificationsApi.pendingOrder).toHaveBeenCalledWith(2);
     expect(ordersApi.listPage).not.toHaveBeenCalled();
-    expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2], "sale");
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
   });
 
 it("待配置通知订单不可见时提示且不跳转", async () => {
@@ -352,6 +352,8 @@ it("待配置通知订单不可见时提示且不跳转", async () => {
     fireEvent.click(await screen.findByRole("button", { name: /订单 HS-MISSING/ }));
     await waitFor(() => expect(warning).toHaveBeenCalledWith("未找到订单 HS-MISSING"));
     expect(navigate).not.toHaveBeenCalled();
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
+    expect(within(screen.getByRole("button", { name: /订单 HS-MISSING/ })).getByText("未读")).toBeInTheDocument();
   });
 
 it("消息为空时显示空状态", async () => {

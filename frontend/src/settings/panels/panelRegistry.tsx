@@ -25,11 +25,13 @@ import { BusinessReminderSettingsPanel } from "./BusinessReminderSettingsPanel";
 import { BusinessPeriodSettingsPanel } from "./BusinessPeriodSettingsPanel";
 import { CompanyProfitSettingsPanel } from "./CompanyProfitSettingsPanel";
 import { AuditPanel } from "../../audit/AuditPanel";
+import { OrderImportPanel } from "./OrderImportPanel";
 
 export type PanelRenderer = (navigate: (key: string) => void) => ReactElement;
 
 export const PANEL_REGISTRY: Record<string, PanelRenderer> = {
   "business-dictionary": () => <BusinessDictionaryPanel />,
+  "order-import": () => <OrderImportPanel />,
   "business-reminders": () => <BusinessReminderSettingsPanel />,
   "business-period": () => <BusinessPeriodSettingsPanel />,
   "company-profit": () => <CompanyProfitSettingsPanel />,

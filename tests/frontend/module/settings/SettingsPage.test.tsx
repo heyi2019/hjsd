@@ -33,7 +33,8 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
   checkBackendHealth: vi.fn(),
 }));
 import { renderLight } from "@fixtures/render";
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { SettingsPage } from "@/settings/SettingsPage";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listResponse, optionSetList } from "@fixtures/api-responses";
@@ -84,4 +85,64 @@ it("业务字典展示账号入库规则：未售出禁止重复，已售出允�
   expect(
     screen.getByText("取消模型").compareDocumentPosition(screen.getByText("入库规则")) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
+});
+
+it("订单导入预检与所选文件和选项绑定，改变选项后必须重新预检", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  vi.mocked(client.api).post.mockResolvedValueOnce({ data: {
+    rows: [{ sheet: "主订单信息", row: 2, order_no: "HS0981", action: "create", errors: [], warnings: [] }],
+    available_sections: { events: 1 }, selected_sections: ["events"], detail_errors: [],
+  } });
+  renderLight(<SettingsPage />, { user: "admin" });
+  await ui.click(screen.getByRole("tab", { name: "订单导入" }));
+  await ui.upload(screen.getByLabelText("选择订单文件"), new File(["订单号"], "订单.csv", { type: "text/csv" }));
+  await ui.click(screen.getByRole("radio", { name: "带详情导入" }));
+  await ui.click(screen.getByRole("checkbox", { name: "操作明细" }));
+  await ui.click(screen.getByRole("radio", { name: "更新已有订单" }));
+  await ui.click(screen.getByRole("button", { name: "预检文件" }));
+  expect(await screen.findByText("HS0981")).toBeInTheDocument();
+  const [path, form] = vi.mocked(client.api).post.mock.calls[0];
+  expect(path).toBe("/order-imports/preview");
+  expect((form as FormData).get("existing")).toBe("update");
+  expect((form as FormData).getAll("sections")).toEqual(["events"]);
+  expect(screen.getByRole("button", { name: "确认导入" })).toBeEnabled();
+  await ui.click(screen.getByRole("radio", { name: "跳过已有订单" }));
+  expect(screen.queryByText("HS0981")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "确认导入" })).toBeDisabled();
+});
+
+it("订单导入展示预检错误并禁止执行，通过后显示实际写入结果", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  const row = { sheet: "主订单信息", row: 2, order_no: "DG0981", action: "error", errors: ["业务日期无效"], warnings: [] };
+  vi.mocked(client.api).post
+    .mockResolvedValueOnce({ data: { rows: [row], available_sections: {}, selected_sections: [], detail_errors: [] } })
+    .mockResolvedValueOnce({ data: { rows: [{ ...row, action: "create", errors: [] }], available_sections: {}, selected_sections: [], detail_errors: [] } })
+    .mockResolvedValueOnce({ data: { created: 1, updated: 0, skipped: 0, events_created: 0, events_matched: 0, cashflows_created: 0, cashflows_matched: 0, cashflows_renumbered: [], rebates_created: 0, rebates_updated: 0 } });
+  renderLight(<SettingsPage />, { user: "admin" });
+  await ui.click(screen.getByRole("tab", { name: "订单导入" }));
+  await ui.upload(screen.getByLabelText("选择订单文件"), new File(["订单号"], "订单.csv", { type: "text/csv" }));
+  await ui.click(screen.getByRole("button", { name: "预检文件" }));
+  expect(await screen.findByText("业务日期无效")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "确认导入" })).toBeDisabled();
+  await ui.click(screen.getByRole("button", { name: "预检文件" }));
+  await ui.click(await screen.findByRole("button", { name: "确认导入" }));
+  expect(await screen.findByText(/新建 1.*更新 0.*跳过 0/)).toBeInTheDocument();
+  expect(vi.mocked(client.api).post.mock.calls[2][0]).toBe("/order-imports/execute");
+});
+
+it("更改导入选项后，迟到的旧预检结果不能重新启用导入", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  let resolvePreview!: (value: unknown) => void;
+  vi.mocked(client.api).post.mockImplementationOnce(() => new Promise((resolve) => { resolvePreview = resolve; }) as never);
+  renderLight(<SettingsPage />, { user: "admin" });
+  await ui.click(screen.getByRole("tab", { name: "订单导入" }));
+  await ui.upload(screen.getByLabelText("选择订单文件"), new File(["订单号"], "订单.csv", { type: "text/csv" }));
+  await ui.click(screen.getByRole("button", { name: "预检文件" }));
+  await ui.click(screen.getByRole("radio", { name: "更新已有订单" }));
+  await act(async () => resolvePreview({ data: {
+    rows: [{ sheet: "主订单信息", row: 2, order_no: "HS0981", action: "create", errors: [], warnings: [] }],
+    available_sections: {}, selected_sections: [], detail_errors: [],
+  } }));
+  expect(screen.queryByText("HS0981")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "确认导入" })).toBeDisabled();
 });

@@ -406,7 +406,41 @@ class TestListAndGetCustomers:
         assert summary[customer.id]["active_order_count"] == 1
         assert foreign.id not in {item["order_id"] for item in detail["business"]}
 
+    def test_customer_list_activity_uses_same_order_scope_as_detail(self, seeded_client, seeded_db):
+        customer = _customer(seeded_db, "范围汇总客户", owner_id=9)
+        mine = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 10), owner_id=9, customer_roles=[(customer.id, "BUYER")], actor="pytest")
+        create_order(seeded_db, order_type="TH", trade_date=date(2026, 10, 11), owner_id=1, customer_roles=[(customer.id, "BUYER")], actor="pytest")
+        headers = {"Authorization": f"Bearer {build_access_token(_scoped_user())}"}
+        listing = seeded_client.get(CUSTOMERS, headers=headers)
+        detail = seeded_client.get(f"{CUSTOMERS}/{customer.id}/detail", headers=headers)
+        assert listing.status_code == detail.status_code == 200
+        row = next(item for item in listing.json()["items"] if item["id"] == customer.id)
+        assert row["active_order_count"] == 1
+        assert [item["order_id"] for item in detail.json()["business"]] == [mine.id]
+
 class TestUpdateCustomer:
+    @pytest.mark.parametrize("kind", ["customer", "counterparty"])
+    def test_profile_audit_records_changed_fields_and_extra_values(self, seeded_db, kind):
+        scope = "CUSTOMER" if kind == "customer" else "COUNTERPARTY"
+        seeded_db.add(OrderFormField(order_type_code=scope, field_key="audit_note", label="扩展说明", field_type="TEXT", is_active=True, is_custom=True, created_by="pytest", updated_by="pytest"))
+        seeded_db.flush()
+        kwargs = {"display_name": "原名称", "phone": "13800001111", "source": "原来源", "extra_values": {"audit_note": "原值"}, "actor": "pytest"}
+        if kind == "customer":
+            item = create_customer(seeded_db, **kwargs)
+            update_customer(seeded_db, item.id, display_name="新名称", phone="13800002222", source="新来源", extra_values={"audit_note": "新值"}, actor="pytest")
+            number = item.customer_no
+        else:
+            item = create_counterparty(seeded_db, type="PEER", **kwargs)
+            update_counterparty(seeded_db, item.id, display_name="新名称", phone="13800002222", source="新来源", extra_values={"audit_note": "新值"}, actor="pytest")
+            number = item.counterparty_no
+        audit = seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == kind, AuditLog.entity_id == number).order_by(AuditLog.id.desc()))
+        assert {key: audit.before_json[key] for key in ("display_name", "phone", "source", "extra_values")} == {
+            "display_name": "原名称", "phone": "13800001111", "source": "原来源", "extra_values": {"audit_note": "原值"},
+        }
+        assert {key: audit.after_json[key] for key in ("display_name", "phone", "source", "extra_values")} == {
+            "display_name": "新名称", "phone": "13800002222", "source": "新来源", "extra_values": {"audit_note": "新值"},
+        }
+
     def test_customer_update_validates_all_fields_before_mutating(self, seeded_db):
         customer = _customer(seeded_db, "原客户")
 

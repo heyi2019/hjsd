@@ -226,18 +226,20 @@ def test_update_deposit_updates_the_linked_hold_cashflow(seeded_db):
     assert hold.amount == Decimal("25.00")
     assert hold.occurred_on == date(2026, 10, 18)
 
-def test_delete_deposit_removes_its_hold_cashflow(seeded_db):
+def test_delete_deposit_preserves_voucher_and_hold_cashflow(seeded_db):
     deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
     )
 
-    delete_deposit(seeded_db, deposit.id, actor="pytest")
+    with pytest.raises(Validation, match="押金不能删除，请使用取消"):
+        delete_deposit(seeded_db, deposit.id, actor="pytest")
 
-    assert seeded_db.get(Deposit, deposit.id) is None
-    assert seeded_db.scalar(select(Cashflow).where(
+    assert seeded_db.get(Deposit, deposit.id) is not None
+    hold = seeded_db.scalar(select(Cashflow).where(
         Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
         Cashflow.source_id == str(deposit.id),
-    )) is None
+    ))
+    assert hold is not None and hold.category == "DEPOSIT_HOLD"
 
 def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
     flow = _make_flow(
@@ -266,12 +268,13 @@ def test_update_studio_cashflow_updates_the_manual_entry(seeded_db):
     assert updated.occurred_on == date(2026, 10, 20)
     assert updated.note == "修正后的房租"
 
-def test_delete_studio_cashflow_removes_the_manual_entry(seeded_db):
+def test_delete_studio_cashflow_preserves_the_manual_entry(seeded_db):
     flow = _make_flow(seeded_db, direction="OUT", category="日用", ledger_type="STUDIO")
 
-    cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
+    with pytest.raises(Validation, match="资金流水不能删除，请使用冲销"):
+        cashflows.delete_cashflow(seeded_db, flow.id, actor="pytest")
 
-    assert seeded_db.get(Cashflow, flow.id) is None
+    assert seeded_db.get(Cashflow, flow.id) is not None
 
 def test_create_cashflow_rejects_bad_direction(seeded_db):
     with pytest.raises(Validation, match="direction 必须为"):

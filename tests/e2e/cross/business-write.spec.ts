@@ -1,4 +1,43 @@
 import { test, expect } from "@playwright/test";
+import { navItem } from "../support/api-stub";
+
+test("设置中下载订单模板并预检导入，重复订单可跳过", async ({ page, request }) => {
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
+  const headers = { "X-Dev-User": "admin" };
+  const sequences = await (await request.get(`${apiBase}/sequences`, { headers })).json();
+  const number = sequences.find((item: { prefix: string }) => item.prefix === "DG")?.next_number as string;
+  expect(number).toMatch(/^DG\d{4}$/);
+
+  await page.goto("/#/settings");
+  await page.getByRole("tab", { name: "订单导入" }).click();
+  await page.getByRole("radio", { name: "带详情导入" }).check();
+  await page.getByRole("checkbox", { name: "操作明细" }).click();
+  await expect(page.getByRole("checkbox", { name: "操作明细" })).toBeChecked();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "下载导入模板" }).click();
+  expect((await download).suggestedFilename()).toBe("订单导入模板.xlsx");
+  await page.getByRole("radio", { name: "台账展示列" }).check();
+  await page.getByLabel("选择订单文件").setInputFiles({
+    name: "历史订单.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(`订单号,业务日期,业务类型,业务操作人,游戏账号/产品,订单备注\n${number},2026-10-17,代挂,admin,导入测试账号,导入联调\n`),
+  });
+  await page.getByRole("button", { name: "预检文件" }).click();
+  await expect(page.getByRole("row").filter({ hasText: number })).toContainText("新建");
+  await page.getByRole("button", { name: "确认导入" }).click();
+  await expect(page.getByText(/导入完成：新建 1，更新 0，跳过 0/)).toBeVisible();
+  const list = await (await request.get(`${apiBase}/orders`, { headers, params: { keyword: number } })).json();
+  const order = list.items.find((item: { order_no: string }) => item.order_no === number);
+  expect(order.account_id).toBeNull();
+  const detail = await (await request.get(`${apiBase}/orders/${order.id}`, { headers })).json();
+  expect(detail.account_snapshot.game_account).toBe("导入测试账号");
+  expect(detail.note).toBe("导入联调");
+
+  await page.getByRole("button", { name: "预检文件" }).click();
+  await expect(page.getByRole("row").filter({ hasText: number })).toContainText("跳过");
+  await page.getByRole("button", { name: "确认导入" }).click();
+  await expect(page.getByText(/导入完成：新建 0，更新 0，跳过 1/)).toBeVisible();
+});
 
 /** 严格业务契约的真实写入联调：不使用旧 account 兼容字段。 */
 test("五类业务写入并按业务规则作废测试订单", async ({ request }) => {
@@ -158,7 +197,7 @@ test("客户需求池：新建、查询与转单", async ({ request }) => {
   });
   expect(customerResponse.status()).toBe(201);
   const customer = (await customerResponse.json()).customer;
-  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17" } });
+  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17", form_extra: { business_responsible_ids: [1] } } });
   expect(orderResponse.status()).toBe(201);
   const order = await orderResponse.json();
   const created = await request.post(`${apiBase}/leads`, {
@@ -173,6 +212,59 @@ test("客户需求池：新建、查询与转单", async ({ request }) => {
   const converted = await request.post(`${apiBase}/leads/${lead.id}/convert`, { headers, data: { order_no: order.order_no } });
   expect(converted.status()).toBe(200);
   expect((await converted.json()).status).toBe("CONVERTED");
+});
+
+test("客户需求页面关闭和转单与后端状态一致", async ({ page, request }) => {
+  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
+  const headers = { "X-Dev-User": "admin" };
+  const customerName = `E2E 客户需求 ${Date.now()}`;
+  const customerResponse = await request.post(`${apiBase}/customers`, { headers, data: { display_name: customerName } });
+  expect(customerResponse.status(), await customerResponse.text()).toBe(201);
+  const customer = (await customerResponse.json()).customer;
+  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17", form_extra: { business_responsible_ids: [1] } } });
+  expect(orderResponse.status(), await orderResponse.text()).toBe(201);
+  const order = await orderResponse.json();
+  const leads = [];
+  for (const target of ["关闭需求", "转单需求"]) {
+    const response = await request.post(`${apiBase}/leads`, { headers, data: { customer_id: customer.id, request_type: "FIND_ACCOUNT", target } });
+    expect(response.status(), await response.text()).toBe(201);
+    leads.push(await response.json());
+  }
+  const convertFields = await (await request.get(`${apiBase}/order-form-fields`, { headers, params: { order_type_code: "LEADCONVERT" } })).json();
+  const orderLabel = convertFields.find((field: { field_key: string }) => field.field_key === "order_id")?.label ?? "订单编号";
+
+  await page.goto("/");
+  await navItem(page, "客户中心").click();
+  await page.getByRole("tab", { name: "客户需求池" }).click();
+  const search = page.getByRole("searchbox", { name: "搜索客户需求" });
+  await search.fill(customerName);
+  await search.press("Enter");
+  const closeRow = page.locator("tr").filter({ hasText: leads[0].lead_no });
+  await expect(closeRow).toBeVisible();
+  await closeRow.getByRole("button", { name: "关闭", exact: true }).click();
+  let modal = page.getByRole("dialog", { name: "关闭客户需求" });
+  await modal.getByLabel("关闭原因").fill("未提交的草稿");
+  await modal.getByRole("button", { name: "取消" }).click();
+  await closeRow.getByRole("button", { name: "关闭", exact: true }).click();
+  modal = page.getByRole("dialog", { name: "关闭客户需求" });
+  await expect(modal.getByLabel("关闭原因")).toHaveValue("");
+  await modal.getByLabel("关闭原因").fill("客户已确认结束");
+  await modal.getByRole("button", { name: "确认关闭" }).click();
+  await expect(modal).toBeHidden();
+  const closed = await (await request.get(`${apiBase}/leads/${leads[0].id}`, { headers })).json();
+  expect(closed.status).toBe("CLOSED");
+  expect(closed.closed_reason).toBe("客户已确认结束");
+
+  const convertRow = page.locator("tr").filter({ hasText: leads[1].lead_no });
+  await expect(convertRow).toBeVisible();
+  await convertRow.getByRole("button", { name: "转单" }).click();
+  const convertModal = page.getByRole("dialog", { name: "需求转单" });
+  await convertModal.getByLabel(orderLabel).fill(order.order_no);
+  await convertModal.getByRole("button", { name: "确认转单" }).click();
+  await expect(convertModal).toBeHidden();
+  const converted = await (await request.get(`${apiBase}/leads/${leads[1].id}`, { headers })).json();
+  expect(converted.status).toBe("CONVERTED");
+  expect(converted.converted_order_id).toBe(order.id);
 });
 
 test("系统通知：查询当前用户的未读通知", async ({ request }) => {
@@ -191,12 +283,13 @@ test("治理能力：报表导出与订单附件闭环", async ({ request }) => 
   const report = await request.get(`${apiBase}/reports/order-profit/export.csv`, { headers, params: { from: "2026-01-01", to: "2026-12-31" } });
   expect(report.status()).toBe(200);
   expect(report.headers()["content-type"]).toContain("text/csv");
-  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17" } });
+  const orderResponse = await request.post(`${apiBase}/orders`, { headers, data: { order_type: "DG", trade_date: "2026-10-17", form_extra: { business_responsible_ids: [1] } } });
   expect(orderResponse.status()).toBe(201);
   const order = await orderResponse.json();
+  const attachmentContent = `E2E ATTACH ${order.order_no} ${Date.now()}`;
   const attachment = await request.post(`${apiBase}/attachments`, {
     headers,
-    data: { entity_type: "order", entity_id: order.order_no, file_name: "e2e.txt", content_type: "text/plain", content_base64: "RTJFIEFUVEFDSA==" },
+    data: { entity_type: "order", entity_id: order.order_no, file_name: "e2e.txt", content_type: "text/plain", content_base64: Buffer.from(attachmentContent).toString("base64") },
   });
   expect(attachment.status()).toBe(201);
   const attachmentBody = await attachment.json();
@@ -204,7 +297,7 @@ test("治理能力：报表导出与订单附件闭环", async ({ request }) => 
   expect((await listed.json()).items.some((item: { id: number }) => item.id === attachmentBody.id)).toBe(true);
   const downloaded = await request.get(`${apiBase}/attachments/${attachmentBody.id}/download`, { headers });
   expect(downloaded.status()).toBe(200);
-  expect(await downloaded.text()).toBe("E2E ATTACH");
+  expect(await downloaded.text()).toBe(attachmentContent);
   const removed = await request.delete(`${apiBase}/attachments/${attachmentBody.id}`, { headers });
   expect(removed.status()).toBe(200);
 });

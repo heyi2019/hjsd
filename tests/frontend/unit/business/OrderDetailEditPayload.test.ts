@@ -89,6 +89,19 @@ describe("详情编辑保存载荷", () => {
       9: { id: 9, expected_amount: "100", amount: "200", note: null, occurred_at: "" },
     })).toEqual([]);
   });
+  it("只改事件备注时不提交未修改的时间", () => {
+    const time = "2026-09-10T12:00:00";
+    expect(buildEventEdits([{ id: 7, amount: "100", note: "旧备注", occurred_at: time }], {
+      7: { id: 7, expected_amount: "100", amount: "100", note: "新备注", occurred_at: time },
+    })).toEqual([{ id: 7, expected_amount: "100", amount: "100", note: "新备注" }]);
+  });
+
+  it("订单编辑对照业务时间而非建档时间", () => {
+    const original = [{ order_id: 21, created_at: "2026-11-14T01:00:00", occurred_at: "2026-09-10T01:00:00", note: "旧备注" }];
+    expect(buildOrderEdits(original, {
+      21: { order_id: 21, occurred_at: "2026-09-10T01:00:00", note: "新备注", form_extra: {} },
+    })).toEqual([{ order_id: 21, note: "新备注" }]);
+  });
   it("会提交事件和订单实际修改的文本、时间和操作人", () => {
     const payload = buildEventEdits(
       [{ id: 7, amount: "100.00", note: "旧备注", occurred_at: "2026-11-14T01:00:00" }],

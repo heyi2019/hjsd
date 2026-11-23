@@ -30,8 +30,10 @@ export interface OrderFormField {
   required_when?: RequiredWhen | null;
   is_active: boolean;
   sort_order: number;
-  /** 核心核算字段锁定：禁止删除，但仍可改必填/停用 */
+  /** 核心字段锁定时不可删除或停用。 */
   locked: boolean;
+  /** 后端业务契约要求此字段始终启用且必填。 */
+  required_locked?: boolean;
   /** 用户自定义字段（区别于种子预置的系统字段）；自定义字段可增删停 */
   is_custom: boolean;
   section?: string;
@@ -41,7 +43,7 @@ export interface OrderFormField {
 export interface ListColumnConfig {
   key: string;
   label: string;
-  /** 锁定列（身份列/操作列）不可隐藏，后端二次校验 */
+  /** 保留历史字段；当前列表列均可隐藏。 */
   locked: boolean;
   is_visible: boolean;
   sort_order: number;

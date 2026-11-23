@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date
 from typing import Any
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -53,6 +54,7 @@ def create_cashflow(
     form_extra_scope: str | None = "FUNDFLOW",
     form_extra_context: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
+    imported_flow_no: str | None = None,
 ) -> Cashflow:
     """创建一笔独立现金流；独立录入直接入账，业务派生流水不走此入口。"""
     try:
@@ -97,6 +99,10 @@ def create_cashflow(
             f"source_type 必须为 {CashflowSourceType.values()}",
             details={"field": "source_type", "value": source_type},
         ) from exc
+    if imported_flow_no is not None:
+        prefix = "SR" if direction == Direction.IN.value else "ZC"
+        if normalized_source_type != CashflowSourceType.MANUAL.value or not re.fullmatch(prefix + r"(?!00000)\d{5}", imported_flow_no):
+            raise Validation("导入流水编号或来源无效")
     if normalized_source_type == CashflowSourceType.ORDER_EVENT.value:
         if not source_id:
             raise Validation("订单事件流水必须填写 source_id")
@@ -129,7 +135,7 @@ def create_cashflow(
         if scope else dict(form_extra or {})
     )
     flow = Cashflow(
-        flow_no=allocate_flow_no(session, direction),
+        flow_no=imported_flow_no or allocate_flow_no(session, direction),
         pool_id=pool.id,
         occurred_on=occurred_on,
         ledger_type=normalized_ledger_type,

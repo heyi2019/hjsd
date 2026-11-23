@@ -6,7 +6,7 @@ import { navItem } from "../support/api-stub";
  *
  * 与 business-write.spec.ts（request fixture 直连 API）互补：本文件验证
  * 「用户在前端页面真实点击 → 填表 → 提交 → 页面反馈」这条 UI 主干，提升联调保真度。
- * 不拦截后端，走真实 E2E 库（8124 独立库，由 playwright webServer 自动重建）。
+ * 不拦截后端，走真实 E2E 库（8124 独立库，启动时按需补充测试数据）。
  *
  * antd Select 交互范式（本仓库实测可靠，区别于 getByRole('option')）：
  *  - antd 把下拉渲染在 body 下的 portal（.ant-select-dropdown），选项 class 为
@@ -172,58 +172,63 @@ async function pickSelect(
 }
 
 test.describe("资金/返点/分期 UI 主写路径", () => {
-  test("资金中心·流水：新增独立资金流水", async ({ page }) => {
+  test("资金中心·工作室收入登记、展示并保留冲销凭证", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
     await page.goto("/");
     await navItem(page, "资金中心").click();
-    await page.getByRole("tab", { name: "流水", exact: true }).click();
-    await page.getByRole("button", { name: "新增流水" }).click();
+    await page.getByRole("tab", { name: "工作室运营" }).click();
+    await page.getByRole("button", { name: "记一笔" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await pickSelect(page, dialog, "资金账户", /投资款荷包/);
-    await dialog.getByLabel("发生日期").fill("2026-10-21");
-    await pickSelect(page, dialog, "收支方向", "收入");
-    await pickSelect(page, dialog, "核算属性", "回收收入");
-    await dialog.getByLabel("类别").fill("E2E_UI_FLOW");
+    await dialog.getByRole("combobox", { name: /资金(池|账户)/ }).click();
+    await page.getByTitle("投资款荷包", { exact: true }).last().click();
+    await dialog.locator(".ant-segmented-item").filter({ hasText: "收入" }).click();
+    await dialog.getByRole("combobox", { name: /科目/ }).click();
+    await page.getByTitle("货款", { exact: true }).last().click();
     await dialog.getByLabel("金额").fill("10.00");
-    await dialog.getByLabel("摘要").fill("E2E 独立流水 UI");
-    // 口径：资金流水已取消审核/驳回流程，录入即入账（3f7c115）。按钮文案为「提交」。
-    await dialog.getByRole("button", { name: "提交" }).click();
+    const note = `E2E 工作室收入 ${Date.now()}`;
+    await dialog.getByLabel("备注").fill(note);
+    const posted = page.waitForResponse((r) => r.url().endsWith("/cashflows") && r.request().method() === "POST");
+    await dialog.getByRole("button", { name: "登记入账" }).click();
+    const response = await posted;
+    expect(response.status()).toBe(201);
+    const flow = await response.json();
+    expect(flow.ledger_type).toBe("STUDIO");
+    expect(flow.direction).toBe("IN");
 
-    await expect(page.getByText("独立资金流水已提交，已入账")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("收入已登记")).toBeVisible({ timeout: 10000 });
+    await page.getByRole("tab", { name: "资金明细" }).click();
+    await page.getByRole("button", { name: "全部" }).click();
+    await page.getByRole("searchbox", { name: "流水搜索" }).fill(note);
+    await page.getByRole("searchbox", { name: "流水搜索" }).press("Enter");
+    await expect(page.getByRole("row").filter({ hasText: flow.flow_no })).toBeVisible();
+
+    await page.getByRole("tab", { name: "工作室运营" }).click();
+    const originalRow = page.getByRole("row").filter({ has: page.getByRole("cell", { name: flow.flow_no, exact: true }) });
+    await expect(originalRow).toBeVisible();
+    await originalRow.getByRole("button", { name: "冲销" }).click();
+    const reverseDialog = page.getByRole("dialog", { name: "冲销工作室收支" });
+    await reverseDialog.getByLabel("冲销原因").fill("端到端验证冲销");
+    const reversed = page.waitForResponse((r) => r.url().endsWith(`/cashflows/${flow.id}/reverse`) && r.request().method() === "POST");
+    await reverseDialog.getByRole("button", { name: "确认冲销" }).click();
+    const reversalResponse = await reversed;
+    expect(reversalResponse.status()).toBe(200);
+    const reversal = await reversalResponse.json();
+    expect(reversal.ledger_type).toBe("STUDIO");
+    expect(reversal.direction).toBe("OUT");
+    expect(reversal.source_id).toBe(flow.flow_no);
+    await expect(page.getByText("工作室收支已冲销")).toBeVisible();
+    await expect(originalRow).toBeVisible();
+    await expect(originalRow.getByRole("button", { name: "冲销" })).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test("资金中心·总览：资金账户划转登记", async ({ page, request }) => {
+  test("资金中心·总览：资金账户划转登记", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
-
-    // E2E 库整次运行只重建一次、用例间累积，前面的 business-write 等用例会从「投资款荷包」
-    // 大量支出，把它拖成负可用余额，导致转出 1.00 被后端以「转出资金账户可用余额不足」拒绝
-    //（实测 -1,191.00）。故先经 API 给转出池注入一笔外部收入（收入流水不受余额限制），
-    // 让本用例与执行顺序解耦、确定性通过。
-    const pools = (await (
-      await request.get(`${API_BASE}/pools`, { headers: ADMIN })
-    ).json()) as Array<{ id: number; code?: string; name?: string }>;
-    const invest =
-      pools.find((p) => p.code === "HJ_INVEST") ??
-      pools.find((p) => (p.name ?? "").includes("投资款荷包"));
-    expect(invest, "缺少投资款荷包（HJ_INVEST）").toBeTruthy();
-    const fund = await request.post(`${API_BASE}/cashflows`, {
-      headers: ADMIN,
-      data: {
-        pool_id: invest!.id,
-        occurred_on: "2026-10-21",
-        direction: "IN",
-        category: "E2E_TRANSFER_FUNDING",
-        amount: "100000.00",
-        note: "E2E 划转用例前置充值",
-      },
-    });
-    expect(fund.status(), "划转前置充值失败").toBe(201);
 
     await page.goto("/");
     await navItem(page, "资金中心").click(); // 默认总览
@@ -242,59 +247,75 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     expect(errors).toEqual([]);
   });
 
-  test("资金中心·返点：新增返点记录", async ({ page, request }) => {
+  test("押金登记及部分释放逐笔保留流水和操作人", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await page.goto("/");
+    await navItem(page, "资金中心").click();
+    await page.getByRole("tab", { name: "押金" }).click();
+    await page.getByRole("button", { name: "新增占用" }).click();
+    const depositDialog = page.getByRole("dialog", { name: "新增押金占用" });
+    await depositDialog.getByRole("combobox", { name: /资金(池|账户)/ }).click();
+    await page.getByTitle("投资款荷包", { exact: true }).last().click();
+    await depositDialog.getByLabel("占用金额").fill("37.00");
+    const created = page.waitForResponse((r) => r.url().endsWith("/deposits") && r.request().method() === "POST");
+    await depositDialog.getByRole("button", { name: "提交" }).click();
+    const createResponse = await created;
+    expect(createResponse.status()).toBe(201);
+    const deposit = await createResponse.json();
+    const hold = deposit.action_history.find((action: { action: string }) => action.action === "HOLD");
+    expect(hold.operator_user_ids.length).toBeGreaterThan(0);
+
+    const row = page.getByRole("row").filter({ hasText: hold.flow_no });
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: "释放" }).click();
+    const releaseDialog = page.getByRole("dialog", { name: "押金释放" });
+    await releaseDialog.getByLabel("释放金额").fill("12.00");
+    const released = page.waitForResponse((r) => r.url().endsWith(`/deposits/${deposit.id}/returns`) && r.request().method() === "POST");
+    await releaseDialog.getByRole("button", { name: "确认释放" }).click();
+    const releaseResponse = await released;
+    expect(releaseResponse.status()).toBe(200);
+    const updated = await releaseResponse.json();
+    expect(updated.returned_amount).toBe("12.00");
+    expect(updated.remaining_amount).toBe("25.00");
+    const release = updated.action_history.find((action: { action: string }) => action.action === "RETURN");
+    expect(release.operator_user_ids.length).toBeGreaterThan(0);
+    await expect(row).toContainText(release.flow_no);
+    expect(errors).toEqual([]);
+  });
+
+  test("订单台账登记返点并生成收入流水", async ({ page, request }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
-    // 业务规则：买号返点（BUY）只能关联回收（HS）订单。故新建 HS 订单作为来源。
-    // HS 订单需绑定 IN_STOCK 的 RECOVERY 账号（与 business-write 夹具一致）。
-    // 库存台账路由已随表改名 accounts → stocks（迁移 0009），返回分页信封 { items, total }。
-    const accounts = (await request
-      .get(`${API_BASE}/stocks`, { headers: ADMIN })
-      .then((r) => r.json())) as {
-      items: Array<{ id: number; inventory_status: string; inventory_type?: string }>;
-    };
-    const account = accounts.items.find(
-      (a) => a.inventory_status === "IN_STOCK" && a.inventory_type === "RECOVERY",
-    );
-    expect(account, "缺少 RECOVERY 测试账号").toBeTruthy();
+    // 买号返点关联 HS 订单；用唯一账号快照建单，避免依赖共享库存夹具。
     const order = await request.post(`${API_BASE}/orders`, {
       headers: ADMIN,
-      data: { order_type: "HS", account_id: account.id, trade_date: "2026-10-21" },
+      data: { order_type: "HS", account_snapshot: { game_account: `e2e-rebate-${Date.now()}`, game_type: "王者荣耀" }, trade_date: "2026-10-21", form_extra: { business_responsible_ids: [1] } },
     });
-    expect(order.status()).toBe(201);
+    expect(order.status(), await order.text()).toBe(201);
     const orderBody = (await order.json()) as { id: number; order_no: string };
     const orderNo = orderBody.order_no;
-    // 业务规则（app/finance/rebates.py:91）：BUY 返点要求来源 HS 订单已登记
-    // is_posted=True 的 BUY 事件。故这里补登记一笔 BUY 事件，否则提交会被拒。
     const evt = await request.post(`${API_BASE}/orders/${orderBody.id}/events`, {
       headers: ADMIN,
       data: { event_type: "BUY", amount: "100.00", occurred_on: "2026-10-21" },
     });
     expect(evt.status()).toBe(201);
 
-    await page.goto("/");
-    await navItem(page, "资金中心").click();
-    await page.getByRole("tab", { name: "返点明细", exact: true }).click();
-    await page.getByRole("button", { name: "新增返点记录" }).click();
-
-    const dialog = page.getByRole("dialog");
+    await page.goto("/#/business/ledger");
+    await page.getByLabel("搜索订单").fill(orderNo);
+    await page.getByLabel("搜索订单").press("Enter");
+    const orderRow = page.getByRole("row").filter({ hasText: orderNo }).first();
+    await orderRow.getByRole("button", { name: "返点", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: "登记返点" });
     await expect(dialog).toBeVisible();
-    await pickSelect(page, dialog, "来源订单", orderNo);
-    await pickSelect(page, dialog, "返点类型", "买号返点");
     await fillByLabel(dialog, "返点金额", "10.00");
-    await fillByLabel(dialog, "返点日期", "2026-10-21");
-    // 返点日期是 antd DatePicker（DateField）。fillByLabel 用 force 强填内部 input 会触发
-    // 面板弹出，面板浮层可能遮挡页脚「创建」按钮，使点击等不到可点击态而卡满 30s 默认超时
-    //（完整套件高负载下动画更慢、更易撞上，表现为间歇性失败）。显式收起面板后再提交。
-    const pickerPanel = dialog.locator(".ant-picker-panel").first();
-    if (await pickerPanel.isVisible().catch(() => false)) {
-      await page.keyboard.press("Escape");
-      await pickerPanel.waitFor({ state: "hidden" }).catch(() => undefined);
-    }
-    await dialog.getByRole("button", { name: /创\s*建/ }).click();
-
-    await expect(page.getByText("返点记录已创建")).toBeVisible({ timeout: 10000 });
+    const posted = page.waitForResponse((r) => r.url().endsWith("/rebates") && r.request().method() === "POST");
+    await dialog.getByRole("button", { name: "确认登记" }).click();
+    const response = await posted;
+    expect(response.status()).toBe(201);
+    expect((await response.json()).source_order_id).toBe(orderBody.id);
+    await expect(page.getByText("返点已登记")).toBeVisible({ timeout: 10000 });
     expect(errors).toEqual([]);
   });
 
@@ -302,16 +323,14 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
-    // 预置分期合约：HS 回收订单（关联在库 RECOVERY 账号并登记 BUY）+ 自营分期出售合约。
-    const stocksResponse = await request.get(`${API_BASE}/stocks`, { headers: ADMIN });
-    expect(stocksResponse.ok()).toBe(true);
-    const account = ((await stocksResponse.json()).items as Array<{ id: number; inventory_status: string; inventory_type?: string }>).find(
-      (item) => item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
-    );
-    expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
+    // 每次创建独立账号，保留测试凭证后仍可重复运行。
     const order = await request.post(`${API_BASE}/orders`, {
       headers: ADMIN,
-      data: { order_type: "HS", trade_date: "2026-10-21", account_id: account!.id },
+      data: {
+        order_type: "HS", trade_date: "2026-10-21",
+        account_snapshot: { game_account: `e2e-payment-${Date.now()}`, game_type: "王者荣耀" },
+        form_extra: { business_responsible_ids: [1] },
+      },
     });
     expect(order.status()).toBe(201);
     const orderId = (await order.json()).id as number;
@@ -348,9 +367,18 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("本次实收").fill("400.00");
     await dialog.getByLabel("收款日期").fill("2026-10-21");
+    const paid = page.waitForResponse((response) => /\/installments\/\d+\/payments$/.test(response.url()) && response.request().method() === "POST");
     await dialog.getByRole("button", { name: "确认收款" }).click();
-
+    const response = await paid;
+    expect(response.status()).toBe(200);
+    const payment = (await response.json()).installment.operation_operators.find(
+      (operation: { operation_key: string }) => operation.operation_key.startsWith("PAY:"),
+    );
+    expect(payment.period_no).toBe(1);
+    expect(payment.flow_no).toBeTruthy();
     await expect(page.getByText("收款已登记")).toBeVisible({ timeout: 10000 });
+    await row.locator(".ant-table-row-expand-icon").click();
+    await expect(page.getByText(`收款（第1期，${payment.flow_no}）`)).toBeVisible();
     expect(errors).toEqual([]);
   });
 });

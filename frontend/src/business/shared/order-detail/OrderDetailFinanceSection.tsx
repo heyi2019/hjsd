@@ -174,8 +174,8 @@ export function OrderDetailFinanceSection({
   orderExtras: OrderDetailMeta["orderExtras"];
   expenseCount: number;
   incomeCount: number;
-  totalExpense: string;
-  totalIncome: string;
+  totalExpense: string | null;
+  totalIncome: string | null;
   editing?: boolean;
   financeDrafts?: Record<string, FinanceDraft>;
   onFinanceEdit?: (flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) => void;
@@ -200,8 +200,8 @@ export function OrderDetailFinanceSection({
         <div className="order-finance-summary">
           <div className="order-finance-summary__item order-finance-summary__item--expense"><span>支出</span><strong>{expenseCount} 笔</strong></div>
           <div className="order-finance-summary__item order-finance-summary__item--income"><span>收入</span><strong>{incomeCount} 笔</strong></div>
-          <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总支出</span><MoneyText value={totalExpense} /></div>
-          <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总收入</span><MoneyText value={totalIncome} /></div>
+          <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总支出</span>{totalExpense === null ? <span>不可用</span> : <MoneyText value={totalExpense} />}</div>
+          <div className="order-finance-summary__item order-finance-summary__item--amount"><span>总收入</span>{totalIncome === null ? <span>不可用</span> : <MoneyText value={totalIncome} />}</div>
         </div>
         <DataTable className="order-detail__data-table order-finance-table" columns={editing ? editableFinanceColumns(financeDrafts, onFinanceEdit, employees, pools, defaultOperatorIds) : FINANCE_COLUMNS} rows={rows} page={1} pageSize={10} total={rows.length} onPageChange={() => undefined} pagination={false} rowKey="key" size="small" />
       </div>

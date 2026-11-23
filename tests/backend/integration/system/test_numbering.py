@@ -62,6 +62,35 @@ def test_sequence_automatically_expands_beyond_padding(db):
     assert allocate_number(db, SequenceKey.CUSTOMER) == "CUS10000"
 
 
+def test_notification_number_cap_applies_to_single_and_batch_allocations(db):
+    sequence = ensure_sequence(db, SequenceKey.NOTIFICATION, "NTF", 4)
+    sequence.current_value = 9998
+    db.commit()
+    with pytest.raises(Validation, match="通知编号已用尽"):
+        numbering.allocate_numbers(db, SequenceKey.NOTIFICATION, 2)
+    db.refresh(sequence)
+    assert sequence.current_value == 9998
+    assert allocate_number(db, SequenceKey.NOTIFICATION) == "NTF9999"
+    assert peek_number(db, SequenceKey.NOTIFICATION) == "已用尽"
+    with pytest.raises(Validation, match="通知编号已用尽"):
+        allocate_number(db, SequenceKey.NOTIFICATION)
+    with pytest.raises(Validation, match="通知编号已用尽"):
+        numbering.allocate_numbers(db, SequenceKey.NOTIFICATION, 1)
+    ensure_sequence(db, SequenceKey.ORDER_HS, "HS", 4)
+    assert allocate_number(db, SequenceKey.ORDER_HS) == "HS0001"
+
+
+def test_sequence_api_reports_notification_capacity(seeded_db, seeded_client, headers):
+    sequence = seeded_db.scalar(select(DocumentSequence).where(DocumentSequence.sequence_key == SequenceKey.NOTIFICATION.value))
+    sequence.current_value = 9900
+    seeded_db.flush()
+    response = seeded_client.get("/api/sequences", headers=headers)
+    assert response.status_code == 200, response.text
+    row = next(item for item in response.json() if item["sequence_key"] == "NOTIFICATION")
+    assert row["remaining"] == 99
+    assert row["near_exhaustion"] is True
+
+
 def test_five_digit_sequence_allocates_past_9999(db):
     """5 位序列（ZC/SR/KU_）分配层能越过 9999 直到 99999（预览层不再提前误报满）。"""
     ensure_sequence(db, SequenceKey.CASHFLOW_OUT, "ZC", 5)

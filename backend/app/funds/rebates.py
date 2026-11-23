@@ -20,9 +20,9 @@ from app.domain.enums import (
     RebateType,
 )
 from app.domain.foundation import Pool
-from app.domain.trade import Cashflow, OrderEvent, RebateRecord, Reconciliation
-from app.settings.field_definitions.pools import require_default_pool
-from app.shared.order_access import get_order
+from app.domain.trade import Cashflow, OrderEvent, RebateRecord
+from app.settings.field_definitions.pools import assert_pool_usable, require_default_pool
+from app.shared.order_access import get_order, lock_order_reference
 from app.shared.operation_operators import validate_optional_operator_ids
 from app.business.orders.events import post_event
 from app.shared.form_field_rules import validate_form_extra
@@ -41,6 +41,7 @@ def create_rebate(
     note: str | None = None,
     operator_user_ids: list[int] | None = None,
     form_extra: dict[str, Any] | None = None,
+    pool_id: int | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
     """返点记录：来源订单必填且必须已成单（REB-01-02）。
@@ -81,6 +82,9 @@ def create_rebate(
     # 不能阻止在订单创建后先登记预计返点。
 
     rebate_no = order_rebate_no(session, order_no=order.order_no, order_id=order.id)
+    if pool_id is not None and user is not None and not user.can_see_pool(pool_id):
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
+    pool = require_default_pool(session) if pool_id is None else assert_pool_usable(session, pool_id)
     amount = _positive(amount, field="amount")
     operator_ids = validate_optional_operator_ids(session, operator_user_ids)
     field_context = {
@@ -122,7 +126,6 @@ def create_rebate(
         source_id=record.rebate_no,
         user=user,
     )
-    pool = require_default_pool(session)
     from app.funds.cashflows import create_cashflow
 
     flow = create_cashflow(
@@ -213,8 +216,10 @@ def update_rebate(
     form_extra: dict[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> RebateRecord:
-    # 与订单详情编辑和对账统一锁顺序：账户 → 返点 → 事件 → 流水。
+    # 与订单日期平移和详情编辑统一锁顺序：订单 → 账户 → 返点 → 事件 → 流水。
     visible = get_rebate(session, rebate_id, user=user)
+    source_order_id = visible.source_order_id
+    lock_order_reference(session, source_order_id)
     prior_flow = session.execute(select(Cashflow.id, Cashflow.pool_id).join(
         OrderEvent, OrderEvent.event_no == Cashflow.source_id,
     ).where(
@@ -227,6 +232,8 @@ def update_rebate(
     if prior_flow is not None:
         session.scalars(select(Pool.id).where(Pool.id == prior_flow.pool_id).with_for_update(key_share=True)).one()
     record = get_rebate(session, rebate_id, user=user, for_update=True)
+    if record.source_order_id != source_order_id:
+        raise Conflict("返点来源订单已变化，请刷新后重试")
     action_event = _rebate_action_event(session, record)
     flow = None
     if action_event is not None:
@@ -242,14 +249,6 @@ def update_rebate(
         )) is not None:
             raise Validation("已冲销的返点不能编辑", details={"rebate_record_id": rebate_id})
     new_amount = _positive(amount, field="amount") if amount is not None else record.amount
-    new_date = collected_on if collected_on is not None else record.collected_on
-    if flow is not None and (flow.amount != new_amount or flow.occurred_on != new_date):
-        earliest_date = min(flow.occurred_on, new_date)
-        if session.scalar(select(Reconciliation.id).where(
-            Reconciliation.pool_id == flow.pool_id,
-            Reconciliation.reconciled_on >= earliest_date,
-        )) is not None:
-            raise Validation("资金账户已有后续对账记录，不能直接修改")
     before = {"amount": str(record.amount), "collected_on": str(record.collected_on), "note": record.note}
     if amount is not None:
         record.amount = new_amount
@@ -291,6 +290,10 @@ def _rebate_action_event(session: Session, record: RebateRecord) -> OrderEvent |
         ).with_for_update().execution_options(populate_existing=True)
     )
 
+
+from app.business.collaboration import register_rebate_operations  # noqa: E402
+
+register_rebate_operations(create_rebate, update_rebate)
 
 __all__ = [
     "create_rebate",

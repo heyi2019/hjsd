@@ -208,7 +208,7 @@ def change_password(
     actor: str,
 ) -> None:
     """改密必须校验当前密码。"""
-    user = session.get(User, user_id)
+    user = session.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
     if user is None:
         raise AuthError("原密码错误")
     if not verify_password(old_password, user.password_hash):
@@ -233,7 +233,7 @@ def reset_password(
     password: str,
     actor: str,
 ) -> None:
-    user = session.get(User, user_id)
+    user = session.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
     if user is None:
         raise Validation("用户不存在")
     password = _required_password(password)

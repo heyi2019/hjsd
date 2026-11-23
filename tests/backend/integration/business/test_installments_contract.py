@@ -51,6 +51,34 @@ def test_installments_page_limits_results_and_preserves_total(seeded_client, see
     assert all(contract.inst_no in exported.text for contract in contracts)
 
 
+def test_installment_export_reuses_detail_queries_and_preserves_schedule_content(seeded_client, seeded_db, headers):
+    import csv
+    import io
+    import json
+    from sqlalchemy import event
+
+    order = _order(seeded_db)
+    contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="200")
+    statements = []
+    connection = seeded_db.connection()
+    def observe(_conn, _cursor, statement, _parameters, _context, _many):
+        statements.append(" ".join(statement.lower().split()))
+    event.listen(connection, "before_cursor_execute", observe)
+    try:
+        response = seeded_client.get("/api/installments/export.csv", headers=headers)
+    finally:
+        event.remove(connection, "before_cursor_execute", observe)
+    assert response.status_code == 200, response.text
+    rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
+    row = next(item for item in rows if contract.inst_no in item.values())
+    schedules = json.loads(row["期次明细"])
+    first = next(item for item in schedules if item["期次"] == 1)
+    assert first["应收金额"] == "200.00"
+    assert first["available_actions"] == []
+    assert sum("from installment_schedules" in sql for sql in statements) == 1
+    assert sum("from installment_dispositions" in sql for sql in statements) == 1
+
+
 def test_installment_order_context_reads_only_display_fields(seeded_db):
     from sqlalchemy import event
     from app.customers.counterparties import create_counterparty
@@ -439,7 +467,9 @@ def test_available_actions_match_business_rules():
             assert av.available_installment_actions(status.value, disps) == expected_actions(status.value, disps)
     for status in ScheduleStatus:
         expected = [] if status in {ScheduleStatus.PAID, ScheduleStatus.WAIVED} else ["waive", "extend"]
-        assert av.available_schedule_actions(status.value) == expected
+        assert av.available_schedule_actions(
+            status.value, None, due_amount=Decimal("100"), received_amount=Decimal("0"), waived_amount=Decimal("0")
+        ) == expected
 
 
 def test_list_endpoint_emits_available_actions(seeded_client, seeded_db, headers):
@@ -481,6 +511,34 @@ def test_schedule_endpoints_return_consistent_available_actions(seeded_client, s
     inst_cancel(seeded_db, contract.id, cancelled_on=TODAY, actor="pytest", reason="取消交易")
     response = seeded_client.get(f"/api/installments/{contract.id}/schedules", headers=headers)
     assert all(not row["available_actions"] for row in response.json())
+
+
+def test_schedule_actions_exclude_zero_and_partially_received_periods(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "schedule-actions-receipts")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    contract = _contract(
+        seeded_db, order.id, contract_type="STOCK_SALE", principal="400",
+        down_payment="0", periods=2, per_period="200", first_due_on=TODAY,
+    )
+    inst_pay(seeded_db, contract.id, amount=Decimal("50"), paid_on=TODAY, period_no=1, actor="pytest")
+    response = seeded_client.get(f"/api/installments/{contract.id}/schedules", headers=headers)
+    assert response.status_code == 200
+    schedules = {row["period_no"]: row for row in response.json()}
+    assert schedules[0]["available_actions"] == []  # 零首付无剩余应收
+    assert schedules[1]["available_actions"] == []  # 已部分收款不能减免或展期
+    assert set(schedules[2]["available_actions"]) == {"waive", "extend"}
+    listing = seeded_client.get("/api/installments", headers=headers).json()["items"]
+    listed = next(item for item in listing if item["id"] == contract.id)
+    assert {item["period_no"]: item["available_actions"] for item in listed["schedules"]} == {
+        period: row["available_actions"] for period, row in schedules.items()
+    }
+    for period in (0, 1):
+        result = seeded_client.post(
+            f"/api/installments/{contract.id}/schedules/{period}/extend",
+            headers=headers, json={"new_due_on": "2027-12-31", "reason": "客户申请"},
+        )
+        assert result.status_code == 422, result.text
 
 
 def test_list_actions_match_default_and_recovery_status_guards(seeded_client, seeded_db, headers):

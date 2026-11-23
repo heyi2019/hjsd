@@ -18,6 +18,8 @@ export function CfgItem(props: {
   hideLabel?: boolean;
   /** 核心业务字段即使被旧配置误停用也必须保留，避免表单出现只有标题没有输入控件。 */
   alwaysActive?: boolean;
+  /** 后端固定要求的字段不允许被历史配置改成选填。 */
+  alwaysRequired?: boolean;
   rules?: Rule[];
   valuePropName?: string;
   tooltip?: ReactNode;
@@ -37,11 +39,16 @@ export function CfgItem(props: {
   const cfg = props.cfg ?? useFieldConfig();
   const condValues = useConditionValues(cfg, props.name);
   if (!props.alwaysActive && !isFieldActive(cfg, props.name)) return null;
+  const resolvedRules = resolveRules(cfg, props.name, props.rules, condValues);
+  const baseRequired = (props.rules ?? []).filter((rule) => Boolean((rule as { required?: boolean }).required));
+  const rules = props.alwaysRequired && !resolvedRules.some((rule) => Boolean((rule as { required?: boolean }).required))
+    ? [...resolvedRules, ...(baseRequired.length ? baseRequired : [{ required: true } as Rule])]
+    : resolvedRules;
   return (
     <Form.Item
       name={props.name}
       label={props.hideLabel ? undefined : props.fixedLabel ?? fieldLabel(cfg, props.name, props.label ?? "")}
-      rules={resolveRules(cfg, props.name, props.rules, condValues)}
+      rules={rules}
       valuePropName={props.valuePropName}
       tooltip={props.tooltip}
       extra={props.extra}

@@ -21,7 +21,7 @@ export interface OrderListParams {
   offset?: number;
 }
 
-type OrderExportParams = Omit<OrderListParams, "limit" | "offset" | "sort_desc">;
+type OrderExportParams = Omit<OrderListParams, "limit" | "offset">;
 
 /** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
 export interface OrderPatchPayload {
@@ -45,6 +45,7 @@ export interface OrderPatchPayload {
 
 export type OrderExecutionEditPayload = {
   profile: object;
+  expected_profile?: Record<string, unknown>;
   events: { id: number; expected_amount: string; amount: string; note: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
   new_events?: { operation_type: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST"; occurred_at: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[]; note?: string }[];
   cashflows?: { flow_no: string; amount?: string; pool_id?: number; occurred_at?: string; note?: string | null; operator_user_ids?: number[] }[];
@@ -82,6 +83,10 @@ export const ordersApi = {
     sale_operator_ids?: number[];
   }) => api.get<{
     total_count: number;
+    in_progress_count: number;
+    completed_count: number;
+    cancelled_count: number;
+    type_total: number;
     status_counts: Record<string, number>;
     type_counts: Record<string, number>;
     game_types: string[];
@@ -98,8 +103,8 @@ export const ordersApi = {
     api
       .get<Blob>("/orders/export.xlsx", { params: { ...params, _t: Date.now() }, paramsSerializer: { indexes: null }, responseType: "blob" })
       .then((r) => r.data),
-  get: (orderId: number) =>
-    api.get<Order>(`/orders/${orderId}`).then((r) => r.data),
+  get: (orderId: number, options?: { fresh?: boolean }) =>
+    api.get<Order>(`/orders/${orderId}`, options?.fresh ? { refreshCache: true } as CacheAwareRequestConfig : undefined).then((r) => r.data),
   executionDetail: (orderId: number, options?: { fresh?: boolean; imagePreviews?: boolean }) =>
     api.get<AccountExecutionDetail>(`/orders/${orderId}/execution-detail`, options ? {
       ...(options.fresh ? { refreshCache: true } : {}),
@@ -115,8 +120,6 @@ export const ordersApi = {
     reason: string; occurred_on: string; unlisted_at: string; operator_user_ids?: number[];
     form_extra?: Record<string, unknown>; amount?: string; pool_id?: number; portion?: string; offset_event_id?: number;
   }) => api.post<{ ok: boolean }>(`/orders/${orderId}/inventory-offsale`, payload).then((r) => r.data),
-  deleteOrder: (orderId: number, reason: string) =>
-    api.delete<void>(`/orders/${orderId}`, { data: { reason } }).then((r) => r.data),
   create: (payload: {
     order_type: string;
     trade_date: string;

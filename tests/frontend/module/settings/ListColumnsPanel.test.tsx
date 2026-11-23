@@ -1,11 +1,12 @@
 /** ListColumnsPanel：列表列显示/顺序配置面板。
- *  覆盖：拉取三张列表、切换列表、隐藏列、上下移动顺序、锁定列不可隐藏。 */
+ *  覆盖：拉取列表、切换列表、隐藏列及调整顺序。 */
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listColumnsApi } from "@/shared/api/orders.api";
 import type { ListColumnConfig, ListScopeConfig } from "@/shared/api/types/forms";
 import { appMessage } from "@/shared/ui/appFeedback";
+import { refreshListColumns, useListViewColumns } from "@/shared/lib/listColumns";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -57,6 +58,12 @@ const ledgerWithCustom: ListScopeConfig = {
   ...ledger,
   columns: [...ledger.columns, customColumn],
 };
+
+function ColumnPreview() {
+  const { arrange } = useListViewColumns("LEDGER");
+  const columns = arrange([{ key: "order_no" }, { key: "party" }, { key: "actions" }]);
+  return <div data-testid="business-columns">{columns.map((column) => column.key).join(",")}</div>;
+}
 
 describe("ListColumnsPanel", () => {
   it("不再提供列宽配置，只保留显示、顺序与固定列", async () => {
@@ -138,6 +145,23 @@ describe("ListColumnsPanel", () => {
     expect(scope).toBe("LEDGER");
     expect(items.find((item) => item.key === "party")?.is_visible).toBe(false);
     expect(items.map((item) => item.key)).toEqual(["order_no", "party", "actions"]);
+  });
+
+  it("保存响应直接同步业务列表，较早的读取结果不能覆盖新配置", async () => {
+    let finishOldRead!: (value: ListScopeConfig[]) => void;
+    renderLight(<><ListColumnsPanel /><ColumnPreview /></>, { user: "admin" });
+    await screen.findByText("对方 / 来源");
+    await act(async () => { await refreshListColumns(); });
+    await waitFor(() => expect(screen.getByTestId("business-columns")).toHaveTextContent("party"));
+    const calls = vi.mocked(listColumnsApi.all).mock.calls.length;
+    vi.mocked(listColumnsApi.all).mockReturnValueOnce(new Promise((resolve) => { finishOldRead = resolve; }));
+    act(() => { void refreshListColumns(); });
+    await waitFor(() => expect(listColumnsApi.all).toHaveBeenCalledTimes(calls + 1));
+    await userEvent.click(screen.getByRole("button", { name: "显示_party" }));
+    await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByTestId("business-columns")).not.toHaveTextContent("party"));
+    await act(async () => finishOldRead([ledger, inventory]));
+    expect(screen.getByTestId("business-columns")).not.toHaveTextContent("party");
   });
 
   it("下移列：提交顺序随数组位置变化", async () => {

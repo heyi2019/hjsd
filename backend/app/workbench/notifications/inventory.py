@@ -10,10 +10,8 @@ from app.core.money import to_money
 from app.core.security import CurrentUser, PERM_FINANCE_READ, PERM_ORDER_CREATE
 from app.domain.notifications import Notification
 from app.domain.trade import Account, Order
-from app.domain.enums import SequenceKey
-from app.shared.numbering import allocate_numbers
-from app.domain.users import User
 from app.workbench.notifications import service
+from ._writes import add_numbered_notifications, lock_recipient
 
 
 def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int:
@@ -24,7 +22,7 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     from app.workbench.reminder_config import read_reminder_config
 
     # 与同用户同步/已读操作串行，同时允许通知插入时的外键 KEY SHARE，避免与编号锁死锁。
-    db.scalar(select(User.id).where(User.id == user.id).with_for_update(key_share=True))
+    lock_recipient(db, user.id)
     days = read_reminder_config(db)["inventory_aging_days"]
     cutoff = datetime.combine(date.today() - timedelta(days=days), time.min)
     already_notified = exists(select(Notification.id).where(
@@ -40,16 +38,10 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     pending = {}
     for account, order in pairs:
         pending.setdefault(account.id, (account, order))
-    numbers = allocate_numbers(db, SequenceKey.NOTIFICATION, len(pending))
-    notifications = []
-    for number, (account, order) in zip(numbers, pending.values()):
+    records = []
+    for account, order in pending.values():
         key = str(account.id)
         game_type = account.game_type or (order.account_snapshot or {}).get("game_type") or "未设置游戏类型"
-        notifications.append(Notification(
-            notification_no=number, recipient_user_id=user.id, notification_type=service.INVENTORY_AGING,
-            title="库存超期提醒", message=f"订单 {order.order_no} · {game_type} · 成本 {to_money(account.cost_amount)} · 库存 {account.stock_no or key} 已超过 {days} 天",
-            entity_type="account", entity_id=key, created_by="system", updated_by="system",
-        ))
-    db.add_all(notifications)
-    db.flush()
-    return len(notifications)
+        records.append((key, f"订单 {order.order_no} · {game_type} · 成本 {to_money(account.cost_amount)} · 库存 {account.stock_no or key} 已超过 {days} 天"))
+    return add_numbered_notifications(db, user_id=user.id, notification_type=service.INVENTORY_AGING,
+                                      title="库存超期提醒", entity_type="account", records=records)

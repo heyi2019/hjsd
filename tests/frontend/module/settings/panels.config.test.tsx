@@ -52,6 +52,15 @@ describe("SequencesPanel", () => {
     expect(screen.queryByRole("button", { name: /新建|编辑|重置|保存/ })).toBeNull();
   });
 
+  it("通知编号接近上限时显示剩余数量和影响", async () => {
+    vi.mocked(sequencesApi.list).mockResolvedValue([
+      { sequence_key: "NOTIFICATION", prefix: "NTF", padding: 4, current_value: 9900, next_number: "NTF9901", remaining: 99, near_exhaustion: true },
+    ]);
+    renderLight(<SequencesPanel />, { user: "admin" });
+    expect(await screen.findByText(/通知编号还剩 99 个/)).toBeInTheDocument();
+    expect(screen.getByText(/用尽后需要生成通知的操作会失败/)).toBeInTheDocument();
+  });
+
   it("分期合约号按业务订单号派生，不展示独立流水序列", async () => {
     vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "INSTALLMENT", prefix: "FQ", padding: 4, current_value: 0, next_number: "FQ0001" },
@@ -142,6 +151,30 @@ describe("BusinessReminderSettingsPanel", () => {
     await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledWith("BUSINESS_OVERVIEW_REMINDERS", expect.objectContaining({
       options: expect.arrayContaining([{ value: "profit_notifications_enabled", label: "1" }]),
     })));
+  });
+
+  it("提醒设置保存与重新读取期间防止重复提交", async () => {
+    let finishUpdate!: () => void;
+    let finishReload!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    const config = { options: [{ value: "inventory_aging_days", label: "7" }] } as never;
+    vi.mocked(optionSetsApi.get).mockResolvedValueOnce(config)
+      .mockReturnValueOnce(new Promise((resolve) => { finishReload = resolve; }));
+    vi.mocked(optionSetsApi.update).mockReturnValueOnce(new Promise((resolve) => { finishUpdate = () => resolve(undefined as never); }));
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+    renderLight(<BusinessReminderSettingsPanel />, { user: "admin" });
+    const button = await screen.findByRole("button", { name: "保存配置" });
+    await waitFor(() => expect(button).toBeEnabled());
+    const form = button.closest("form")!;
+    await act(async () => { fireEvent.submit(form); fireEvent.submit(form); });
+    await waitFor(() => expect(optionSetsApi.update).toHaveBeenCalledTimes(1));
+    expect(button).toBeDisabled();
+    await act(async () => finishUpdate());
+    await waitFor(() => expect(optionSetsApi.get).toHaveBeenCalledTimes(2));
+    expect(button).toBeDisabled();
+    await act(async () => { fireEvent.submit(form); });
+    expect(optionSetsApi.update).toHaveBeenCalledTimes(1);
+    await act(async () => finishReload(config));
+    await waitFor(() => expect(button).toBeEnabled());
   });
 });
 

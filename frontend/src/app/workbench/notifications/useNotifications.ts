@@ -11,7 +11,7 @@ export function isProfitNotification(item: NotificationItem) {
   return item.entity_type === "order" && (item.notification_type === "PROFIT_PENDING" || item.notification_type === "PROFIT_ALLOCATED");
 }
 
-export function useNotifications({ onPendingProfitNotificationsClick, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void; active?: boolean }) {
+export function useNotifications({ onPendingProfitNotificationsClick, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void | Promise<void>; active?: boolean }) {
   const { username } = useSession();
   const [dataOwner, setDataOwner] = useState(username);
   const [selected, setSelected] = useState<NotificationItem | null>(null);
@@ -92,6 +92,11 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
     busy.current.add(item.id);
     const generation = cursor.current.generation;
     try {
+      if (item.notification_type === "PROFIT_PENDING" && item.entity_type === "order") {
+        // 目标页实际打开分润后再标记；查询失败或无权查看时消息仍保留未读。
+        await onPendingProfitNotificationsClick?.(item.id);
+        return;
+      }
       if (!item.read_at) {
         const result = await notificationsApi.markReadBatch([item.id], category);
         if (cursor.current.generation !== generation) return;
@@ -115,8 +120,7 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
       }
       setNotificationError(null);
       setRetryItem(null);
-      if (item.notification_type === "PROFIT_PENDING" && item.entity_type === "order") onPendingProfitNotificationsClick?.(item.id);
-      else setSelected(item);
+      setSelected(item);
     } catch {
       if (cursor.current.generation === generation) { setNotificationError("标记已读失败，请重试。"); setRetryItem(item); }
     } finally {

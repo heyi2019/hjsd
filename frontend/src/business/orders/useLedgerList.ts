@@ -44,6 +44,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const [loading, setLoading] = useState(false);
   const [mineOrders, setMineOrders] = useState(initialMine);
   const requestSequence = useLatestRequest();
+  const summarySequence = useLatestRequest();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   // 订单台账排序：默认最新在前，可切换最旧在前（仅调展示顺序，不动接口）。
@@ -53,7 +54,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const exportLedger = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportCsv(queryFilters), `订单台账-${today()}.csv`);
+      downloadBlob(await ordersApi.exportCsv({ ...queryFilters, sort_desc: ledgerSortDesc }), `订单台账-${today()}.csv`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -64,7 +65,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
   const exportLedgerXlsx = async () => {
     setLedgerExporting(true);
     try {
-      downloadBlob(await ordersApi.exportXlsx(queryFilters), `订单台账-${today()}.xlsx`);
+      downloadBlob(await ordersApi.exportXlsx({ ...queryFilters, sort_desc: ledgerSortDesc }), `订单台账-${today()}.xlsx`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     } finally {
@@ -117,7 +118,7 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     } : {}),
   }), [mineOrders, orderTypeFilter, orderStatusFilter, businessModeFilter, gameTypeFilter, inventoryStatusFilter, inventoryOperatorIds, saleOperatorIds, keyword, dateRange]);
 
-  const load = useCallback(async () => {
+  const loadList = useCallback(async () => {
     const requestId = requestSequence.start();
     setLoading(true);
     try {
@@ -128,15 +129,52 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
         offset: (page - 1) * pageSize,
       });
       if (!requestSequence.isCurrent(requestId)) return;
+      const lastPage = Math.max(1, Math.ceil(result.total / pageSize));
+      if (page > lastPage) {
+        setOrders([]);
+        setPageTotal(result.total);
+        setLoadError(null);
+        setPage(lastPage);
+        return;
+      }
       setOrders(result.items);
       setPageTotal(result.total);
       setLoadError(null);
     } catch (error) {
-      if (requestSequence.isCurrent(requestId)) setLoadError(normalizeError(error));
+      if (requestSequence.isCurrent(requestId)) {
+        setOrders([]);
+        setPageTotal(0);
+        setLoadError(normalizeError(error));
+      }
     } finally {
       if (requestSequence.isCurrent(requestId)) setLoading(false);
     }
   }, [queryFilters, ledgerSortDesc, page, pageSize, requestSequence]);
+
+  const loadSummary = useCallback(async () => {
+    const requestId = summarySequence.start();
+    setSummaryLoading(true);
+    setLedgerSummary(null);
+    try {
+      const result = await ordersApi.ledgerSummary(queryFilters);
+      if (!summarySequence.isCurrent(requestId)) return;
+      setLedgerSummary(result);
+      setGameTypes(result.game_types);
+      setSummaryError(null);
+    } catch (error) {
+      if (summarySequence.isCurrent(requestId)) setSummaryError(normalizeError(error));
+    } finally {
+      if (summarySequence.isCurrent(requestId)) setSummaryLoading(false);
+    }
+  }, [queryFilters, summarySequence]);
+
+  // 写操作或手动重试同时刷新列表和统计；普通翻页只读取列表。
+  const load = useCallback(async () => {
+    await Promise.all([loadList(), loadSummary()]);
+  }, [loadList, loadSummary]);
+  const currentLoadRef = useRef(load);
+  currentLoadRef.current = load;
+  const reloadCurrent = useCallback(() => currentLoadRef.current(), []);
 
   const initialQueryKey = JSON.stringify([initialMine, initialStatus, initialTradeDateFrom, initialTradeDateTo, initialKeyword, myOperatorId]);
   const [initializedQueryKey, setInitializedQueryKey] = useState<string | null>(null);
@@ -196,20 +234,19 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     const debounceSearch = previous !== null && previous.revision === searchRevision && previous.filters === filters && previous.keyword !== searchKeyword;
     previousListQuery.current = { keyword: searchKeyword, filters, revision: searchRevision };
     if (debounceSearch) setLoading(true);
-    const timer = debounceSearch ? window.setTimeout(() => void load(), 250) : undefined;
-    if (!debounceSearch) void load();
+    const timer = debounceSearch ? window.setTimeout(() => void loadList(), 250) : undefined;
+    if (!debounceSearch) void loadList();
     return () => {
       if (timer !== undefined) window.clearTimeout(timer);
       requestSequence.invalidate();
     };
-  }, [active, initializedQueryKey, initialQueryKey, load, queryFilters, requestSequence, searchRevision]);
+  }, [active, initializedQueryKey, initialQueryKey, loadList, queryFilters, requestSequence, searchRevision]);
 
   useEffect(() => {
     if (!active || initializedQueryKey !== initialQueryKey) {
       previousSummaryQuery.current = null;
-      return;
+      return summarySequence.invalidate;
     }
-    let cancelled = false;
     setSummaryLoading(true);
     setLedgerSummary(null);
     const { keyword: searchKeyword, ...otherFilters } = queryFilters;
@@ -217,26 +254,13 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     const previous = previousSummaryQuery.current;
     const debounceSearch = previous !== null && previous.revision === searchRevision && previous.filters === filters && previous.keyword !== searchKeyword;
     previousSummaryQuery.current = { keyword: searchKeyword, filters, revision: searchRevision };
-    const fetchSummary = () => {
-      void ordersApi.ledgerSummary(queryFilters).then((result) => {
-        if (cancelled) return;
-        setLedgerSummary(result);
-        setGameTypes(result.game_types);
-        setSummaryError(null);
-      }).catch((error) => {
-        if (cancelled) return;
-        setSummaryError(normalizeError(error));
-      }).finally(() => {
-        if (!cancelled) setSummaryLoading(false);
-      });
-    };
-    const timer = debounceSearch ? window.setTimeout(fetchSummary, 250) : undefined;
-    if (!debounceSearch) fetchSummary();
+    const timer = debounceSearch ? window.setTimeout(() => void loadSummary(), 250) : undefined;
+    if (!debounceSearch) void loadSummary();
     return () => {
-      cancelled = true;
+      summarySequence.invalidate();
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [active, initializedQueryKey, initialQueryKey, queryFilters, searchRevision]);
+  }, [active, initializedQueryKey, initialQueryKey, loadSummary, queryFilters, searchRevision, summarySequence]);
 
   const filteredOrders = orders;
 
@@ -284,6 +308,6 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     inventoryStatusOptions,
     gameTypeOptions,
     filteredOrders,
-    load,
+    load: reloadCurrent,
   };
 }

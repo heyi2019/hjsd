@@ -18,7 +18,7 @@ def build_finance_summary(
     db: Session,
     *,
     order_ids: list[int],
-    event_cashflows: dict[int, ExecutionCashflowOut],
+    event_cashflows: dict[str, ExecutionCashflowOut],
     order_cashflows: dict[int, list[ExecutionCashflowOut]],
     order_rebates: dict[int, list[ExecutionRebateOut]],
     action_model_rebate_nos: set[str],

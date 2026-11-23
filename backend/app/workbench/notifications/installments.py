@@ -8,14 +8,13 @@ from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.core.security import CurrentUser, PERM_FINANCE_READ, PERM_ORDER_CREATE
-from app.domain.enums import InstallmentContractType, InstallmentStatus, SequenceKey
+from app.domain.enums import InstallmentContractType, InstallmentStatus
 from app.domain.notifications import Notification
 from app.domain.trade import Installment, InstallmentSchedule, Order
-from app.domain.users import User
-from app.shared.numbering import allocate_numbers
 from app.shared.scope import owner_scope_filter
 from app.workbench.reminder_config import read_reminder_config
 from app.workbench.notifications.service import INSTALLMENT_OVERDUE
+from ._writes import add_numbered_notifications, lock_recipient
 
 
 def sync_overdue_installment_notifications_for_user(
@@ -26,7 +25,7 @@ def sync_overdue_installment_notifications_for_user(
         return 0
 
     # 与同用户同步和已读操作串行，允许通知外键的 KEY SHARE 锁。
-    db.scalar(select(User.id).where(User.id == user.id).with_for_update(key_share=True))
+    lock_recipient(db, user.id)
     if not read_reminder_config(db)["overdue_installments_enabled"]:
         return 0
 
@@ -53,21 +52,9 @@ def sync_overdue_installment_notifications_for_user(
     if scope is not None:
         stmt = stmt.where(scope)
     rows = db.execute(stmt).all()
-    numbers = allocate_numbers(db, SequenceKey.NOTIFICATION, len(rows))
-    db.add_all([
-        Notification(
-            notification_no=number,
-            recipient_user_id=user.id,
-            notification_type=INSTALLMENT_OVERDUE,
-            title="分期逾期提醒",
-            message=(f"订单 {order.order_no} · 合约 {contract.inst_no} · 第 {schedule.period_no} 期"
-                     f" · 到期日 {schedule.due_on} · 待还 {to_money(schedule.due_amount - schedule.received_amount - schedule.waived_amount)}"),
-            entity_type="installment_schedule",
-            entity_id=str(schedule.id),
-            created_by="system",
-            updated_by="system",
-        )
-        for number, (schedule, contract, order) in zip(numbers, rows)
-    ])
-    db.flush()
-    return len(rows)
+    records = [(str(schedule.id),
+                f"订单 {order.order_no} · 合约 {contract.inst_no} · 第 {schedule.period_no} 期"
+                f" · 到期日 {schedule.due_on} · 待还 {to_money(schedule.due_amount - schedule.received_amount - schedule.waived_amount)}")
+               for schedule, contract, order in rows]
+    return add_numbered_notifications(db, user_id=user.id, notification_type=INSTALLMENT_OVERDUE,
+                                      title="分期逾期提醒", entity_type="installment_schedule", records=records)

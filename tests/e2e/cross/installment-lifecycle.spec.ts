@@ -20,24 +20,15 @@ const TRADE_DATE = "2026-10-17";
 /** Decimal 在 JSON 里序列化为字符串或数字，统一转 number 比较金额口径。 */
 const money = (v: unknown): number => Number(String(v));
 
-/** 从库存取一枚指定类型的在库账号，复用 business-write.spec.ts 的已验证逻辑。 */
-async function stockAccountId(request: any, inventoryType: string): Promise<number> {
-  const res = await request.get(`${apiBase()}/stocks`, { headers: ADMIN });
-  expect(res.ok(), "库存列表拉取失败").toBe(true);
-  const items = (await res.json()).items as Array<{ inventory_status: string; inventory_type?: string; id: number }>;
-  const account = items.find(
-    (it) => it.inventory_status === "IN_STOCK" && it.inventory_type === inventoryType,
-  );
-  expect(account, `缺少 ${inventoryType} 在库测试账号`).toBeTruthy();
-  return account!.id;
-}
-
 /** 建 HS 回收单并入库（BUY 事件），返回 order id。 */
 async function createBoughtHsOrder(request: any): Promise<number> {
-  const accountId = await stockAccountId(request, "RECOVERY");
   const orderRes = await request.post(`${apiBase()}/orders`, {
     headers: ADMIN,
-    data: { order_type: "HS", trade_date: TRADE_DATE, account_id: accountId },
+    data: {
+      order_type: "HS", trade_date: TRADE_DATE,
+      account_snapshot: { game_account: `e2e-installment-${Date.now()}`, game_type: "王者荣耀" },
+      form_extra: { business_responsible_ids: [1] },
+    },
   });
   expect(orderRes.status(), "建 HS 单失败").toBe(201);
   const orderId = (await orderRes.json()).id as number;
@@ -117,16 +108,17 @@ test("分期合约：金额口径 + 状态机 PENDING→ACTIVE→SETTLED→DELIV
   expect(deliver.status()).toBe(200);
   expect((await deliver.json()).status).toBe("DELIVERED");
 
-  // 清理：取消并删除订单（删除需带原因，验证业务约束）
-  await request.delete(`${base}/orders/${orderId}`, { headers: ADMIN, data: { reason: "E2E 清理" } });
 });
 
 test("业务规则：DG/代挂订单不允许建分期（仅全款）", async ({ request }) => {
   const base = apiBase();
-  const accountId = await stockAccountId(request, "CONSIGNMENT");
   const orderRes = await request.post(`${base}/orders`, {
     headers: ADMIN,
-    data: { order_type: "DG", trade_date: TRADE_DATE, account_id: accountId },
+    data: {
+      order_type: "DG", trade_date: TRADE_DATE,
+      account_snapshot: { game_account: `e2e-installment-dg-${Date.now()}`, game_type: "王者荣耀" },
+      form_extra: { business_responsible_ids: [1] },
+    },
   });
   expect(orderRes.status()).toBe(201);
   const orderId = (await orderRes.json()).id as number;
@@ -147,8 +139,6 @@ test("业务规则：DG/代挂订单不允许建分期（仅全款）", async ({
   expect(instRes.status(), "DG 建分期应被拒").toBeGreaterThanOrEqual(400);
   expect(instRes.status()).toBeLessThan(500);
 
-  // 清理
-  await request.delete(`${base}/orders/${orderId}`, { headers: ADMIN, data: { reason: "E2E 清理" } });
 });
 
 test("分期独有动作：提前结清（剩余应收归零）", async ({ request }) => {
@@ -186,8 +176,6 @@ test("分期独有动作：提前结清（剩余应收归零）", async ({ reque
   const settledInst = await settle.json();
   expect(money(settledInst.remaining_receivable), "提前结清后剩余应收应归零").toBe(0);
 
-  // 清理
-  await request.delete(`${base}/orders/${orderId}`, { headers: ADMIN, data: { reason: "E2E 清理" } });
 });
 
 test("分期独有动作：未结清分期可取消并冲销", async ({ request }) => {
@@ -226,8 +214,6 @@ test("分期独有动作：未结清分期可取消并冲销", async ({ request 
   expect(typeof money(cancelBody.reversed_amount)).toBe("number");
   expect(cancelBody.order_status, "取消后订单状态应回退").not.toBe("COMPLETED");
 
-  // 清理
-  await request.delete(`${base}/orders/${orderId}`, { headers: ADMIN, data: { reason: "E2E 清理" } });
 });
 
 test("业务规则：已结清分期不可取消（终态约束）", async ({ request }) => {
@@ -268,6 +254,4 @@ test("业务规则：已结清分期不可取消（终态约束）", async ({ re
   });
   expect(cancel.status(), "已结清分期取消应被拒").toBe(409);
 
-  // 清理（已结清未交付，删除订单带原因）
-  await request.delete(`${base}/orders/${orderId}`, { headers: ADMIN, data: { reason: "E2E 清理" } });
 });

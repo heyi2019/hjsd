@@ -252,13 +252,15 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     // 售出→返点建链：DG 订单可建 SELL 类型返点（rebates.py 要求 order_type==DG）。
     const rebateResponse = await request.post(`${base}/rebates`, { headers, data: { source_order_id: order.id, rebate_type: "SELL", amount: "100", collected_on: "2026-10-17" } });
     expect(rebateResponse.status()).toBe(201);
-    const rebate = await rebateResponse.json();
     // 口径变更：返点结算模型已重构——DG 代挂沿用统一 SELL 事件登记卖出金额与利润，
     // 不再有独立「登记结算」流程，也不再生成 REBATE_FEE 手续费分录
     // （后端 /rebates/{id}/settlements 端点与 REBATE_FEE 类别均已移除）。
-    // 故此处只验证：返点登记成功并在「返点明细」页签可见。
+    // 返点收入在资金明细中随关联订单流水展示。
     await navItem(page, "资金中心").click();
-    await page.getByRole("tab", { name: "返点明细" }).click();
-    await expect(page.getByRole("row").filter({ hasText: rebate.rebate_no })).toBeVisible({ timeout: 10000 });
+    await page.getByRole("tab", { name: "资金明细" }).click();
+    await page.getByRole("button", { name: "全部" }).click();
+    await page.getByLabel("流水搜索").fill(detail.order_no);
+    await page.getByLabel("流水搜索").press("Enter");
+    await expect(page.getByRole("row").filter({ hasText: detail.order_no }).filter({ hasText: "返点" })).toBeVisible({ timeout: 10000 });
   });
 });

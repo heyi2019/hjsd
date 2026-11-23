@@ -766,6 +766,91 @@ class TestInstallmentsApi:
         )
         assert create_operator_row["operator_user_ids"] == [1, 2]
 
+    def test_partial_payments_keep_individual_operators_and_match_cashflows(self, seeded_client, seeded_db, headers):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="300")
+        for amount, operators in (("100", [1]), ("50", [2])):
+            inst_pay(seeded_db, contract.id, amount=amount, paid_on=TODAY, period_no=1,
+                     actor="pytest", operator_user_ids=operators)
+        response = seeded_client.get("/api/installments", headers=headers)
+        assert response.status_code == 200, response.text
+        item = next(row for row in response.json()["items"] if row["id"] == contract.id)
+        payments = [row for row in item["operation_operators"] if row["operation_key"].startswith("PAY:")]
+        assert len(payments) == 2
+        assert [row["period_no"] for row in payments] == [1, 1]
+        assert [row["operator_user_ids"] for row in payments] == [[1], [2]]
+        assert all(row["flow_no"] for row in payments)
+
+        changed = seeded_client.put(
+            f"/api/installments/{contract.id}/operation-operators/{payments[0]['operation_key']}",
+            json={"operator_user_ids": [1, 2]}, headers=headers,
+        )
+        assert changed.status_code == 200, changed.text
+        seeded_db.expire_all()
+        flows = {row.flow_no: row for row in seeded_db.scalars(
+            select(Cashflow).where(Cashflow.source_type == "INSTALLMENT", Cashflow.source_id == contract.inst_no)
+        ).all()}
+        assert flows[payments[0]["flow_no"]].operator_user_ids == [1, 2]
+        assert flows[payments[1]["flow_no"]].operator_user_ids == [2]
+
+    def test_legacy_payment_operator_shows_period_number_as_historical_summary(self, seeded_client, seeded_db, headers):
+        from app.shared.operation_operators import upsert_operation_operators
+
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="300")
+        schedule = seeded_db.scalar(select(InstallmentSchedule).where(
+            InstallmentSchedule.installment_id == contract.id, InstallmentSchedule.period_no == 1,
+        ))
+        upsert_operation_operators(seeded_db, entity_type="installment", entity_id=contract.inst_no,
+                                   operation_key=f"PAY:{schedule.id}", actor="pytest", operator_user_ids=[1])
+        response = seeded_client.get("/api/installments", headers=headers)
+        item = next(row for row in response.json()["items"] if row["id"] == contract.id)
+        payment = next(row for row in item["operation_operators"] if row["operation_key"].startswith("PAY:"))
+        assert payment["period_no"] == 1
+        assert payment["flow_no"] is None
+        assert payment["historical_summary"] is True
+        update = seeded_client.put(
+            f"/api/installments/{contract.id}/operation-operators/{payment['operation_key']}",
+            json={"operator_user_ids": [2]}, headers=headers,
+        )
+        assert update.status_code == 422, update.text
+
+    def test_payment_operator_edit_respects_cashflow_account_scope(self, seeded_client, seeded_db):
+        order = _order(seeded_db, owner_id=9)
+        contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="300")
+        inst_pay(seeded_db, contract.id, amount="50", paid_on=TODAY, period_no=1,
+                 actor="pytest", operator_user_ids=[1])
+        from app.domain.foundation import BusinessOperationOperator
+        operation = seeded_db.scalar(select(BusinessOperationOperator).where(
+            BusinessOperationOperator.entity_type == "installment",
+            BusinessOperationOperator.entity_id == contract.inst_no,
+            BusinessOperationOperator.operation_key.like("PAY:%"),
+        ))
+        scoped = CurrentUser.build(id=9, username="scoped-operator", roles=["OPERATOR"],
+                                   owner_scope="SELF", pool_ids=frozenset())
+        response = seeded_client.put(
+            f"/api/installments/{contract.id}/operation-operators/{operation.operation_key}",
+            json={"operator_user_ids": [2]},
+            headers={"Authorization": f"Bearer {build_access_token(scoped)}"},
+        )
+        assert response.status_code == 404, response.text
+        seeded_db.expire_all()
+        assert seeded_db.get(BusinessOperationOperator, operation.id).operator_user_ids == [1]
+        flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "INSTALLMENT",
+                                                      Cashflow.source_id == contract.inst_no))
+        assert flow.operator_user_ids == [1]
+
+    def test_default_payment_operator_matches_cashflow(self, seeded_client, seeded_db, headers):
+        order = _order(seeded_db)
+        contract = _contract(seeded_db, order.id, down_payment="0", periods=1, per_period="300")
+        inst_pay(seeded_db, contract.id, amount="50", paid_on=TODAY, period_no=1, actor="pytest")
+        response = seeded_client.get("/api/installments", headers=headers)
+        item = next(row for row in response.json()["items"] if row["id"] == contract.id)
+        payment = next(row for row in item["operation_operators"] if row["operation_key"].startswith("PAY:"))
+        flow = seeded_db.scalar(select(Cashflow).where(Cashflow.flow_no == payment["flow_no"]))
+        assert payment["operator_user_ids"]
+        assert flow.operator_user_ids == payment["operator_user_ids"]
+
     def test_list_endpoint_returns_order_context_from_database(
         self, seeded_client, seeded_db, headers
     ):

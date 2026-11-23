@@ -95,6 +95,7 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       <ErrorBanner error={summaryError} onRetry={() => void load()} />
       <Space wrap className="ui-filter-bar ui-filter-bar--spaced customer-list-filters">
         <SearchInput
+          className="ui-filter-search"
           aria-label="搜索客户"
           enterButton={(
             <PermissionGate permission="customer.read">

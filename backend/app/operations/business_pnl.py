@@ -31,7 +31,7 @@ from ._shared import (
     cashflow_totals_by_order,
 )
 
-def r5_business_pnl(
+def business_pnl_report(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None,
 ) -> dict[str, Any]:

@@ -58,6 +58,7 @@ export function buildOrderFormFieldColumns(params: {
           >
             <Switch
               checked={value}
+              disabled={Boolean(row.required_locked)}
               loading={togglingId === row.id}
               aria-label={`必填_${row.field_key}`}
               onChange={async (checked: boolean) => {
@@ -123,6 +124,7 @@ export function buildOrderFormFieldColumns(params: {
             <ConfirmButton
               permission="field-definition.manage"
               size="small"
+              disabled={Boolean(row.required_locked)}
               title={row.is_active ? `停用字段「${row.label}」` : `启用字段「${row.label}」`}
               description={row.is_active
                 ? "停用后该字段从建单表单消失（自定义字段值保留在订单数据中）。若被其它字段的条件必填引用，需先解除条件。"

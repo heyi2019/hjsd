@@ -29,7 +29,7 @@ export const sequencesApi = {
 };
 
 export const attachmentsApi = {
-  list: (entity_type: string, entity_id: string) => api.get<{ items: AttachmentItem[] }>("/attachments", { params: { entity_type, entity_id } }).then(r => r.data),
+  list: (entity_type: string, entity_id: string) => api.get<{ items: AttachmentItem[] }>("/attachments", { params: { entity_type, entity_id }, refreshCache: true } as CacheAwareRequestConfig).then(r => r.data),
   create: (data: Record<string, unknown>) => api.post<AttachmentItem>("/attachments", data).then(r => r.data),
   download: (id: number) => api.get<Blob>(`/attachments/${id}/download`, { responseType: "blob" }).then(r => r.data),
   remove: (id: number) => api.delete(`/attachments/${id}`).then(r => r.data),

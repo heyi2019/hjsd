@@ -69,6 +69,8 @@ export function setupInventoryWrite() {
       order_type: "HS",
       trade_date: "2026-10-15",
       status: "ACTIVE",
+      latest_sale_event_id: 33,
+      active_consignments: [],
       events: [{
         id: 31,
         event_no: "EV0001",

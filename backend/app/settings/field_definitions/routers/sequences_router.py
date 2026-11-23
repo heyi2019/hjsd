@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import CurrentUser
-from app.shared.numbering import format_next_number
+from app.shared.numbering import NOTIFICATION_MAX, format_next_number
+from app.domain.enums import SequenceKey
 from app.settings.field_definitions import schemas
 from app.settings.field_definitions.sequences import list_sequences as foundation_list_sequences
 from ._router_shared import manage_order_types
@@ -22,6 +23,7 @@ def list_sequences(
     del user
     result: list[schemas.SequenceOut] = []
     for sequence in foundation_list_sequences(db):
+        remaining = max(0, NOTIFICATION_MAX - sequence.current_value) if sequence.sequence_key == SequenceKey.NOTIFICATION.value else None
         next_number = format_next_number(
             sequence_key=sequence.sequence_key,
             prefix=sequence.prefix,
@@ -35,6 +37,8 @@ def list_sequences(
                 padding=sequence.padding,
                 current_value=sequence.current_value,
                 next_number=next_number,
+                remaining=remaining,
+                near_exhaustion=remaining is not None and remaining <= 100,
             )
         )
     return result

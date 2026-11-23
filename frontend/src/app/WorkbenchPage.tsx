@@ -35,7 +35,8 @@ export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }
         appMessage.warning(`未找到订单 ${target.order_no}`);
         return;
       }
-      onWorkbenchNavigate(`/business/ledger?allocation_order_id=${target.order_id}&keyword=${encodeURIComponent(target.order_no)}`);
+      const notificationQuery = notificationId === undefined ? "" : `&notification_id=${notificationId}`;
+      onWorkbenchNavigate(`/business/ledger?allocation_order_id=${target.order_id}${notificationQuery}&keyword=${encodeURIComponent(target.order_no)}`);
     } catch (error) {
       appMessage.error(normalizeError(error).message);
     }
@@ -77,7 +78,7 @@ export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }
         </Card>
         <Notifications
           onPartyNavigate={onWorkbenchNavigate}
-          onPendingProfitNotificationsClick={(notificationId) => void openPendingProfitAllocation(notificationId)}
+          onPendingProfitNotificationsClick={openPendingProfitAllocation}
           active={active}
         />
       </div>

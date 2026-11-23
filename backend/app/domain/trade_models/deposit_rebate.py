@@ -51,6 +51,10 @@ class Deposit(Base, AuditMixin):
             f"ledger_type IN {CashflowLedgerType.values()!r}".replace("[", "(").replace("]", ")"),
             name="deposit_ledger_type_valid",
         ),
+        CheckConstraint(
+            "ledger_type <> 'STUDIO' OR source_order_id IS NULL",
+            name="studio_deposit_no_order",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

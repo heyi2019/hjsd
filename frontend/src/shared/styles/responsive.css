@@ -125,12 +125,10 @@
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
   .ui-filter-bar.ant-space > * { flex: 0 1 auto; max-width: 100%; }
-  .customer-list-filters > :first-child,
-  .counterparty-filter-bar > :first-child,
-  .business-ledger-filters > :first-child { flex: 1 1 100%; }
-  .business-ledger-filters > :first-child .ui-ledger-search { width: 100%; }
+  .ui-filter-bar > .ant-space-item:has(> .ui-filter-search),
+  .ui-filter-bar > .ui-filter-search { flex: 1 1 100%; max-width: 100%; }
+  .ui-filter-bar .ui-filter-search { width: 100%; }
   .studio-expense-filters > * { flex: 0 1 auto; max-width: 100%; }
-  .ui-filter-bar.funds-cashflow-filters > :first-child { flex: 1 1 100%; max-width: 100%; }
   .ant-table-wrapper { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
   /* 单一滚动容器 = .ant-table-content（antd 默认已是 overflow-x:auto 的那层）：
      表宽取 max-content 撑开，横向滚动发生在 content 内而非 wrapper / page-content。
@@ -163,6 +161,17 @@
     background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
   }
   .ant-table-wrapper .ant-table-thead > tr > th:first-child { z-index: 3; }
+  /* 订单表带展开列：固定按列 key 标记的订单号，不固定展开按钮。 */
+  .orders-ledger .ant-table-tbody > tr > td:first-child,
+  .orders-ledger .ant-table-thead > tr > th:first-child { position: static; z-index: auto; background: unset; }
+  .orders-ledger .ant-table-tbody > tr > td.ui-col-mobile-identity,
+  .orders-ledger .ant-table-thead > tr > th.ui-col-mobile-identity {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 2;
+    background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
+  }
+  .orders-ledger .ant-table-thead > tr > th.ui-col-mobile-identity { z-index: 3; }
   /* 移动端隐藏列按列 key 打标（见 listColumns.ts 的 markMobileHiddenColumns）：
      列配置会过滤 / 排序，按 nth-child 物理序号隐藏会错位（实测曾把「状态」列藏掉）。
      th 靠 column.className、td 靠 onCell，必须双写；断点保持 ≤640px 不变。 */

@@ -86,25 +86,30 @@ def stats_audit_logs(
     """
     del user
     wanted = [item.strip() for item in entity_types.split(",") if item.strip()]
+    if not wanted:
+        return schemas.AuditEntityStatsOut(items=[])
+    grouped = (
+        select(AuditLog.entity_type.label("entity_type"), func.count().label("total_count"), func.max(AuditLog.id).label("last_id"))
+        .where(AuditLog.entity_type.in_(set(wanted)))
+        .group_by(AuditLog.entity_type)
+        .subquery()
+    )
+    results = {
+        row.entity_type: row
+        for row in db.execute(
+            select(grouped.c.entity_type, grouped.c.total_count, AuditLog.occurred_at, AuditLog.actor)
+            .join(AuditLog, AuditLog.id == grouped.c.last_id)
+        )
+    }
     items: list[schemas.AuditEntityStatOut] = []
     for entity_type in wanted:
-        count = db.scalar(
-            select(func.count())
-            .select_from(AuditLog)
-            .where(AuditLog.entity_type == entity_type)
-        )
-        last = db.scalars(
-            select(AuditLog)
-            .where(AuditLog.entity_type == entity_type)
-            .order_by(AuditLog.id.desc())
-            .limit(1)
-        ).first()
+        row = results.get(entity_type)
         items.append(
             schemas.AuditEntityStatOut(
                 entity_type=entity_type,
-                count=int(count or 0),
-                last_at=last.occurred_at if last else None,
-                last_actor=last.actor if last else None,
+                count=int(row.total_count) if row else 0,
+                last_at=row.occurred_at if row else None,
+                last_actor=row.actor if row else None,
             )
         )
     return schemas.AuditEntityStatsOut(items=items)

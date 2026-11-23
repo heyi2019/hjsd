@@ -1,4 +1,4 @@
-"""押金写路径：创建、编辑、删除。"""
+"""押金写路径：创建、编辑和凭证保留。"""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -32,6 +32,7 @@ from app.customers.counterparties import assert_counterparty_usable
 from .._common import _positive
 from ._shared import (
     _can_see_pool,
+    _deposit_actions,
     _locked_deposit,
     _normalize_ledger_type,
     _out_of_scope_error,
@@ -94,8 +95,7 @@ def create_deposit(
     )
     session.add(deposit)
     session.flush()
-    session.add(
-        Cashflow(
+    hold = Cashflow(
             flow_no=allocate_flow_no(session, Direction.OUT.value),
             pool_id=pool.id,
             occurred_on=paid_on,
@@ -110,8 +110,8 @@ def create_deposit(
             note="押金占用",
             created_by=actor,
             updated_by=actor,
-        )
     )
+    session.add(hold)
     session.flush()
     record_audit(
         session,
@@ -121,7 +121,7 @@ def create_deposit(
         actor=actor,
         after={"pool": pool.code, "amount": str(money)},
     )
-    upsert_operation_operators(
+    operation = upsert_operation_operators(
         session,
         entity_type="deposit",
         entity_id=deposit.id,
@@ -130,6 +130,8 @@ def create_deposit(
         operator_user_ids=operator_user_ids,
         occurred_at=deposit.created_at,
     )
+    hold.operator_user_ids = list(operation.operator_user_ids)
+    session.flush()
     return deposit
 
 
@@ -140,9 +142,9 @@ def _editable_deposit(
     user: CurrentUser | None = None,
 ) -> Deposit:
     deposit = _locked_deposit(session, deposit_id, user)
-    if deposit.status != DepositStatus.PAID.value or to_money(deposit.returned_amount) > 0 or to_money(deposit.lost_amount) > 0:
+    if "EDIT" not in _deposit_actions(deposit):
         raise Validation(
-            "只有未发生退还/损失的押金可编辑或删除",
+            "只有未发生退还/损失的押金可编辑",
             details={
                 "deposit_id": deposit.id,
                 "status": deposit.status,
@@ -272,28 +274,5 @@ def delete_deposit(
     actor: str,
     user: CurrentUser | None = None,
 ) -> None:
-    deposit = _editable_deposit(session, deposit_id, user=user)
-    before = {
-        "pool_id": deposit.pool_id,
-        "amount": str(to_money(deposit.paid_amount)),
-        "paid_on": deposit.paid_on.isoformat(),
-    }
-    flows = list(session.scalars(select(Cashflow).where(
-        Cashflow.source_type == CashflowSourceType.DEPOSIT.value,
-        Cashflow.source_id == str(deposit.id),
-    )).all())
-    if any(flow.category != "DEPOSIT_HOLD" or flow.direction != Direction.OUT.value for flow in flows):
-        raise Validation("押金已产生后续资金流水，不能直接删除", details={"deposit_id": deposit.id})
-    for flow in flows:
-        session.delete(flow)
-    session.delete(deposit)
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.DEPOSIT_DELETE,
-        entity_type="deposit",
-        entity_id=str(deposit_id),
-        actor=actor,
-        before=before,
-        after={"deleted": True},
-    )
+    _locked_deposit(session, deposit_id, user)
+    raise Validation("押金不能删除，请使用取消或退还处理", details={"deposit_id": deposit_id})

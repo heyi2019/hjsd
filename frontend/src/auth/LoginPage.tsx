@@ -6,10 +6,11 @@ import {
 } from "../shared/api/client";
 import { useSession } from "../shared/state/session";
 import { LoginAside } from "./LoginAside";
+import projectVersion from "../../../VERSION?raw";
 
 /** 登录页只提供账号密码登录；账号需先在「设置-用户」中由管理员创建。 */
 export function LoginPage() {
-  const { login } = useSession();
+  const { login, sessionError } = useSession();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -44,24 +45,24 @@ export function LoginPage() {
           <h2>登录工作台</h2>
           <p className="login-sub">请输入账号和密码，开始今天的工作。</p>
         </div>
-        {error ? <div id="login-error" className="error" role="alert">{error}</div> : null}
+        {error || sessionError ? <div id="login-error" className="error" role="alert">{error || sessionError}</div> : null}
         <div className="login-actions">
               <Form layout="vertical" onFinish={submit}>
                 <Form.Item name="username" label="用户名" rules={[{ required: true, message: "请输入用户名" }]}>
-                  <Input autoFocus autoComplete="username" placeholder="请输入用户名" aria-describedby={error ? "login-error" : undefined} />
+                  <Input autoFocus autoComplete="username" placeholder="请输入用户名" aria-describedby={error || sessionError ? "login-error" : undefined} />
                 </Form.Item>
                 <Form.Item
                   name="password"
                   label="密码"
                   rules={[{ required: !import.meta.env.DEV, message: "请输入密码" }]}
                 >
-                  <Input.Password autoComplete="current-password" placeholder="请输入密码" aria-describedby={error ? "login-error" : undefined} />
+                  <Input.Password autoComplete="current-password" placeholder="请输入密码" aria-describedby={error || sessionError ? "login-error" : undefined} />
                 </Form.Item>
                 <Button type="primary" htmlType="submit" block loading={submitting}>登录</Button>
               </Form>
         </div>
 
-        <p className="login-card-foot">账号由管理员创建，如需帮助请联系管理员</p>
+        <div className="login-card-foot"><p>账号由管理员创建，如需帮助请联系管理员</p><span>V{projectVersion.trim()}</span></div>
       </Card>
     </main>
   );

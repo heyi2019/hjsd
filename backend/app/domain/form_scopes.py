@@ -11,6 +11,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# 这些字段由客户需求接口契约强制要求，设置只能改展示名称和排序。
+REQUIRED_CORE_FIELDS: dict[str, frozenset[str]] = {
+    "LEAD": frozenset({"customer_id", "request_type", "target"}),
+    "LEADCLOSE": frozenset({"reason"}),
+    "LEADCONVERT": frozenset({"order_id"}),
+}
+
 
 @dataclass(frozen=True)
 class FormScope:

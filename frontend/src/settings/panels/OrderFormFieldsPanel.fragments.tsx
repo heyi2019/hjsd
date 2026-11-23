@@ -40,7 +40,6 @@ export const ORDER_SCOPE_OPTIONS = [
   { value: "DG", label: "代挂" },
 ];
 export const ORDER_SCOPE_CODES = new Set(ORDER_SCOPE_OPTIONS.map((item) => item.value));
-export const SECTION_ORDER_STORAGE_KEY = "heijin.form-field-section-order";
 export const DEFAULT_SECTION_ORDER = FIELD_SECTION_OPTIONS.map((item) => item.value);
 export type SectionManagementRow = {
   value: string;

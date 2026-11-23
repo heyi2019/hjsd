@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { LoginPage } from "@/auth/LoginPage";
+import projectVersion from "../../../../VERSION?raw";
 
 import * as client from "@/shared/api/client";
 vi.mock("@/shared/api/client", async (importOriginal) => ({
@@ -33,6 +34,7 @@ describe("LoginPage：后端前置检查", () => {
     expect(screen.getByLabelText("用户名")).toHaveAttribute("autocomplete", "username");
     expect(screen.getByLabelText("密码")).toHaveAttribute("autocomplete", "current-password");
     expect(screen.getByRole("button", { name: "登录" })).toBeInTheDocument();
+    expect(screen.getByText(`V${projectVersion.trim()}`)).toBeInTheDocument();
   });
 
   it("后端不可达时显示连接提示，而不是等待登录后才报 500", async () => {

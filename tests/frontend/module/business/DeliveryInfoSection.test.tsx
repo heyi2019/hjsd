@@ -9,6 +9,7 @@ import { DeliveryInfoSection } from "@/business/shared/forms/DeliveryInfoSection
 import { renderLight } from "@fixtures/render";
 
 vi.mock("@/shared/lib/optionSets", () => ({
+  useOptionSetResource: () => ({ options: [{ value: "淘宝", label: "淘宝" }, { value: "其他", label: "其他" }], loading: false, error: null, retry: vi.fn() }),
   useOptionSet: (code: string) =>
     code === "INTERMEDIARY_PLATFORM"
       ? [

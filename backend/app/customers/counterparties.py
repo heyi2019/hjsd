@@ -186,12 +186,16 @@ def update_counterparty(
                  **(item.form_extra or {}), **normalized_fields},
         changed_fields=normalized_fields,
     )
+    before = {name: getattr(item, name) for name in normalized_fields}
+    if values:
+        before["extra_values"] = {key: (item.form_extra or {}).get(key) for key in values}
     for name, value in normalized_fields.items():
         setattr(item, name, value)
     item.updated_by = actor
     session.flush()
+    saved_extras = {}
     if extra_values is not _UNSET:
-        set_extra_values(
+        saved_extras = set_extra_values(
             session,
             entity_type=EntityType.COUNTERPARTY.value,
             entity_id=item.id,
@@ -203,7 +207,13 @@ def update_counterparty(
         entity_type="counterparty",
         entity_id=item.counterparty_no,
         actor=actor,
-        after={"display_name": item.display_name, "status": item.status},
+        before=before,
+        after={
+            "display_name": item.display_name,
+            "status": item.status,
+            **{name: getattr(item, name) for name in normalized_fields},
+            **({"extra_values": saved_extras} if saved_extras else {}),
+        },
     )
     return item
 

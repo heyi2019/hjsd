@@ -4,18 +4,40 @@
 """
 from __future__ import annotations
 
-from collections.abc import Iterable
 from decimal import Decimal
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFound, Validation
+from app.core.errors import Conflict, NotFound, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import CashflowLedgerType, DepositStatus
 from app.domain.trade import Deposit
+from app.shared.order_access import lock_order_reference
 
 
 # ------------------------------------------------------------ 押金派生规则（单一来源）
+def deposit_available_actions(
+    status: str, paid_amount: Decimal, returned_amount: Decimal, lost_amount: Decimal,
+) -> list[str]:
+    """由后端统一决定押金的业务动作，写入时仍重新加锁校验。"""
+    paid = to_money(paid_amount)
+    returned = to_money(returned_amount)
+    lost = to_money(lost_amount)
+    actions: list[str] = []
+    if status == DepositStatus.PAID.value and returned <= 0 and lost <= 0:
+        actions.extend(("EDIT", "CANCEL"))
+    if status in (DepositStatus.PAID.value, DepositStatus.PARTIALLY_RETURNED.value) and paid - returned - lost > 0:
+        actions.extend(("RETURN", "LOSS"))
+    return actions
+
+
+def _deposit_actions(deposit: Deposit) -> list[str]:
+    return deposit_available_actions(
+        deposit.status, deposit.paid_amount, deposit.returned_amount, deposit.lost_amount,
+    )
+
+
 def _outstanding(deposit: Deposit) -> Decimal:
     """未释放余额 = 实缴 − 已退 − 已损失（退还/没收共用同一口径）。"""
     return (
@@ -55,8 +77,7 @@ def _assert_returnable(deposit: Deposit, action: str) -> None:
     RETURNED/LOST 是终态。前端靠按钮 disabled 挡住正常点击，但 API 可被直调，
     故服务端必须拦截，否则 CANCELLED 押金可再次释放造成重复入账。
     """
-    allowed = (DepositStatus.PAID.value, DepositStatus.PARTIALLY_RETURNED.value)
-    if deposit.status not in allowed:
+    if "RETURN" not in _deposit_actions(deposit):
         raise Validation(
             f"{action}仅适用于未结清的押金",
             details={"deposit_id": deposit.id, "status": deposit.status},
@@ -89,19 +110,6 @@ def _can_see_pool(user: CurrentUser | None, pool_id: int) -> bool:
     return user is None or user.can_see_pool(pool_id)
 
 
-def _is_scope_all(user: CurrentUser | None) -> bool:
-    """用户是否不受池范围约束（管理员或 owner_scope=ALL）。"""
-    return user is None or user.is_admin or user.owner_scope == "ALL"
-
-
-def _visible_pool_ids(user: CurrentUser | None, pool_ids: Iterable[int]) -> list[int]:
-    """按用户池范围过滤候选池 ID（list_deposits 用）。"""
-    ids = list(pool_ids)
-    if _is_scope_all(user):
-        return ids
-    return [pool for pool in ids if user.can_see_pool(pool)]  # type: ignore[union-attr]
-
-
 def _out_of_scope_error(pool_id: int) -> NotFound:
     return NotFound("资金账户不存在", details={"pool_id": pool_id})
 
@@ -111,10 +119,19 @@ def _deposit_not_found(deposit_id: int) -> NotFound:
 
 
 def _locked_deposit(session: Session, deposit_id: int, user: CurrentUser | None) -> Deposit:
-    """串行化押金操作并重新读取状态，避免并发请求使用过期余额。"""
+    """先锁来源订单，再锁押金，避免与订单日期平移的锁顺序相反。"""
+    current = session.execute(
+        select(Deposit.pool_id, Deposit.source_order_id).where(Deposit.id == deposit_id)
+    ).one_or_none()
+    if current is None or not _can_see_pool(user, current.pool_id):
+        raise _deposit_not_found(deposit_id)
+    if current.source_order_id is not None:
+        lock_order_reference(session, current.source_order_id)
     deposit = session.get(Deposit, deposit_id, with_for_update=True, populate_existing=True)
     if deposit is None or not _can_see_pool(user, deposit.pool_id):
         raise _deposit_not_found(deposit_id)
+    if deposit.source_order_id != current.source_order_id:
+        raise Conflict("押金来源订单已变化，请刷新后重试")
     return deposit
 
 

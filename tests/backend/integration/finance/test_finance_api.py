@@ -19,6 +19,7 @@ from app.domain.trade import Cashflow, OrderFormField
 from app.funds.cashflow_queries import list_cashflows
 from app.funds.cashflows import create_cashflow
 from app.funds.deposits.writes import create_deposit
+from app.funds.deposits.lifecycle import lose_deposit, return_deposit
 from app.funds.deposits.reads import list_deposits
 from app.funds.rebates import create_rebate
 from app.funds.transfers import create_transfer, repair_transfer
@@ -28,6 +29,61 @@ from app.business.orders.events import post_event
 from app.funds.balances import pool_balance
 
 TODAY = date(2026, 10, 4)
+
+
+def test_deposit_available_actions_follow_lifecycle(seeded_client, seeded_db, headers):
+    deposit = create_deposit(seeded_db, pool_id=1, amount="100", paid_on=TODAY, actor="pytest")
+
+    def actions():
+        response = seeded_client.get("/api/deposits", headers=headers)
+        assert response.status_code == 200, response.text
+        return next(row["available_actions"] for row in response.json() if row["id"] == deposit.id)
+
+    assert set(actions()) == {"EDIT", "CANCEL", "RETURN", "LOSS"}
+    lose_deposit(seeded_db, deposit.id, amount="30", lost_on=TODAY,
+                 category="OTHER", reason="损失", actor="pytest")
+    assert set(actions()) == {"RETURN", "LOSS"}
+    return_deposit(seeded_db, deposit.id, amount="70", released_on=TODAY, actor="pytest")
+    assert actions() == []
+
+
+def test_deposit_partial_actions_keep_each_flow_operator(seeded_client, seeded_db, headers):
+    deposit = create_deposit(seeded_db, pool_id=1, amount="100", paid_on=TODAY,
+                             actor="pytest", operator_user_ids=[1])
+    return_deposit(seeded_db, deposit.id, amount="20", released_on=TODAY,
+                   actor="pytest", operator_user_ids=[1])
+    return_deposit(seeded_db, deposit.id, amount="30", released_on=TODAY,
+                   actor="pytest", operator_user_ids=[2])
+    loss = lose_deposit(seeded_db, deposit.id, amount="10", lost_on=TODAY,
+                        category="OTHER", reason="损失", actor="pytest", operator_user_ids=[1, 2])
+
+    response = seeded_client.get("/api/deposits/page", headers=headers)
+    assert response.status_code == 200, response.text
+    item = next(row for row in response.json()["items"] if row["id"] == deposit.id)
+    history = item["action_history"]
+    assert [(row["action"], row["operator_user_ids"]) for row in history] == [
+        ("HOLD", [1]), ("RETURN", [1]), ("RETURN", [2]), ("LOSS", [1, 2]),
+    ]
+    assert history[-1]["flow_no"] == loss.flow_no
+    cashflows = seeded_client.get("/api/cashflows", headers=headers).json()["items"]
+    recorded = {row["flow_no"]: row["operator_user_ids"] for row in cashflows}
+    assert all(recorded[row["flow_no"]] == row["operator_user_ids"] for row in history)
+
+
+def test_reconciliation_and_snapshots_require_finance_read_even_with_pool_access(seeded_client, seeded_db, headers):
+    from app.settings.auth.session import get_current_user
+
+    create_reconciliation(seeded_db, pool_id=1, reconciled_on=TODAY,
+                          account_label="权限测试", statement_balance="0", actor="pytest")
+    employee = CurrentUser.build(id=6, username="employee", roles=["EMPLOYEE"], pool_ids=frozenset({1}))
+    seeded_client.app.dependency_overrides[get_current_user] = lambda: employee
+    try:
+        for path in ("/api/reconciliations", "/api/reconciliations/page", "/api/balance-snapshots"):
+            response = seeded_client.get(path, headers=headers, params={"pool_id": 1})
+            assert response.status_code == 403, (path, response.text)
+    finally:
+        seeded_client.app.dependency_overrides.pop(get_current_user, None)
+    assert seeded_client.get("/api/reconciliations", headers=headers, params={"pool_id": 1}).status_code == 200
 
 
 @pytest.mark.parametrize("kind", ["deposit", "reconciliation"])
@@ -116,6 +172,22 @@ def _active_order(seeded_db) -> int:
         occurred_on=TODAY, actor="pytest",
     )
     return order.id
+
+
+def test_rebate_receipt_cannot_be_voided_through_generic_cashflow_reversal(seeded_client, seeded_db, headers):
+    order_id = _active_order(seeded_db)
+    rebate = create_rebate(seeded_db, source_order_id=order_id, rebate_type="BUY",
+                           amount="50", collected_on=TODAY, actor="pytest")
+    from app.domain.trade import OrderEvent
+    event = seeded_db.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == event.event_no))
+
+    response = seeded_client.post(f"/api/cashflows/{flow.id}/reverse", headers=headers,
+                                  json={"reversed_on": TODAY.isoformat(), "reason": "尝试作废返点"})
+    assert response.status_code == 422, response.text
+    assert "返点不可冲销" in response.text
+    assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.source_type == "REVERSAL", Cashflow.source_id == flow.flow_no)) is None
+    assert rebate.amount == Decimal("50.00")
 
 
 class TestFinanceApi:

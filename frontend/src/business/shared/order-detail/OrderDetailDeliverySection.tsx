@@ -35,6 +35,10 @@ const DELIVERY_FIELDS = [
 ] as const;
 const SALE_SCOPES: Record<string, string> = { HS: "SALEREC", TH: "SALETH", DG: "SALEDG" };
 
+export function findCurrentSaleEvent(order: AccountExecutionOrder | undefined): AccountExecutionEvent | undefined {
+  return order?.latest_sale_event_id == null ? undefined : order.events.find((event) => event.id === order.latest_sale_event_id && event.event_type === "SELL");
+}
+
 function textValue(value: unknown): string {
   return typeof value === "string" && value.trim() ? value : "-";
 }
@@ -254,15 +258,10 @@ export function OrderDetailDeliverySection({
     [detail, meta.sourceOrderNo],
   );
   const sellOrder = useMemo(
-    () => detail?.orders.find(
-      (order) => order.events.some((event) => event.event_type === "SELL"),
-    ),
+    () => detail?.orders.find((order) => order.latest_sale_event_id != null),
     [detail],
   );
-  const sellEvent = useMemo(() => sellOrder?.events
-    .filter((event) => event.event_type === "SELL")
-    .reduce<AccountExecutionEvent | undefined>((latest, event) => !latest || event.id > latest.id ? event : latest, undefined),
-  [sellOrder]);
+  const sellEvent = useMemo(() => findCurrentSaleEvent(sellOrder), [sellOrder]);
   const saleScope = sellOrder ? SALE_SCOPES[sellOrder.order_type] ?? sellOrder.order_type : undefined;
 
   if (editing) {

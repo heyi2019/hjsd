@@ -13,7 +13,7 @@ from app.core.money import to_money
 from app.shared.operation_operators import upsert_operation_operators
 from app.domain.enums import AuditAction, ScheduleStatus
 from app.domain.trade import InstallmentSchedule
-from .._shared import SCHEDULE_CLOSED_STATUSES, _merge_form_extra, _required_text, get_installment
+from .._shared import SCHEDULE_CLOSED_STATUSES, _merge_form_extra, _required_text, _restore_when_overdue_cleared, get_installment
 
 def extend_schedule(
     session: Session,
@@ -49,14 +49,17 @@ def extend_schedule(
         raise Validation("已收期不可展期", details={"period_no": period_no})
     if schedule.status in {ScheduleStatus.PAID.value, ScheduleStatus.WAIVED.value}:
         raise Validation("已完成期次不可展期", details={"period_no": period_no})
+    if to_money(schedule.received_amount) + to_money(schedule.waived_amount) >= to_money(schedule.due_amount):
+        raise Validation("该期没有剩余应收，不可展期", details={"period_no": period_no})
     if new_due_on <= schedule.due_on:
         raise Validation("展期后的到期日必须晚于原到期日", details={"field": "new_due_on"})
     original_due_on = schedule.due_on
     schedule.due_on = new_due_on
-    if schedule.status == ScheduleStatus.OVERDUE.value:
+    if schedule.status == ScheduleStatus.OVERDUE.value and new_due_on >= date.today():
         schedule.status = ScheduleStatus.PENDING.value
     installment.updated_by = actor
     session.flush()
+    _restore_when_overdue_cleared(session, installment)
     record_audit(
         session,
         action=AuditAction.INSTALLMENT_EXTEND,

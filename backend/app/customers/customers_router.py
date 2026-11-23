@@ -93,7 +93,7 @@ def list_customers(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
     )
     activity = get_customer_activity_summary(
-        db, [item.id for item in customers]
+        db, [item.id for item in customers], user=user
     )
     return PageOut(
         items=[
@@ -144,6 +144,7 @@ def export_customers_csv(
     keyword: str | None = Query(default=None),
     status: str | None = Query(default=None),
     created_by: list[str] | None = Query(default=None),
+    sort_desc: bool = Query(default=False),
     order_filter: dict = Depends(mine_order_filter),
     created_filter: dict = Depends(created_date_filter),
     db: Session = Depends(get_db),
@@ -152,12 +153,12 @@ def export_customers_csv(
     """客户按可见列导出 CSV：同 /customers 筛选口径。"""
     _limit_customer_access(user, "export", 30)
     customers = parties_list_customers(
-        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=None, offset=0, **order_filter, **created_filter
+        db, keyword=keyword, status=status, created_by=created_by, user=user, limit=None, offset=0, sort_desc=sort_desc, **order_filter, **created_filter
     )
     extras = get_extra_values_bulk(
         db, entity_type="customer", entity_ids=[item.id for item in customers]
     )
-    activity = get_customer_activity_summary(db, [item.id for item in customers])
+    activity = get_customer_activity_summary(db, [item.id for item in customers], user=user)
     rows = [
         to_customer_out(
             item,

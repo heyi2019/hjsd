@@ -48,6 +48,7 @@ def pending_profit_order(
             Notification.recipient_user_id == user.id,
             Notification.notification_type == service.PROFIT_PENDING,
             Notification.entity_type == "order",
+            query.visibility_filter(db, user),
         ))
         items = [item] if item else []
     else:
@@ -56,6 +57,7 @@ def pending_profit_order(
             Notification.read_at.is_(None),
             Notification.notification_type == service.PROFIT_PENDING,
             Notification.entity_type == "order",
+            query.visibility_filter(db, user),
         ).order_by(Notification.id.desc()).limit(1))
         items = [item] if item else []
     if not items:

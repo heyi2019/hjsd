@@ -2,15 +2,200 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import csv
+import io
+from concurrent.futures import ThreadPoolExecutor
+from threading import Event
+from uuid import uuid4
 
 import pytest
+from sqlalchemy import create_engine, event, select
+from sqlalchemy.orm import sessionmaker
 
 from app.business.orders.create import create_order
 from app.business.shared.form_config.form_fields import create_order_form_field
 from app.domain.trade import OrderFormField
 from app.customers.customers import create_customer
 from app.customers.counterparties import create_counterparty
-from app.customers.leads import create_lead
+from app.customers.leads import close_lead, convert_lead, create_lead
+from app.core.errors import Conflict, Validation
+from app.customers.customer_merge import merge_customers
+from app.customers.customers import set_customer_status, update_customer
+from app.domain.base import Base
+from app.domain.parties import Customer, CustomerLead, OrderCustomerRole
+from app.domain.users import User
+from app.settings.field_definitions.seeds import seed_foundation
+
+pytestmark = pytest.mark.db
+
+
+@pytest.fixture
+def concurrent_customer_factory(v1_engine):
+    database = f"heijin_customer_race_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            session.add(User(username="pytest", display_name="测试", password_hash="unused"))
+            session.commit()
+        yield factory
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
+
+
+@pytest.mark.parametrize("first_action", ["close", "convert"])
+def test_competing_lead_actions_recheck_latest_status(concurrent_customer_factory, first_action):
+    factory = concurrent_customer_factory
+    with factory() as session:
+        customer = create_customer(session, display_name="并发需求", actor="pytest")
+        order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest")
+        lead = create_lead(session, customer_id=customer.id, request_type="FIND_ACCOUNT", target="测试", actor="pytest")
+        lead_id, order_no = lead.id, order.order_no
+        session.commit()
+
+    def perform(session, action):
+        if action == "close":
+            close_lead(session, lead_id, reason="结束", actor="pytest")
+        else:
+            convert_lead(session, lead_id, order_no=order_no, actor="pytest")
+
+    ready, proceed, waiting = Event(), Event(), Event()
+
+    def competitor():
+        with factory() as session:
+            stale = session.get(CustomerLead, lead_id)
+            assert stale.status == "OPEN"
+            def before(_conn, _cursor, statement, _parameters, _context, _many):
+                sql = statement.lower()
+                if ("from customer_leads" in sql and "for update" in sql) or "update customer_leads" in sql:
+                    waiting.set()
+            event.listen(session.connection(), "before_cursor_execute", before)
+            ready.set()
+            assert proceed.wait(10)
+            try:
+                perform(session, "convert" if first_action == "close" else "close")
+                session.commit()
+                return "accepted"
+            except Conflict:
+                session.rollback()
+                return "rejected"
+
+    with ThreadPoolExecutor(max_workers=1) as executor, factory() as first:
+        future = executor.submit(competitor)
+        try:
+            assert ready.wait(10)
+            perform(first, first_action)
+            proceed.set()
+            assert waiting.wait(10)
+            first.commit()
+            assert future.result(timeout=10) == "rejected"
+        finally:
+            proceed.set()
+            first.rollback()
+    with factory() as session:
+        lead = session.get(CustomerLead, lead_id)
+        assert lead.status == ("CLOSED" if first_action == "close" else "CONVERTED")
+        assert (lead.converted_order_id is None) == (first_action == "close")
+        assert (lead.closed_reason is None) == (first_action == "convert")
+
+
+@pytest.mark.parametrize("second_action", ["merge", "create_lead", "update", "disable"])
+def test_customer_merge_serializes_competing_writes(concurrent_customer_factory, second_action):
+    factory = concurrent_customer_factory
+    with factory() as session:
+        source = create_customer(session, display_name="源客户", actor="pytest")
+        target = create_customer(session, display_name="目标客户", actor="pytest")
+        other = create_customer(session, display_name="另一目标", actor="pytest")
+        order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", customer_roles=[(source.id, "SELLER")])
+        source_id, target_id, other_id, order_id = source.id, target.id, other.id, order.id
+        session.commit()
+    ready, proceed, waiting = Event(), Event(), Event()
+
+    def competitor():
+        with factory() as session:
+            stale = session.get(Customer, source_id)
+            assert stale.status == "ACTIVE"
+            def before(_conn, _cursor, statement, _parameters, _context, _many):
+                sql = statement.lower()
+                if ("from customers" in sql and ("for update" in sql or "for key share" in sql)) or "update customers" in sql or "insert into customer_leads" in sql:
+                    waiting.set()
+            event.listen(session.connection(), "before_cursor_execute", before)
+            ready.set()
+            assert proceed.wait(10)
+            try:
+                if second_action == "merge":
+                    merge_customers(session, source_customer_id=source_id, target_customer_id=other_id, reason="重复", actor="pytest")
+                elif second_action == "create_lead":
+                    create_lead(session, customer_id=source_id, request_type="FIND_ACCOUNT", target="测试", actor="pytest")
+                elif second_action == "update":
+                    update_customer(session, source_id, display_name="不应写入", actor="pytest")
+                else:
+                    set_customer_status(session, source_id, "DISABLED", actor="pytest")
+                session.commit()
+                return "accepted"
+            except (Conflict, Validation):
+                session.rollback()
+                return "rejected"
+
+    with ThreadPoolExecutor(max_workers=1) as executor, factory() as first:
+        future = executor.submit(competitor)
+        try:
+            assert ready.wait(10)
+            merge_customers(first, source_customer_id=source_id, target_customer_id=target_id, reason="重复", actor="pytest")
+            proceed.set()
+            assert waiting.wait(10)
+            first.commit()
+            assert future.result(timeout=10) == "rejected"
+        finally:
+            proceed.set()
+            first.rollback()
+    with factory() as session:
+        source = session.get(Customer, source_id)
+        assert source.status == "MERGED" and source.merged_into_id == target_id
+        assert source.display_name == "源客户"
+        assert session.scalar(select(OrderCustomerRole.customer_id).where(OrderCustomerRole.order_id == order_id)) == target_id
+        assert not session.scalars(select(CustomerLead).where(CustomerLead.customer_id == source_id)).all()
+
+
+def test_merge_waits_for_new_lead_then_migrates_it(concurrent_customer_factory):
+    factory = concurrent_customer_factory
+    with factory() as session:
+        source = create_customer(session, display_name="源客户", actor="pytest")
+        target = create_customer(session, display_name="目标客户", actor="pytest")
+        source_id, target_id = source.id, target.id
+        session.commit()
+    reached = Event()
+
+    def merge():
+        with factory() as session:
+            def before(_conn, _cursor, statement, _parameters, _context, _many):
+                sql = statement.lower()
+                if ("from customers" in sql and "for update" in sql) or "update customers" in sql:
+                    reached.set()
+            event.listen(session.connection(), "before_cursor_execute", before)
+            merge_customers(session, source_customer_id=source_id, target_customer_id=target_id, reason="重复", actor="pytest")
+            session.commit()
+
+    with ThreadPoolExecutor(max_workers=1) as executor, factory() as first:
+        lead = create_lead(first, customer_id=source_id, request_type="FIND_ACCOUNT", target="并发需求", actor="pytest")
+        lead_id = lead.id
+        future = executor.submit(merge)
+        try:
+            assert reached.wait(10)
+            first.commit()
+            future.result(timeout=10)
+        finally:
+            first.rollback()
+    with factory() as session:
+        assert session.get(CustomerLead, lead_id).customer_id == target_id
 
 
 def test_lead_conditional_field_can_depend_on_core_fields(seeded_client, seeded_db, headers):
@@ -96,6 +281,23 @@ def test_customer_center_creation_period_filters_lists_summaries_and_export(seed
     exported = seeded_client.get("/api/customers/export.csv", params=params, headers=headers)
     assert "周期客户0" in exported.text and "周期客户1" not in exported.text
     assert seeded_client.get("/api/customers", params={"created_from": "2026-12-16", "created_to": "2026-12-15"}, headers=headers).status_code == 422
+
+
+@pytest.mark.parametrize("descending", [False, True])
+def test_customer_export_matches_list_order_and_filters(seeded_client, seeded_db, headers, descending):
+    customers = [create_customer(seeded_db, display_name=f"导出排序{index}", actor="pytest") for index in range(3)]
+    customers[0].created_at = datetime(2026, 1, 1, 10)
+    customers[1].created_at = datetime(2026, 1, 2, 10)
+    customers[2].created_at = datetime(2026, 1, 2, 10)
+    create_customer(seeded_db, display_name="不属于筛选", actor="pytest")
+    seeded_db.flush()
+    params = {"keyword": "导出排序", "sort_desc": str(descending).lower()}
+    listed = seeded_client.get("/api/customers", params=params, headers=headers)
+    exported = seeded_client.get("/api/customers/export.csv", params=params, headers=headers)
+    assert listed.status_code == 200, listed.text
+    assert exported.status_code == 200, exported.text
+    rows = list(csv.DictReader(io.StringIO(exported.content.decode("utf-8-sig"))))
+    assert [row["客户编号"] for row in rows] == [item["customer_no"] for item in listed.json()["items"]]
 
 
 def test_lead_lifecycle_and_manual_order_conversion(seeded_client, seeded_db, headers):

@@ -1,4 +1,4 @@
-/* 登录与首次改密共用浅色入口，独立于工作台的明暗主题。 */
+/* 登录与首次改密共用固定深色卡片，独立于工作台的明暗主题。 */
 .login-card h1 { font: var(--font-h1); letter-spacing: var(--ls-tight); }
 .login-card label { font: var(--font-body-s); }
 
@@ -78,42 +78,42 @@
   top: 0;
   width: 100%;
   max-width: 420px;
-  border: 1px solid #e5edf7;
+  border: 1px solid #33445d;
   border-radius: 24px;
   overflow: hidden;
-  background: #fff;
-  color: #17233b;
-  box-shadow: 0 24px 72px rgba(36, 69, 114, .11), 0 2px 8px rgba(36, 69, 114, .04);
+  background: #162236;
+  color: #eef4ff;
+  box-shadow: 0 24px 72px rgba(17, 30, 50, .24), 0 2px 8px rgba(17, 30, 50, .12);
   backdrop-filter: none;
 }
 .login-shell .login-card.ant-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 3px; background: linear-gradient(90deg, #0a63d8, #78b7ff); }
 .login-shell .login-card .ant-card-body { display: flex; flex-direction: column; gap: 28px; padding: clamp(30px, 3.2vw, 42px) !important; }
 .login-shell .login-card-head { display: grid; gap: 9px; }
-.login-shell .login-card-head .login-kicker { margin: 0; color: #0a63d8; font-size: 12px; letter-spacing: .08em; }
-.login-shell .login-card-head h2, .login-shell .login-card h1 { margin: 0; color: #17233b; font-size: 28px; line-height: 1.25; letter-spacing: -.03em; }
+.login-shell .login-card-head .login-kicker { margin: 0; color: #82b6ff; font-size: 12px; letter-spacing: .08em; }
+.login-shell .login-card-head h2, .login-shell .login-card h1 { margin: 0; color: #f4f7ff; font-size: 28px; line-height: 1.25; letter-spacing: -.03em; }
 .login-shell .login-card-head h2 { font-weight: 650; }
-.login-shell .login-card .login-sub { margin: 0; color: #596b82; font-size: 14px; line-height: 1.6; }
+.login-shell .login-card .login-sub { margin: 0; color: #b9c9dd; font-size: 14px; line-height: 1.6; }
 .login-shell .login-card .ant-form { display: grid; gap: 3px; }
 .login-shell .login-card .ant-form-item { margin-bottom: 16px; }
 .login-shell .login-card .ant-form > .ant-btn-primary { margin-block-start: var(--space-2); }
 .login-shell .login-card .ant-form-item .ant-form-item-row { flex-direction: column !important; }
 .login-shell .login-card .ant-form-item .ant-form-item-label { flex: none !important; max-width: none !important; overflow: visible !important; padding-block-end: var(--space-1); padding-right: 0 !important; text-align: left !important; }
 .login-shell .login-card .ant-form-item .ant-form-item-control { max-width: 100%; }
-.login-shell .login-card .ant-form-item .ant-form-item-label > label { color: #344860 !important; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.login-shell .login-card .ant-form-item .ant-form-item-label > label { color: #d9e5f4 !important; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .login-shell .login-card .ant-input:not(.ant-input-affix-wrapper .ant-input),
 .login-shell .login-card .ant-input-affix-wrapper {
-  height: 46px !important;
-  min-height: 46px !important;
-  border: 1px solid #dce5f0 !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  border: 1px solid #475b74 !important;
   border-radius: 10px;
-  background: #f9fbfe !important;
-  color: #17233b !important;
+  background: #24334a !important;
+  color: #f4f7ff !important;
   box-shadow: none !important;
 }
-.login-shell .login-card .ant-input:not(.ant-input-affix-wrapper .ant-input) { padding-block: 0; line-height: 44px; }
+.login-shell .login-card .ant-input:not(.ant-input-affix-wrapper .ant-input) { padding-block: 0; line-height: 34px; }
 .login-shell .login-card .ant-input-affix-wrapper { display: inline-flex; align-items: center; padding-block: 0; }
 .login-shell .login-card input,
-:root[data-theme="dark"] .login-shell .login-card input { color: #17233b !important; background: #f9fbfe !important; }
+:root[data-theme="dark"] .login-shell .login-card input { color: #f4f7ff !important; background: #24334a !important; }
 .login-shell .login-card .ant-input-affix-wrapper .ant-input,
 :root[data-theme="dark"] .login-shell .login-card .ant-input-affix-wrapper .ant-input {
   height: 100% !important;
@@ -124,18 +124,19 @@
   background: transparent !important;
   box-shadow: none !important;
 }
-.login-shell .login-card input::placeholder { color: #a5b1c0; }
+.login-shell .login-card input::placeholder { color: #aab9cb; }
 .login-shell .login-card .ant-input:not(.ant-input-affix-wrapper .ant-input):focus,
-.login-shell .login-card .ant-input-affix-wrapper-focused { border-color: #0a63d8 !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(10, 99, 216, .12) !important; }
+.login-shell .login-card .ant-input-affix-wrapper-focused { border-color: #82b6ff !important; background: #24334a !important; box-shadow: 0 0 0 3px rgba(69, 145, 247, .22) !important; }
 .login-shell .login-card :is(.ant-input, .ant-input-affix-wrapper).ant-input-status-error { border-color: #b23b3b !important; }
 .login-shell .login-card :is(.ant-input:focus, .ant-input-affix-wrapper-focused).ant-input-status-error { box-shadow: 0 0 0 3px rgba(178, 59, 59, .24) !important; }
-.login-shell .login-card .ant-input-suffix .anticon { color: #8291a4; opacity: 1; }
-.login-shell .login-card .ant-btn-primary { width: 100%; height: 46px !important; min-height: 46px !important; border-radius: 10px; font: var(--font-card-title); font-size: 15px; letter-spacing: .06em; }
+.login-shell .login-card .ant-input-suffix .anticon { color: #b9c9dd; opacity: 1; }
+.login-shell .login-card .ant-btn-primary { width: 100%; height: 36px !important; min-height: 36px !important; border-radius: 10px; font: var(--font-card-title); font-size: 15px; letter-spacing: .06em; }
 .login-shell .login-card .ant-btn-primary:not(:disabled) { background: #0a63d8 !important; color: var(--on-accent) !important; box-shadow: 0 8px 18px rgba(10, 99, 216, .18); }
 .login-shell .login-card .ant-btn-primary:disabled { background: #f1f3f6 !important; border-color: #d9dfe8 !important; color: #65758a !important; box-shadow: none; }
 .login-shell .login-card .ant-btn-primary:not(:disabled):hover { background: #0756bf !important; }
-.login-shell .login-card-foot { margin: 0; padding-top: 18px; border-top: 1px solid #edf1f6; color: #65758a; font-size: 12px; line-height: 1.5; text-align: center; }
-.login-shell .login-card .error { margin: 0; padding: var(--space-2) var(--space-3); border: var(--border-w) solid #ffd4d0; border-radius: var(--radius-sm); background: #fff3f2; color: #b42318; font: var(--font-body-s); }
+.login-shell .login-card-foot { margin: 0; padding-top: 18px; border-top: 1px solid #40516a; color: #b9c9dd; font-size: 12px; line-height: 1.5; text-align: center; }
+.login-shell .login-card-foot p { margin: 0 0 4px; }
+.login-shell .login-card .error { margin: 0; padding: var(--space-2) var(--space-3); border: var(--border-w) solid #a75a5a; border-radius: var(--radius-sm); background: #4a2831; color: #ffd6d1; font: var(--font-body-s); }
 .login-hero { display: flex; align-items: center; gap: var(--space-3); }
 .login-actions { display: grid; gap: var(--space-3); }
 

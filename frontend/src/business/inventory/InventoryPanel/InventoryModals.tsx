@@ -4,7 +4,6 @@ import { appMessage } from "../../../shared/ui/appFeedback";
 import { currentDevUser, normalizeError } from "../../../shared/api/client";
 import { ordersApi } from "../../../shared/api/orders.api";
 import { InventoryCancellationDialog } from "../../shared/cancellation/InventoryCancellationDialog";
-import { InventoryDeleteDialog } from "./InventoryDeleteDialog";
 import { OrderConsignmentModal, OrderPlatformOffsaleModal, OrderProfileModal } from "../../shared/operations";
 import { InventoryRebateModal } from "../../shared/rebate";
 import { CashflowModal } from "../../../finance/cashflow";
@@ -17,8 +16,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
   const {
     cancelInlineEdit,
     consignmentTarget,
-    deleteTarget,
-    deleting,
     detailTarget,
     editingAccount,
     employees,
@@ -44,7 +41,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     saveInline,
     savingAccount,
     setConsignmentTarget,
-    setDeleteTarget,
     setDetailTarget,
     setExecutionDetails,
     setPlatformOffsaleTarget,
@@ -52,7 +48,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
     setRebateTarget,
     closeCashflow,
     setSaleTarget,
-    submitDelete,
     submitVoid,
     updateEventDraft,
     updateFinanceDraft,
@@ -202,13 +197,6 @@ export function InventoryModals({ controller }: { controller: InventoryControlle
         }}
         onError={(error) => controller.setError(normalizeError(error))}
         operationSource="库存中心"
-      />
-      {/* 删除确认与其它弹窗同级渲染：嵌套进受控 Modal 的 children 会被父级 open=false 打断关闭渲染。 */}
-      <InventoryDeleteDialog
-        account={deleteTarget}
-        submitting={deleting}
-        onCancel={() => { if (!deleting) setDeleteTarget(null); }}
-        onConfirm={(reason) => submitDelete(reason)}
       />
     </>
   );

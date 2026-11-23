@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { OrdersPage } from "@/business/OrdersPage";
+import { useLedgerList } from "@/business/orders/useLedgerList";
 
 import { installmentsApi } from "@/shared/api/installments.api";
 const installmentListFixture = vi.fn<(params?: import("@/shared/api/installments.api").InstallmentListParams) => Promise<import("@/shared/api/types/installments").Installment[]>>();
@@ -83,15 +84,20 @@ function setupLedgerApi(source: unknown[] = orders) {
   });
   vi.mocked(ordersApi.ledgerSummary).mockImplementation(async (params) => {
     const rows = filterRows(params);
-    const countBy = (key: string) => rows.reduce<Record<string, number>>((counts, row) => {
+    const facets = filterRows({ ...params, order_type: undefined });
+    const countBy = (key: string, source = rows) => source.reduce<Record<string, number>>((counts, row) => {
       const value = (row as Record<string, unknown>)[key];
       if (typeof value === "string") counts[value] = (counts[value] ?? 0) + 1;
       return counts;
     }, {});
     return {
       total_count: rows.length,
+      in_progress_count: rows.filter((row) => ["ACTIVE", "INSTALLMENT"].includes(String((row as Record<string, unknown>).status))).length,
+      completed_count: rows.filter((row) => (row as Record<string, unknown>).status === "COMPLETED").length,
+      cancelled_count: rows.filter((row) => (row as Record<string, unknown>).status === "CANCELLED").length,
+      type_total: facets.length,
       status_counts: countBy("status"),
-      type_counts: countBy("order_type"),
+      type_counts: countBy("order_type", facets),
       game_types: [...new Set(rows.map((row) => (row as Record<string, unknown>).account_game_type).filter((value): value is string => typeof value === "string"))],
     } as never;
   });
@@ -124,6 +130,86 @@ async function openLedger(user?: string) {
 }
 
 describe("OrdersPage：四类订单台账", () => {
+  it.each([["employee", false], ["operator", true], ["viewer", false]] as const)("%s 订单动作入口与事件及导出权限一致", async (role, allowed) => {
+    await openLedger(role);
+    const row = screen.getAllByText("HS-2026-0001").find((element) => element.closest("tr"))!.closest("tr") as HTMLElement;
+    expect(Boolean(within(row).queryByRole("button", { name: "售出" }))).toBe(allowed);
+    expect(Boolean(within(row).queryByRole("button", { name: "运营" }))).toBe(allowed);
+    expect(Boolean(screen.queryByRole("button", { name: "导出" }))).toBe(allowed);
+  });
+  it("筛选失败后清除旧订单，避免在新条件下操作旧结果", async () => {
+    await openLedger("admin");
+    vi.mocked(ordersApi.listPage).mockRejectedValueOnce(new Error("订单查询失败"));
+    fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "不存在" } });
+    await ui.click(screen.getByRole("button", { name: "执行订单搜索" }));
+    expect(await screen.findByText(/订单查询失败/)).toBeVisible();
+    expect(screen.queryByText("HS-2026-0001")).not.toBeInTheDocument();
+  });
+
+  it("刷新同时更新统计，末页不足时回到有效页，普通翻页不重读统计", async () => {
+    const rows = Array.from({ length: 11 }, (_, index) => ({
+      ...orders[0], id: index + 1, order_no: `HS-ITEM-${index + 1}`,
+    }));
+    setupLedgerApi(rows);
+    function Probe() {
+      const ledger = useLedgerList({ active: true, initialMine: false });
+      return <><button onClick={() => ledger.setPage(2)}>第二页</button>
+        <button onClick={() => void ledger.load()}>刷新</button>
+        <span>{`页码:${ledger.page}`}</span><span>{`统计:${ledger.ledgerSummary?.total_count ?? "等待"}`}</span>
+        <span>{ledger.orders.map((item) => item.order_no).join(",")}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await screen.findByText("统计:11");
+    await ui.click(screen.getByRole("button", { name: "第二页" }));
+    await screen.findByText("HS-ITEM-11");
+    expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1);
+    rows.pop();
+    await ui.click(screen.getByRole("button", { name: "刷新" }));
+    await screen.findByText("页码:1");
+    expect(await screen.findByText("统计:10")).toBeVisible();
+    expect(screen.getByText(/HS-ITEM-1,/)).toBeVisible();
+  });
+
+  it("订单写入完成后刷新当前筛选和统计，不恢复写入前的视图", async () => {
+    let finishWrite: (() => Promise<void>) | undefined;
+    function Probe() {
+      const ledger = useLedgerList({ active: true, initialMine: false });
+      return <><button onClick={() => { finishWrite = ledger.load; }}>开始写入</button>
+        <button onClick={() => ledger.setOrderTypeFilter("TH")}>筛选提号</button>
+        <button onClick={() => void finishWrite?.()}>写入完成</button>
+        <span>{`订单:${ledger.orders.map((item) => item.order_no).join(",")}`}</span>
+        <span>{`统计:${ledger.ledgerSummary?.total_count ?? "等待"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await screen.findByText("订单:HS-2026-0001,TH-2026-0002");
+    await ui.click(screen.getByRole("button", { name: "开始写入" }));
+    await ui.click(screen.getByRole("button", { name: "筛选提号" }));
+    await screen.findByText("订单:TH-2026-0002");
+    await screen.findByText("统计:1");
+    const previousCalls = vi.mocked(ordersApi.listPage).mock.calls.length;
+    await ui.click(screen.getByRole("button", { name: "写入完成" }));
+    await waitFor(() => expect(ordersApi.listPage).toHaveBeenCalledTimes(previousCalls + 1));
+    expect(ordersApi.listPage).toHaveBeenLastCalledWith(expect.objectContaining({ order_type: "TH" }));
+    expect(ordersApi.ledgerSummary).toHaveBeenLastCalledWith(expect.objectContaining({ order_type: "TH" }));
+    expect(screen.getByText("订单:TH-2026-0002")).toBeInTheDocument();
+  });
+
+  it("较早的统计响应不能覆盖刷新后的统计", async () => {
+    let finishOld!: (value: Awaited<ReturnType<typeof ordersApi.ledgerSummary>>) => void;
+    vi.mocked(ordersApi.ledgerSummary).mockReturnValueOnce(new Promise((resolve) => { finishOld = resolve; }));
+    vi.mocked(ordersApi.ledgerSummary).mockResolvedValueOnce(orderLedgerSummary({ total_count: 3 }));
+    function Probe() {
+      const ledger = useLedgerList({ active: true, initialMine: false });
+      return <><button onClick={() => void ledger.load()}>刷新</button>
+        <span>{`统计:${ledger.ledgerSummary?.total_count ?? "等待"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await waitFor(() => expect(ordersApi.ledgerSummary).toHaveBeenCalledTimes(1));
+    await ui.click(screen.getByRole("button", { name: "刷新" }));
+    expect(await screen.findByText("统计:3")).toBeVisible();
+    await act(async () => finishOld(orderLedgerSummary({ total_count: 1 })));
+    expect(screen.getByText("统计:3")).toBeVisible();
+  });
   it("汇总加载及失败时类型计数显示占位符", async () => {
     let rejectSummary!: (error: Error) => void;
     vi.mocked(ordersApi.ledgerSummary).mockImplementation(() => new Promise((_resolve, reject) => { rejectSummary = reject; }));
@@ -289,14 +375,15 @@ describe("OrdersPage：四类订单台账", () => {
     const csvItem = await screen.findAllByText(/导出表格/);
     fireEvent.click(csvItem[csvItem.length - 1]);
     await waitFor(() => expect(vi.mocked(ordersApi.exportCsv)).toHaveBeenCalledWith(
-      expect.objectContaining({ mine: true, status: "IN_PROGRESS", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16" }),
+      expect.objectContaining({ mine: true, status: "IN_PROGRESS", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16", sort_desc: true }),
     ));
 
+    await ui.click(screen.getByRole("button", { name: "最旧在前" }));
     await ui.click(screen.getByRole("button", { name: /导出/ }));
     const xlsxItem = await screen.findAllByText(/导出工作簿/);
     fireEvent.click(xlsxItem[xlsxItem.length - 1]);
     await waitFor(() => expect(vi.mocked(ordersApi.exportXlsx)).toHaveBeenCalledWith(
-      expect.objectContaining({ mine: true, status: "IN_PROGRESS", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16" }),
+      expect.objectContaining({ mine: true, status: "IN_PROGRESS", trade_date_from: "2026-11-01", trade_date_to: "2026-11-16", sort_desc: false }),
     ));
   });
 
@@ -367,6 +454,16 @@ describe("OrdersPage：四类订单台账", () => {
       expect(card).not.toBeNull();
       expect(within(card!).getByText(value)).toBeInTheDocument();
     }
+  });
+
+  it("订单统计直接展示后端卡片数，缺失时不伪装成零", async () => {
+    vi.mocked(ordersApi.ledgerSummary).mockResolvedValue({ total_count: 10, in_progress_count: 7, cancelled_count: 0, type_total: 27, status_counts: { ACTIVE: 99 }, type_counts: {}, game_types: [] } as never);
+    renderLight(<OrdersPage initialTab="ledger" />);
+    const inProgress = (await screen.findByText("进行中订单")).closest(".ui-stat") as HTMLElement;
+    await waitFor(() => expect(inProgress).toHaveTextContent("7"));
+    expect(screen.getByText("完成订单量").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByText("已取消订单").closest(".ui-stat")).toHaveTextContent("0");
+    expect(screen.getByText("全部 27")).toBeInTheDocument();
   });
 
   it("FE-253：订单统计加载未完成时统计卡不显示可信的零", async () => {
@@ -671,7 +768,7 @@ describe("OrdersPage：四类订单台账", () => {
     const actionLabels = Array.from(firstRow.querySelectorAll(".orders-ledger-actions button")).map((button) => button.textContent?.trim());
     expect(actionLabels.slice(0, 6)).toEqual(["售出", "运营", "返点", "资金收支", "分润配置", "编辑"]);
     expect(actionLabels.indexOf("取消")).toBeGreaterThan(actionLabels.indexOf("编辑"));
-    expect(actionLabels.indexOf("删除")).toBeGreaterThan(actionLabels.indexOf("取消"));
+    expect(actionLabels).not.toContain("删除");
     await ui.click(within(firstRow).getByRole("button", { name: "运营" }));
     for (const label of ["寄售（上架）", "描述", "作图"]) {
       expect(screen.getByRole("menuitem", { name: label })).toBeInTheDocument();
@@ -700,6 +797,7 @@ describe("OrdersPage：四类订单台账", () => {
         order_type: "DG",
         trade_date: "2026-10-03",
         status: "ACTIVE",
+        active_consignments: [{ event_id: 301, platform: "寄售平台A", price: null, listed_at: "2026-10-03T10:00:00" }],
         events: [{
           id: 301,
           event_type: "OPERATE",
@@ -730,6 +828,7 @@ describe("OrdersPage：四类订单台账", () => {
         order_type: "HS",
         trade_date: "2026-10-01",
         status: "ACTIVE",
+        active_consignments: [{ event_id: 29, platform: "千寻", price: null, listed_at: "2026-11-01T10:00:00" }],
         events: [{
           id: 29,
           event_type: "OPERATE",
@@ -749,11 +848,12 @@ describe("OrdersPage：四类订单台账", () => {
   it("运营下拉在详情缓存过期后仍反映最新寄售记录", async () => {
     const account = { id: 1, source_order_id: 1, source_order_no: "HS-2026-0001", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "100.00" };
     const baseOrder = { order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" };
-    const stale = { account, orders: [{ ...baseOrder, events: [] }] };
+    const stale = { account, orders: [{ ...baseOrder, events: [], active_consignments: [] }] };
     const fresh = {
       account,
       orders: [{
         ...baseOrder,
+        active_consignments: [{ event_id: 29, platform: "千寻", price: null, listed_at: "2026-11-19T21:25:00" }],
         events: [{ id: 29, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-19T21:25" } }],
       }],
     };
@@ -777,8 +877,8 @@ describe("OrdersPage：四类订单台账", () => {
     const account = { id: 1, source_order_id: 1, source_order_no: "HS-2026-0001", inventory_type: "RECOVERY", status: "WAITING", cost_amount: "100.00" };
     const listing = { id: 29, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"], listed_at: "2026-11-01T10:00" } };
     const order = { order_id: 1, order_no: "HS-2026-0001", order_type: "HS", trade_date: "2026-10-01", status: "ACTIVE" };
-    const before = { account, orders: [{ ...order, events: [listing] }] };
-    const after = { account, orders: [{ ...order, events: [listing, {
+    const before = { account, orders: [{ ...order, active_consignments: [{ event_id: 29, platform: "千寻", price: null, listed_at: "2026-11-01T10:00:00" }], events: [listing] }] };
+    const after = { account, orders: [{ ...order, active_consignments: [], events: [listing, {
       id: 30, event_type: "OPERATE", operation_type: "UNLIST", reason: "平台停售", form_extra: { consignment_event_id: 29, consignment_platforms: ["千寻"], platform_unlist_scope: "PLATFORM" },
     }] }] };
     let unlisted = false;
@@ -1048,5 +1148,24 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
     await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
     await waitFor(() => expect(screen.getAllByText("TH-2026-0002").length).toBeGreaterThanOrEqual(1));
     expect(screen.queryAllByRole("button", { name: "编辑账号" }).length).toBe(0);
+  });
+
+  it("未绑定库存的历史订单展开时仍可查看订单与资金明细", async () => {
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
+      { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "ACTIVE", account_id: null },
+    ]) as never);
+    vi.mocked(ordersApi.get).mockResolvedValue({
+      id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "ACTIVE",
+      account_id: null, note: "导入订单备注", account_snapshot: { game_account: "历史账号" },
+      events: [], cashflows: [{ flow_no: "SR00123", pool_id: 1, occurred_on: "2026-10-03", direction: "IN", category: "OTHER", amount: "25.00", operator: "admin" }], rebates: [],
+    } as never);
+    renderLight(<OrdersPage />, { user: "admin" });
+    await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
+    const row = (await screen.findByText("TH-2026-0002")).closest("tr")!;
+    fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
+    expect(await screen.findByText("导入订单备注")).toBeInTheDocument();
+    expect(screen.getByText("历史账号")).toBeInTheDocument();
+    expect(screen.getByText("SR00123")).toBeInTheDocument();
+    expect(ordersApi.executionDetail).not.toHaveBeenCalled();
   });
 });

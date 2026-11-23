@@ -109,6 +109,10 @@ class OkOut(BaseModel):
     ok: bool
 
 
+class PasswordChangeOut(OkOut):
+    access_token: str
+
+
 class TeamOut(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -175,7 +179,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         roles=[user.role], owner_scope=user.owner_scope,
         pool_ids=frozenset(user.pool_ids or []), team_ids=frozenset(user.team_ids or []),
     )
-    return {"access_token": build_access_token(current), "token_type": "bearer", "user": _public(user)}
+    return {"access_token": build_access_token(current, password_hash=user.password_hash), "token_type": "bearer", "user": _public(user)}
 
 
 @router.get("/me", response_model=PublicUserOut)
@@ -188,8 +192,8 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
     return payload
 
 
-@router.post("/change-password", response_model=OkOut)
-def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> OkOut:
+@router.post("/change-password", response_model=PasswordChangeOut)
+def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)) -> PasswordChangeOut:
     service.change_password(
         db,
         user.id,
@@ -197,7 +201,8 @@ def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_cur
         new_password=payload.new_password,
         actor=user.username,
     )
-    return {"ok": True}
+    account = db.get(User, user.id)
+    return {"ok": True, "access_token": build_access_token(user, password_hash=account.password_hash)}
 
 
 @router.post("/logout", response_model=OkOut)

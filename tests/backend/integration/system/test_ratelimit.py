@@ -90,6 +90,28 @@ class TestRateLimiter:
         assert ratelimit.CustomerRateLimiter().is_allowed(key, 1)
         assert not ratelimit.CustomerRateLimiter().is_allowed(key, 1)
 
+    def test_production_login_limit_is_shared_between_workers(self, monkeypatch):
+        from app.core import ratelimit
+        url = os.environ.get("TEST_REDIS_URL")
+        if not url:
+            pytest.skip("需要独立的 TEST_REDIS_URL 验证生产登录限流")
+        monkeypatch.setattr(ratelimit, "get_settings", lambda: SimpleNamespace(is_development=False, customer_rate_limit_redis_url=url))
+        key = f"login:test:{uuid.uuid4()}"
+        assert ratelimit.LoginRateLimiter().is_allowed(key, 1)
+        assert not ratelimit.LoginRateLimiter().is_allowed(key, 1)
+        assert ratelimit.CustomerRateLimiter().is_allowed(key, 1)
+        process_key = f"login:process:{uuid.uuid4()}"
+        env = {**os.environ, "RATE_TEST_KEY": process_key, "APP_ENV": "production", "JWT_SECRET_KEY": "test-login-secret-0123456789-abcdef", "CUSTOMER_RATE_LIMIT_REDIS_URL": url}
+        script = "import os; from app.core.ratelimit import LoginRateLimiter; raise SystemExit(0 if LoginRateLimiter().is_allowed(os.environ['RATE_TEST_KEY'], 1, 60) else 1)"
+        assert subprocess.run([sys.executable, "-c", script], env=env).returncode == 0
+        assert subprocess.run([sys.executable, "-c", script], env=env).returncode == 1
+
+    def test_production_login_limit_fails_closed_without_redis(self, monkeypatch):
+        from app.core import ratelimit
+        monkeypatch.setattr(ratelimit, "get_settings", lambda: SimpleNamespace(is_development=False, customer_rate_limit_redis_url=""))
+        with pytest.raises(RateLimitUnavailable, match="登录保护"):
+            ratelimit.LoginRateLimiter().is_allowed("login:test", 1)
+
     def test_non_development_environment_cannot_bypass_shared_limiter(self, monkeypatch):
         from app.core import ratelimit
         monkeypatch.setattr(ratelimit, "get_settings", lambda: SimpleNamespace(is_production=False, is_development=False, customer_rate_limit_redis_url=""))
@@ -127,6 +149,17 @@ def _login(client: TestClient, username: str, password: str, ip: str | None = No
 
 
 class TestLoginRateLimit:
+    @pytest.fixture(autouse=True)
+    def isolated_shared_counter(self, monkeypatch):
+        from app.settings.auth import router as auth
+        url = os.environ.get("TEST_REDIS_URL")
+        if not url:
+            pytest.skip("需要独立的 TEST_REDIS_URL 验证登录限流")
+        monkeypatch.setattr(get_settings(), "customer_rate_limit_redis_url", url)
+        original = auth._client_ip
+        prefix = uuid.uuid4().hex
+        monkeypatch.setattr(auth, "_client_ip", lambda request: f"{prefix}:{original(request)}")
+
     def test_production_blocks_after_limit(self, client, rate_user, monkeypatch):
         login_limiter.reset()
         settings = get_settings()

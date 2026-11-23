@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import or_, select, tuple_
 from sqlalchemy.orm import Session
 
-from app.core.security import CurrentUser, PERM_AUDIT_READ
+from app.core.security import CurrentUser, PERM_AUDIT_READ, PERM_FINANCE_READ
 from app.domain.foundation import AuditLog
 from app.domain.trade import Account, Order
 from app.domain.users import User
@@ -57,7 +57,24 @@ def _assemble_order_execution_detail(
     orders = [order]
     relations = preloaded.relations if preloaded is not None else load_relations(db, orders)
     context = preloaded.context if preloaded is not None else load_event_context(db, [order.id])
-    events = {order.id: context.events_by_order.get(order.id, [])}
+    all_events = context.events_by_order.get(order.id, [])
+    def flow_visible(flow) -> bool:
+        return flow is not None and user.has(PERM_FINANCE_READ) and flow.pool_id is not None and user.can_see_pool(flow.pool_id)
+
+    events = {order.id: [event.model_copy(update={
+        "cashflow": next((flow for flow in event.cashflows if flow_visible(flow)), None),
+        "cashflows": [flow for flow in event.cashflows if flow_visible(flow)],
+        "pool_id": event.pool_id if event.pool_id is None or (user.has(PERM_FINANCE_READ) and user.can_see_pool(event.pool_id)) else None,
+    }) for event in all_events]}
+    visible_cashflows = {order.id: [flow for flow in context.order_cashflows.get(order.id, []) if flow_visible(flow)]}
+    visible_rebate_nos = {
+        context.rebate_no_by_event_no[event.event_no]
+        for event in all_events
+        if event.event_no in context.rebate_no_by_event_no and any(flow_visible(flow) for flow in event.cashflows)
+    }
+    unrestricted = user.has(PERM_FINANCE_READ) and (user.is_admin or user.owner_scope == "ALL")
+    visible_rebates = {order.id: [rebate for rebate in relations.rebates_by_order.get(order.id, [])
+                                 if unrestricted or rebate.rebate_no in visible_rebate_nos]}
     rebate_nos = context.action_model_rebate_nos_by_order.get(order.id, set())
     event_ids = [event.id for rows in events.values() for event in rows]
     audit: list[AccountAuditOut] = []
@@ -68,10 +85,12 @@ def _assemble_order_execution_detail(
             event_id_values = [str(item) for item in event_ids]
             filters.append((AuditLog.entity_type == "inventory_event_edit") & AuditLog.entity_id.in_(event_id_values))
         filters.append((AuditLog.entity_type == "inventory_order_edit") & AuditLog.entity_id.in_([str(order.id), order.order_no]))
-        flow_nos = [flow.flow_no for flow in context.order_cashflows.get(order.id, [])]
+        flow_nos = [flow.flow_no for flow in visible_cashflows[order.id]]
         if flow_nos:
             filters.append((AuditLog.entity_type == "inventory_cashflow_edit") & AuditLog.entity_id.in_(flow_nos))
-        audit_rows = preloaded.audits.get(order.id, []) if preloaded is not None else db.scalars(select(AuditLog).where(or_(*filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all()
+        audit_rows = ([row for row in preloaded.audits.get(order.id, [])
+                       if row.entity_type != "inventory_cashflow_edit" or row.entity_id in flow_nos]
+                      if preloaded is not None else db.scalars(select(AuditLog).where(or_(*filters)).order_by(AuditLog.occurred_at.desc(), AuditLog.id.desc())).all())
         audit = [AccountAuditOut(id=row.id, action=row.action, entity_type=row.entity_type, entity_id=row.entity_id, actor=row.actor, reason=row.reason, occurred_at=row.occurred_at) for row in audit_rows]
     responsible_ids = {
         user_id
@@ -87,10 +106,10 @@ def _assemble_order_execution_detail(
         orders,
         order_extra_values=relations.order_extra_values,
         field_defs_by_type=relations.field_defs_by_type,
-        cashflows_by_order=context.order_cashflows,
+        cashflows_by_order=visible_cashflows,
         customers_by_order=relations.customers_by_order,
         counterparties_by_order=relations.counterparties_by_order,
-        rebates_by_order=relations.rebates_by_order,
+        rebates_by_order=visible_rebates,
         events_by_order=events,
         operator_names_by_order={
             order.id: [names_by_id[user_id] for user_id in (relations.order_extra_values.get(order.id, {}).get("business_responsible_ids") or []) if user_id in names_by_id]
@@ -102,8 +121,8 @@ def _assemble_order_execution_detail(
         finance_summary=build_finance_summary(
             db,
             order_ids=[order.id],
-            event_cashflows={event.event_no: context.event_cashflows[event.event_no]
-                             for event in events[order.id] if event.event_no in context.event_cashflows},
+            event_cashflows={flow.flow_no: flow for event in all_events
+                             for flow in context.event_cashflows.get(event.event_no, [])},
             order_cashflows={order.id: context.order_cashflows.get(order.id, [])},
             order_rebates={order.id: relations.rebates_by_order.get(order.id, [])},
             action_model_rebate_nos=rebate_nos,

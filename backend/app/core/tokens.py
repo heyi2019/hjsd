@@ -102,7 +102,13 @@ def verify_password(password: str, encoded: str) -> bool:
         return False
 
 
-def build_access_token(user: CurrentUser, *, settings: Settings | None = None) -> str:
+def credential_stamp(password_hash: str, *, settings: Settings | None = None) -> str:
+    """将令牌绑定当前密码摘要；令牌中不暴露密码或密码摘要。"""
+    settings = settings or get_settings()
+    return hmac.new(settings.jwt_secret_key.encode(), f"erp:credential:{password_hash}".encode(), hashlib.sha256).hexdigest()
+
+
+def build_access_token(user: CurrentUser, *, password_hash: str | None = None, settings: Settings | None = None) -> str:
     """把用户会话关键信息打包进 token，不写入手机号等敏感资料。"""
     return encode_token(
         {
@@ -113,6 +119,7 @@ def build_access_token(user: CurrentUser, *, settings: Settings | None = None) -
             "pool_ids": sorted(user.pool_ids),
             "team_ids": sorted(user.team_ids),
             "owner_scope": user.owner_scope,
+            **({"credential_stamp": credential_stamp(password_hash, settings=settings)} if password_hash is not None else {}),
         },
         settings=settings,
     )

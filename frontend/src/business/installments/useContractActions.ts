@@ -1,5 +1,5 @@
 /** 分期合约的写操作与导出。 */
-import type { Dispatch, SetStateAction } from "react";
+import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { installmentsApi, type InstallmentListParams } from "../../shared/api/installments.api";
 import type { Installment } from "../../shared/api/types/installments";
@@ -17,6 +17,9 @@ export function useContractActions(params: {
   filters: InstallmentListParams;
 }) {
   const { modal, load, setExporting, filters } = params;
+  const pendingOperatorRef = useRef(new Set<string>());
+  const [pendingOperators, setPendingOperators] = useState<Set<string>>(new Set());
+  const operatorKey = (installmentId: number, operationKey: string) => JSON.stringify([installmentId, operationKey]);
   const {
     payTarget, deliverTarget, recoverTarget, cancelTarget, settleTarget, defaultTarget, waiveTarget, extendTarget,
     setPayTarget, setDeliverTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget, setWaiveTarget, setExtendTarget,
@@ -204,12 +207,19 @@ export function useContractActions(params: {
   };
 
   const updateOperationOperators = async (installmentId: number, operationKey: string, operatorUserIds: number[]) => {
+    const key = operatorKey(installmentId, operationKey);
+    if (pendingOperatorRef.current.has(key)) return;
+    pendingOperatorRef.current.add(key);
+    setPendingOperators(new Set(pendingOperatorRef.current));
     try {
       await installmentsApi.updateOperationOperators(installmentId, operationKey, operatorUserIds);
       appMessage.success("操作人已更新");
       await load();
     } catch (err) {
       appMessage.error(normalizeError(err).message);
+    } finally {
+      pendingOperatorRef.current.delete(key);
+      setPendingOperators(new Set(pendingOperatorRef.current));
     }
   };
 
@@ -225,5 +235,6 @@ export function useContractActions(params: {
     submitWaive,
     submitExtend,
     updateOperationOperators,
+    isOperatorUpdating: (installmentId: number, operationKey: string) => pendingOperators.has(operatorKey(installmentId, operationKey)),
   };
 }

@@ -129,6 +129,69 @@ beforeEach(() => {
 });
 
 describe("InstallmentsPanel：分期合约", () => {
+  it("员工目录失败不被列表成功覆盖，可单独重试", async () => {
+    let finishList!: (rows: Installment[]) => void;
+    const pendingList = new Promise<Installment[]>((resolve) => { finishList = resolve; });
+    installmentListFixture.mockReturnValueOnce(pendingList);
+    vi.mocked(employeesApi.list).mockRejectedValueOnce(new Error("目录暂不可用"));
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    const error = await screen.findByRole("alert");
+    expect(error).toHaveTextContent("员工目录加载失败");
+    await act(async () => finishList(withBackendActions(installments)));
+    await screen.findByText("HS0001-INS01");
+    expect(error).toBeVisible();
+    await userEvent.click(within(error).getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.queryByText(/员工目录加载失败/)).not.toBeInTheDocument());
+    expect(installmentListFixture).toHaveBeenCalledTimes(1);
+  });
+
+  it("没有订单更新权限时，动作操作人只读", async () => {
+    installmentListFixture.mockResolvedValue(withBackendActions([{
+      ...installments[0], operation_operators: [{ operation_key: "CREATE", operator_user_ids: [1], occurred_at: "2026-10-01T10:00:00" }],
+    }]));
+    renderLight(<InstallmentsPanel />, { user: "finance" });
+    const row = (await screen.findByText("HS0001-INS01")).closest("tr") as HTMLElement;
+    await userEvent.click(row.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+    expect(await screen.findByRole("combobox", { name: "编辑建单操作人" })).toBeDisabled();
+  });
+
+  it("收款操作人显示期号和流水，历史汇总明确标识", async () => {
+    installmentListFixture.mockResolvedValue(withBackendActions([{
+      ...installments[0], operation_operators: [
+        { operation_key: "PAY:1:SR00001", period_no: 1, flow_no: "SR00001", historical_summary: false, operator_user_ids: [1], occurred_at: "2026-10-01T10:00:00" },
+        { operation_key: "PAY:987", period_no: 2, flow_no: null, historical_summary: true, operator_user_ids: [1], occurred_at: "2026-10-01T11:00:00" },
+      ],
+    }]));
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    const row = (await screen.findByText("HS0001-INS01")).closest("tr") as HTMLElement;
+    await userEvent.click(row.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+    expect(await screen.findByText("收款（第1期，SR00001）")).toBeVisible();
+    expect(screen.getByText("收款（第2期，历史汇总）")).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "编辑收款（第2期，历史汇总）操作人" })).toBeDisabled();
+    expect(screen.queryByText("收款（987）")).not.toBeInTheDocument();
+  });
+
+  it("操作人保存期间禁止重复修改，完成刷新后再允许操作", async () => {
+    installmentListFixture.mockResolvedValue(withBackendActions([{
+      ...installments[0], operation_operators: [{ operation_key: "CREATE", operator_user_ids: [1], occurred_at: "2026-10-01T10:00:00" }],
+    }]));
+    vi.mocked(employeesApi.list).mockResolvedValue([
+      { id: 1, username: "admin", display_name: "管理员", is_active: true },
+      { id: 2, username: "other", display_name: "协作人员", is_active: true },
+    ]);
+    let finish!: (value: Installment) => void;
+    vi.mocked(installmentsApi.updateOperationOperators).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    renderLight(<InstallmentsPanel />, { user: "admin" });
+    const row = (await screen.findByText("HS0001-INS01")).closest("tr") as HTMLElement;
+    await userEvent.click(row.querySelector(".ant-table-row-expand-icon") as HTMLElement);
+    const select = await screen.findByRole("combobox", { name: "编辑建单操作人" });
+    await userEvent.click(select);
+    await userEvent.click(await screen.findByText("协作人员", { selector: ".ant-select-item-option-content" }));
+    await waitFor(() => expect(installmentsApi.updateOperationOperators).toHaveBeenCalledTimes(1));
+    expect(select).toBeDisabled();
+    await act(async () => finish(withBackendActions(installments)[0]));
+    await waitFor(() => expect(select).toBeEnabled());
+  });
   it("切换时序后列表加载失败，不显示旧筛选结果，并支持重试", async () => {
     renderLight(<InstallmentsPanel />, { user: "admin" });
     expect(await screen.findByText("HS0001-INS01")).toBeVisible();

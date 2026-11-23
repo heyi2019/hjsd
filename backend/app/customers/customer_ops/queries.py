@@ -144,8 +144,17 @@ def summarize_customers(
     }
 
 
-def get_customer(session: Session, customer_id: int, user: CurrentUser | None = None) -> Customer:
-    customer = session.get(Customer, customer_id)
+def get_customer(session: Session, customer_id: int, user: CurrentUser | None = None, *, for_update: bool = False, key_share: bool = False) -> Customer:
+    if for_update or key_share:
+        stmt = select(Customer).where(Customer.id == customer_id)
+        scope = owner_scope_filter(Customer.owner_id, user, session) if user is not None else None
+        if scope is not None:
+            stmt = stmt.where(scope)
+        customer = session.scalar(
+            stmt.with_for_update(read=key_share, key_share=key_share).execution_options(populate_existing=True)
+        )
+    else:
+        customer = session.get(Customer, customer_id)
     if customer is None:
         raise NotFound(f"客户 {customer_id} 不存在", details={"customer_id": customer_id})
     if user is not None and user.owner_scope != "ALL" and not user.is_admin:

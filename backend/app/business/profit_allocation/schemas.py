@@ -22,6 +22,8 @@ class ProfitAllocationSet(RequestModel):
     items: list[ProfitAllocationItem] = Field(default_factory=list)
     form_extra: dict[str, object] | None = None
     amounts_changed: bool | None = None
+    rates_changed: bool = False
+    expected_order_profit: Decimal | None = Field(default=None, decimal_places=2)
 
     @model_validator(mode="after")
     def require_grouped_form_state(self):
@@ -30,6 +32,10 @@ class ProfitAllocationSet(RequestModel):
             raise ValueError("按动作分润必须提供金额修改状态")
         if self.amounts_changed is not None and len(grouped) != len(self.items):
             raise ValueError("金额修改状态仅用于按动作分润")
+        if self.expected_order_profit is not None and self.amounts_changed is None:
+            raise ValueError("利润校验仅用于按动作分润")
+        if self.rates_changed and self.amounts_changed is None:
+            raise ValueError("比例修改状态仅用于按动作分润")
         return self
 
 

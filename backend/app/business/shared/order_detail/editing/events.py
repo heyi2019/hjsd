@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import Conflict, NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.trade import Account, Cashflow, Installment, OrderEvent, RebateRecord, Reconciliation
+from app.domain.trade import Account, Cashflow, Installment, OrderEvent, RebateRecord
 from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.shared.order_access import get_order
@@ -196,9 +196,6 @@ def validate_event_edits(
             raise Validation("关联分期的记录不能直接修改，请先处理分期")
         if amount_changed and has_rebate:
             raise Validation("关联返点的记录不能直接修改，请先核对返点")
-        earliest_date = min(flow.occurred_on, item.occurred_at.date()) if date_changed else flow.occurred_on
-        if db.scalar(select(Reconciliation.id).where(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= earliest_date)) is not None:
-            raise Validation("资金账户已有后续对账记录，不能直接修改")
         if amount_changed and event.event_type == "BUY":
             cost_delta += item.amount - Decimal(str(event.amount))
         changes.append((event, flow, item, rebate))

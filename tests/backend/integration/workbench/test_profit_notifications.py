@@ -150,6 +150,63 @@ def test_sell_pending_notification_is_idempotent(seeded_db):
     assert notification.read_at is not None
     assert sum(row.read_at is None for row in rows) == 1
 
+
+def test_sale_rolls_back_when_notification_numbers_are_exhausted(v1_engine, app):
+    from fastapi.testclient import TestClient
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from uuid import uuid4
+    from app.core.database import get_db
+    from app.domain.base import Base
+    from app.domain.enums import SequenceKey
+    from app.domain.foundation import DocumentSequence
+    from app.domain.trade import Cashflow
+    from app.settings.field_definitions.seeds import seed_foundation
+
+    schema = f"notification_limit_{uuid4().hex[:12]}"
+    with v1_engine.begin() as connection:
+        connection.exec_driver_sql(f'CREATE SCHEMA "{schema}"')
+    engine = create_engine(v1_engine.url, connect_args={"options": f"-c search_path={schema}"})
+
+    def request_session():
+        with Session(bind=engine, autoflush=False) as session:
+            try:
+                yield session
+                session.commit()
+            except Exception:
+                session.rollback()
+                raise
+
+    try:
+        Base.metadata.create_all(engine)
+        with Session(engine, autoflush=False) as session:
+            seed_foundation(session, actor="pytest")
+            session.add(User(id=1, username="admin", display_name="管理员", password_hash="unused", role="ADMIN", owner_scope="ALL"))
+            session.flush()
+            order = _order(session, "number-limit")
+            _buy(session, order)
+            sequence = session.scalar(select(DocumentSequence).where(DocumentSequence.sequence_key == SequenceKey.NOTIFICATION.value))
+            sequence.current_value = 9999
+            session.commit()
+            order_id = order.id
+            before_flows = len(session.scalars(select(Cashflow.id).where(Cashflow.order_id == order_id)).all())
+        app.dependency_overrides[get_db] = request_session
+        with TestClient(app) as client:
+            result = client.post(f"/api/orders/{order_id}/events", headers={"X-Dev-User": "admin"}, json={
+                "event_type": "SELL", "amount": "800", "occurred_on": TODAY2.isoformat(), "operator_user_ids": [1],
+            })
+        assert result.status_code == 422, result.text
+        assert "通知编号已用尽" in result.json()["message"]
+        with Session(engine) as session:
+            assert session.get(Order, order_id).status == "ACTIVE"
+            assert not session.scalars(select(OrderEvent.id).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")).all()
+            assert len(session.scalars(select(Cashflow.id).where(Cashflow.order_id == order_id)).all()) == before_flows
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        engine.dispose()
+        with v1_engine.begin() as connection:
+            connection.exec_driver_sql(f'DROP SCHEMA "{schema}" CASCADE')
+
 def test_sell_without_operator_ids_falls_back_to_actor(seeded_db):
     """事件未标操作人时，回退到 actor 对应的用户（seeduser3）。"""
     seller_id = _uid(seeded_db, "seeduser3")
@@ -360,6 +417,31 @@ def test_profit_notification_details_only_returns_visible_owned_notifications(se
     assert denied.json() == []
     denied_report = seeded_client.get("/api/reports/commission", params={"notification_id": other.id}, headers={"Authorization": f"Bearer {build_access_token(scoped)}"})
     assert denied_report.status_code == 404
+
+
+def test_profit_notifications_follow_current_order_scope(seeded_client, seeded_db):
+    user = seeded_db.get(User, 2)
+    user.role = "OPERATOR"
+    user.owner_scope = "SELF"
+    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest", owner_id=2)
+    pending = _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
+    allocated = _make_unread(seeded_db, recipient_user_id=2, notification_type="PROFIT_ALLOCATED", entity_type="order", entity_id=order.order_no)
+    auth = {"Authorization": f"Bearer {build_access_token(CurrentUser.build(id=2, username='seeduser2', roles=['OPERATOR'], owner_scope='SELF'))}"}
+    before = seeded_client.get("/api/notifications/inbox", params={"category": "sale"}, headers=auth).json()["items"]
+    assert {pending.id, allocated.id}.issubset({item["id"] for item in before})
+    # 即使订单未绑定库存，仍能查看可见订单的分润摘要。
+    detail = seeded_client.get("/api/notifications/profit-details", params={"ids": pending.id}, headers=auth)
+    assert [item["notification_id"] for item in detail.json()] == [pending.id]
+    order.owner_id = 1
+    seeded_db.flush()
+    after = seeded_client.get("/api/notifications/inbox", params={"category": "sale"}, headers=auth).json()["items"]
+    assert not {pending.id, allocated.id}.intersection({item["id"] for item in after})
+    target = seeded_client.get("/api/notifications/pending-order", params={"notification_id": pending.id}, headers=auth).json()
+    assert target == {"order_no": None, "order_id": None}
+    denied = seeded_client.post("/api/notifications/read", json={"ids": [pending.id], "category": "sale"}, headers=auth)
+    assert denied.json()["read_ids"] == []
+    seeded_db.refresh(pending)
+    assert pending.read_at is None
 
 
 def test_profit_notification_details_batch_does_not_query_per_order(seeded_client, seeded_db):

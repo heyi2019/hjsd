@@ -24,6 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,6 +44,8 @@ class Pool(Base, AuditMixin):
             name="status_valid",
         ),
         UniqueConstraint("code", name="uq_pools_code"),
+        Index("uq_pools_single_default", "is_default", unique=True,
+              postgresql_where=text("is_default IS TRUE"), sqlite_where=text("is_default IS TRUE")),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

@@ -15,6 +15,7 @@ COPY patches/ ./patches/
 RUN npm ci --registry=https://registry.npmmirror.com
 
 COPY frontend/ ./frontend/
+COPY VERSION ./VERSION
 
 # ui_guards.mjs 按 cwd(frontend)/../backend/app/domain/enums.py 读取枚举做对齐校验，
 # 故后端源码必须落在 /app/backend/app；放 /backend/app 会 ENOENT 直接中断构建。

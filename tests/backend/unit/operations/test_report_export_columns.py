@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import csv
 import io
+from decimal import Decimal
 from app.operations.export import report_csv
 
 
@@ -153,3 +154,16 @@ def test_report_csv_keeps_untranslated_values_intact():
     )
     assert rows[0] == ["row_type", "状态", "发生额", "备注", "附加"]
     assert rows[1] == ["ITEM", "UNKNOWN_CODE", "100.00", "", '{"k": 1}']
+
+
+def test_report_csv_treats_formula_like_text_as_text_and_keeps_numbers():
+    from app.core.report_csv import restore_spreadsheet_csv_text
+
+    values = ["=1+1", "+SUM(1,2)", "-cmd|' /C'!A0", "@SUM(A1)", " \t=1+1", "＝1+1", "'=literal", "''=literal", "普通文本"]
+    report = {"items": [{"value": value, "amount": Decimal("-12.50"), "number_text": "-12.50"} for value in values]}
+    text = report_csv(report, columns=[("value", "=文本", True), ("amount", "金额", True), ("number_text", "数字字符串", True)])
+    rows = list(csv.reader(io.StringIO(text.lstrip("\ufeff"))))
+    assert rows[0][1] == "'=文本"
+    assert [restore_spreadsheet_csv_text(row[1]) for row in rows[1:]] == values
+    assert all(row[2:] == ["-12.50", "-12.50"] for row in rows[1:])
+    assert all(rows[index][1].startswith("'") for index in range(1, 7))

@@ -69,6 +69,19 @@ beforeEach(() => {
 });
 
 describe("OrderFormFieldsPanel", () => {
+  it("业务必填字段在设置中不能停用或改为选填", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
+      makeField({ id: 62, field_key: "target", label: "需求目标", required: true, required_locked: true, locked: true, is_custom: false }),
+    ]);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await screen.findByText("需求目标");
+    expect(screen.getByLabelText("必填_target")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "停用" })).toBeDisabled();
+    await ui.click(screen.getByRole("button", { name: "编辑需求目标" }));
+    expect(screen.getByLabelText("必填")).toBeDisabled();
+    expect(screen.getByLabelText("条件必填·依赖字段")).toBeDisabled();
+  });
+
   it("顶部筛选工具栏使用稳定的横向布局容器", async () => {
     renderLight(<OrderFormFieldsPanel />, { user: "admin" });
 
@@ -110,6 +123,17 @@ describe("OrderFormFieldsPanel", () => {
     // 编辑 / 查看字段 入口保留
     expect(screen.getByRole("button", { name: "编辑运营信息" })).toBeInTheDocument();
     expect(screen.getAllByText("查看字段").length).toBeGreaterThan(0);
+  });
+
+  it("板块管理不受旧浏览器本地顺序影响", async () => {
+    localStorage.setItem("heijin.form-field-section-order", JSON.stringify(["FINANCE", "OPERATION"]));
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    const management = await screen.findByTestId("form-section-management");
+    await waitFor(() => {
+      const account = within(management).getByText("ACCOUNT_PRODUCT");
+      const finance = within(management).getByText("FINANCE");
+      expect(account.compareDocumentPosition(finance) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
   });
 
   it("板块管理显示编码并可编辑板块名称", async () => {

@@ -14,6 +14,7 @@ class AttachmentCreate(RequestModel):
     file_name: str = Field(min_length=1, max_length=255)
     content_type: str = Field(min_length=1, max_length=128)
     content_base64: str = Field(min_length=1)
+    allow_duplicate: bool = False
 
 
 class AttachmentOut(BaseModel):

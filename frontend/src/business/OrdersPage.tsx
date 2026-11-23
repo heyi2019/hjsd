@@ -15,17 +15,18 @@ import { useOrdersPageController } from "./orders/useOrdersPageController";
 import type { InitialLedgerFilters } from "./orders/useLedgerList";
 import type { BusinessCenterEntryTab, BusinessCenterTab } from "./businessCenter";
 
-export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilters, initialAllocationOrderId, initialInstallmentStatus, initialInventoryAgeGtDays, active = true, onNavigate }: {
+export function OrdersPage({ initialTab, initialMine = false, initialLedgerFilters, initialAllocationOrderId, initialAllocationNotificationId, initialInstallmentStatus, initialInventoryAgeGtDays, active = true, onNavigate }: {
   initialTab?: BusinessCenterEntryTab;
   initialMine?: boolean;
   initialLedgerFilters?: InitialLedgerFilters;
   initialAllocationOrderId?: number;
+  initialAllocationNotificationId?: number;
   initialInstallmentStatus?: string;
   initialInventoryAgeGtDays?: number;
   active?: boolean;
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
 } = {}) {
-  const controller = useOrdersPageController({ initialTab, initialMine, initialLedgerFilters, initialAllocationOrderId, active, onNavigate });
+  const controller = useOrdersPageController({ initialTab, initialMine, initialLedgerFilters, initialAllocationOrderId, initialAllocationNotificationId, active, onNavigate });
   const {
     activeTab,
     installmentRefreshKey,

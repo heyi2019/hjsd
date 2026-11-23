@@ -54,6 +54,14 @@ def _scoped_user() -> CurrentUser:
 
 class TestOrdersApi:
 
+    def test_employee_cannot_post_sale_or_consignment_events(self, seeded_client):
+        headers = {"X-Dev-User": "employee"}
+        sale = seeded_client.post("/api/orders/1/stock-sale", headers=headers, json={"amount": "100", "occurred_on": D.isoformat()})
+        listing = seeded_client.post("/api/orders/1/events", headers=headers, json={
+            "event_type": "OPERATE", "operation_type": "CONSIGNMENT", "occurred_on": D.isoformat(),
+        })
+        assert sale.status_code == listing.status_code == 403
+
     def test_batch_details_match_individual_detail_with_and_without_finance_permission(self, seeded_db):
         first, second = _order(seeded_db), _order(seeded_db)
         post_event(seeded_db, first.id, event_type="BUY", amount="100.00", occurred_on=D, actor="pytest", operator_user_ids=[9])

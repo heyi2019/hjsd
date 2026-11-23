@@ -1,7 +1,7 @@
 name: frontend-gate
 
 # 前端门禁三档（2026-11-11 裁决，替代「每次 push 都跑全量」）：
-#   ① full_suite=true（手动 workflow_dispatch）→ npm run test:ci，全量含 deep，发版收口/里程碑用
+#   ① full_suite=true（手动 workflow_dispatch）→ 前端全量含 deep + 真实后端浏览器联动
 #   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；命中公共层/分层配置自动降级 quick
 #   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过
 # 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，
@@ -127,3 +127,72 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+  browser-e2e:
+    name: Browser tests with isolated backend
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp_e2e
+          POSTGRES_PASSWORD: erp_e2e
+          POSTGRES_DB: heijin_erp_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erp_e2e"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      APP_ENV: development
+      E2E_DATABASE_URL: postgresql+psycopg://erp_e2e:erp_e2e@127.0.0.1:5432/heijin_erp_e2e
+      CUSTOMER_RATE_LIMIT_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.lock.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements-dev.lock.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser integration tests
+        working-directory: frontend
+        run: npm run test:e2e -- --workers=1
+
+      - name: Upload browser test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-results
+          path: frontend/test-results/
+          if-no-files-found: ignore

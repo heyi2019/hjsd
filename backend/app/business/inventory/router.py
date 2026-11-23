@@ -4,6 +4,7 @@
 """
 
 from datetime import date
+from typing import Literal
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
+    PERM_REPORT_EXPORT,
     CurrentUser,
 )
 from app.settings.auth.session import (
@@ -23,8 +25,8 @@ from app.business.inventory.inventory import (
     inventory_ledger as query_inventory_ledger,
     list_accounts as query_inventory_accounts,
 )
-from app.business.inventory.deletion import delete_inventory as delete_inventory_record
-from app.business.inventory.export import build_inventory_ledger_csv
+from app.business.inventory.deletion import delete_inventory as reject_inventory_deletion
+from app.business.inventory.export import build_inventory_ledger_csv, build_inventory_visible_csv
 from app.shared.audit import record_audit
 from app.core.errors import PermissionDenied
 
@@ -43,12 +45,14 @@ router = APIRouter(tags=["ACC-01 账号台账"])
 
 read_access = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 manage = require_permissions(PERM_ORDER_CREATE)
+export_access = require_permissions(PERM_REPORT_EXPORT)
 
 @router.get("/stocks/export.csv")
 def export_accounts_csv(
     status: str | None = Query(default=None),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_access,
+    _exporter: CurrentUser = export_access,
 ) -> Response:
     """库存中心按可见列导出 CSV，沿用 /stocks 的权限口径。"""
     accounts = query_inventory_accounts(
@@ -100,13 +104,9 @@ def delete_inventory(
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
 ) -> Response:
-    """删除及其全部订单从属数据（仅管理员）。
-
-    请求体必带删除原因（空白一律 422）；库存及其订单/事件/流水/返点等从属数据
-    全部物理删除，库存快照与原因写入审计日志，操作不可恢复。
-    """
+    """历史删除接口：库存凭证保留，统一拒绝物理删除。"""
     _require_admin(user)
-    delete_inventory_record(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
+    reject_inventory_deletion(db, account_id, actor=_actor(user), reason=payload.reason, user=user)
     return Response(status_code=204)
 
 
@@ -159,8 +159,10 @@ def export_inventory_ledger_csv(
     inventory_operator_ids: list[int] | None = Query(default=None),
     age_gt_days: int | None = Query(default=None, gt=0),
     sort_desc: bool = Query(default=True),
+    mode: Literal["full", "visible"] = Query(default="full"),
     db: Session = Depends(get_db),
     user: CurrentUser = read_access,
+    _exporter: CurrentUser = export_access,
 ) -> Response:
     """按库存中心当前筛选口径导出；明细读取与 CSV 拼装不再由浏览器承担。"""
     result = query_inventory_ledger(
@@ -180,13 +182,11 @@ def export_inventory_ledger_csv(
     )
     pairs = result["items"]
     accounts = _account_outputs(db, [account for account, _order in pairs], user,
-                                loaded_orders=[order for _account, order in pairs])
-    csv_text, failed_details = build_inventory_ledger_csv(
-        pairs,
-        accounts,
-        db=db,
-        user=user,
-    )
+                                loaded_orders=[order for _account, order in pairs], include_images=mode == "full")
+    if mode == "visible":
+        csv_text, failed_details = build_inventory_visible_csv(pairs, accounts, db=db), 0
+    else:
+        csv_text, failed_details = build_inventory_ledger_csv(pairs, accounts, db=db, user=user)
     response = file_response(
         csv_text,
         f"库存中心-{date.today().isoformat()}.csv",
@@ -204,6 +204,7 @@ def export_inventory_ledger_csv(
             "total": result["total"],
             "truncated": False,
             "detail_failures": failed_details,
+            "mode": mode,
         },
     )
     return response

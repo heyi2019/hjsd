@@ -1,7 +1,7 @@
 import { Form, Input } from "antd";
-import { AdaptiveFormGrid, BusinessRegistrationGroup, Select } from "../../../shared/ui";
+import { AdaptiveFormGrid, BusinessRegistrationGroup, ErrorBanner, Select } from "../../../shared/ui";
 import { CfgItem, sectionLabel } from "../../../shared/forms/ConfigurableField";
-import { useOptionSet } from "../../../shared/lib/optionSets";
+import { useOptionSet, useOptionSetResource } from "../../../shared/lib/optionSets";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import "./DeliveryInfoSection.css";
@@ -17,7 +17,8 @@ export function DeliveryInfoSection(props: {
   const intermediaryType = Form.useWatch("intermediary_type", form);
   const platform = Form.useWatch("intermediary_platform", form);
   const compensationEnabled = intermediaryType === "包赔";
-  const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM") ?? [];
+  const platformResource = useOptionSetResource("INTERMEDIARY_PLATFORM", Boolean(props.showIntermediary));
+  const platformOptions = platformResource.options ?? [];
   const intermediaryTypeOptions = useOptionSet("INTERMEDIARY_TYPE") ?? [];
   const compensationTypeOptions = useOptionSet("COMPENSATION_TYPE") ?? [];
 
@@ -29,6 +30,7 @@ export function DeliveryInfoSection(props: {
 
   return (
     <BusinessRegistrationGroup className="delivery-info-section" title={deliveryTitle}>
+      <ErrorBanner error={platformResource.error} onRetry={platformResource.retry} retrying={platformResource.loading} />
       <AdaptiveFormGrid>
         <CfgItem name="bound_phone" label="换绑手机号"><Input placeholder="可选填" /></CfgItem>
         <CfgItem name="bound_phone_owner" label="手机号绑定人"><Input placeholder="可选填" /></CfgItem>

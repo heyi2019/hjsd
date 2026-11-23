@@ -9,26 +9,28 @@ import { columnKey, useListViewColumns } from "../../../shared/lib/listColumns";
 import { inventoryCellValue, operationMenuItems, type InventoryActionKey } from "./helpers";
 import type { InventoryOrderRow } from "./types";
 import { type Dispatch, type SetStateAction } from "react";
+import { useSession } from "../../../shared/state/session";
+import { authorizedOrderOperationItems } from "../../shared/operations";
 
 export function useInventoryColumns(params: {
-  canDelete: boolean;
   editingAccount: Account | null;
   executionDetails: Record<number, AccountExecutionDetail>;
   loadExecution: (row: Account, force?: boolean) => Promise<void>;
   setSaleTarget: Dispatch<SetStateAction<Account | null>>;
   setConsignmentTarget: Dispatch<SetStateAction<Account | null>>;
   setRebateTarget: Dispatch<SetStateAction<Account | null>>;
-  setDeleteTarget: Dispatch<SetStateAction<Account | null>>;
   openCashflow: (account: Account) => Promise<void>;
   openPlatformOffsale: (account: Account) => Promise<void>;
   openEditor: (account: Account, orderId?: number) => Promise<void>;
   handleInventoryAction: (key: InventoryActionKey, row: Account) => void;
 }) {
   const {
-    canDelete, editingAccount, executionDetails, loadExecution,
-    setSaleTarget, setConsignmentTarget, setRebateTarget, setDeleteTarget,
+    editingAccount, executionDetails, loadExecution,
+    setSaleTarget, setConsignmentTarget, setRebateTarget,
     openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   } = params;
+  const { can } = useSession();
+  const canSell = can("order.create") && (can("order.event.post") || can("finance.order.event.post"));
   const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
   const columns: ColumnsType<InventoryOrderRow> = [
     { title: "库存编号", key: "stock_no", width: 86, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account.stock_no) },
@@ -74,11 +76,11 @@ export function useInventoryColumns(params: {
       width: 420,
       render: (_value, row) => {
         const account = row.account;
-        const operationItems = operationMenuItems(row, executionDetails[account.id]);
+        const operationItems = authorizedOrderOperationItems(operationMenuItems(row, executionDetails[account.id]), can);
         const canCancel = isEditableAccountType(row.inventory_type) && row.order_type !== "DG";
         return (
         <Space className="inventory-row-actions" size={4}>
-          <PermissionButton
+          {canSell ? <PermissionButton
             permission="order.create"
             type="link"
             size="small"
@@ -90,7 +92,7 @@ export function useInventoryColumns(params: {
             }}
           >
             售出
-          </PermissionButton>
+          </PermissionButton> : null}
           {operationItems.length > 0 ? <Dropdown
             trigger={["click"]}
             placement="bottomLeft"
@@ -107,7 +109,7 @@ export function useInventoryColumns(params: {
             }}
           >
             <PermissionButton
-              permission="order.create"
+              permission="order.event.post"
               type="link"
               size="small"
               aria-label="运营"
@@ -169,19 +171,6 @@ export function useInventoryColumns(params: {
               取消
             </PermissionButton> : null}
           </> : null}
-          {canDelete ? <PermissionButton
-            permission="order.update"
-            type="link"
-            size="small"
-            danger
-            aria-label="删除"
-            onClick={(event) => {
-              event.stopPropagation();
-              setDeleteTarget(account);
-            }}
-          >
-            删除
-          </PermissionButton> : null}
         </Space>
         );
       },

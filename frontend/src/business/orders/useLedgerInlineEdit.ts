@@ -28,6 +28,10 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
   const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
   const [ledgerOrderDetails, setLedgerOrderDetails] = useState<Record<number, AccountExecutionDetail>>({});
   const [ledgerOrderDetailLoading, setLedgerOrderDetailLoading] = useState<Record<number, boolean>>({});
+  const detailsRef = useRef(ledgerOrderDetails);
+  const expandedRef = useRef(expandedOrderIds);
+  detailsRef.current = ledgerOrderDetails;
+  expandedRef.current = expandedOrderIds;
   const detailRequestsRef = useRef<Partial<Record<number, Promise<AccountExecutionDetail | null>>>>({});
   const detailVersions = useKeyedLatestRequest<number>();
   const editIntent = useLatestRequest();
@@ -45,7 +49,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     if (!force && detailRequestsRef.current[orderId]) return detailRequestsRef.current[orderId];
     const version = detailVersions.start(orderId);
     setLedgerOrderDetailLoading((current) => ({ ...current, [orderId]: true }));
-    const request = ordersApi.executionDetail(orderId, full ? { fresh: true } : { imagePreviews: true })
+    const request = ordersApi.executionDetail(orderId, full ? { fresh: true } : { imagePreviews: true, ...(force ? { fresh: true } : {}) })
       .then(async (detail) => {
         if (!detailVersions.isCurrent(orderId, version)) return null;
         setLedgerOrderDetails((current) => ({ ...current, [orderId]: detail }));
@@ -53,7 +57,17 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
         return detail;
       })
       .catch((error) => {
-        if (detailVersions.isCurrent(orderId, version)) appMessage.error(normalizeError(error).message);
+        if (detailVersions.isCurrent(orderId, version)) {
+          if (force) {
+            setLedgerOrderDetails((current) => {
+              const next = { ...current };
+              delete next[orderId];
+              return next;
+            });
+            setExpandedOrderIds((current) => current.filter((id) => id !== String(orderId)));
+          }
+          appMessage.error(normalizeError(error).message);
+        }
         return null;
       })
       .finally(() => {
@@ -63,6 +77,19 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
       });
     detailRequestsRef.current[orderId] = request;
     return request;
+  };
+  const refreshCachedLedgerDetail = async (orderId: number, accountId?: number) => {
+    const details = detailsRef.current;
+    const relatedAccountId = accountId ?? details[orderId]?.account.id;
+    const ids = new Set([orderId]);
+    if (relatedAccountId != null) {
+      Object.entries(details).forEach(([id, detail]) => {
+        if (detail.account.id === relatedAccountId) ids.add(Number(id));
+      });
+    }
+    await Promise.all([...ids].filter((id) =>
+      details[id] || expandedRef.current.includes(String(id)) || detailRequestsRef.current[id]
+    ).map((id) => loadLedgerOrderDetail(id, true)));
   };
   const orderDetailEditor = useOrderDetailEditor({
     getExecutionDetail: (id) => Object.values(ledgerOrderDetails).find((detail) => detail.account.id === id),
@@ -127,7 +154,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     orderDetailEditor.cancelPendingOpen();
     // 手风琴：一次只展开一行，避免多行展开同时挂载多份详情导致 DOM 与页面长度翻倍。
     setExpandedOrderIds(expanded ? [String(record.id)] : []);
-    if (expanded) void loadLedgerOrderDetail(record.id);
+    if (expanded && record.account_id != null) void loadLedgerOrderDetail(record.id);
   };
 
   const cancelInlineEdit = () => {
@@ -152,6 +179,7 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     ledgerOrderDetails,
     ledgerOrderDetailLoading,
     loadLedgerOrderDetail,
+    refreshCachedLedgerDetail,
     openLedgerEditor,
     handleLedgerExpand,
     cancelInlineEdit,
@@ -159,6 +187,10 @@ export function useLedgerInlineEdit(params: { onDetailSaved?: (detail: AccountEx
     employees: orderDetailEditor.employees,
     ensureEmployees: orderDetailEditor.ensureEmployees,
     pools: orderDetailEditor.pools,
+    employeeError: orderDetailEditor.employeeError,
+    poolError: orderDetailEditor.poolError,
+    retryEmployees: orderDetailEditor.retryEmployees,
+    retryPools: orderDetailEditor.retryPools,
     eventDrafts: orderDetailEditor.eventDrafts,
     operationDrafts: orderDetailEditor.operationDrafts,
     financeDrafts: orderDetailEditor.financeDrafts,

@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 from app.core.money import to_money
 from app.core.schemas import RequestModel
 from app.domain.enums import CashflowLedgerType
+from app.funds.deposits._shared import deposit_available_actions
 
 
 class DepositCreate(RequestModel):
@@ -61,6 +62,15 @@ class DepositOperationOperatorOut(BaseModel):
     occurred_at: datetime
 
 
+class DepositActionOut(BaseModel):
+    flow_no: str
+    action: Literal["HOLD", "RETURN", "LOSS", "CANCEL"]
+    occurred_on: date
+    amount: Decimal
+    operator_user_ids: list[int]
+    operator: str
+
+
 class DepositOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -82,6 +92,12 @@ class DepositOut(BaseModel):
     operator: str
     form_extra: dict[str, Any] | None = None
     operation_operators: list[DepositOperationOperatorOut] = Field(default_factory=list)
+    action_history: list[DepositActionOut] = Field(default_factory=list)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def available_actions(self) -> list[str]:
+        return deposit_available_actions(self.status, self.paid_amount, self.returned_amount, self.lost_amount)
 
     @computed_field  # type: ignore[prop-decorator]
     @property

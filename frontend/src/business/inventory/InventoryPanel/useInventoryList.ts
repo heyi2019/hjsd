@@ -61,9 +61,11 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   }), [businessMode, inventoryType, gameTypeFilter, inventoryOperatorIds, ageGtDays, keyword, dateRange, sortDesc]);
 
   const queryKey = JSON.stringify([filters, page, pageSize]);
+  const queryKeyRef = useRef(queryKey);
+  queryKeyRef.current = queryKey;
   const markLocallyRemoved = (id: number) => {
     locallyRemovedIdsRef.current.add(id);
-    removalOriginsRef.current.set(id, queryKey);
+    removalOriginsRef.current.set(id, queryKeyRef.current);
   };
 
   const load = useCallback(async () => {
@@ -82,7 +84,6 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
           removalOriginsRef.current.delete(id);
         }
       });
-      setRows(list);
       setTotalCount(data.total);
       setFacetTotal(data.facet_total);
       setTypeCounts(data.type_counts);
@@ -90,6 +91,13 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
       setInventoryStats(data.stats);
       setListError(false);
       setError(null);
+      const lastPage = Math.max(1, Math.ceil(data.total / pageSize));
+      if (page > lastPage) {
+        setRows([]);
+        setPage(lastPage);
+      } else {
+        setRows(list);
+      }
     } catch (err) {
       if (loadSequence.isCurrent(requestId)) {
         setRows([]);
@@ -102,6 +110,9 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
       if (loadSequence.isCurrent(requestId)) setListLoading(false);
     }
   }, [filters, page, pageSize, loadSequence, queryKey]);
+  const currentLoadRef = useRef(load);
+  currentLoadRef.current = load;
+  const reloadCurrent = useCallback(() => currentLoadRef.current(), []);
 
   const wasActiveRef = useRef(false);
   const previousInitialAgeRef = useRef(initialAgeGtDays);
@@ -139,10 +150,10 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     if (type) return typeCounts[type] ?? 0;
     return facetTotal;
   }, [facetTotal, typeCounts]);
-  async function handleExport() {
+  async function handleExport(mode: "full" | "visible") {
     setExporting(true);
     try {
-      const result = await stocksApi.inventoryLedgerExport(filters);
+      const result = await stocksApi.inventoryLedgerExport({ ...filters, mode });
       downloadBlob(result.blob, `库存中心_${today()}.csv`);
       if (result.failedDetailCount) appMessage.warning(`${result.failedDetailCount} 条明细读取失败，已导出其余可用字段`);
       else appMessage.success("库存数据已导出");
@@ -160,7 +171,7 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
     ageGtDays, setAgeGtDays,
     keyword, setKeyword, submitSearch, dateRange, setDateRange, sortDesc, setSortDesc,
     page, setPage, pageSize, setPageSize, error, setError, listLoading, listError,
-    businessOptions, inventoryTypeOptions, gameTypeOptions, load,
+    businessOptions, inventoryTypeOptions, gameTypeOptions, load: reloadCurrent,
     countInventoryRows, totalCount, setTotalCount,
     handleExport, exporting, locallyRemovedIdsRef, markLocallyRemoved,
   };

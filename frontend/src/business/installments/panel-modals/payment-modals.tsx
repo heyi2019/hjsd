@@ -144,7 +144,7 @@ export function ExtendModal({ controller }: { controller: ContractTableControlle
       employees={employees}
       intro={
         <Typography.Paragraph type="secondary">
-          新到期日必须晚于原到期日；逾期期次展期后回到 PENDING。
+          新到期日必须晚于原到期日；如果仍早于今天，该期仍为逾期。
         </Typography.Paragraph>
       }
       testIdSuffix="installment-extend"

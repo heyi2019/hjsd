@@ -75,7 +75,7 @@ export function DataCenterPanel({ onNavigate, range }: { onNavigate?: (key: stri
       />
 
       <Space className="muted" size="small">
-        利润 = 账号售出利润 + 工作室其他收入；资金账户余额和流水请进入资金中心查看。
+        利润 = 账号售出利润 + 工作室其他收入 − 工作室成本。售出利润按当前已售出账号在所选期间的收支计算；在途成本为所选期间入库且目前在库的成本，押金占用为当前值。
       </Space>
     </section>
     </Card>

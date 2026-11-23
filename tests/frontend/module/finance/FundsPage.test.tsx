@@ -60,7 +60,7 @@ const balance = {
   available: "700.00",
 };
 const deposits = [
-  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, ledger_type: "BUSINESS", paid_on: "2026-10-01", paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
+  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, ledger_type: "BUSINESS", paid_on: "2026-10-01", paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "PARTIALLY_RETURNED", available_actions: ["RETURN", "LOSS"], expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
   { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-BUY-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
@@ -109,6 +109,52 @@ function PeriodReadyProbe() {
 }
 
 describe("FundsPage：资金账户卡片", () => {
+  it("资金表单提示员工目录加载失败并可重试", async () => {
+    vi.mocked(employeesApi.list).mockRejectedValueOnce(new Error("员工服务不可用"));
+    renderLight(<FundsPage />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: /资金账户划转/ }));
+    const dialog = await screen.findByRole("dialog", { name: "资金账户划转" });
+    expect(await within(dialog).findByText(/员工目录加载失败/)).toBeInTheDocument();
+    await ui.click(within(dialog).getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(within(dialog).queryByText(/员工目录加载失败/)).toBeNull());
+    expect(employeesApi.list).toHaveBeenCalledTimes(2);
+  });
+
+  it("押金和对账切页时丢弃旧请求，修改每页条数回到第一页", async () => {
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.page>>) => void;
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.page>>) => void;
+    const oldDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.page>>>((resolve) => { finishDeposits = resolve; });
+    const oldReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationsApi.page>>>((resolve) => { finishReconciliations = resolve; });
+    const reconciliation = { id: 1, pool_id: 1, reconciled_on: "2026-10-01", account_label: "账户", system_balance: "0", statement_balance: "0", difference: "0", status: "OPEN" };
+    vi.mocked(depositsApi.page).mockReturnValueOnce(oldDeposits).mockImplementation(async ({ limit, offset }) => ({
+      items: [{ ...deposits[0], id: offset + 1 }], total: 30, limit, offset,
+    }));
+    vi.mocked(reconciliationsApi.page).mockReturnValueOnce(oldReconciliations).mockImplementation(async ({ limit, offset }) => ({
+      items: [{ ...reconciliation, id: offset + 1 }], total: 30, limit, offset,
+    }));
+    const { result } = renderHook(() => ({ deposits: useDepositResources(), reconciliations: useReconciliationResources() }));
+    act(() => { void result.current.deposits.loadDeposits(); void result.current.reconciliations.loadReconciliations(); });
+    act(() => { result.current.deposits.setDepositsPage(2, 10); result.current.reconciliations.setReconciliationsPage(2, 10); });
+    await waitFor(() => {
+      expect(result.current.deposits.deposits[0]?.id).toBe(11);
+      expect(result.current.reconciliations.reconciliations[0]?.id).toBe(11);
+    });
+    await act(async () => {
+      finishDeposits({ items: [{ ...deposits[0], id: 99 }], total: 30, limit: 10, offset: 0 });
+      finishReconciliations({ items: [{ ...reconciliation, id: 99 }], total: 30, limit: 10, offset: 0 });
+      await Promise.all([oldDeposits, oldReconciliations]);
+    });
+    expect(result.current.deposits.deposits[0]?.id).toBe(11);
+    expect(result.current.reconciliations.reconciliations[0]?.id).toBe(11);
+    act(() => { result.current.deposits.setDepositsPage(2, 20); result.current.reconciliations.setReconciliationsPage(2, 20); });
+    await waitFor(() => {
+      expect(result.current.deposits.depositsPaging).toMatchObject({ page: 1, pageSize: 20 });
+      expect(result.current.reconciliations.reconciliationsPaging).toMatchObject({ page: 1, pageSize: 20 });
+      expect(depositsApi.page).toHaveBeenLastCalledWith({ limit: 20, offset: 0 });
+      expect(reconciliationsApi.page).toHaveBeenLastCalledWith({ limit: 20, offset: 0 });
+    });
+  });
+
   it("末页记录减少后押金和对账回到有效页", async () => {
     let total = 11;
     const reconciliation = { id: 1, pool_id: 1, reconciled_on: "2026-10-01", account_label: "账户", system_balance: "0", statement_balance: "0", difference: "0", status: "OPEN" };
@@ -154,7 +200,7 @@ describe("FundsPage：资金账户卡片", () => {
     await ui.click(reconciliationNext!);
     expect(await screen.findByText("第二页账户")).toBeInTheDocument();
   });
-  it.each(["新增", "编辑", "删除"])("工作室收支%s后刷新资金明细和账户余额", async (action) => {
+  it.each(["新增", "编辑", "冲销"])("工作室收支%s后刷新资金明细和账户余额", async (action) => {
     let changed = false;
     vi.mocked(optionSetsApi.get).mockImplementation(async (code) => ({ code, options: code === "STUDIO_EXPENSE_ITEM" ? [{ value: "房租", label: "房租" }] : code === "BUSINESS_PERIOD" ? [{ value: "start_day", label: "16" }] : [] }) as never);
     const studioFlow = { id: 51, flow_no: "STUDIO-51", pool_id: 1, occurred_on: "2026-10-20", category: "房租", direction: "OUT", amount: "100.00", source_type: "MANUAL", source: "MANUAL", ledger_type: "STUDIO", accounting_attribute: "OPERATING_EXPENSE", is_reversed: false };
@@ -166,7 +212,7 @@ describe("FundsPage：资金账户卡片", () => {
     ));
     vi.mocked(cashflowsApi.update).mockImplementation(async () => { changed = true; return studioFlow as never; });
     vi.mocked(cashflowsApi.create).mockImplementation(async () => { changed = true; return studioFlow as never; });
-    vi.mocked(cashflowsApi.remove).mockImplementation(async () => { changed = true; return undefined as never; });
+    vi.mocked(cashflowsApi.reverse).mockImplementation(async () => { changed = true; return studioFlow as never; });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "工作室运营" }));
@@ -181,7 +227,11 @@ describe("FundsPage：资金账户卡片", () => {
     } else {
       await ui.click(within(row).getByRole("button", { name: action }));
       if (action === "编辑") await ui.click(await screen.findByRole("button", { name: "保存修改" }));
-      else await ui.click(await screen.findByRole("button", { name: "确认删除" }));
+      else {
+        const modal = await screen.findByRole("dialog", { name: /冲销工作室收支/ });
+        await ui.type(within(modal).getByLabelText("冲销原因"), "登记有误");
+        await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
+      }
     }
     await waitFor(() => expect(changed).toBe(true));
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
@@ -560,6 +610,23 @@ describe("FundsPage：资金账户卡片", () => {
     expect(screen.getByRole("combobox", { name: "流水方向" })).toBeDisabled();
   });
 
+  it.each(["total_in", "total_out"] as const)("资金流水缺少 %s 时显示不可用并可重试", async (missing) => {
+    vi.mocked(cashflowsApi.list).mockResolvedValueOnce({
+      ...cashflowPage(cashflows, { total_in: "800.00", total_out: "500.00" }),
+      [missing]: undefined,
+    });
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "资金明细" }));
+
+    expect(await screen.findByText(/资金流水汇总数据不完整/)).toBeInTheDocument();
+    expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("不可用");
+    expect(screen.getByText("总支出").closest(".ui-stat")).toHaveTextContent("不可用");
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByText("ZC00001")).toBeInTheDocument();
+    expect(screen.getByText("总收入").closest(".ui-stat")).toHaveTextContent("800.00");
+  });
+
   it("切换流水日期请求失败时展示原因并按当前日期重试", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -647,6 +714,20 @@ describe("FundsPage：资金账户卡片", () => {
 });
 
 describe("FundsPage：押金占用", () => {
+  it("押金损失金额缺失时显示未知，不当成零", async () => {
+    renderLight(<FundsPage />, { user: "admin" });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    const cell = await screen.findByText("#99");
+    const row = cell.closest("tr") as HTMLElement;
+    const headings = screen.getAllByRole("columnheader").map((heading) => heading.textContent);
+    const index = headings.findIndex((heading) => heading === "已损失");
+    expect(index).toBeGreaterThanOrEqual(0);
+    expect(within(row).getAllByRole("cell")[index]).toHaveTextContent("-");
+    await ui.click(within(row).getByRole("button", { name: "释放" }));
+    const dialog = await screen.findByRole("dialog", { name: "押金释放" });
+    expect(dialog).toHaveTextContent(/已损失\s*-/);
+  });
+
   it("押金板块作为独立入口保留业务资金口径", async () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -920,7 +1001,7 @@ describe("FundsPage：资金写路径", () => {
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     expect(within(modal).getByText("操作人")).toBeInTheDocument();
     await pickSelect(modal, 0, /经营主池/);
-    await ui.type(modal.querySelector("#amount") ?? modal, "500.00");
+    await ui.type(within(modal).getByLabelText("占用金额"), "500.00");
     await ui.click(screen.getByRole("button", { name: /提\s*交/ }));
     await waitFor(() => expect(vi.mocked(depositsApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(depositsApi.create).mock.calls[0][0] as Record<string, unknown>;
@@ -945,7 +1026,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("押金释放金额超过大额剩余一分时提示并阻止提交", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_amount: "9999999999999999.98", returned_amount: "0.00", remaining_amount: "9999999999999999.98" }] as never);
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_amount: "9999999999999999.98", returned_amount: "0.00", remaining_amount: "9999999999999999.98", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "押金" }));
@@ -958,7 +1039,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("未发生释放或损失的押金可编辑并回填", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { ...deposits[0], status: "PAID" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -971,17 +1052,41 @@ describe("FundsPage：资金写路径", () => {
     await waitFor(() => expect(vi.mocked(depositsApi.update)).toHaveBeenCalledWith(11, expect.objectContaining({ amount: "500.00", paid_on: "2026-10-17" })));
   });
 
-  it("未发生释放或损失的押金可删除并刷新列表", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00" }] as never);
-    resolveMockOnce(vi.mocked(depositsApi.remove), undefined);
+  it("押金保留凭证，未发生释放或损失时可取消", async () => {
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "押金" }));
     const row = screen.getByText("#99").closest("tr") as HTMLElement;
-    await ui.click(within(row).getByRole("button", { name: "删除" }));
-    expect(await screen.findByText("删除押金占用")).toBeInTheDocument();
-    await ui.click(screen.getByRole("button", { name: "确认删除" }));
-    await waitFor(() => expect(vi.mocked(depositsApi.remove)).toHaveBeenCalledWith(11));
+    expect(within(row).queryByRole("button", { name: "删除" })).toBeNull();
+    expect(within(row).getByRole("button", { name: /取\s*消/ })).toBeEnabled();
+  });
+
+  it("部分损失后的押金不能编辑或取消，仍可释放和登记损失", async () => {
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", returned_amount: "0.00", lost_amount: "50.00", remaining_amount: "450.00" }] as never);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    const row = screen.getByText("#99").closest("tr") as HTMLElement;
+    expect(within(row).getByRole("button", { name: /编\s*辑/ })).toBeDisabled();
+    expect(within(row).getByRole("button", { name: /取\s*消/ })).toBeDisabled();
+    expect(within(row).getByRole("button", { name: /释\s*放/ })).toBeEnabled();
+    expect(within(row).getByRole("button", { name: "登记损失" })).toBeEnabled();
+  });
+
+  it("押金逐笔展示退还和损失的操作人", async () => {
+    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], action_history: [
+      { flow_no: "SR00001", action: "RETURN", occurred_on: "2026-10-01", amount: "20.00", operator_user_ids: [1], operator: "admin" },
+      { flow_no: "SR00002", action: "RETURN", occurred_on: "2026-10-02", amount: "30.00", operator_user_ids: [2], operator: "finance" },
+      { flow_no: "ZC00003", action: "LOSS", occurred_on: "2026-10-03", amount: "10.00", operator_user_ids: [1, 2], operator: "admin" },
+    ] }] as never);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("tab", { name: "押金" }));
+    const row = screen.getByText("#99").closest("tr") as HTMLElement;
+    expect(row).toHaveTextContent(/释放 SR00001.*管理员/);
+    expect(row).toHaveTextContent(/释放 SR00002.*财务/);
+    expect(row).toHaveTextContent(/损失 ZC00003.*管理员、财务/);
   });
 
   it("押金释放按 deposit.post 门控：finance 可见、operator 不可见", async () => {
@@ -999,9 +1104,9 @@ describe("FundsPage：资金写路径", () => {
     await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /登记损失/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
-    await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
-    await ui.type(modal.querySelector("#category") ?? modal, "违约损失");
-    await ui.type(modal.querySelector("#reason") ?? modal, "对手方未按约返还");
+    await ui.type(within(modal).getByLabelText("损失金额"), "100.00");
+    await ui.type(within(modal).getByLabelText("费用分类"), "违约损失");
+    await ui.type(within(modal).getByLabelText("损失原因"), "对手方未按约返还");
     await ui.click(screen.getByRole("button", { name: /确认损失/ }));
     await waitFor(() => expect(vi.mocked(depositsApi.loss)).toHaveBeenCalled());
     expect(vi.mocked(depositsApi.loss).mock.calls[0]).toEqual([11, {
@@ -1015,7 +1120,7 @@ describe("FundsPage：资金写路径", () => {
 
   it("押金取消：PAID 押金填原因后调用 depositsApi.cancel（全额冲正由后端写）", async () => {
     vi.mocked(depositsApi.list).mockResolvedValue([
-      { id: 12, pool_id: 1, paid_amount: "300.00", returned_amount: "0.00", lost_amount: "0.00", remaining_amount: "300.00", status: "PAID" },
+      { id: 12, pool_id: 1, paid_amount: "300.00", returned_amount: "0.00", lost_amount: "0.00", remaining_amount: "300.00", status: "PAID", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] },
     ] as unknown as Awaited<ReturnType<typeof depositsApi.list>>);
     resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 12 });
     renderLight(<FundsPage />, { user: "finance" });
@@ -1024,7 +1129,7 @@ describe("FundsPage：资金写路径", () => {
     await ui.click(await screen.findByRole("button", { name: /取\s*消/ }));
     const modal = document.querySelector(".ant-modal-content") as HTMLElement;
     await waitFor(() => expect(modal).toBeTruthy());
-    await ui.type(modal.querySelector("#reason") as Element, "押金登记有误");
+    await ui.type(within(modal).getByLabelText("取消原因"), "押金登记有误");
     await ui.click(screen.getByRole("button", { name: /确认取消/ }));
     await waitFor(() => expect(vi.mocked(depositsApi.cancel)).toHaveBeenCalled(), { timeout: 5000 });
     expect(vi.mocked(depositsApi.cancel).mock.calls[0]).toEqual([12, {
@@ -1034,7 +1139,7 @@ describe("FundsPage：资金写路径", () => {
     }]);
   });
 
-  it("P1/FE-049：超出转出资金账户可用余额时由后端拒绝", async () => {
+  it("FE-049：允许提交超过转出账户余额的划转", async () => {
     vi.mocked(poolsApi.list).mockResolvedValueOnce([
       { id: 1, code: "POOL-A", name: "经营主池", pool_type: "OPERATING", status: "ACTIVE" },
       { id: 2, code: "POOL-B", name: "押金池", pool_type: "DEPOSIT", status: "ACTIVE" },
@@ -1045,7 +1150,7 @@ describe("FundsPage：资金写路径", () => {
   ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" }));
     vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
     vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
-    vi.mocked(transfersApi.create).mockRejectedValueOnce(new Error("转出资金账户可用余额不足"));
+    resolveMockOnce(vi.mocked(transfersApi.create), { transfer_id: "TRF-TEST" });
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     await screen.findByText(/经营主池/);
@@ -1060,11 +1165,36 @@ describe("FundsPage：资金写路径", () => {
     };
     await choosePool(0, /经营主池/);
     await choosePool(1, /押金池/);
-    await user.type(modal.querySelector("#amount") ?? modal, "700.01");
+    await user.type(within(modal).getByLabelText("划转金额"), "900.01");
     await user.click(screen.getByRole("button", { name: /确认划转/ }));
 
-    await waitFor(() => expect(screen.getByText(/可用余额不足/)).toBeInTheDocument());
-    expect(transfersApi.create).toHaveBeenCalled();
+    await waitFor(() => expect(transfersApi.create).toHaveBeenCalledWith(expect.objectContaining({
+      source_pool_id: 1,
+      target_pool_id: 2,
+      amount: "900.01",
+    })));
+  });
+
+  it("划转请求进行中不能关闭并重开表单", async () => {
+    let finish!: () => void;
+    const pending = new Promise<never>((resolve) => { finish = () => resolve(undefined as never); });
+    vi.mocked(transfersApi.create).mockReset().mockReturnValueOnce(pending);
+    renderLight(<FundsPage />, { user: "admin" });
+    await screen.findByRole("cell", { name: /经营主池/ });
+    await ui.click(screen.getByRole("button", { name: "资金账户划转" }));
+    const modal = await screen.findByRole("dialog", { name: "资金账户划转" });
+    await pickSelect(modal, 0, /经营主池/);
+    await pickSelect(modal, 1, /押金池/);
+    await ui.type(within(modal).getByLabelText("划转金额"), "20.00");
+    await ui.click(within(modal).getByRole("button", { name: "确认划转" }));
+    try {
+      await waitFor(() => expect(transfersApi.create).toHaveBeenCalled());
+      expect(within(modal).queryByRole("button", { name: "Close" })).toBeNull();
+      await ui.keyboard("{Escape}");
+      expect(within(modal).getByLabelText("划转金额")).toHaveValue("20.00");
+    } finally {
+      await act(async () => { finish(); await pending; });
+    }
   });
 
 });

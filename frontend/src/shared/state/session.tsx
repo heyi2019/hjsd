@@ -1,6 +1,6 @@
 /** 权限点：以后端 `core/security.py` 的 `PERM_*` 为唯一来源。
  * 前端只用它控制按钮显隐；后端仍会二次鉴权，隐藏菜单不构成权限控制。 */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, setDevUser as persistDevUser } from "../api/client";
 
@@ -101,6 +101,7 @@ interface SessionValue {
   authenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   mustChangePassword: boolean;
+  sessionError: string | null;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -122,7 +123,12 @@ export function SessionProvider({
   // DEV 态始终视为已登录，使用 X-Dev-User 直通，不受残留生产 token 或首次改密状态影响。
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const sessionGeneration = useRef(0);
+  const userRefreshVersion = useRef(0);
   useEffect(() => {
+    let active = true;
+    const generation = sessionGeneration.current;
     const isDev = import.meta.env.DEV;
     const token = localStorage.getItem(ACCESS_TOKEN_KEY);
     if (isDev) localStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -131,24 +137,59 @@ export function SessionProvider({
     // 避免纯组件用例依赖本地后端。
     if (isDev && !syncDevUser) return;
     if (!token && !isDev) return;
+    const refreshVersion = ++userRefreshVersion.current;
     void currentUserApi().then((current) => {
+      if (!active || generation !== sessionGeneration.current || refreshVersion !== userRefreshVersion.current) return;
       if (token && !isDev) setRole(current.role.toLowerCase());
       setUsername(current.username);
       if (!isDev) setMustChangePassword(Boolean(current.must_change_password));
     }).catch(() => {
-      if (token && !isDev) {
-        localStorage.removeItem(ACCESS_TOKEN_KEY);
-        setAuthenticated(false);
-      }
+      // 网络故障保留会话；实际 401 由客户端统一失效通知处理。
     });
+    return () => { active = false; };
   }, [syncDevUser]);
+  useEffect(() => {
+    const onExpired = (event: Event) => {
+      const message = (event as CustomEvent<{ message?: string }>).detail?.message;
+      sessionGeneration.current += 1;
+      setAuthenticated(false);
+      setMustChangePassword(false);
+      setSessionError(message || "登录已失效，请重新登录");
+    };
+    window.addEventListener("erp:session-expired", onExpired);
+    return () => window.removeEventListener("erp:session-expired", onExpired);
+  }, []);
+  useEffect(() => {
+    if (!authenticated || import.meta.env.DEV || !syncDevUser) return;
+    let active = true;
+    const refresh = async () => {
+      const generation = sessionGeneration.current;
+      const version = ++userRefreshVersion.current;
+      const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+      if (!token) return;
+      try {
+        const current = await currentUserApi();
+        if (!active || generation !== sessionGeneration.current || version !== userRefreshVersion.current || localStorage.getItem(ACCESS_TOKEN_KEY) !== token) return;
+        setRole(current.role.toLowerCase());
+        setUsername(current.username);
+        setMustChangePassword(Boolean(current.must_change_password));
+      } catch { /* 客户端负责会话失效，网络错误不改变现有状态。 */ }
+    };
+    const onFocus = () => { void refresh(); };
+    window.addEventListener("focus", onFocus);
+    const timer = window.setInterval(() => { if (document.visibilityState !== "hidden") void refresh(); }, 60_000);
+    return () => { active = false; window.removeEventListener("focus", onFocus); window.clearInterval(timer); };
+  }, [authenticated, syncDevUser]);
   const switchUser = useCallback((next: string) => {
+    sessionGeneration.current += 1;
     persistDevUser(next);
     // dev 直通时「当前身份」本身就是这个 dev 用户名，role 与 username 同步。
     setRole(next);
     setUsername(next);
   }, []);
   const login = useCallback(async (account: string, password: string) => {
+    const generation = ++sessionGeneration.current;
+    setSessionError(null);
     if (import.meta.env.DEV && account.trim().toLowerCase() === "admin" && !password) {
       persistDevUser("admin");
       setRole("admin");
@@ -158,6 +199,7 @@ export function SessionProvider({
       return;
     }
     const loggedIn = await loginApi(account, password);
+    if (generation !== sessionGeneration.current) return;
     setRole(loggedIn.role.toLowerCase());
     // 用户名必须单独存：角色来自 users.role，用户名来自 users.username，二者不可互相代替。
     setUsername(loggedIn.username);
@@ -169,26 +211,24 @@ export function SessionProvider({
     setMustChangePassword(false);
   }, []);
   const logout = useCallback(async () => {
+    sessionGeneration.current += 1;
     // 先结束本地会话，再尝试通知服务端；网络慢或后端不可达时也必须立即落登录页。
     setAuthenticated(false);
     setMustChangePassword(false);
+    setSessionError(null);
     // 后端 /auth/logout 失败也必须退出本地会话：否则「退出登录」点了没反应，
     // 用户以为已退出却仍停留在已登录界面。
     try {
       await logoutApi();
     } catch {
       // 退出是本地会话的终止动作，不应被后端不可达阻断或产生未处理拒绝。
-      // 服务端若可达会撤销 token；不可达时 finally 仍清理本地 token 并落登录页。
-    } finally {
-      // logoutApi 自身负责清理 token；这里保留 finally 只确保未来替换实现时状态仍收口。
-      setAuthenticated(false);
-      setMustChangePassword(false);
+      // 服务端若可达会撤销旧 token；本地已立即结束该会话。
     }
   }, []);
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[role] ?? []);
-    return { role, username, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, changePassword, login, logout };
-  }, [role, username, switchUser, authenticated, mustChangePassword, changePassword, login, logout]);
+    return { role, username, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout };
+  }, [role, username, switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

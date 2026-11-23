@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { ReportsPage } from "@/reporting/ReportsPage";
+import { ReportsPage } from "@/operations/ReportsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { setAntdDateRange } from "@fixtures/antdRange";
 import { commissionResponse, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
@@ -144,7 +144,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
     await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { from: "2026-10-01", to: "2026-10-31", sort_desc: true }));
     expect(createUrl).toHaveBeenCalled();
     expect(revokeUrl).toHaveBeenCalled();
     expect(successSpy).toHaveBeenCalledWith("报表已导出");

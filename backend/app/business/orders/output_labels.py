@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.domain.trade import OrderEvent
+from app.domain.trade import Cashflow, OrderEvent
 
 
 def _elapsed_label(
@@ -44,7 +44,7 @@ def _elapsed_label(
 
 
 def _selected_operator_label(
-    event: OrderEvent | None, operator_names: dict[int, str] | None
+    event: OrderEvent | Cashflow | None, operator_names: dict[int, str] | None
 ) -> str:
     if event is None:
         return ""

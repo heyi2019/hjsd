@@ -71,6 +71,14 @@ def new_workbook() -> Workbook:
     return workbook
 
 
+def _literal_cell(sheet: Worksheet, *, row: int, column: int, value: Any):
+    cell = sheet.cell(row=row, column=column, value=value)
+    # openpyxl 默认把 '=' 开头的字符串标成公式；业务输入应保持原始文本。
+    if isinstance(value, str) and cell.data_type == "f":
+        cell.data_type = "s"
+    return cell
+
+
 def _style_group_cell(cell, fill: PatternFill) -> None:
     cell.fill = fill
     cell.font = _HEADER_FONT
@@ -115,7 +123,7 @@ def _write_group_rows(
                 sheet.merge_cells(
                     start_row=2, start_column=start + 1, end_row=2, end_column=index
                 )
-            _style_group_cell(sheet.cell(row=1, column=start + 1, value=name), _GROUP_FILL)
+            _style_group_cell(_literal_cell(sheet, row=1, column=start + 1, value=name), _GROUP_FILL)
 
         if block_has_sub:
             sub_start = start
@@ -131,7 +139,7 @@ def _write_group_rows(
                                 end_column=position,
                             )
                         _style_group_cell(
-                            sheet.cell(row=2, column=sub_start + 1, value=sub_name),
+                            _literal_cell(sheet, row=2, column=sub_start + 1, value=sub_name),
                             _SUBGROUP_FILL,
                         )
                     sub_start = position
@@ -212,7 +220,7 @@ def _write_single_sheet(
 
     label_row = header_row_count
     for column_index, label in enumerate(column_labels, start=1):
-        cell = sheet.cell(row=label_row, column=column_index, value=label)
+        cell = _literal_cell(sheet, row=label_row, column=column_index, value=label)
         cell.fill = _HEADER_FILL
         cell.font = _HEADER_FONT
         cell.alignment = _HEADER_ALIGN
@@ -222,7 +230,8 @@ def _write_single_sheet(
         excel_row = body_start + row_offset
         for column_index, (key, _label) in enumerate(visible, start=1):
             labels = value_labels.get(key) if value_labels else None
-            cell = sheet.cell(
+            cell = _literal_cell(
+                sheet,
                 row=excel_row, column=column_index, value=_cell_value(row.get(key), labels)
             )
             cell.font = _BODY_FONT

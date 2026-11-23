@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+from app.domain.form_scopes import REQUIRED_CORE_FIELDS
 
 FlowDirection = Literal["BASE", "IN", "OUT"]
 
@@ -45,9 +46,20 @@ class OrderFormFieldOut(BaseModel):
     is_active: bool
     sort_order: int
     locked: bool
+    required_locked: bool = False
     is_custom: bool
     section: str = "EXTRA"
     note: str | None = None
+
+    @model_validator(mode="after")
+    def apply_core_contract(self) -> "OrderFormFieldOut":
+        if self.field_key in REQUIRED_CORE_FIELDS.get(self.order_type_code, ()):
+            self.required = True
+            self.required_when = None
+            self.is_active = True
+            self.locked = True
+            self.required_locked = True
+        return self
 
 
 class FormScopeOut(BaseModel):

@@ -56,7 +56,6 @@ from app.core.settings import get_settings  # noqa: E402
 from app.domain import (  # noqa: E402
     attachments,
     foundation,
-    imports,
     lists,
     notifications,
     options,
@@ -68,7 +67,7 @@ from app.settings.field_definitions.seeds import seed_foundation  # noqa: E402
 from app.settings.field_definitions.catalog_seed import seed_catalog  # noqa: E402
 
 __all__ = [
-    "attachments", "foundation", "imports", "lists", "notifications",
+    "attachments", "foundation", "lists", "notifications",
     "options", "parties", "trade", "users",
 ]
 

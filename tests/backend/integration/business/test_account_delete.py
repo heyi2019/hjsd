@@ -1,9 +1,4 @@
-"""INVENTORY-03 库存全量删除功能契约（2026-11-13 裁决）。
-
-口径：物理删除库存行，**关联订单/事件/资金流水/返点全部删除**；
-仅系统管理员可删，删除原因必填且写入审计日志；
-审计日志与客户、合作方等主数据保留。
-"""
+"""INVENTORY-03 订单和库存凭证保留：历史删除接口不得清理业务数据。"""
 from __future__ import annotations
 
 from datetime import date
@@ -12,6 +7,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
+from app.core.errors import Validation
 from app.domain.enums import (
     AuditAction,
     InstallmentContractType,
@@ -26,10 +22,14 @@ from app.domain.trade import (
     InstallmentDisposition,
     Order,
     OrderEvent,
+    RebateRecord,
 )
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.inventory.profile import create_account
+from app.business.inventory.deletion import delete_inventory
+from app.business.orders.deletion import delete_order
+from app.funds.rebates import create_rebate
 
 D = date(2026, 10, 20)
 
@@ -60,17 +60,24 @@ def _delete(seeded_client, account_id: int, *, headers: dict[str, str], reason: 
     )
 
 
-def test_delete_inventory_removes_orders_and_keeps_audit_reason(seeded_client, seeded_db, headers):
+def test_delete_inventory_preserves_order_events_cashflows_and_rebate(seeded_client, seeded_db, headers):
     account_id, order_id = _account_with_order(seeded_db)
     stock_no = seeded_db.get(Account, account_id).stock_no
+    rebate = create_rebate(
+        seeded_db, source_order_id=order_id, amount=Decimal("5"),
+        collected_on=D, actor="pytest", rebate_type="BUY",
+    )
+    rebate_id = rebate.id
+    seeded_db.commit()
     response = _delete(seeded_client, account_id, headers=headers, reason="重复录入，需清理")
-    assert response.status_code == 204, response.text
+    assert response.status_code == 422, response.text
     seeded_db.expire_all()
 
-    assert seeded_db.get(Account, account_id) is None
-    assert seeded_db.get(Order, order_id) is None
-    assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id)) is None
-    assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order_id)) is None
+    assert seeded_db.get(Account, account_id) is not None
+    assert seeded_db.get(Order, order_id) is not None
+    assert seeded_db.scalar(select(OrderEvent.id).where(OrderEvent.order_id == order_id)) is not None
+    assert seeded_db.scalar(select(Cashflow.id).where(Cashflow.order_id == order_id)) is not None
+    assert seeded_db.get(RebateRecord, rebate_id) is not None
 
     audit = seeded_db.scalar(
         select(AuditLog).where(
@@ -78,14 +85,11 @@ def test_delete_inventory_removes_orders_and_keeps_audit_reason(seeded_client, s
             AuditLog.entity_id == stock_no,
         )
     )
-    assert audit is not None and audit.reason == "重复录入，需清理"
-    assert audit.before_json["stock_no"] == stock_no
-    assert audit.before_json["game_account"] == "delete-target"
-    assert audit.after_json["deleted_orders"][0]["id"] == order_id
+    assert audit is None
 
 
 @pytest.mark.parametrize("entry", ["order", "inventory"])
-def test_delete_only_removes_target_event_cashflows_and_reversal_chain(seeded_client, seeded_db, headers, entry):
+def test_delete_preserves_event_cashflows_and_reversal_chain(seeded_client, seeded_db, headers, entry):
     account_id, order_id = _account_with_order(seeded_db, "delete-scope-target")
     other_account_id, other_order_id = _account_with_order(seeded_db, "delete-scope-other")
     target = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order_id))
@@ -116,12 +120,13 @@ def test_delete_only_removes_target_event_cashflows_and_reversal_chain(seeded_cl
 
     response = (_delete(seeded_client, account_id, headers=headers) if entry == "inventory" else
                 seeded_client.request("DELETE", f"/api/orders/{order_id}", headers=headers, json={"reason": "重复录入"}))
-    assert response.status_code == 204, response.text
+    assert response.status_code == 422, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(Order, order_id) is None
-    assert seeded_db.get(Cashflow, target_id) is None
-    assert seeded_db.get(Cashflow, target_reversal_id) is None
-    assert seeded_db.get(Cashflow, nested_reversal_id) is None
+    assert seeded_db.get(Order, order_id) is not None
+    assert seeded_db.get(Account, account_id) is not None
+    assert seeded_db.get(Cashflow, target_id) is not None
+    assert seeded_db.get(Cashflow, target_reversal_id) is not None
+    assert seeded_db.get(Cashflow, nested_reversal_id) is not None
     assert seeded_db.get(Order, other_order_id) is not None
     assert seeded_db.get(Account, other_account_id) is not None
     assert seeded_db.get(Cashflow, other_id) is not None
@@ -147,7 +152,7 @@ def test_non_admin_cannot_delete_inventory(seeded_client, seeded_db, operator_he
     assert seeded_db.get(Account, account_id) is not None
 
 
-def test_installment_disposition_is_removed_with_inventory(seeded_client, seeded_db, headers):
+def test_delete_inventory_preserves_installment_disposition(seeded_client, seeded_db, headers):
     account_id, order_id = _account_with_order(seeded_db, "disposition-target")
     inst = Installment(
         inst_no="DEL-DISP-001",
@@ -180,13 +185,45 @@ def test_installment_disposition_is_removed_with_inventory(seeded_client, seeded
     seeded_db.commit()
 
     response = _delete(seeded_client, account_id, headers=headers)
-    assert response.status_code == 204, response.text
+    assert response.status_code == 422, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(Account, account_id) is None
-    assert seeded_db.get(Order, order_id) is None
+    assert seeded_db.get(Account, account_id) is not None
+    assert seeded_db.get(Order, order_id) is not None
     assert seeded_db.scalar(
         select(InstallmentDisposition.id).where(InstallmentDisposition.account_id == account_id)
-    ) is None
+    ) is not None
+
+
+@pytest.mark.parametrize("entry", ["order", "inventory"])
+def test_direct_delete_service_cannot_bypass_voucher_retention(seeded_db, entry):
+    account_id, order_id = _account_with_order(seeded_db, f"service-{entry}")
+    with pytest.raises(Validation, match="不可删除"):
+        if entry == "order":
+            delete_order(seeded_db, order_id, actor="pytest", reason="重复录入")
+        else:
+            delete_inventory(seeded_db, account_id, actor="pytest", reason="重复录入")
+    assert seeded_db.get(Order, order_id) is not None
+    assert seeded_db.get(Account, account_id) is not None
+
+
+@pytest.mark.parametrize("entry", ["order", "inventory"])
+def test_empty_order_or_unlinked_inventory_is_still_a_voucher(seeded_client, seeded_db, headers, entry):
+    account = create_account(
+        seeded_db, game_account=f"empty-{entry}", business_mode="SELF",
+        inventory_type="RECOVERY", actor="pytest",
+    )
+    if entry == "order":
+        order = create_order(seeded_db, order_type="HS", trade_date=D, actor="pytest", account_id=account.id)
+        endpoint = f"/api/orders/{order.id}"
+    else:
+        endpoint = f"/api/stocks/{account.id}"
+    seeded_db.commit()
+    response = seeded_client.request("DELETE", endpoint, headers=headers, json={"reason": "重复录入"})
+    assert response.status_code == 422, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Account, account.id) is not None
+    if entry == "order":
+        assert seeded_db.get(Order, order.id) is not None
 
 
 def test_delete_unknown_account_returns_404(seeded_client, headers):

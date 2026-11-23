@@ -39,9 +39,9 @@ from app.operations._shared import cashflow_totals_by_order
 from app.business.orders.router_outputs.list_payload import _order_list_payload
 from app.business.profit_allocation import service as policy_allocations
 from app.operations.profit import order_profit_detail
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
-from app.operations.r3_commission import r3_commission_reconciliation
-from app.operations.r5_business_pnl import r5_business_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
+from app.operations.commission import commission_reconciliation
+from app.operations.business_pnl import business_pnl_report
 from app.business.inventory.profile import create_account
 from sqlalchemy import select
 
@@ -232,7 +232,7 @@ def test_allocation_amount_boundary_uses_cashflow_profit(seeded_db):
     assert rows[0]["total_amount"] == "300.00"
 
 
-def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
+def test_commission_rate_allocation_uses_cashflow_profit(seeded_db):
     """按比例分润：报表按资金明细利润先扣公司比例，再按原人员比例分配。"""
     order_id = _order_with_events(seeded_db)
     _add_flow(seeded_db, order_id, "OUT", "200")
@@ -244,7 +244,7 @@ def test_r3_rate_allocation_uses_cashflow_profit(seeded_db):
         ],
     )
 
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     entries = [row for group in report["order_groups"] for row in group["orders"]]
     assert sorted(row["profit_base"] for row in entries) == [
         Decimal("90.00"), Decimal("90.00"), Decimal("120.00"),
@@ -265,7 +265,7 @@ def test_company_rate_settings_recalculate_existing_order_without_rewriting_allo
     assert defaults.json() == {"profit_rate": "40.00", "loss_rate": "50.00"}
     saved = seeded_client.put("/api/profit-allocation/company-settings", json={"profit_rate": "25", "loss_rate": "50"}, headers=headers)
     assert saved.status_code == 200, saved.text
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     group = next(row for row in report["order_groups"] if row["order_id"] == order_id)
     amounts = {row["user_id"]: row["profit_base"] for row in group["orders"]}
     assert amounts == {None: Decimal("75.00"), 1: Decimal("112.50"), 2: Decimal("112.50")}
@@ -277,7 +277,7 @@ def test_company_rate_settings_recalculate_existing_order_without_rewriting_allo
     # 100% 后改回，人员原权重仍保留；设置只改变计算口径。
     for rate in ("100", "25"):
         assert seeded_client.put("/api/profit-allocation/company-settings", json={"profit_rate": rate, "loss_rate": "50"}, headers=headers).status_code == 200
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     group = next(row for row in report["order_groups"] if row["order_id"] == order_id)
     assert {row["user_id"]: row["profit_base"] for row in group["orders"]} == amounts
 
@@ -333,7 +333,7 @@ def test_rebate_is_income_and_bad_debt_is_expense(seeded_db):
 
 
 def test_reports_follow_rebate_and_bad_debt(seeded_db):
-    """RPT-01 / R2 / R5 与分润基数同源，返点列只作其中项展示。"""
+    """月度损益、业务损益和订单利润 与分润基数同源，返点列只作其中项展示。"""
     order_id = _order_with_events(seeded_db)
     _add_rebate(seeded_db, order_id, "100")
     _add_bad_debt(seeded_db, order_id, "400")
@@ -346,10 +346,10 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     assert item["net_profit"] == Decimal("200.00")
 
     # 跨报表一致性契约仍成立（既有红线）。
-    r5 = r5_business_pnl(seeded_db)
-    assert r5["total"]["main_profit"] == detail["total"]["net_profit"]
+    business_report = business_pnl_report(seeded_db)
+    assert business_report["total"]["main_profit"] == detail["total"]["net_profit"]
 
-    monthly = r2_monthly_pnl(seeded_db)
+    monthly = monthly_pnl_report(seeded_db)
     oct_item = next(row for row in monthly["items"] if row["month"] == "2026-10")
     assert oct_item["rebate_income"] == Decimal("100.00")
     # 返点已含在销售收入里，不重复加回经营利润。
@@ -360,12 +360,12 @@ def test_reports_follow_rebate_and_bad_debt(seeded_db):
     )
 
 
-def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_db):
-    """R2「其中返点」列与利润明细同源：新模型返点(自动生成IN流水)也必须进列。
+def test_monthly_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_db):
+    """月度损益「其中返点」列与利润明细同源：新模型返点(自动生成IN流水)也必须进列。
 
-    回归：旧口径 R2 的 rebate_income 复用 order_profit_flow_by_date 的 extra_income，
+    回归：旧口径 月度损益 的 rebate_income 复用 order_profit_flow_by_date 的 extra_income，
     而后者对「已生成资金流水的新模型返点」continue 防重复，连带把其中项展示也跳过，
-    导致同一笔新模型返点在 R2 列=0、利润明细列=amount 口径打架（2026-11-12 修）。
+    导致同一笔新模型返点在 月度损益 列=0、利润明细列=amount 口径打架（2026-11-12 修）。
     """
     from app.funds.rebates import create_rebate
 
@@ -383,8 +383,8 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
     assert ditem["rebate"] == Decimal("250.00")
     assert ditem["income"] >= Decimal("250.00")  # 已含在收入大类
 
-    # R2「其中返点」列必须与利润明细同源 = 250（改动前这里是 0）
-    monthly = r2_monthly_pnl(seeded_db)
+    # 月度损益「其中返点」列必须与利润明细同源 = 250（改动前这里是 0）
+    monthly = monthly_pnl_report(seeded_db)
     oct_item = next(row for row in monthly["items"] if row["month"] == "2026-10")
     assert oct_item["rebate_income"] == ditem["rebate"] == Decimal("250.00")
     # 其中项只作展示，不重复加回经营利润
@@ -395,8 +395,8 @@ def test_r2_rebate_column_counts_action_model_rebate_like_profit_detail(seeded_d
     )
 
 
-def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
-    """R3 利润含返点收入、坏账支出，扣公司分润后按人员占比分配。"""
+def test_commission_allocation_includes_rebate_and_bad_debt(seeded_db):
+    """分润对账 利润含返点收入、坏账支出，扣公司分润后按人员占比分配。"""
     order_id = _order_with_events(seeded_db)
     _add_rebate(seeded_db, order_id, "100")
     _add_bad_debt(seeded_db, order_id, "400")
@@ -408,7 +408,7 @@ def test_r3_allocation_includes_rebate_and_bad_debt(seeded_db):
         ],
     )
 
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     entries = [
         row
         for group in report["order_groups"]
@@ -443,7 +443,7 @@ def test_profit_and_report_totals_share_same_cashflow_basis(seeded_db):
     """利润权威取数口与报表取数口数值同源（PROFIT-02 / REPORT-01 铁律）。
 
     ``order_cashflow_profit_by_order``（分润基数/订单列表）与
-    ``cashflow_totals_by_order``（报表 R1-R5）是两条独立 SQL 聚合，但必须共用
+    ``cashflow_totals_by_order``（报表 各经营报表）是两条独立 SQL 聚合，但必须共用
     同一口径：收入 IN + 返点、支出 OUT + 坏账，押金损失重分类流水排除。
     本用例覆盖全部四类来源，锁定二者数值恒等，防止任一处口径漂移。
     """

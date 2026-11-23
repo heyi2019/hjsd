@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { accounts, setupInventoryWrite } from "@fixtures/inventoryWriteSetup";
 import { InventoryPanel } from "@/business/inventory/InventoryPanel";
-import { InventoryDeleteDialog } from "@/business/inventory/InventoryPanel/InventoryDeleteDialog";
 import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/business/shared/sale";
 import { InventoryRebateModal } from "@/business/shared/rebate";
 import { OrderConsignmentModal } from "@/business/shared/operations/consignment";
@@ -77,7 +76,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     vi.mocked(ordersApi.executionDetail).mockRejectedValueOnce(new Error("上架记录读取失败"));
     vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce({
       account: { id: 1, status: "WAITING" },
-      orders: [{ order_id: 22, status: "ACTIVE", events: [] }],
+      orders: [{ order_id: 22, status: "ACTIVE", events: [], active_consignments: [] }],
     } as never);
     renderConsignment();
     expect(await screen.findByText(/上架记录读取失败/)).toBeInTheDocument();
@@ -86,6 +85,15 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
     await waitFor(() => expect(screen.queryByText(/上架记录读取失败/)).not.toBeInTheDocument());
     expect(screen.getByRole("combobox", { name: "寄售平台" })).toBeEnabled();
     expect(ordersApi.executionDetail).toHaveBeenCalledTimes(2);
+  });
+
+  it("后端未返回上架状态时提示重试，不能当作空记录继续上架", async () => {
+    vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce({
+      account: { id: 1, status: "WAITING" }, orders: [{ order_id: 22, status: "ACTIVE", events: [] }],
+    } as never);
+    renderConsignment();
+    expect(await screen.findByText(/上架状态不可用/)).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "寄售平台" })).toBeDisabled();
   });
 
   it("原订单寄售事件的已上架记录展示平台名", async () => {
@@ -98,6 +106,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
           status: "ACTIVE",
           trade_date: "2026-10-12",
           created_at: "2026-10-12T09:10:00",
+          active_consignments: [{ event_id: 901, platform: "盼之", price: null, listed_at: "2026-10-12T09:10:00" }],
           events: [{
             id: 901,
             event_type: "OPERATE",
@@ -115,7 +124,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
 
   it("已上架平台不再出现在新增上架选项", async () => {
     vi.mocked(ordersApi.executionDetail).mockResolvedValue({ account: { id: 1, status: "WAITING" }, orders: [{
-      order_id: 22, status: "ACTIVE", events: [{ id: 901, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"] } }],
+      order_id: 22, status: "ACTIVE", active_consignments: [{ event_id: 901, platform: "盼之", price: null, listed_at: "2026-10-12T09:10:00" }], events: [{ id: 901, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"] } }],
     }] } as never);
     renderConsignment();
     await screen.findByText("盼之");
@@ -130,6 +139,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
         { id: 901, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["盼之"] } },
         { id: 902, event_type: "OPERATE", operation_type: "UNLIST", form_extra: { consignment_event_id: 901, consignment_platforms: ["盼之"], platform_unlist_scope: "PLATFORM" } },
       ],
+      active_consignments: [],
     }] } as never);
     renderConsignment();
     await screen.findByText("暂无上架记录");
@@ -147,6 +157,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
           status: "ACTIVE",
           trade_date: "2026-10-12",
           created_at: "2026-10-12T09:10:00",
+          active_consignments: [{ event_id: 902, platform: "寄售平台A", price: null, listed_at: "2026-10-12T09:10:00" }],
           events: [{
             id: 902,
             event_type: "OPERATE",
@@ -172,6 +183,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
         status: "ACTIVE",
         trade_date: "2026-10-12",
         created_at: "2026-10-12T09:10:00",
+        active_consignments: Array.from({ length: 12 }, (_, index) => ({ event_id: 920 + index, platform: `寄售平台${index + 1}`, price: null, listed_at: `2026-10-${String(index + 1).padStart(2, "0")}T09:10:00` })),
         events: Array.from({ length: 12 }, (_, index) => ({
           id: 920 + index,
           event_type: "OPERATE",
@@ -198,6 +210,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
         status: "ACTIVE",
         trade_date: "2026-10-12",
         created_at: "2026-10-12T09:10:00",
+        active_consignments: [],
         events: [],
       }],
     } as never);
@@ -218,6 +231,7 @@ describe("InventoryConsignmentModal 已上架记录平台展示（L234）", () =
         status: "ACTIVE",
         trade_date: "2026-10-12",
         created_at: "2026-10-12T09:10:00",
+        active_consignments: [],
         events: [],
       }],
     } as never);
@@ -463,6 +477,7 @@ describe("OrderDetailDeliverySection", () => {
           order_no: "HS-FE267",
           order_type: "HS",
           created_at: "2026-11-02T10:00:00",
+          latest_sale_event_id: 1,
           extra_values: {
             bound_phone: "13800000001", bound_phone_owner: "买号绑定人", intermediary_platform: "盼之",
             sell_bound_phone: "13800000002", sell_bound_phone_owner: "卖号绑定人", sell_intermediary_platform: "其他",

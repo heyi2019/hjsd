@@ -5,12 +5,13 @@ from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import NotFound, Validation
 from app.core.security import CurrentUser
-from app.domain.trade import Cashflow, Order, OrderEvent, Reconciliation
+from app.domain.trade import Cashflow, Order, OrderEvent
 from app.domain.enums import CashflowSourceType
 from app.domain.foundation import Pool
 from app.domain.users import User
 from app.settings.field_definitions.pools import assert_pool_usable
 
+from ..timestamps import business_timestamp
 from .schemas import ExecutionCashflowEditItem, ExecutionEditItem, ExecutionEditRequest
 
 
@@ -34,7 +35,7 @@ def prepare_cashflow_event_edits(db: Session, order_id: int, payload: ExecutionE
         if not user.can_see_pool(flow.pool_id):
             raise NotFound("资金明细不存在")
         amount_changed = item.amount is not None and item.amount != flow.amount
-        time_changed = item.occurred_at is not None and item.occurred_at.replace(tzinfo=None) != flow.created_at
+        time_changed = item.occurred_at is not None and item.occurred_at.replace(tzinfo=None) != business_timestamp(flow.occurred_on, flow.created_at)
         if not amount_changed and not time_changed:
             continue
         if amount_changed and event.event_type not in {"BUY", "SELL"}:
@@ -76,11 +77,16 @@ def lock_edit_pools(db: Session, order_id: int, payload: ExecutionEditRequest, u
     pool_ids = set(db.scalars(select(Cashflow.pool_id).where(or_(event_flow, named_flow))).all())
     if any(not user.can_see_pool(pool_id) for pool_id in pool_ids):
         raise NotFound("关联资金流水不存在")
+    target_pool_ids = set()
     for item in flow_items:
         if item.pool_id is not None:
             if not user.can_see_pool(item.pool_id):
                 raise NotFound("资金账户不存在", details={"pool_id": item.pool_id})
             pool_ids.add(item.pool_id)
+            target_pool_ids.add(item.pool_id)
+    # 先取得状态共享锁，再取得对账使用的账户行锁；与停用操作保持相同顺序。
+    for pool_id in sorted(target_pool_ids):
+        assert_pool_usable(db, pool_id)
     if pool_ids:
         db.scalars(select(Pool.id).where(Pool.id.in_(pool_ids)).order_by(Pool.id).with_for_update(key_share=True)).all()
 
@@ -115,13 +121,6 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order: Order, item
                 raise Validation("关联业务的金额或日期请通过原业务修改", details={"flow_no": flow.flow_no})
             if pool_changed and flow.source_type in {CashflowSourceType.DEPOSIT.value, CashflowSourceType.TRANSFER.value}:
                 raise Validation("押金或划转资金账户请通过原业务修改", details={"flow_no": flow.flow_no})
-            new_pool = item.pool_id if item.pool_id is not None else flow.pool_id
-            new_date = item.occurred_at.date() if item.occurred_at is not None else flow.occurred_on
-            if db.scalar(select(Reconciliation.id).where(or_(
-                and_(Reconciliation.pool_id == flow.pool_id, Reconciliation.reconciled_on >= flow.occurred_on),
-                and_(Reconciliation.pool_id == new_pool, Reconciliation.reconciled_on >= new_date),
-            ))) is not None:
-                raise Validation("资金账户已有后续对账记录，不能直接修改")
         before = {
             "pool_id": flow.pool_id,
             "amount": str(flow.amount),

@@ -19,7 +19,7 @@ from app.funds.rebates import create_rebate, list_rebates
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.funds.balances import pool_balance
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
 
 TODAY = date(2026, 10, 4)
 
@@ -176,7 +176,7 @@ class TestCashflowLifecycle:
                 seeded_db, flow.id, reversed_on=TODAY, actor="finance", reason="再次冲销"
             )
 
-        monthly = r2_monthly_pnl(seeded_db)
+        monthly = monthly_pnl_report(seeded_db)
         assert monthly["items"] == []
 
     def test_business_event_cashflow_must_be_reversed_by_event(self, seeded_db):

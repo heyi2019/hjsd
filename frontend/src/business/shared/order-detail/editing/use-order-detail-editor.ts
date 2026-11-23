@@ -40,9 +40,10 @@ export function useOrderDetailEditor(params: {
   const [financeDrafts, setFinanceDrafts] = useState<Record<string, FinanceDraft>>({});
   const [orderDrafts, setOrderDrafts] = useState<Record<number, OrderDraft>>({});
   const [partyDrafts, setPartyDrafts] = useState<Record<number, PartyAddition[]>>({});
-  const { employees, reload: reloadEmployees, reloadFresh: reloadFreshEmployees } = useEmployeeOptions(false);
-  const { items: pools, reload: reloadPools } = useReferenceList("pools", poolsApi.list, false);
+  const { employees, error: employeeError, reload: reloadEmployees, reloadFresh: reloadFreshEmployees } = useEmployeeOptions(false);
+  const { items: pools, error: poolError, reload: reloadPools } = useReferenceList("pools", poolsApi.list, false);
   const [invEditExtraForm] = Form.useForm();
+  const originalAccount = useRef<Account | null>(null);
   const originalAccountExtras = useRef<Record<string, unknown>>({});
   const saveAction = useAsyncAction();
   const savingAccount = saveAction.pending;
@@ -79,6 +80,8 @@ export function useOrderDetailEditor(params: {
     setFinanceDrafts({});
     setOrderDrafts({});
     setPartyDrafts({});
+    originalAccount.current = null;
+    originalAccountExtras.current = {};
     invEditExtraForm.resetFields();
   }
 
@@ -97,6 +100,7 @@ export function useOrderDetailEditor(params: {
     setOrderDrafts({});
     setPartyDrafts({});
     invEditExtraForm.resetFields();
+    originalAccount.current = JSON.parse(JSON.stringify(account)) as Account;
     originalAccountExtras.current = { ...(account.extra_values ?? {}) };
     invEditExtraForm.setFieldsValue({ form_extra: account.extra_values ?? {} });
     await Promise.all([ensureEmployees(true), ensurePools()]);
@@ -196,7 +200,7 @@ export function useOrderDetailEditor(params: {
     const originalOrders = detail?.orders ?? [];
     const originalOrder = originalOrders.find((order) => order.order_id === orderId);
     setOrderDrafts((current) => {
-      const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: originalOrder?.created_at ?? "", note: originalOrder?.note ?? "", form_extra: {} };
+      const currentDraft = current[orderId] ?? { order_id: orderId, occurred_at: originalOrder?.occurred_at ?? originalOrder?.created_at ?? "", note: originalOrder?.note ?? "", form_extra: {} };
       const next = {
         ...current,
         [orderId]: {
@@ -227,42 +231,26 @@ export function useOrderDetailEditor(params: {
     await saveAction.run(async () => {
       try {
         const extraValues = await invEditExtraForm.validateFields();
-        const {
-          id,
-          game_account,
-          game_type,
-          game_password,
-          camp_account,
-          channel_region,
-          bound_phone,
-          has_secondary,
-          secondary_images,
-          wallet_realname,
-          wallet_realname_images,
-          account_description,
-          account_images,
-          note,
-          extra_values,
-        } = editingAccount;
-        const changedAccountExtras = Object.fromEntries(Object.entries(extra_values ?? {}).filter(
-          ([key, value]) => JSON.stringify(value) !== JSON.stringify(originalAccountExtras.current[key]),
-        ));
+        const { id, extra_values } = editingAccount;
+        const original = originalAccount.current;
+        if (!original) throw new Error("编辑资料已失效，请重新打开");
+        const fields = ["game_account", "game_type", "game_password", "camp_account", "channel_region", "bound_phone", "has_secondary", "secondary_images", "wallet_realname", "wallet_realname_images", "account_description", "account_images", "note"] as const;
+        const same = (left: unknown, right: unknown) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+        const changedFields = fields.filter((field) => !same(editingAccount[field], original[field]));
+        const changedAccountKeys = [...new Set([...Object.keys(originalAccountExtras.current), ...Object.keys(extra_values ?? {})])]
+          .filter((key) => !same(extra_values?.[key], originalAccountExtras.current[key]));
+        const changedFormKeys = Object.keys(extraValues?.form_extra ?? {})
+          .filter((key) => !same(extraValues.form_extra[key], originalAccountExtras.current[key]));
+        const changedAccountExtras = Object.fromEntries(changedAccountKeys.map((key) => [key, extra_values?.[key] ?? null]));
         const profile = {
-          game_account,
-          game_type,
-          game_password,
-          camp_account,
-          channel_region,
-          bound_phone,
-          has_secondary,
-          secondary_images,
-          wallet_realname,
-          wallet_realname_images,
-          account_description,
-          account_images,
-          note,
-          ...(Object.keys(changedAccountExtras).length ? { extra_values: changedAccountExtras } : {}),
-          form_extra: extraValues?.form_extra ?? {},
+          ...Object.fromEntries(changedFields.map((field) => [field, editingAccount[field] ?? null])),
+          ...(changedAccountKeys.length ? { extra_values: changedAccountExtras } : {}),
+          form_extra: Object.fromEntries(changedFormKeys.map((key) => [key, extraValues.form_extra[key] ?? null])),
+        };
+        const expectedProfile = {
+          ...Object.fromEntries(changedFields.map((field) => [field, original[field] ?? null])),
+          ...(changedAccountKeys.length ? { extra_values: Object.fromEntries(changedAccountKeys.map((key) => [key, originalAccountExtras.current[key] ?? null])) } : {}),
+          form_extra: Object.fromEntries(changedFormKeys.map((key) => [key, originalAccountExtras.current[key] ?? null])),
         };
         const detail = getExecutionDetail(id);
         const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];
@@ -277,6 +265,7 @@ export function useOrderDetailEditor(params: {
         if (sourceOrderId == null) throw new Error("账号没有绑定来源订单，无法保存详情");
         await ordersApi.updateExecution(sourceOrderId, {
           profile,
+          expected_profile: expectedProfile,
           events,
           new_events,
           cashflows,
@@ -319,6 +308,10 @@ export function useOrderDetailEditor(params: {
     updatePartyDraft,
     employees,
     pools,
+    employeeError,
+    poolError,
+    retryEmployees: reloadFreshEmployees,
+    retryPools: () => reloadPools(() => poolsApi.list({ fresh: true })),
     ensureEmployees,
     invEditExtraForm,
     savingAccount,

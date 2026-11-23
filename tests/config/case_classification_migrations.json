@@ -157,5 +157,110 @@
     "nodeid": "tests/frontend/module/business/OrdersPage.actions.test.tsx::分润：提交表单数据并由后端决定保存口径",
     "old_id": "IT-B01-560",
     "new_id": "IT-B01-640"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_action_allocations_use_order_and_sale_responsibles",
+    "old_id": "IT-F01-177",
+    "new_id": "IT-B10-059"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_cannot_choose_seller_before_sale",
+    "old_id": "IT-F01-178",
+    "new_id": "IT-B10-060"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rate_cannot_exceed_one_hundred_in_database",
+    "old_id": "IT-F01-179",
+    "new_id": "IT-B10-061"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_incomplete_and_duplicate_action_categories",
+    "old_id": "IT-F01-180",
+    "new_id": "IT-B10-062"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_multiple_company_rows",
+    "old_id": "IT-F01-181",
+    "new_id": "IT-B10-063"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_same_person_twice_in_one_action",
+    "old_id": "IT-F01-182",
+    "new_id": "IT-B10-064"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_role_is_closed_in_database",
+    "old_id": "IT-F01-183",
+    "new_id": "IT-B10-065"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_splits_one_action_across_multiple_executors",
+    "old_id": "IT-F01-184",
+    "new_id": "IT-B10-066"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_user_must_exist",
+    "old_id": "IT-F01-185",
+    "new_id": "IT-B10-067"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_buy_sell_recipient_is_bound_to_action_actor",
+    "old_id": "IT-F01-186",
+    "new_id": "IT-B10-068"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_duplicate_user_role_rejected",
+    "old_id": "IT-F01-187",
+    "new_id": "IT-B10-069"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_empty_items_rejected",
+    "old_id": "IT-F01-188",
+    "new_id": "IT-B10-070"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_fifty_fifty",
+    "old_id": "IT-F01-189",
+    "new_id": "IT-B10-071"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_invalid_allocation_role_rejected_by_service",
+    "old_id": "IT-F01-190",
+    "new_id": "IT-B10-072"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_negative_rate_rejected",
+    "old_id": "IT-F01-191",
+    "new_id": "IT-B10-073"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_reset_replaces_old_rows",
+    "old_id": "IT-F01-192",
+    "new_id": "IT-B10-074"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_sale_completion_binds_seller_for_allocation",
+    "old_id": "IT-F01-193",
+    "new_id": "IT-B10-075"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_sum_99_rejected",
+    "old_id": "IT-F01-194",
+    "new_id": "IT-B10-076"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_total_must_be_100",
+    "old_id": "IT-F01-195",
+    "new_id": "IT-B10-077"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_typed_allocation_requires_four_income_categories",
+    "old_id": "IT-F01-196",
+    "new_id": "IT-B10-078"
+  },
+  {
+    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_unknown_allocation_field_rejected_by_service",
+    "old_id": "IT-F01-197",
+    "new_id": "IT-B10-079"
   }
 ]

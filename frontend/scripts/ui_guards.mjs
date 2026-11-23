@@ -90,6 +90,18 @@ const READ_ONLY_BUTTONS = new Map([
   ["src/business/shared/order-detail/OrderDetailDialog.tsx", [
     '<Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button>',
   ]],
+  ["src/business/shared/order-detail/OrderAttachments.tsx", [
+    `<Button type="link" aria-expanded={open} onClick={() => { setOpen(!open); if (!open) void reload(); }}>
+      {open ? "收起订单附件" : "查看订单附件"}
+    </Button>`,
+    '<Button type="link" onClick={() => void reload()}>重新加载</Button>',
+    '<Button type="link" onClick={() => void download(item)}>下载</Button>',
+    '<Button disabled={uploading} onClick={() => setDuplicate(null)}>取消</Button>',
+  ]],
+  ["src/business/shared/order-detail/editing/ReferenceDataErrors.tsx", [
+    '<Button type="link" size="small" onClick={() => { void retryEmployees().catch(() => undefined); }}>重试员工</Button>',
+    '<Button type="link" size="small" onClick={() => { void retryPools().catch(() => undefined); }}>重试资金账户</Button>',
+  ]],
 ]);
 for (const [rule, probe, hint] of BANNED) {
   for (const file of pages()) {

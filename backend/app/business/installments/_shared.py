@@ -20,9 +20,12 @@ from app.core.errors import (
 from app.core.money import (
     require_non_negative,
     require_positive,
+    to_money,
 )
+from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.domain.trade import (
     Installment,
+    InstallmentSchedule,
     Order,
 )
 from app.domain.enums import InstallmentStatus
@@ -33,6 +36,24 @@ SCHEDULE_CLOSED_STATUSES = frozenset({
     InstallmentStatus.DELIVERED.value,
     InstallmentStatus.SETTLED.value,
 })
+
+
+def _restore_when_overdue_cleared(session: Session, installment: Installment) -> None:
+    """最后一个逾期应收已消除时，按是否收款恢复正常合约状态。"""
+    if installment.status != InstallmentStatus.OVERDUE.value:
+        return
+    session.flush()
+    outstanding_overdue = session.scalar(
+        select(InstallmentSchedule.id).where(
+            InstallmentSchedule.installment_id == installment.id,
+            InstallmentSchedule.due_on < date.today(),
+            InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
+            < InstallmentSchedule.due_amount,
+        ).limit(1)
+    )
+    if outstanding_overdue is None:
+        action = "RESUME_PAID" if to_money(installment.paid_amount) > 0 else "RESUME_UNPAID"
+        installment.status = transition(INSTALLMENT_TRANSITIONS, installment.status, action, entity="分期合约")
 
 def _non_negative(value: Any, *, field: str) -> Decimal:
     try:

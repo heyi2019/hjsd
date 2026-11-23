@@ -29,7 +29,7 @@ from app.funds.deposits.writes import (
 )
 from app.shared.operation_operators import list_operation_operators_bulk
 
-from ..router_output import _actor, _cashflow_out, _deposit_out
+from ..router_output import _actor, _cashflow_out, _deposit_action_histories, _deposit_out
 
 router = APIRouter(tags=["商户押金"])
 read_access = require_permissions(PERM_FINANCE_READ, PERM_ORDER_CREATE, require_all=False)
@@ -45,7 +45,8 @@ def page_deposits(
 ) -> PageOut[schemas.DepositOut]:
     items, total = finance_list_deposits(db, pool_id=pool_id, user=user, limit=limit, offset=offset)
     operators = list_operation_operators_bulk(db, entity_type="deposit", entity_ids=[item.id for item in items])
-    rows = [_deposit_out(item, db, operation_operators=operators.get(str(item.id), [])) for item in items]
+    histories = _deposit_action_histories(db, [item.id for item in items])
+    rows = [_deposit_out(item, db, operation_operators=operators.get(str(item.id), []), action_history=histories.get(str(item.id), [])) for item in items]
     return PageOut(items=rows, total=total, limit=limit, offset=offset)
 
 
@@ -68,7 +69,8 @@ def list_deposits(
     operators = list_operation_operators_bulk(
         db, entity_type="deposit", entity_ids=[item.id for item in items],
     )
-    return [_deposit_out(item, db, operation_operators=operators.get(str(item.id), [])) for item in items]
+    histories = _deposit_action_histories(db, [item.id for item in items])
+    return [_deposit_out(item, db, operation_operators=operators.get(str(item.id), []), action_history=histories.get(str(item.id), [])) for item in items]
 
 
 @router.post("/deposits", response_model=schemas.DepositOut, status_code=201)

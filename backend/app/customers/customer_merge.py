@@ -94,6 +94,13 @@ def merge_customers(
     target = get_customer(session, target_customer_id, user)
     if source.id == target.id:
         raise Validation("来源与目标不能是同一客户", code=ErrorCode.MERGE_TARGET_INVALID)
+    # 合并、客户资料变更和新关联写入共享客户行锁；按编号顺序锁定避免相反方向合并死锁。
+    session.scalars(
+        select(Customer).where(Customer.id.in_((source.id, target.id)))
+        .order_by(Customer.id).with_for_update().execution_options(populate_existing=True)
+    ).all()
+    source = get_customer(session, source_customer_id, user)
+    target = get_customer(session, target_customer_id, user)
     if target.status != CustomerStatus.ACTIVE.value:
         raise Validation(
             "目标客户必须为 ACTIVE",
@@ -111,16 +118,15 @@ def merge_customers(
     roles = session.scalars(
         select(OrderCustomerRole).where(OrderCustomerRole.customer_id == source.id)
     ).all()
+    existing_roles = set(session.execute(
+        select(OrderCustomerRole.order_id, OrderCustomerRole.role).where(
+            OrderCustomerRole.customer_id == target.id,
+            OrderCustomerRole.order_id.in_({role.order_id for role in roles}),
+        )
+    ).all()) if roles else set()
     migrated = 0
     for role in roles:
-        exists = session.scalar(
-            select(OrderCustomerRole).where(
-                OrderCustomerRole.order_id == role.order_id,
-                OrderCustomerRole.customer_id == target.id,
-                OrderCustomerRole.role == role.role,
-            )
-        )
-        if exists is not None:
+        if (role.order_id, role.role) in existing_roles:
             session.delete(role)
             continue
         role.customer_id = target.id
@@ -176,7 +182,7 @@ def assert_customer_usable(
     session: Session, customer_id: int, *, user: CurrentUser | None = None
 ) -> Customer:
     """新订单参与方校验：停用/已合并一律拒绝（CUS-01-04、A11）。"""
-    customer = get_customer(session, customer_id, user)
+    customer = get_customer(session, customer_id, user, key_share=True)
     if customer.status != CustomerStatus.ACTIVE.value:
         raise Validation(
             f"客户 {customer.customer_no} 状态为 {customer.status}，不可作为新订单参与方",

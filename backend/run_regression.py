@@ -204,6 +204,7 @@ GROUPS = {
         "tests/backend/integration/business/test_orders_query_contract.py",
         "tests/backend/integration/business/test_orders_account_effects.py",
         "tests/backend/integration/business/test_orders_api.py",
+        "tests/backend/integration/business/test_order_import.py",
         "tests/backend/integration/business/test_orders.py",
         "tests/backend/integration/business/test_orders_flows.py",
         "tests/backend/integration/business/test_orders_events.py",
@@ -214,7 +215,7 @@ GROUPS = {
         "tests/backend/integration/business/test_installments_overdue.py",
         "tests/backend/integration/business/test_installments_api_class.py",
         "tests/backend/integration/operations/test_reporting_contract.py",
-        "tests/backend/integration/business/test_m2.py",
+        "tests/backend/integration/business/test_installments_funds_integration.py",
     ],
     "foundation": [
         "tests/backend/integration/settings/test_foundation_contract.py",
@@ -247,6 +248,7 @@ GROUPS = {
         "tests/backend/integration/business/test_orders_query_contract.py",
         "tests/backend/integration/business/test_orders_account_effects.py",
         "tests/backend/integration/business/test_orders_api.py",
+        "tests/backend/integration/business/test_order_import.py",
         "tests/backend/integration/business/test_orders.py",
         "tests/backend/integration/business/test_orders_flows.py",
         "tests/backend/integration/business/test_orders_events.py",
@@ -284,7 +286,7 @@ GROUPS = {
         "tests/backend/integration/business/test_installments_lifecycle.py",
         "tests/backend/integration/business/test_installments_overdue.py",
         "tests/backend/integration/business/test_installments_api_class.py",
-        "tests/backend/integration/business/test_m2.py",
+        "tests/backend/integration/business/test_installments_funds_integration.py",
         "tests/backend/integration/business/test_installments_service.py",
         "tests/backend/integration/business/test_installments_service_write_paths.py",
         "tests/backend/integration/business/test_installments_service_defensive.py",
@@ -293,6 +295,8 @@ GROUPS = {
         "tests/backend/integration/business/test_installment_totals.py",
     ],
     "finance": [
+        "tests/backend/integration/business/test_installments_funds_integration.py",
+        "tests/backend/integration/business/test_order_import.py",
         "tests/backend/integration/finance/test_finance_api.py",
         "tests/backend/integration/finance/test_finance_deposits.py",
         "tests/backend/integration/finance/test_finance_rebates_guards.py",
@@ -335,13 +339,15 @@ GROUPS = {
         "tests/backend/unit/operations/test_report_export_columns.py",
         "tests/backend/unit/operations/test_xlsx_sheet_capacity.py",
         "tests/backend/integration/operations/test_reporting_service.py",
-        "tests/backend/integration/operations/test_reporting_r_consistency.py",
+        "tests/backend/integration/operations/test_reporting_consistency.py",
         "tests/backend/integration/operations/test_profit_cashflow_basis.py",
-        "tests/backend/integration/operations/test_profit_r2_accounting.py",
+        "tests/backend/integration/operations/test_profit_monthly_accounting.py",
         "tests/backend/integration/operations/test_data_center_summary.py",
+        "tests/backend/integration/operations/test_list_export_csv.py",
+        "tests/backend/unit/settings/test_list_scope_ui_parity.py",
     ],
     "profit-allocation": [
-        "tests/backend/integration/settings/test_policy_allocation.py",
+        "tests/backend/integration/business/test_profit_allocation.py",
     ],
     "governance": [
         "tests/backend/integration/system/test_attachments_contract.py",
@@ -418,10 +424,21 @@ def _groups_for_source_path(path: str) -> set[str]:
         t in path for t in ("business/", "order", "state_machine", "request_schema")
     ):
         selected.add("orders")
-    if "installment" in path or path.endswith("/test_m2.py"):
+    if "installment" in path:
         selected.add("installments")
     if path.startswith("backend/app/funds/") or "finance" in path or "rebate" in path:
         selected.add("finance")
+    # 订单日期、事件与详情资金编辑会改同一批资金凭证；资金写入也影响订单和经营报表。
+    if (path == "backend/app/business/orders/mutations.py"
+        or path.startswith("backend/app/business/orders/events")
+        or path.startswith("backend/app/business/orders/importing/")
+        or path.startswith("backend/app/business/shared/order_detail/editing/")):
+        selected.add("finance")
+    if (path.startswith(("backend/app/funds/cashflow_writes/", "backend/app/funds/deposits/"))
+        or path == "backend/app/funds/rebates.py"):
+        selected.update(("orders", "reporting"))
+    if path == "backend/app/funds/cashflow_reads/studio.py":
+        selected.add("reporting")
     if any(t in path for t in ("customers", "parties", "leads")):
         selected.add("parties")
     if "report" in path:
@@ -439,7 +456,7 @@ def _groups_for_source_path(path: str) -> set[str]:
 
 # 核心 / 共享 / 配置 / 测试基建 / 跨模块取数口：启发式选测不许碰，一律降级全量。
 STRUCTURAL_PREFIXES = (
-    "backend/app/core/", "backend/app/domain/", "backend/app/main.py",
+    "backend/app/core/", "backend/app/domain/", "backend/app/shared/", "backend/app/main.py",
     "backend/app/config", "backend/app/settings", "backend/app/db",
     "backend/requirements", "backend/alembic/", "backend/run_regression.py",
     "tests/config/catalog.py", "backend/scripts/promise_catalog.py",

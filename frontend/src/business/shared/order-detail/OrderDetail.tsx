@@ -7,6 +7,8 @@ import type { EmployeeOption } from "../../../shared/api/types/org";
 import type { Pool } from "../../../shared/api/types/finance";
 import { formatDateTimeMinute } from "../../../shared/lib/format";
 import { currentDevUser } from "../../../shared/api/client";
+import { useOptionSetResource } from "../../../shared/lib/optionSets";
+import { ErrorBanner } from "../../../shared/ui";
 import {
   INVENTORY_STATUS_LABEL,
   BUSINESS_MODE_LABEL,
@@ -14,6 +16,7 @@ import {
   VALUE_ADDED_SERVICE_LABEL,
 } from "../../../shared/lib/labels";
 import { OrderDetailView } from "./OrderDetailView";
+import { OrderAttachments } from "./OrderAttachments";
 import { ImageOriginalContext } from "./imageOriginalContext";
 import { ordersApi } from "../../../shared/api/orders.api";
 import {
@@ -121,6 +124,7 @@ export function OrderDetail({
   onCancel?: () => void;
   saving?: boolean;
 }) {
+  const optionSets = useOptionSetResource("INTERMEDIARY_PLATFORM", Boolean(editing));
   // 展开详情是订单级：即便调用方误传了账号聚合快照，这里也再次按订单主键收口，
   // 防止同一账号的寄售/回收/提号订单串入当前订单的资金、分润和操作明细。
   const scopedDetail = useMemo(
@@ -151,8 +155,9 @@ export function OrderDetail({
   );
   // 合计一律取后端 finance_summary（与上面明细同源），前端只数条数、不再累加金额。
   const summary = scopedDetail?.finance_summary;
-  const totalExpense = summary?.total_expense ?? "0.00";
-  const totalIncome = summary?.total_income ?? "0.00";
+  const validTotal = (value: unknown) => typeof value === "string" && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim()) ? value : null;
+  const totalExpense = validTotal(summary?.total_expense);
+  const totalIncome = validTotal(summary?.total_income);
 
   const financeRows = useMemo<OrderFinanceRow[]>(() => (detailView?.finance_rows ?? []).map((row) => ({
     key: row.key,
@@ -244,6 +249,7 @@ export function OrderDetail({
   return (
     <ImageOriginalContext.Provider value={scopedDetail?.image_previews && previewOrderId != null && !editing
       ? (field, index) => ordersApi.executionImage(previewOrderId, field, index, scopedDetail.image_versions?.[field]?.[index]) : null}>
+    <ErrorBanner error={optionSets.error} onRetry={optionSets.retry} retrying={optionSets.loading} />
     <OrderDetailView
       meta={meta}
       detail={scopedDetail}
@@ -277,6 +283,7 @@ export function OrderDetail({
       onCancel={onCancel}
       saving={saving}
     />
+    {contextOrder?.order_no && !editing ? <OrderAttachments orderNo={contextOrder.order_no} /> : null}
     </ImageOriginalContext.Provider>
   );
 }

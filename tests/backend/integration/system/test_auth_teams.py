@@ -245,6 +245,9 @@ def test_bearer_permissions_refresh_after_user_role_change(
 ):
     created = _create_user(seeded_client, username="live-role", role="VIEWER")
     token = _login(seeded_client, "live-role", "password123")
+    changed = seeded_client.post("/api/auth/change-password", headers={"Authorization": f"Bearer {token}"}, json={"old_password": "password123", "new_password": "newpassword1"})
+    assert changed.status_code == 200, changed.text
+    token = changed.json()["access_token"]
 
     updated = seeded_client.patch(
         f"/api/users/{created['id']}",

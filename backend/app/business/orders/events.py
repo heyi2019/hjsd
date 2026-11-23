@@ -75,6 +75,8 @@ def post_event(
     source_id: str | None = None,
     user: CurrentUser | None = None,
     allow_installment_delivery: bool = False,
+    historical_import: bool = False,
+    historical_cashflows_supplied: bool = False,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。
 
@@ -82,6 +84,9 @@ def post_event(
     RebateRecord）；不传时事件无来源，行为与改造前一致。
     """
     from app.shared.order_access import get_order
+
+    if historical_cashflows_supplied and (not historical_import or event_type not in {"BUY", "SELL", "CANCEL"}):
+        raise Validation("仅历史导入的资金事件可以使用独立流水明细")
 
     (
         sale_mode,
@@ -130,6 +135,7 @@ def post_event(
         event_type,
         offset_event_id=offset_event_id,
         reason=reason,
+        allow_unbound_import=historical_import and order.account_id is None,
     )
 
     if event_type == EventType.DELIVER.value:
@@ -147,7 +153,7 @@ def post_event(
         )
 
     if event_type == EventType.SELL.value:
-        _assert_sellable_order(session, order)
+        _assert_sellable_order(session, order, allow_unbound_import=historical_import and order.account_id is None)
 
     has_cashflow = event_type in EVENT_FLOW_MAP and not installment_sale
     if not has_cashflow and event_type != EventType.DELIVER.value:
@@ -269,7 +275,7 @@ def post_event(
         direction = cancel_direction
 
     flow: Cashflow | None = None
-    if has_cashflow:
+    if has_cashflow and not historical_cashflows_supplied:
         flow = Cashflow(
             flow_no=allocate_flow_no(session, direction),
             pool_id=event.pool_id,
@@ -324,12 +330,12 @@ def post_event(
         (offset is None or cancel_fully_consumed)
     ):
         # 冲销事件闭环：订单进入 CANCELLED，此后不再接受任何新事件
-        action = "CANCEL_SELL" if offset is not None and offset.event_type == "SELL" and order.account_id is not None and order.order_type in {"HS", "TH"} else "CANCEL"
+        action = "CANCEL_SELL" if offset is not None and offset.event_type == "SELL" and (order.account_id is not None or historical_import) and order.order_type in {"HS", "TH"} else "CANCEL"
         order.status = transition(ORDER_TRANSITIONS, order.status, action, entity="订单")
     session.flush()
 
     # 每次售出完成后提醒本次 SELL 执行人检查分润。
-    if event_type == EventType.SELL.value and not installment_sale:
+    if event_type == EventType.SELL.value and not installment_sale and not historical_import:
         from app.workbench.notifications.triggers import notify_seller_to_allocate
 
         notify_seller_to_allocate(session, order, event, actor=actor, new_sale=True)

@@ -1,5 +1,5 @@
 import { Alert, Button, Form, Input } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { OrderDetailDialog } from "../shared/order-detail/OrderDetailDialog";
 import "./OrderAllocationModal.css";
 import type { FormInstance } from "antd";
@@ -14,9 +14,8 @@ import {
 import { appMessage } from "../../shared/ui/appFeedback";
 import { normalizeError } from "../../shared/api/client";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
-import { useKeyedLatestRequest } from "../../shared/hooks/useLatestRequest";
 import { profitAllocationApi } from "../../shared/api/profitAllocation.api";
-import { moneyRules } from "../../shared/lib/validators";
+import { moneyRules, percentRules } from "../../shared/lib/validators";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { EmployeeSelectControl } from "../../shared/forms/ResponsibleEmployeeSelect";
 import type { Order } from "../../shared/api/types/orders";
@@ -24,6 +23,7 @@ import type { useProfitAllocation } from "./useProfitAllocation";
 import {
   ALLOCATION_TYPE_LABEL,
   buildAllocationOptionGroups,
+  convertAllocationValue,
   type ActionAllocationCandidates,
   type AllocationFormRow,
   type AllocationType,
@@ -45,31 +45,20 @@ function AllocationFields({
   allocationCandidates,
   allocationForm,
   employeeOptions,
-  getAllocationSession,
-  orderId,
+  orderProfit,
+  onEdited,
   watchedRows,
 }: {
   allocationCandidates: ActionAllocationCandidates;
   allocationForm: FormInstance;
   employeeOptions: AllocationEmployeeOption[];
-  getAllocationSession: () => number;
-  orderId: number;
+  orderProfit: string;
+  onEdited: (row: number, input: "rate" | "amount") => void;
   watchedRows: AllocationFormRow[];
 }) {
-  const conversionVersion = useKeyedLatestRequest<number>();
   const optionGroups = buildAllocationOptionGroups(allocationCandidates, employeeOptions);
-  const invalidateConversion = conversionVersion.invalidate;
   const convertValue = (row: number, direction: "RATE_TO_AMOUNT" | "AMOUNT_TO_RATE", value: string, target: "allocation_rate" | "allocation_amount") => {
-    const version = conversionVersion.start(row);
-    const session = getAllocationSession();
-    if (!value.trim()) return;
-    void profitAllocationApi.convert(orderId, direction, value).then((result) => {
-      if (!conversionVersion.isCurrent(row, version) || getAllocationSession() !== session) return;
-      if (result.value == null) { appMessage.error("分润比例换算失败，请重试"); return; }
-      allocationForm.setFieldValue(["allocations", row, target], result.value);
-    }).catch(() => {
-      if (conversionVersion.isCurrent(row, version) && getAllocationSession() === session) appMessage.error("分润比例换算失败，请重试");
-    });
+    allocationForm.setFieldValue(["allocations", row, target], convertAllocationValue(orderProfit, direction, value) ?? "");
   };
   return (
     <Form.List name="allocations">
@@ -125,11 +114,13 @@ function AllocationFields({
                 <Form.Item
                   name={[field.name, "allocation_rate"]}
                   label="比例"
+                  rules={percentRules()}
                 >
                   <Input
                     suffix="%"
-                    readOnly
                     className="ui-control-width-120"
+                    inputMode="decimal"
+                    onChange={(event) => { onEdited(field.name, "rate"); convertValue(field.name, "RATE_TO_AMOUNT", event.target.value, "allocation_amount"); }}
                   />
                 </Form.Item>
                 <Form.Item
@@ -141,8 +132,7 @@ function AllocationFields({
                     prefix="¥"
                     suffix=""
                     className="ui-control-width-140"
-                    onChange={() => { invalidateConversion(field.name); allocationForm.setFieldValue(["allocations", field.name, "allocation_rate"], ""); }}
-                    onBlur={(event) => convertValue(field.name, "AMOUNT_TO_RATE", event.target.value, "allocation_rate")}
+                    onChange={(event) => { onEdited(field.name, "amount"); convertValue(field.name, "AMOUNT_TO_RATE", event.target.value, "allocation_rate"); }}
                   />
                 </Form.Item>
               </AdaptiveFormGrid>
@@ -162,6 +152,7 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
     allocationIsLoss,
     allocationOpen,
     allocationProfit,
+    allocationOrderProfit,
     employeeOptions,
     load,
     loadLedgerDetail,
@@ -171,7 +162,8 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
   const watchedRows = Form.useWatch<AllocationFormRow[]>("allocations", allocationForm) ?? [];
   const write = useAsyncAction();
   const [showOrderDetail, setShowOrderDetail] = useState(false);
-  useEffect(() => { setShowOrderDetail(false); }, [allocationOpen, actionOrder?.id]);
+  const editedInputs = useRef<Record<number, "rate" | "amount">>({});
+  useEffect(() => { setShowOrderDetail(false); editedInputs.current = {}; }, [allocationOpen, actionOrder?.id]);
 
   const submitAllocations = async (values: AllocationFormValues) => {
     if (!actionOrder) return;
@@ -183,7 +175,8 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
     const session = getAllocationSession();
     await write.run(async () => {
       try {
-        const amountsChanged = rows.some((_, index) => allocationForm.isFieldTouched(["allocations", index, "allocation_amount"]));
+        const amountsChanged = Object.values(editedInputs.current).some((input) => input === "amount");
+        const ratesChanged = Object.values(editedInputs.current).some((input) => input === "rate");
         const payloadRows = rows.map((item) => ({
           allocation_type: item.allocation_type,
           employee_ids: item.employee_ids ?? [],
@@ -191,7 +184,7 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
           allocation_rate: item.allocation_rate?.trim() || null,
           allocation_amount: item.allocation_amount?.trim() || null,
         }));
-        await profitAllocationApi.set(actionOrder.id, payloadRows, formExtraOrUndefined(values.form_extra), amountsChanged);
+        await profitAllocationApi.set(actionOrder.id, payloadRows, formExtraOrUndefined(values.form_extra), amountsChanged, allocationOrderProfit, ratesChanged);
         appMessage.success("分润已保存");
         const savedOrder = actionOrder;
         if (getAllocationSession() === session) closeAllocations();
@@ -243,8 +236,8 @@ export function AllocationModal({ controller, onNavigate }: { controller: Alloca
           allocationCandidates={allocationCandidates}
           allocationForm={allocationForm}
           employeeOptions={employeeOptions}
-          getAllocationSession={getAllocationSession}
-          orderId={actionOrder?.id ?? 0}
+          orderProfit={allocationOrderProfit}
+          onEdited={(row, input) => { editedInputs.current[row] = input; }}
           watchedRows={watchedRows}
         />
         <FieldConfigScope scope="ALLOCATION" active={allocationOpen}>

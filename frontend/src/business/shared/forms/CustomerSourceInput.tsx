@@ -1,21 +1,22 @@
 import { Form, Input } from "antd";
-import { Select } from "../../../shared/ui";
-import { useOptionSet } from "../../../shared/lib/optionSets";
+import { ErrorBanner, Select } from "../../../shared/ui";
+import { useOptionSetResource } from "../../../shared/lib/optionSets";
 import { CfgItem } from "../../../shared/forms/ConfigurableField";
 
 /** 客户来源只允许选择预设值；「其他」时再收集具体渠道，避免自由输入导致来源口径分散。 */
 export function CustomerSourceFields(props: { name: string; otherName: string }) {
   const source = Form.useWatch(props.name);
   const form = Form.useFormInstance();
-  const configuredOptions = useOptionSet("CUSTOMER_SOURCE");
+  const sourceOptions = useOptionSetResource("CUSTOMER_SOURCE");
   const onChange = (value: string) => {
     if (value !== "其他") form.setFieldValue(props.otherName, undefined);
   };
 
   return (
     <>
+      <ErrorBanner error={sourceOptions.error} onRetry={sourceOptions.retry} retrying={sourceOptions.loading} />
       <CfgItem name={props.name} label="客户来源">
-        <Select placeholder="请选择客户来源" options={configuredOptions ?? []} loading={configuredOptions === null} disabled={configuredOptions === null} onChange={onChange} />
+        <Select placeholder="请选择客户来源" options={sourceOptions.options ?? []} loading={sourceOptions.loading} disabled={sourceOptions.options === null} onChange={onChange} />
       </CfgItem>
       <CfgItem
         className="customer-source-other"

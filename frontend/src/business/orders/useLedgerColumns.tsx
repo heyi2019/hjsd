@@ -5,17 +5,17 @@ import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, StatusTag } from "../../shared/ui";
-import { orderOperationMenuItems } from "../shared/operations";
+import { authorizedOrderOperationItems, orderOperationMenuItems } from "../shared/operations";
 import { inventoryTypeOfOrder } from "../inventory/InventoryPanel/types";
 import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL } from "../shared/inventory/inventory-logic";
 import { formatOrderAmount } from "./helpers";
+import { useSession } from "../../shared/state/session";
 
 /**
  * 订单台账列定义域：库存共享字段与订单字段的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
  * 弹窗动作由调用方传入，本模块负责列展示与点击转发。
  */
 export function useLedgerColumns(params: {
-  canDeleteOrder: boolean;
   ledgerDetails: Record<number, AccountExecutionDetail>;
   loadLedgerDetail: (order: Pick<Order, "id" | "account_id">, force?: boolean) => Promise<void>;
   openLedgerEditor: (order: Order) => void;
@@ -27,10 +27,8 @@ export function useLedgerColumns(params: {
   openOrderConsignment: (order: Order) => void;
   openCancelTransaction: (order: Order) => void;
   openOrderOffsale: (order: Order) => void;
-  openOrderDelete: (order: Order) => void;
 }) {
   const {
-    canDeleteOrder,
     ledgerDetails,
     loadLedgerDetail,
     openLedgerEditor,
@@ -42,8 +40,9 @@ export function useLedgerColumns(params: {
     openOrderConsignment,
     openCancelTransaction,
     openOrderOffsale,
-    openOrderDelete,
   } = params;
+  const { can } = useSession();
+  const canSell = can("order.create") && (can("order.event.post") || can("finance.order.event.post"));
   const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
   const ledgerColumns: ColumnsType<Order> = [
     { title: "库存编号", dataIndex: "stock_no", width: "var(--col-w-86)", ellipsis: true, render: (v: string | null) => v || "-" },
@@ -77,7 +76,7 @@ export function useLedgerColumns(params: {
           || Boolean(order.sale_at)
           || (order.events ?? []).some((event) => event.event_type === "SELL");
         const canOperateAccount = Boolean(order.account_id) && order.status !== "CANCELLED";
-        const operationItems = orderOperationMenuItems(
+        const operationItems = authorizedOrderOperationItems(orderOperationMenuItems(
           {
             row: canOperateAccount
               ? {
@@ -88,16 +87,16 @@ export function useLedgerColumns(params: {
             detail: order.account_id ? ledgerDetails[order.account_id] : undefined,
           },
           { allowProfileAfterSold: canOperateAccount },
-        );
+        ), can);
         return (
           <Space size={4} className="orders-ledger-actions">
-            <PermissionButton
+            {canSell ? <PermissionButton
               permission="order.create"
               type="link"
               size="small"
               disabled={order.account_status !== "WAITING" || !order.account_id}
               onClick={(event) => { event.stopPropagation(); void openOrderSale(order); }}
-            >售出</PermissionButton>
+            >售出</PermissionButton> : null}
             {operationItems.length > 0 ? <Dropdown
               trigger={["click"]}
               placement="bottomLeft"
@@ -119,7 +118,7 @@ export function useLedgerColumns(params: {
               }}
             >
               <PermissionButton
-                permission="order.create"
+                permission="order.event.post"
                 type="link"
                 size="small"
                 aria-label="运营"
@@ -165,15 +164,6 @@ export function useLedgerColumns(params: {
               disabled={!['ACTIVE', 'INSTALLMENT', 'COMPLETED'].includes(order.status)}
               onClick={(event) => { event.stopPropagation(); void openCancelTransaction(order); }}
             >取消</PermissionButton> : null}
-            {canDeleteOrder ? (
-              <PermissionButton
-                permission="order.update"
-                type="link"
-                size="small"
-                danger
-                onClick={(event) => { event.stopPropagation(); void openOrderDelete(order); }}
-              >删除</PermissionButton>
-            ) : null}
           </Space>
         );
       },

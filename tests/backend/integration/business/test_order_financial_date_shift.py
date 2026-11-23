@@ -11,43 +11,45 @@
 - #6 成交日期平移同步 InstallmentDisposition.occurred_on（坏账归期）。
 - #7 成交日期平移同步旧模型 RebateRecord.collected_on（返点归期）。
 - #18 平移同步 Account.buy_date（仅本单有已过账 BUY 事件时）。
-- #14 平移触及已对账资金账户期间时拒绝。
+- 平移触及已对账期间时保留原始对账快照。
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
 
-from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import (
     Direction,
     InstallmentContractType,
     InstallmentDispositionAction,
     InstallmentStatus,
-    ReconciliationStatus,
     RebateType,
 )
-from app.domain.foundation import Pool
 from app.domain.trade import (
     Account,
+    BalanceSnapshot,
     Cashflow,
+    Deposit,
     Installment,
     InstallmentDisposition,
     Order,
     OrderEvent,
     RebateRecord,
-    Reconciliation,
 )
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.orders.mutations import update_order
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
 from app.business.inventory.profile import create_account
+from app.funds.deposits.lifecycle import lose_deposit, return_deposit
+from app.funds.deposits.writes import create_deposit
+from app.funds.reconciliation import create_reconciliation
+from app.funds.rebates import create_rebate
 
 D1 = date(2026, 9, 10)
 D2 = date(2026, 10, 10)
@@ -177,29 +179,110 @@ def test_shift_moves_bad_debt_rebate_and_buy_date(seeded_db):
     assert disp.occurred_on == D2
 
     # 报表归月随之迁移：9 月归零，10 月含返点收入 200 + 坏账支出 300
-    oct_item = next(r for r in r2_monthly_pnl(seeded_db)["items"] if r["month"] == "2026-10")
+    oct_item = next(r for r in monthly_pnl_report(seeded_db)["items"] if r["month"] == "2026-10")
     assert oct_item["rebate_income"] == Decimal("200.00")
     assert oct_item["cost"] >= Decimal("300.00")
 
 
-# --------------------------------------------------------------- #14 对账边界
-def test_shift_rejected_when_crossing_reconciled_period(seeded_db):
-    """平移流水跨越资金账户已对账日期时拒绝，保护已固化余额快照。"""
+def test_shift_crosses_reconciled_period_without_rewriting_snapshot(seeded_db):
+    """允许平移已对账期间的流水，保留创建时的对账与首次快照。"""
     order, _account = _recovery_order(seeded_db, trade_date=D1)
     post_event(
         seeded_db, order.id, event_type="BUY", amount=Decimal("100"),
         occurred_on=D1, actor="pytest", pool_id=1,
     )
-    # 在流水旧日与新日之间建立对账快照（10-01）
     mid = date(2026, 10, 1)
-    pool = seeded_db.scalar(select(Pool).where(Pool.id == 1))
-    seeded_db.add(Reconciliation(
-        pool_id=pool.id, reconciled_on=mid, account_label="test-account",
-        system_balance=to_money("0"), statement_balance=to_money("0"), difference=to_money("0"),
-        status=ReconciliationStatus.OPEN.value, unmatched_flow_ids=[],
-        created_by="pytest", updated_by="pytest",
-    ))
-    seeded_db.flush()
+    recon = create_reconciliation(seeded_db, pool_id=1, reconciled_on=mid,
+                                  account_label="test-account", statement_balance="0",
+                                  reason="核对", actor="pytest")
+    snapshot = seeded_db.scalar(select(BalanceSnapshot).where(BalanceSnapshot.reconciliation_id == recon.id))
+    assert snapshot.balance == recon.system_balance == Decimal("-100.00")
 
-    with pytest.raises(Validation, match="已对账期间"):
-        update_order(seeded_db, order.id, actor="pytest", trade_date=D2)
+    update_order(seeded_db, order.id, actor="pytest", trade_date=D2)
+    assert recon.system_balance == snapshot.balance == Decimal("-100.00")
+    flow = seeded_db.scalar(select(Cashflow).where(Cashflow.order_id == order.id))
+    assert flow.occurred_on == D2
+
+
+def test_shift_updates_linked_deposit_dates_and_each_cashflow(seeded_db):
+    order, _account = _recovery_order(seeded_db, trade_date=D1)
+    deposit = create_deposit(seeded_db, pool_id=1, amount="100", paid_on=D1,
+                             expected_release_on=D1 + timedelta(days=40),
+                             source_order_id=order.id, actor="pytest")
+    return_deposit(seeded_db, deposit.id, amount="20", released_on=D1 + timedelta(days=2), actor="pytest")
+    lose_deposit(seeded_db, deposit.id, amount="30", lost_on=D1 + timedelta(days=3),
+                 category="OTHER", reason="损失", actor="pytest")
+    unaffected = create_deposit(seeded_db, pool_id=1, amount="50", paid_on=D1, actor="pytest")
+
+    update_order(seeded_db, order.id, actor="pytest", trade_date=D2)
+
+    assert deposit.paid_on == D2
+    assert deposit.expected_release_on == D2 + timedelta(days=40)
+    assert deposit.released_on == D2 + timedelta(days=2)
+    assert deposit.lost_on == D2 + timedelta(days=3)
+    flows = seeded_db.scalars(select(Cashflow).where(Cashflow.source_type == "DEPOSIT", Cashflow.source_id == str(deposit.id))).all()
+    assert {flow.occurred_on for flow in flows} == {D2, D2 + timedelta(days=2), D2 + timedelta(days=3)}
+    assert seeded_db.get(Deposit, unaffected.id).paid_on == D1
+
+
+@pytest.mark.parametrize("override_event", [False, True])
+def test_execution_detail_order_date_edit_shifts_related_financial_dates(seeded_client, seeded_db, headers, override_event):
+    order, _account = _recovery_order(seeded_db, trade_date=D1)
+    event, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=D1,
+                          actor="pytest", pool_id=1)
+    rebate = create_rebate(seeded_db, source_order_id=order.id, rebate_type="BUY", amount="10",
+                           collected_on=D1 + timedelta(days=1), actor="pytest")
+    deposit = create_deposit(seeded_db, pool_id=1, amount="30", paid_on=D1 + timedelta(days=2),
+                             expected_release_on=D1 + timedelta(days=12), source_order_id=order.id,
+                             actor="pytest")
+    order_id, event_id, rebate_id, deposit_id = order.id, event.id, rebate.id, deposit.id
+    seeded_db.commit()
+
+    events = [{"id": event_id, "expected_amount": "100", "amount": "100", "occurred_at": "2026-10-15T12:00:00"}] if override_event else []
+    response = seeded_client.patch(f"/api/orders/{order_id}/execution-edit", headers=headers, json={
+        "events": events, "orders": [{"order_id": order_id, "occurred_at": "2026-10-10T12:30:00"}],
+    })
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Order, order_id).trade_date == D2
+    expected_event_date = D2 + timedelta(days=5) if override_event else D2
+    assert seeded_db.get(OrderEvent, event_id).occurred_on == expected_event_date
+    assert seeded_db.get(RebateRecord, rebate_id).collected_on == D2 + timedelta(days=1)
+    assert seeded_db.get(Deposit, deposit_id).paid_on == D2 + timedelta(days=2)
+    assert seeded_db.get(Deposit, deposit_id).expected_release_on == D2 + timedelta(days=12)
+    flows = seeded_db.scalars(select(Cashflow).where(Cashflow.order_id == order_id)).all()
+    assert {flow.occurred_on for flow in flows} == {expected_event_date, D2 + timedelta(days=1), D2 + timedelta(days=2)}
+    detail_response = seeded_client.get(f"/api/orders/{order_id}/execution-detail", headers=headers)
+    assert detail_response.status_code == 200, detail_response.text
+    detail = detail_response.json()
+    detail_order = next(item for item in detail["orders"] if item["order_id"] == order_id)
+    assert detail_order["occurred_at"].startswith(D2.isoformat())
+    event_view = next(item for item in detail_order["events"] if item["id"] == event_id)
+    assert event_view["occurred_at"].startswith(expected_event_date.isoformat())
+    date_by_flow = {flow.flow_no: flow.occurred_on.isoformat() for flow in flows}
+    for row in detail["detail_view"]["finance_rows"]:
+        if row["flow_no"] in date_by_flow:
+            assert row["occurred_at"].startswith(date_by_flow[row["flow_no"]])
+
+
+def test_order_date_shift_updates_consignment_time_visible_in_detail(seeded_client, seeded_db, headers):
+    order, _account = _recovery_order(seeded_db, trade_date=D1)
+    event, _ = post_event(
+        seeded_db, order.id, event_type="OPERATE", operation_type="CONSIGNMENT", amount=0,
+        occurred_on=D1 + timedelta(days=3), actor="pytest",
+        form_extra={"consignment_platforms": ["测试平台"], "listed_at": "2026-09-13T13:45:00"},
+    )
+    order_id, event_id = order.id, event.id
+    seeded_db.commit()
+    update_order(seeded_db, order_id, actor="pytest", trade_date=D2)
+    seeded_db.commit()
+
+    seeded_db.expire_all()
+    assert seeded_db.get(OrderEvent, event_id).form_extra["listed_at"] == "2026-10-13T13:45:00"
+    response = seeded_client.get(f"/api/orders/{order_id}/execution-detail", headers=headers)
+    assert response.status_code == 200, response.text
+    detail = response.json()
+    detail_event = next(item for item in detail["orders"][0]["events"] if item["id"] == event_id)
+    assert detail_event["occurred_at"] == "2026-10-13T13:45:00"
+    operation = next(item for item in detail["detail_view"]["operation_rows"] if item["key"] == "consignment")
+    assert operation["occurred_at"] == "2026-10-13T13:45:00"

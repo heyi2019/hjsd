@@ -10,13 +10,15 @@ from sqlalchemy.orm import Session
 from app.business.inventory.profile import create_account
 from app.domain.foundation import AuditLog
 from app.domain.foundation import Pool
-from app.domain.trade import Account, Cashflow, Installment, Order, OrderEvent, Reconciliation
+from app.domain.trade import Account, BalanceSnapshot, Cashflow, Installment, Order, OrderEvent, Reconciliation
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.shared.form_config.form_fields import create_order_form_field
 from app.core.database import get_db
 from app.customers.customers import create_customer
 from app.domain.parties import OrderCustomerRole
+
+pytestmark = pytest.mark.db
 
 
 def test_batch_party_edits_reuse_locked_order(seeded_client, seeded_db, headers):
@@ -423,7 +425,7 @@ def test_reversal_error_precedes_installment_error(seeded_client, seeded_db, hea
     assert seeded_db.get(OrderEvent, buy.id).amount == Decimal("100")
 
 
-def test_reconciliation_committed_after_dependency_check_blocks_amount_edit(seeded_client, seeded_db, headers):
+def test_reconciliation_committed_after_dependency_check_keeps_historical_value(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="edit-concurrent-reconciliation", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     buy, _ = post_event(seeded_db, order.id, event_type="BUY", amount=Decimal("100"), occurred_on=date(2026, 10, 1), actor="pytest")
@@ -450,12 +452,12 @@ def test_reconciliation_committed_after_dependency_check_blocks_amount_edit(seed
     finally:
         sqlalchemy_event.remove(seeded_db.get_bind(), "after_cursor_execute", commit_reconciliation)
     assert inserted
-    assert response.status_code == 422, response.text
-    assert "资金账户已有后续对账记录" in response.text
+    assert response.status_code == 200, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(Account, account.id).cost_amount == Decimal("100")
-    assert seeded_db.get(OrderEvent, buy.id).amount == Decimal("100")
-    assert seeded_db.get(Cashflow, flow.id).amount == Decimal("100")
+    assert seeded_db.get(Account, account.id).cost_amount == Decimal("120")
+    assert seeded_db.get(OrderEvent, buy.id).amount == Decimal("120")
+    assert seeded_db.get(Cashflow, flow.id).amount == Decimal("120")
+    assert seeded_db.scalar(select(Reconciliation).where(Reconciliation.account_label == "concurrent")).system_balance == 0
 
 
 def test_operator_with_order_update_can_save_order_detail(seeded_client, seeded_db, operator_headers):
@@ -482,6 +484,120 @@ def test_operator_with_order_update_can_save_order_detail(seeded_client, seeded_
     assert response.status_code == 200, response.text
     seeded_db.expire_all()
     assert seeded_db.get(Account, account.id).game_account == "operator-detail-edited"
+
+
+def test_profile_edits_merge_different_fields_and_reject_stale_same_field(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="profile-concurrent", business_mode="SELF", inventory_type="RECOVERY",
+                             account_description="原描述", note="原备注", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    seeded_db.commit()
+    url = f"/api/orders/{order.id}/execution-edit"
+    first = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"account_description": "甲修改"},
+                                "expected_profile": {"account_description": "原描述"}})
+    assert first.status_code == 200, first.text
+    second = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"note": "乙修改"},
+                                 "expected_profile": {"note": "原备注"}})
+    assert second.status_code == 200, second.text
+    stale = seeded_client.patch(url, headers=headers, json={"events": [], "profile": {"account_description": "丙修改"},
+                                "expected_profile": {"account_description": "原描述"}})
+    assert stale.status_code == 409, stale.text
+    assert "原描述" not in stale.text
+    seeded_db.expire_all()
+    saved = seeded_db.get(Account, account.id)
+    assert (saved.account_description, saved.note) == ("甲修改", "乙修改")
+
+
+def test_profile_edit_validates_current_form_values_without_replacing_untouched_fields(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="profile-form-concurrent", business_mode="SELF", inventory_type="RECOVERY",
+                             note="旧备注", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    create_order_form_field(seeded_db, order_type_code="INVEDIT", field_key="check_note", label="核对凭据",
+                            required=True, actor="pytest")
+    account.form_extra = {"check_note": "其他人更新的凭据", "legacy": "保留"}
+    seeded_db.commit()
+    response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
+        "events": [], "profile": {"note": "新备注", "form_extra": {}},
+        "expected_profile": {"note": "旧备注", "form_extra": {}},
+    })
+    assert response.status_code == 200, response.text
+    seeded_db.expire_all()
+    assert seeded_db.get(Account, account.id).form_extra == {"check_note": "其他人更新的凭据", "legacy": "保留"}
+    no_form_patch = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={
+        "events": [], "profile": {"note": "再次修改"}, "expected_profile": {"note": "新备注"},
+    })
+    assert no_form_patch.status_code == 200, no_form_patch.text
+
+
+@pytest.mark.parametrize("same_field", [True, False])
+def test_concurrent_profile_edits_check_after_obtaining_locks(v1_engine, same_field):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from uuid import uuid4
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from app.business.shared.order_detail.editing import edit_execution_detail
+    from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
+    from app.core.errors import Conflict
+    from app.core.security import DEV_USERS
+    from app.domain.base import Base
+    from app.settings.field_definitions.seeds import seed_foundation
+
+    database = f"heijin_profile_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
+    try:
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest")
+            account = create_account(session, game_account="concurrent-profile", business_mode="SELF", inventory_type="RECOVERY",
+                                     account_description="原描述", note="原备注", actor="pytest")
+            order = create_order(session, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+            account_id, order_id = account.id, order.id
+            session.commit()
+        waiting = Event()
+
+        def second_edit():
+            with factory() as session:
+                assert session.get(Account, account_id).account_description == "原描述"
+                connection = session.connection()
+                def observe(_conn, _cursor, statement, _parameters, _context, _many):
+                    if "from orders" in statement.lower() and "for update" in statement.lower():
+                        waiting.set()
+                sqlalchemy_event.listen(connection, "before_cursor_execute", observe)
+                profile = {"account_description": "乙描述"} if same_field else {"note": "乙备注"}
+                expected = {"account_description": "原描述"} if same_field else {"note": "原备注"}
+                try:
+                    edit_execution_detail(session, order_id, ExecutionEditRequest.model_validate({
+                        "events": [], "profile": profile, "expected_profile": expected,
+                    }), DEV_USERS["admin"])
+                    session.commit()
+                    return "saved"
+                except Conflict:
+                    session.rollback()
+                    return "conflict"
+
+        with factory() as first, ThreadPoolExecutor(max_workers=1) as executor:
+            edit_execution_detail(first, order_id, ExecutionEditRequest.model_validate({
+                "events": [], "profile": {"account_description": "甲描述"},
+                "expected_profile": {"account_description": "原描述"},
+            }), DEV_USERS["admin"])
+            future = executor.submit(second_edit)
+            assert waiting.wait(10)
+            assert not future.done()
+            first.commit()
+            assert future.result(timeout=10) == ("conflict" if same_field else "saved")
+        with factory() as session:
+            saved = session.get(Account, account_id)
+            assert saved.account_description == "甲描述"
+            assert saved.note == ("原备注" if same_field else "乙备注")
+    finally:
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}" WITH (FORCE)')
+        admin.dispose()
 
 
 def test_order_edit_saves_profile_and_amount_together(seeded_client, seeded_db, headers):
@@ -627,7 +743,6 @@ def test_order_detail_edit_updates_cashflow_amount_and_pool(seeded_client, seede
 
 @pytest.mark.parametrize("target", ["original", "reversal", "rebate"])
 def test_order_detail_rejects_editing_protected_rebate_amount(seeded_client, seeded_db, headers, target):
-    from app.funds.cashflows import reverse_cashflow
     from app.funds.rebates import create_rebate
 
     day = date(2026, 10, 1)
@@ -636,7 +751,15 @@ def test_order_detail_rejects_editing_protected_rebate_amount(seeded_client, see
     rebate = create_rebate(seeded_db, source_order_id=order.id, rebate_type="BUY", amount="100", collected_on=day, actor="pytest")
     action = seeded_db.scalar(select(OrderEvent).where(OrderEvent.source_type == "REBATE", OrderEvent.source_id == rebate.rebate_no))
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
-    reversal = None if target == "rebate" else reverse_cashflow(seeded_db, flow.id, reversed_on=day, actor="pytest", reason="错录")
+    reversal = None
+    if target != "rebate":
+        # 历史库可能已有旧版产生的返点冲销；新版禁止新建，仍须保护这些凭证。
+        reversal = Cashflow(flow_no=f"LEGACY-{target}", pool_id=flow.pool_id, order_id=order.id,
+                            occurred_on=day, ledger_type=flow.ledger_type, accounting_attribute="REVERSAL",
+                            category="REVERSAL", direction="OUT", amount=flow.amount, source_type="REVERSAL",
+                            source_id=flow.flow_no, created_by="pytest", updated_by="pytest")
+        seeded_db.add(reversal)
+        seeded_db.flush()
     flow_id = flow.id
     reversal_id = reversal.id if reversal is not None else None
     flow_no = reversal.flow_no if target == "reversal" else flow.flow_no
@@ -651,7 +774,7 @@ def test_order_detail_rejects_editing_protected_rebate_amount(seeded_client, see
         assert seeded_db.get(Cashflow, reversal_id).amount == Decimal("100")
 
 
-def test_order_detail_cashflow_amount_cannot_bypass_reconciliation(seeded_client, seeded_db, headers):
+def test_order_detail_cashflow_amount_can_change_without_rewriting_reconciliation(seeded_client, seeded_db, headers):
     from app.funds.reconciliation import create_reconciliation
 
     day = date(2026, 10, 1)
@@ -659,16 +782,18 @@ def test_order_detail_cashflow_amount_cannot_bypass_reconciliation(seeded_client
     order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
     action, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=day, actor="pytest")
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
-    create_reconciliation(seeded_db, pool_id=flow.pool_id, reconciled_on=day, account_label="已核对",
-                          statement_balance="0", reason="核对", actor="admin")
-    action_id, flow_id, flow_no = action.id, flow.id, flow.flow_no
+    recon = create_reconciliation(seeded_db, pool_id=flow.pool_id, reconciled_on=day, account_label="已核对",
+                                  statement_balance="0", reason="核对", actor="admin")
+    action_id, flow_id, flow_no, recon_id = action.id, flow.id, flow.flow_no, recon.id
     seeded_db.commit()
     response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers,
                                    json={"events": [], "cashflows": [{"flow_no": flow_no, "amount": "200"}]})
-    assert response.status_code == 422, response.text
+    assert response.status_code == 200, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(OrderEvent, action_id).amount == Decimal("100")
-    assert seeded_db.get(Cashflow, flow_id).amount == Decimal("100")
+    assert seeded_db.get(OrderEvent, action_id).amount == Decimal("200")
+    assert seeded_db.get(Cashflow, flow_id).amount == Decimal("200")
+    snapshot = seeded_db.scalar(select(BalanceSnapshot).where(BalanceSnapshot.reconciliation_id == recon_id))
+    assert seeded_db.get(Reconciliation, recon_id).system_balance == snapshot.balance == Decimal("-100")
 
 
 def test_order_detail_cannot_move_deposit_flow_to_another_pool(seeded_client, seeded_db, headers):
@@ -693,7 +818,7 @@ def test_order_detail_cannot_move_deposit_flow_to_another_pool(seeded_client, se
 
 
 @pytest.mark.parametrize("reconciled", [False, True])
-def test_order_detail_manual_cashflow_respects_reconciliation(seeded_client, seeded_db, headers, reconciled):
+def test_order_detail_manual_cashflow_edit_keeps_reconciliation_snapshot(seeded_client, seeded_db, headers, reconciled):
     from app.funds.cashflows import create_cashflow
     from app.funds.reconciliation import create_reconciliation
 
@@ -702,37 +827,44 @@ def test_order_detail_manual_cashflow_respects_reconciliation(seeded_client, see
     order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     flow = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=day, direction="IN", category="OTHER", amount="100", order_id=order.id, actor="pytest")
+    recon = None
     if reconciled:
-        create_reconciliation(seeded_db, pool_id=pool.id, reconciled_on=day, account_label="已核对",
-                              statement_balance="0", reason="核对", actor="admin")
+        recon = create_reconciliation(seeded_db, pool_id=pool.id, reconciled_on=day, account_label="已核对",
+                                      statement_balance="0", reason="核对", actor="admin")
+    recon_id = recon.id if recon is not None else None
     flow_id, flow_no = flow.id, flow.flow_no
     seeded_db.commit()
     response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers,
                                    json={"events": [], "cashflows": [{"flow_no": flow_no, "amount": "200"}]})
-    assert response.status_code == (422 if reconciled else 200), response.text
+    assert response.status_code == 200, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(Cashflow, flow_id).amount == (Decimal("100") if reconciled else Decimal("200"))
+    assert seeded_db.get(Cashflow, flow_id).amount == Decimal("200")
+    if recon_id is not None:
+        snapshot = seeded_db.scalar(select(BalanceSnapshot).where(BalanceSnapshot.reconciliation_id == recon_id))
+        assert seeded_db.get(Reconciliation, recon_id).system_balance == snapshot.balance == Decimal("100")
 
 
 @pytest.mark.parametrize("original_day,new_day", [(1, 4), (4, 1)])
-def test_event_date_cannot_move_across_reconciliation(seeded_client, seeded_db, headers, original_day, new_day):
+def test_event_date_can_move_across_reconciliation_without_rewriting_snapshot(seeded_client, seeded_db, headers, original_day, new_day):
     from app.funds.reconciliation import create_reconciliation
 
     account = create_account(seeded_db, game_account=f"edit-date-reconciliation-{original_day}", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
     action, _ = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 10, original_day), actor="pytest")
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "ORDER_EVENT", Cashflow.source_id == action.event_no))
-    create_reconciliation(seeded_db, pool_id=flow.pool_id, reconciled_on=date(2026, 10, 3), account_label="已核对",
-                          statement_balance="0", reason="核对", actor="admin")
-    event_id, flow_id = action.id, flow.id
+    recon = create_reconciliation(seeded_db, pool_id=flow.pool_id, reconciled_on=date(2026, 10, 3), account_label="已核对",
+                                  statement_balance="0", reason="核对", actor="admin")
+    event_id, flow_id, recon_id, original_balance = action.id, flow.id, recon.id, recon.system_balance
     seeded_db.commit()
     response = seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json={"events": [
         {"id": event_id, "expected_amount": "100", "amount": "100", "occurred_at": f"2026-10-{new_day:02d}T12:00:00"},
     ]})
-    assert response.status_code == 422, response.text
+    assert response.status_code == 200, response.text
     seeded_db.expire_all()
-    assert seeded_db.get(OrderEvent, event_id).occurred_on == date(2026, 10, original_day)
-    assert seeded_db.get(Cashflow, flow_id).occurred_on == date(2026, 10, original_day)
+    assert seeded_db.get(OrderEvent, event_id).occurred_on == date(2026, 10, new_day)
+    assert seeded_db.get(Cashflow, flow_id).occurred_on == date(2026, 10, new_day)
+    snapshot = seeded_db.scalar(select(BalanceSnapshot).where(BalanceSnapshot.reconciliation_id == recon_id))
+    assert seeded_db.get(Reconciliation, recon_id).system_balance == snapshot.balance == original_balance
 
 
 @pytest.mark.parametrize("entry", ["event", "cashflow"])

@@ -76,37 +76,3 @@ export function resolveCancelAmount(params: {
 export function formatOrderAmount(order: Order): string {
   return order.sale_amount ? `¥${money(order.sale_amount)}` : "-";
 }
-
-export function orderSearchText(order: Order): string {
-  return [
-    order.order_no,
-    order.account_game_type,
-    order.account_game_account,
-    order.account_channel_region,
-    order.party_name,
-    order.party_source,
-    order.note,
-  ].filter(Boolean).join(" ").toLowerCase();
-}
-
-export function orderMatchesBusinessMode(order: Order, mode: BusinessModeFilterKey): boolean {
-  return mode === "all" || order.business_mode === mode || order.account_business_mode === mode;
-}
-
-export function filterBusinessOrders(
-  orders: Order[],
-  type: BusinessFilterKey,
-  mode: BusinessModeFilterKey,
-  keyword: string,
-  gameType: string,
-  inventoryStatus: string,
-): Order[] {
-  const normalizedKeyword = keyword.trim().toLowerCase();
-  return orders.filter((order) => (
-    (type === "all" || order.order_type === type)
-    && orderMatchesBusinessMode(order, mode)
-    && (gameType === "all" || order.account_game_type === gameType)
-    && (inventoryStatus === "all" || order.account_status === inventoryStatus)
-    && (!normalizedKeyword || orderSearchText(order).includes(normalizedKeyword))
-  ));
-}

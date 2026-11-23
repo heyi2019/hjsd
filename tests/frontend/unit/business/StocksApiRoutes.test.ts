@@ -20,10 +20,8 @@ describe("stocksApi 路由", () => {
     apiMock.delete.mockResolvedValue({ data: undefined });
   });
 
-  it("删除库存走 DELETE /stocks/{id} 且请求体带删除原因", async () => {
-    await stocksApi.remove(7, "重复录入");
-
-    expect(apiMock.delete).toHaveBeenCalledWith("/stocks/7", { data: { reason: "重复录入" } });
+  it("库存凭证保留，不暴露物理删除客户端方法", () => {
+    expect("remove" in stocksApi).toBe(false);
   });
 
   it("不再暴露旧库存列表与资料更新客户端方法", () => {

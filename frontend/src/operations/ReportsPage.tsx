@@ -15,7 +15,7 @@ import { type ReportRange, ReportsActiveContext } from "./reports/shared";
 
 export function ReportsPage({ onNavigate, active = true, initialReportTab, initialReportFrom, initialReportTo, initialReportAll = false }: { onNavigate?: (key: string) => void; active?: boolean; initialReportTab?: "commission" | "my-earnings"; initialReportFrom?: string; initialReportTo?: string; initialReportAll?: boolean }) {
   const [myEarnings, setMyEarnings] = useState(initialReportTab === "my-earnings");
-  const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "r3" : "pnl");
+  const [activeTab, setActiveTab] = useState(initialReportTab === "commission" || myEarnings ? "commission" : "pnl");
   const periodState = useBusinessPeriod();
   const entryKey = JSON.stringify([initialReportTab, initialReportFrom, initialReportTo, initialReportAll]);
   const [appliedEntry, setAppliedEntry] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
     } else if (initialReportFrom && initialReportTo && dayjs(initialReportFrom).isValid() && dayjs(initialReportTo).isValid() && initialReportFrom <= initialReportTo) {
       periodState.setPeriod({ from: initialReportFrom, to: initialReportTo });
     }
-    if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("r3");
+    if (initialReportTab === "commission" || initialReportTab === "my-earnings") setActiveTab("commission");
     setAppliedEntry(entryKey);
   }, [active, initialReportTab, initialReportFrom, initialReportTo, initialReportAll, periodState.ready, appliedEntry, entryKey]);
   const reportRange: ReportRange = {
@@ -43,7 +43,7 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
   const tabItems = [
     { key: "data-center", label: "数据中心", render: () => <DataCenterPanel onNavigate={onNavigate} range={reportRange} /> },
     { key: "profit", label: "订单利润", render: () => <OrderProfit range={reportRange} /> },
-    { key: "r3", label: "分润对账", render: () => <Commission range={reportRange} mine={myEarnings} /> },
+    { key: "commission", label: "分润对账", render: () => <Commission range={reportRange} mine={myEarnings} onMineChange={setMyEarnings} /> },
     { key: "pnl", label: "经营损益", render: () => <OperatingPnl range={reportRange} /> },
   ];
   const entryReady = periodState.ready && appliedEntry === entryKey;

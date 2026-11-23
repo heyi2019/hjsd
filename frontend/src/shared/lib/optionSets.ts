@@ -3,7 +3,7 @@
  * 选项词典（D 类筛选器 / 业务字典）被库存、资金等页面的筛选器广泛使用，
  * 一次性拉全量后在内存缓存，组件按 code 取用，避免每个筛选器各自请求。
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { optionSetsApi } from "../api/options.api";
 import type { OptionItem } from "../api/types/common";
 import { subscribeReferenceDataChanged } from "../state/referenceDataEvents";
@@ -52,19 +52,27 @@ export function clearOptionSetsCache(): void {
 
 subscribeReferenceDataChanged("optionSets", clearOptionSetsCache);
 
-/** 组件用：返回全量 code→options 映射（加载中为 null）。 */
-function useOptionSets(): OptionSetMap | null {
+/** 业务表单可区分加载、失败和空词典；展示组件仍可使用原有回退。 */
+function useOptionSets(enabled: boolean) {
   const [map, setMap] = useState<OptionSetMap | null>(cache);
+  const [loading, setLoading] = useState(enabled && !cache);
+  const [error, setError] = useState<{ message: string } | null>(null);
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     let sequence = 0;
     const reload = () => {
       const current = ++sequence;
+      setMap(cache);
+      setLoading(!cache);
+      setError(null);
       void loadOptionSets()
         .then((m) => {
-          if (active && current === sequence) setMap(m);
+          if (active && current === sequence) { setMap(m); setLoading(false); }
         })
-        .catch(() => undefined);
+        .catch(() => {
+          if (active && current === sequence) { setMap(null); setLoading(false); setError({ message: "选项词典加载失败，请重新加载" }); }
+        });
     };
     listeners.add(reload);
     reload();
@@ -72,15 +80,19 @@ function useOptionSets(): OptionSetMap | null {
       active = false;
       listeners.delete(reload);
     };
-  }, []);
-  return map;
+  }, [enabled]);
+  const retry = useCallback(() => clearOptionSetsCache(), []);
+  return { map, loading: enabled && loading, error: enabled ? error : null, retry };
+}
+
+export function useOptionSetResource(code: string, enabled = true) {
+  const state = useOptionSets(enabled);
+  return { options: state.map?.[code] ?? null, loading: state.loading, error: state.error, retry: state.retry };
 }
 
 /** 组件用：按 code 取单个选项列表（加载中为 null）。 */
 export function useOptionSet(code: string): OptionItem[] | null {
-  const map = useOptionSets();
-  if (map === null) return null;
-  return map[code] ?? null;
+  return useOptionSetResource(code).options;
 }
 
 /**

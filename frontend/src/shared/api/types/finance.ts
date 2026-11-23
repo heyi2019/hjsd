@@ -51,8 +51,20 @@ export interface Deposit {
   form_extra?: Record<string, unknown> | null;
   /** 押金剩余：实收 − 已退 − 已损失，且不小于 0；后端下发，前端不再相减。 */
   remaining_amount: string;
+  /** 后端根据押金状态和已退、已损金额计算的可用业务动作。 */
+  available_actions: string[];
   operator?: string | null;
   operation_operators?: DepositOperationOperator[];
+  action_history?: DepositAction[];
+}
+
+export interface DepositAction {
+  flow_no: string;
+  action: "HOLD" | "RETURN" | "LOSS" | "CANCEL";
+  occurred_on: string;
+  amount: string;
+  operator_user_ids: number[];
+  operator: string;
 }
 
 export interface DepositOperationOperator {

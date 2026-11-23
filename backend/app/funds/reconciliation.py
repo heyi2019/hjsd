@@ -21,6 +21,7 @@ from app.domain.foundation import Pool
 from app.domain.trade import BalanceSnapshot, Cashflow, Reconciliation
 from app.shared.form_field_rules import validate_form_extra
 from app.settings.field_definitions.pools import assert_pool_usable
+from app.funds.pool_scope import visible_pool_ids
 
 from ._common import _non_negative, _text
 
@@ -223,18 +224,12 @@ def list_reconciliations(
     limit: int | None = None,
     offset: int = 0,
 ) -> list[Reconciliation] | tuple[list[Reconciliation], int]:
+    visible = visible_pool_ids(user, pool_id=pool_id, pool_ids=pool_ids)
+    if visible == []:
+        return ([], 0) if limit is not None else []
     stmt = select(Reconciliation)
-    if pool_id is not None:
-        if user is not None and not user.can_see_pool(pool_id):
-            return ([], 0) if limit is not None else []
-        stmt = stmt.where(Reconciliation.pool_id == pool_id)
-    elif pool_ids is not None:
-        visible_pool_ids = list(pool_ids)
-        if user is not None and not (user.is_admin or user.owner_scope == "ALL"):
-            visible_pool_ids = [pool for pool in visible_pool_ids if user.can_see_pool(pool)]
-        stmt = stmt.where(Reconciliation.pool_id.in_(visible_pool_ids))
-    elif user is not None and not (user.is_admin or user.owner_scope == "ALL"):
-        stmt = stmt.where(Reconciliation.pool_id.in_(sorted(user.pool_ids)))
+    if visible is not None:
+        stmt = stmt.where(Reconciliation.pool_id.in_(visible))
     total = (session.scalar(select(func.count()).select_from(stmt.subquery())) or 0) if limit is not None else None
     items = list(session.scalars(
         stmt.order_by(Reconciliation.reconciled_on.desc(), Reconciliation.id.desc()).limit(limit).offset(offset)
@@ -299,7 +294,7 @@ def list_balance_snapshots(
     pool_id: int | None = None,
     user: CurrentUser | None = None,
 ) -> list[BalanceSnapshot]:
-    """查询已固化的日终余额快照（FIN-01-05），按日期倒序。"""
+    """查询随对账即时固化的余额快照（FIN-01-05），按日期倒序。"""
     stmt = select(BalanceSnapshot)
     if pool_id is not None:
         if user is not None and not user.can_see_pool(pool_id):

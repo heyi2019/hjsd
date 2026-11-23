@@ -25,6 +25,8 @@ _post_sell_hooks: list[Callable[..., Any]] = []
 # 资金流水创建和冲销由资金域提供，调用与业务操作处于同一事务。
 _cashflow_creator: Callable[..., Any] | None = None
 _cashflow_reverser: Callable[..., Any] | None = None
+_rebate_creator: Callable[..., Any] | None = None
+_rebate_updater: Callable[..., Any] | None = None
 
 
 def register_post_sell_hook(hook: Callable[..., Any]) -> None:
@@ -37,6 +39,23 @@ def register_cashflow_operations(creator: Callable[..., Any], reverser: Callable
     global _cashflow_creator, _cashflow_reverser
     _cashflow_creator = creator
     _cashflow_reverser = reverser
+
+
+def register_rebate_operations(creator: Callable[..., Any], updater: Callable[..., Any]) -> None:
+    global _rebate_creator, _rebate_updater
+    _rebate_creator, _rebate_updater = creator, updater
+
+
+def create_rebate(*args: Any, **kwargs: Any) -> Any:
+    if _rebate_creator is None:
+        raise RuntimeError("返点服务未注册")
+    return _rebate_creator(*args, **kwargs)
+
+
+def update_rebate(*args: Any, **kwargs: Any) -> Any:
+    if _rebate_updater is None:
+        raise RuntimeError("返点服务未注册")
+    return _rebate_updater(*args, **kwargs)
 
 
 def run_post_sell_hooks(
@@ -75,6 +94,9 @@ __all__ = [
     "create_cashflow",
     "reverse_cashflow",
     "register_cashflow_operations",
+    "create_rebate",
+    "update_rebate",
+    "register_rebate_operations",
     "register_post_sell_hook",
     "run_post_sell_hooks",
 ]

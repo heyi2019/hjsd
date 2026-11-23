@@ -28,6 +28,12 @@ COLUMN_VALUE_LABELS: dict[str, dict[str, str]] = {
 DETAIL_KEY_LABELS: dict[str, str] = {
     # 事件（操作明细）
     "event_no": "事件号",
+    "import_sequence": "事件顺序",
+    "import_form_extra": "运营详情(JSON)",
+    "import_parent_no": "关联上架事件号",
+    "import_pool_code": "资金账户编码",
+    "import_offset_no": "冲销来源事件号",
+    "import_is_posted": "已过账",
     "event_type": "动作",
     "sale_mode": "结算方式",
     "operation_type": "运营动作",
@@ -36,6 +42,11 @@ DETAIL_KEY_LABELS: dict[str, str] = {
     "delivery_direction": "交付方向",
     # 资金（资金明细）
     "flow_no": "流水号",
+    "pool_code": "资金账户编码",
+    "import_category": "业务类别编码",
+    "import_source_type": "来源类型",
+    "import_source_id": "来源编号",
+    "accounting_attribute": "核算属性",
     "category": "类别",
     "direction": "方向",
     # 返点（返点明细）
@@ -237,6 +248,7 @@ NESTED_VALUE_LABELS: dict[str, dict[str, str]] = {
         "GAME_TYPE_UPDATE": "编辑游戏类型",
         "GAME_TYPE_DISABLE": "停用游戏类型",
         "GAME_TYPE_DEFAULT": "设置默认游戏类型",
+        "GAME_TYPE_DELETE": "删除游戏类型",
         "LIST_COLUMNS_UPDATE": "列表列显示配置变更",
         "LIST_COLUMNS_RESET": "列表列配置恢复默认",
         "LIST_COLUMN_ADD": "列表新增自定义列",

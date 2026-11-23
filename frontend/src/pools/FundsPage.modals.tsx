@@ -4,7 +4,7 @@
 import { Form, Input, Typography } from "antd";
 import type { FormInstance } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, InlineError, MoneyInput, MoneyText, PermissionButton, Select, StatusTag, dateValueFromEvent, dateValueProps } from "../shared/ui";
 import type { NormalizedError } from "../shared/api/client";
 import type { Permission } from "../shared/state/session";
@@ -17,10 +17,11 @@ import { configurableLabel } from "../shared/lib/optionSets";
 import { ACCOUNTING_ATTRIBUTE_LABEL } from "../shared/lib/labels";
 import type { FundsPageController } from "./useFundsPageController";
 import { ResponsibleEmployeeSelect } from "../shared/forms/ResponsibleEmployeeSelect";
+import { EmployeeDirectoryError } from "./EmployeeDirectoryError";
 
 const Modal = BusinessActionModal;
 
-type WriteState = { error: NormalizedError | null; pending: boolean };
+type WriteState = { error: NormalizedError | null; pending: boolean; isPending: () => boolean };
 type Pool = FundsPageController["pools"][number];
 
 /** 资金账户下拉选项只展示名称；编号仍由后端按选中 id 绑定。 */
@@ -54,6 +55,8 @@ interface FundsActionModalProps {
   formIntro?: ReactNode;
   children: ReactNode;
   employees?: EmployeeOption[];
+  employeeError?: unknown;
+  reloadEmployees?: () => Promise<unknown>;
   showOperator?: boolean;
 }
 
@@ -81,15 +84,22 @@ function FundsActionModal({
   formIntro,
   children,
   employees = [],
+  employeeError,
+  reloadEmployees,
   showOperator = false,
 }: FundsActionModalProps) {
+  const formId = `funds-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
-    <Modal title={title} fieldCount={fieldCount} wrapClassName={wrapClassName} open={open} onCancel={onCancel} footer={null}>
+    <Modal title={title} fieldCount={fieldCount} wrapClassName={wrapClassName} open={open}
+      closable={!write.pending} maskClosable={!write.pending}
+      onCancel={() => { if (!write.isPending()) onCancel(); }} footer={null}>
       {beforeError}
       <InlineError error={write.error} />
+      {showOperator && reloadEmployees ? <EmployeeDirectoryError error={employeeError} reload={reloadEmployees} /> : null}
       {intro}
       <FieldConfigScope scope={scope} active={open}>
         <BusinessRegistrationForm
+          name={formId}
           layout="horizontal"
           labelAlign="left"
           labelCol={{ flex: "108px" }}
@@ -126,7 +136,7 @@ export function DepositModal({ ctrl }: { ctrl: FundsPageController }) {
       scope="FUNDDEPOSIT" form={depositForm} onFinish={submitDeposit}
       initialValues={{ paid_on: today(), ledger_type: "BUSINESS" }}
       write={write} permission="deposit.post" submitLabel={depositEditTarget ? "保存修改" : "提交"}
-      employees={employees} showOperator
+      employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
     >
       <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}>
         <Select aria-label="资金账户" options={poolOptions(pools)} />
@@ -166,7 +176,7 @@ export function TransferModal({ ctrl }: { ctrl: FundsPageController }) {
       open={transferOpen} onCancel={() => { setTransferOpen(false); transferForm.resetFields(); }}
       scope="FUNDTRANSFER" form={transferForm} onFinish={submitTransfer}
       initialValues={{ occurred_on: today() }}
-      write={write} permission="finance.transfer" submitLabel="确认划转" employees={employees} showOperator
+      write={write} permission="finance.transfer" submitLabel="确认划转" employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
     >
       <CfgItem name="source_pool_id" label="转出资金账户" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="target_pool_id" label="转入资金账户" rules={[{ required: true }]}><Select options={poolOptions(pools)} /></CfgItem>
@@ -185,13 +195,13 @@ export function ReconciliationModal({ ctrl }: { ctrl: FundsPageController }) {
       open={reconciliationOpen} onCancel={() => { setReconciliationOpen(false); reconciliationForm.resetFields(); }}
       scope="FUNDRECON" form={reconciliationForm} onFinish={submitReconciliation}
       initialValues={{ reconciled_on: today() }}
-      write={write} permission="deposit.post" submitLabel="提交对账" employees={employees} showOperator
+      write={write} permission="deposit.post" submitLabel="提交对账" employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
     >
       <CfgItem name="pool_id" label="资金账户" rules={[{ required: true }]}><Select aria-label="资金账户" options={poolOptions(pools)} /></CfgItem>
       <CfgItem name="reconciled_on" label="对账日期" rules={[{ required: true }]} getValueFromEvent={dateValueFromEvent} getValueProps={dateValueProps}><DateField /></CfgItem>
       <CfgItem name="account_label" label="对账账户" rules={[{ required: true }]} extra="同一资金账户 + 对账账户 + 对账日期只能对账一次，重复提交会被拒绝"><Input /></CfgItem>
       <CfgItem name="statement_balance" label="账面余额" rules={requiredMoneyRules("账面余额")}><MoneyInput /></CfgItem>
-      <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填（系统余额=期初余额+已入账流水）"><Input.TextArea rows={2} /></CfgItem>
+      <CfgItem name="reason" label="差异原因" extra="账面余额与系统余额不一致时必填；系统余额按创建时截至对账日期的已入账流水计算"><Input.TextArea rows={2} /></CfgItem>
       <CfgItem name="note" label="说明"><Input.TextArea rows={2} /></CfgItem>
     </FundsActionModal>
   );
@@ -204,7 +214,7 @@ export function ResolveModal({ ctrl }: { ctrl: FundsPageController }) {
       title="核销对账差异" fieldCount={2}
       open={Boolean(resolveTarget)} onCancel={() => { setResolveTarget(null); resolveForm.resetFields(); }}
       scope="FUNDCLEAR" form={resolveForm} onFinish={resolveReconciliation}
-      write={write} permission="deposit.post" submitLabel="确认核销" employees={employees} showOperator
+      write={write} permission="deposit.post" submitLabel="确认核销" employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
     >
       <CfgItem name="reason" label="处理说明" rules={[{ required: true }]}><Input.TextArea rows={3} /></CfgItem>
     </FundsActionModal>
@@ -219,12 +229,12 @@ export function ReleaseModal({ ctrl }: { ctrl: FundsPageController }) {
       open={Boolean(returnTarget)} onCancel={() => { setReturnTarget(null); returnForm.resetFields(); }}
       scope="FUNDRELEASE" form={returnForm} onFinish={submitReturn}
       write={write} permission="deposit.post" submitLabel="确认释放"
-      employees={employees} showOperator
+      employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
       intro={
         <>
           {returnTarget ? (
             <Typography.Paragraph type="secondary">
-              押金占用合计 <MoneyText value={returnTarget.paid_amount} />；已释放 <MoneyText value={returnTarget.returned_amount} />；已损失 <MoneyText value={returnTarget.lost_amount ?? "0.00"} />；剩余可释放 <MoneyText value={returnTarget.remaining_amount} strong />。
+              押金占用合计 <MoneyText value={returnTarget.paid_amount} />；已释放 <MoneyText value={returnTarget.returned_amount} />；已损失 <MoneyText value={returnTarget.lost_amount} />；剩余可释放 <MoneyText value={returnTarget.remaining_amount} strong />。
             </Typography.Paragraph>
           ) : null}
           <Typography.Paragraph type="warning">
@@ -268,7 +278,7 @@ export function LossModal({ ctrl }: { ctrl: FundsPageController }) {
       open={Boolean(lossTarget)} onCancel={() => { setLossTarget(null); lossForm.resetFields(); }}
       scope="FUNDLOSS" form={lossForm} onFinish={submitLoss}
       write={write} permission="deposit.post" submitLabel="确认损失"
-      employees={employees} showOperator
+      employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
       intro={
         <Typography.Paragraph type="warning">
           登记损失后该押金占用相应扣减，操作不可撤销，请核对金额与费用分类。
@@ -291,7 +301,7 @@ export function CancelModal({ ctrl }: { ctrl: FundsPageController }) {
       open={Boolean(cancelTarget)} onCancel={() => { setCancelTarget(null); cancelForm.resetFields(); }}
       scope="FUNDCANCEL" form={cancelForm} onFinish={submitCancelDeposit}
       write={write} permission="deposit.post" submitLabel="确认取消" danger
-      employees={employees} showOperator
+      employees={employees} employeeError={ctrl.employeeError} reloadEmployees={ctrl.reloadEmployees} showOperator
       intro={
         <>
           {cancelTarget ? (

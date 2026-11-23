@@ -462,8 +462,8 @@ def db(v1_engine):
     `join_transaction_mode="create_savepoint"` 降级为 savepoint release，teardown
     只剩一次 `rollback()`（实测 <2ms）。
 
-    前提已核验：app 内唯一独立连接是 `api.py` 的 healthz 只读探活，业务写路径
-    全部经 `get_db` 注入的会话，不会被绕过。
+    业务写路径全部经 `get_db` 注入的会话。资金流水导出使用独立只读快照连接，
+    需要跨连接读取已提交数据的导出测试使用专用临时测试库，不能依赖本夹具的未提交数据。
 
     差异（已确认无影响）：PG 的 `setval` 不受事务回滚影响，因此序列值不再随用例
     归零；而编号计数器 `document_sequences` 是**普通表**，仍随回滚归位。

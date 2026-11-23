@@ -37,14 +37,14 @@ export type ExecutionOperationCreate = {
 
 /** 只提交真正修改的订单字段，编辑交付信息时保留原备注和入库时间。 */
 export function buildOrderEdits(
-  orders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "note">>,
+  orders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "occurred_at" | "note">>,
   drafts: Record<number, OrderDraft>,
 ) {
   const originals = new Map(orders.map((order) => [order.order_id, order]));
   return Object.values(drafts).flatMap((draft) => {
     const original = originals.get(draft.order_id);
     if (!original) return [];
-    const timeChanged = Boolean(draft.occurred_at && draft.occurred_at !== (original.created_at ?? ""));
+    const timeChanged = Boolean(draft.occurred_at && draft.occurred_at !== (original.occurred_at ?? original.created_at ?? ""));
     const noteChanged = draft.note !== (original.note ?? "");
     const hasExtra = Object.keys(draft.form_extra).length > 0;
     if (!timeChanged && !noteChanged && !hasExtra) return [];
@@ -101,7 +101,7 @@ export function buildEventEdits(
     expected_amount: draft.expected_amount,
     amount: draft.amount,
     note: draft.note,
-    ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),
+    ...(draft.occurred_at && draft.occurred_at !== (originals.get(draft.id)?.occurred_at ?? "") ? { occurred_at: draft.occurred_at } : {}),
     ...(draft.operator_user_ids !== undefined ? { operator_user_ids: draft.operator_user_ids } : {}),
     ...(draft.form_extra !== undefined ? { form_extra: draft.form_extra } : {}),
   }));

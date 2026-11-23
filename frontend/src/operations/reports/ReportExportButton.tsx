@@ -24,6 +24,7 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
       ...(params?.mine ? { mine: true } : {}),
       ...(params?.all_people ? { all_people: true } : {}),
       ...(params?.user_id ? { user_id: params.user_id } : {}),
+      ...(params?.sort_desc !== undefined ? { sort_desc: params.sort_desc } : {}),
     };
     setExporting(true);
     try {

@@ -7,6 +7,7 @@
 """
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Iterable
 
 from app.domain.enums import (
@@ -85,9 +86,17 @@ def available_installment_actions(
     return actions
 
 
-def available_schedule_actions(status: str, contract_status: str | None = None) -> list[str]:
-    """结束的合约及已完成的期次不允许减免或展期。"""
-    if contract_status in SCHEDULE_CLOSED_STATUSES or status in _SCHEDULE_BLOCKED:
+def available_schedule_actions(
+    status: str,
+    contract_status: str | None,
+    *,
+    due_amount: Decimal,
+    received_amount: Decimal,
+    waived_amount: Decimal,
+) -> list[str]:
+    """按写入规则返回有未收金额且未收过款的期次动作。"""
+    if (contract_status in SCHEDULE_CLOSED_STATUSES or status in _SCHEDULE_BLOCKED
+        or received_amount > 0 or received_amount + waived_amount >= due_amount):
         return []
     return [WAIVE, EXTEND]
 

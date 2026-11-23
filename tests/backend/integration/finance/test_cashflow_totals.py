@@ -15,11 +15,71 @@ import io
 from datetime import date
 from decimal import Decimal
 from uuid import uuid4
-from sqlalchemy import event, select
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, event, select, update
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
+from app.domain.base import Base
 from app.domain.foundation import Pool
+from app.domain.trade import Cashflow
+from app.domain.users import User
+from app.settings.field_definitions.seeds import seed_foundation
+
+pytestmark = pytest.mark.db
 
 TODAY = date(2026, 10, 4)
+
+
+def test_postgresql_cashflow_retains_cents_at_decimal_precision_limit(seeded_db):
+    pool = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+    amount = Decimal("9007199254740991.99")
+    flow = Cashflow(flow_no="SR99991", pool_id=pool.id, occurred_on=TODAY, direction="IN", category="OTHER",
+                    accounting_attribute="OTHER_INCOME", source_type="MANUAL", amount=amount,
+                    created_by="pytest", updated_by="pytest")
+    seeded_db.add(flow)
+    seeded_db.flush()
+    seeded_db.refresh(flow)
+    assert flow.amount == amount
+
+
+@pytest.fixture
+def committed_finance_client(v1_engine, app):
+    """导出使用独立连接；用独立测试库模拟真实请求边界与已提交数据。"""
+    database = f"heijin_export_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    with admin.connect() as connection:
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+    engine = create_engine(v1_engine.url.set(database=database), pool_size=5)
+    try:
+        Base.metadata.create_all(engine)
+        with Session(engine, autoflush=False) as session:
+            seed_foundation(session, actor="pytest")
+            session.add_all([
+                User(id=1, username="seeduser1", display_name="种子用户1", password_hash="unused"),
+                User(id=2, username="seeduser2", display_name="种子用户2", password_hash="unused"),
+            ])
+            session.commit()
+
+        def request_db():
+            with Session(engine, autoflush=False) as session:
+                try:
+                    yield session
+                    session.commit()
+                except Exception:
+                    session.rollback()
+                    raise
+
+        app.dependency_overrides[get_db] = request_db
+        with TestClient(app) as client:
+            yield client, engine
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        admin.dispose()
 
 
 def _create(client, headers, *, direction: str, amount: str, note: str, occurred_on: date = TODAY) -> dict:
@@ -101,7 +161,8 @@ def test_keyword_wildcards_are_escaped(seeded_client, headers):
     assert Decimal(str(body["total_in"])) == Decimal("0")
 
 
-def test_cashflow_list_and_export_display_selected_operator_names(seeded_client, headers):
+def test_cashflow_list_and_export_display_selected_operator_names(committed_finance_client, headers):
+    seeded_client, _engine = committed_finance_client
     payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "ledger_type": "STUDIO",
                "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
                "category": "房租", "amount": "100", "operator_user_ids": [1, 2]}
@@ -123,12 +184,13 @@ def test_cashflow_list_and_export_display_selected_operator_names(seeded_client,
     assert legacy["operator"] == "admin"
 
 
-def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, headers):
+def test_export_accepts_keyword_instead_of_leaking_query_object(committed_finance_client, headers):
     """导出路由曾漏传 keyword：路由默认值 `Query(None)` 被原样带进 SQL 条件 → 500。
 
     关键字加在列表接口后，导出（直接调用 `list_cashflows`）也必须显式传，
     否则 `keyword.strip()` 作用在 Query 对象上。这里同时锁住「导出按关键字过滤」。
     """
+    seeded_client, _engine = committed_finance_client
     created = _create(seeded_client, headers, direction="IN", amount="12.34", note="导出关键字-甲")
 
     hit = seeded_client.get(
@@ -163,16 +225,19 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(seeded_client, h
         seeded_client.app.dependency_overrides.pop(read_access.dependency, None)
 
 
-def test_cashflow_export_includes_fund_account_name(seeded_client, seeded_db, headers):
+def test_cashflow_export_includes_fund_account_name(committed_finance_client, headers):
+    seeded_client, engine = committed_finance_client
     created = _create(seeded_client, headers, direction="OUT", amount="20", note="资金账户导出")
-    pool = seeded_db.scalar(select(Pool).where(Pool.id == 1))
+    with Session(engine) as session:
+        pool_name = session.scalar(select(Pool.name).where(Pool.id == 1))
     response = seeded_client.get("/api/cashflows/export.csv", headers=headers, params={"keyword": created["flow_no"]})
     assert response.status_code == 200, response.text
     rows = list(csv.reader(io.StringIO(response.text.lstrip("\ufeff"))))
-    assert rows[1][rows[0].index("资金账户")] == pool.name
+    assert rows[1][rows[0].index("资金账户")] == pool_name
 
 
-def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, headers):
+def test_cashflow_export_displays_chinese_labels_like_list(committed_finance_client, headers):
+    seeded_client, _engine = committed_finance_client
     payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "ledger_type": "STUDIO",
                "direction": "OUT", "accounting_attribute": "OPERATING_EXPENSE",
                "category": "房租", "amount": "100"}
@@ -200,9 +265,10 @@ def test_cashflow_export_displays_chinese_labels_like_list(seeded_client, header
     assert rows[0]["核算属性"] == "回收成本"
 
 
-def test_export_has_no_row_cap_and_respects_date_range(seeded_client, seeded_db, headers, monkeypatch):
+def test_export_has_no_row_cap_and_respects_date_range(committed_finance_client, headers, monkeypatch):
     from app.funds.routers import cashflows_router
 
+    seeded_client, engine = committed_finance_client
     monkeypatch.setattr(cashflows_router, "CASHFLOW_EXPORT_BATCH_SIZE", 3)
     for index in range(3):
         _create(seeded_client, headers, direction="IN", amount="10", note=f"导出测试{index}\n第二行")
@@ -213,7 +279,6 @@ def test_export_has_no_row_cap_and_respects_date_range(seeded_client, seeded_db,
         if "sum(cashflow.amount)" in statement.lower():
             totals_queries.append(statement)
 
-    engine = seeded_db.get_bind()
     event.listen(engine, "before_cursor_execute", record_totals)
     try:
         response = seeded_client.get("/api/cashflows/export.csv", headers=headers)
@@ -234,3 +299,44 @@ def test_export_has_no_row_cap_and_respects_date_range(seeded_client, seeded_db,
     assert narrowed.status_code == 200, narrowed.text
     assert all(f"导出测试{index}" in narrowed.text for index in range(3))
     assert "范围外流水" not in narrowed.text
+
+
+@pytest.mark.parametrize("change", ["insert", "move"])
+def test_export_uses_one_snapshot_when_rows_change_between_batches(committed_finance_client, headers, monkeypatch, change):
+    from app.funds.cashflows import create_cashflow
+    from app.funds.routers import cashflows_router
+
+    seeded_client, engine = committed_finance_client
+    original_numbers = [
+        _create(seeded_client, headers, direction="IN", amount="10", note=f"导出快照-{index}")["flow_no"]
+        for index in range(4)
+    ]
+    monkeypatch.setattr(cashflows_router, "CASHFLOW_EXPORT_BATCH_SIZE", 2)
+    original_list = cashflows_router.finance_list_cashflows
+    injected = []
+
+    def insert_after_first_batch(session, **kwargs):
+        items, total = original_list(session, **kwargs)
+        if kwargs["offset"] == 0 and not injected:
+            with Session(engine) as writer:
+                if change == "insert":
+                    new_flow = create_cashflow(writer, pool_id=1, occurred_on=date(2026, 10, 5), direction="IN",
+                                               category="OTHER", amount="20", note="导出期间新增", actor="pytest")
+                    injected.append(new_flow.flow_no)
+                else:
+                    writer.execute(update(Cashflow).where(Cashflow.flow_no == original_numbers[0]).values(
+                        occurred_on=date(2026, 10, 5), note="导出期间修改",
+                    ))
+                    injected.append(original_numbers[0])
+                writer.commit()
+        return items, total
+
+    monkeypatch.setattr(cashflows_router, "finance_list_cashflows", insert_after_first_batch)
+    response = seeded_client.get("/api/cashflows/export.csv", headers=headers)
+    assert response.status_code == 200, response.text
+    rows = list(csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))))
+    numbers = [row["流水号"] for row in rows]
+    assert len(injected) == 1
+    assert len(numbers) == len(original_numbers)
+    assert set(numbers) == set(original_numbers)
+    assert "导出期间修改" not in response.text

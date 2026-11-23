@@ -139,7 +139,7 @@ def test_dg_platform_offsale_keeps_account_in_stock(seeded_db):
 @pytest.mark.parametrize("order_type", ["HS", "TH"])
 def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_type):
     from app.business.profit_allocation.service import set_allocations
-    from app.operations.r3_commission import r3_commission_reconciliation
+    from app.operations.commission import commission_reconciliation
 
     snapshot = {**_snapshot(f"cancel-sale-{order_type}"), "bound_phone": "13700000001"}
     order = create_order(seeded_db, order_type=order_type, trade_date=D, actor="pytest", account_snapshot=snapshot, form_extra={"intermediary_platform": "买号平台"})
@@ -178,7 +178,7 @@ def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_typ
     with pytest.raises(Validation, match="已经登记过卖号交付"):
         post_event(seeded_db, order.id, event_type="DELIVER", delivery_direction="SELL", occurred_on=D, actor="pytest", note="再次重复交付")
     set_allocations(seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}], actor="pytest")
-    group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
+    group = next(group for group in commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
     assert group["outbound_date"] == date(2026, 11, 2)
     assert group["orders"][0]["outbound_date"] == date(2026, 11, 2)
 
@@ -186,7 +186,7 @@ def test_cancel_completed_sale_returns_account_to_inventory(seeded_db, order_typ
 @pytest.mark.parametrize("order_type", ["HS", "TH"])
 def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded_db, headers, order_type):
     from app.business.profit_allocation.service import set_allocations
-    from app.operations.r3_commission import r3_commission_reconciliation
+    from app.operations.commission import commission_reconciliation
     from app.shared.order_amounts import order_cashflow_profit_by_order
     order = create_order(seeded_db, order_type=order_type, trade_date=D, actor="pytest", account_snapshot=_snapshot(f"partial-sale-{order_type}"))
     operators = list(seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id).limit(2)))
@@ -234,5 +234,5 @@ def test_cancel_sale_with_partial_refund_returns_inventory(seeded_client, seeded
     current_pending = seeded_db.scalar(select(Notification).where(Notification.recipient_user_id == operator.id, Notification.notification_type == "PROFIT_PENDING", Notification.entity_id == order.order_no))
     assert current_pending.read_at is None
     set_allocations(seeded_db, order.id, items=[{"user_id": operator.id, "role": "OWNER", "allocation_rate": "100"}], actor="pytest")
-    group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
+    group = next(group for group in commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == order.id)
     assert group["outbound_date"] == date(2026, 10, 31)

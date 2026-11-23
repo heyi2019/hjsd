@@ -11,11 +11,11 @@
      cash_balance=income−expense；available=cash_balance（押金占用已在 expense 扣过，
      不再二次减 deposit_held；deposit_held 降为其中项信息列，2026-11-12 裁决）。
 - #5  外部注入并入 income、删除 external_in 独立列（原为单列）。
-- #9（已由 C 推翻）：押金挂单改为完整进业务口径——占用进 R2 直接成本、
+- #9（已由 C 推翻）：押金挂单改为完整进业务口径——占用进 月度损益 直接成本、
      释放进收入；押金线只有一套逻辑：净额=收入−支出，正为利润、负为损失
      （损失=−利润），不另记第二次现金流。
 - 押金损失不重复：business_cashflow_filter 只排除损失那笔 OUT，资金中心/
-     订单利润/报表同源(R3/R5)/R2 月度损益共用同一谓词。
+     订单利润/报表同源(分润对账与业务损益)/月度损益 月度损益共用同一谓词。
 - 售出/返点是收入子类型、回收/提号是支出子类型，均进大类不单列。
 """
 from __future__ import annotations
@@ -31,7 +31,7 @@ from app.domain.trade import Cashflow
 from app.funds.deposits.writes import create_deposit
 from app.funds.deposits.lifecycle import lose_deposit, return_deposit
 from app.funds.balances import pool_balance
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
 from sqlalchemy import select
 
 TODAY = date(2026, 10, 17)
@@ -90,10 +90,10 @@ def test_deposit_hold_in_expense_release_in_income(seeded_db):
     )
 
 
-# -------------- C 押金完整走业务口径：R2 与订单利润逐笔同源（推翻旧 #9）
+# -------------- C 押金完整走业务口径：月度损益 与订单利润逐笔同源（推翻旧 #9）
 def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_db):
-    """用户裁决 C：挂单押金占用进 R2 直接成本、释放进收入；损失按「收入−支出」
-    净额体现、不另记第二次现金流；R2 订单贡献与订单利润逐笔同源。"""
+    """用户裁决 C：挂单押金占用进 月度损益 直接成本、释放进收入；损失按「收入−支出」
+    净额体现、不另记第二次现金流；月度损益 订单贡献与订单利润逐笔同源。"""
     from app.business.orders.create import create_order
     from app.shared.order_amounts import order_cashflow_profit_by_order
 
@@ -102,8 +102,8 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     )
     invest = _pool(seeded_db, "HJ_INVEST")
 
-    def r2_oct():
-        data = r2_monthly_pnl(seeded_db)
+    def october_monthly_totals():
+        data = monthly_pnl_report(seeded_db)
         item = next((r for r in data["items"] if r["month"] == "2026-10"), None)
         return (
             item["cost"] if item else Decimal("0.00"),
@@ -111,71 +111,71 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
             item["operating_expense"] if item else Decimal("0.00"),
         )
 
-    cost0, income0, op0 = r2_oct()
+    cost0, income0, op0 = october_monthly_totals()
     profit0 = order_cashflow_profit_by_order(seeded_db, order_ids=[order.id]).get(
         order.id, Decimal("0.00")
     )
 
-    # 占用 2000：进 R2 直接成本、进订单利润支出侧。
+    # 占用 2000：进 月度损益 直接成本、进订单利润支出侧。
     dep = create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("2000"), paid_on=TODAY,
         source_order_id=order.id, actor="pytest",
     )
     seeded_db.expire_all()
-    cost1, income1, op1 = r2_oct()
+    cost1, income1, op1 = october_monthly_totals()
     assert cost1 == cost0 + Decimal("2000"), (
-        f"[BUG] 押金占用未进 R2 直接成本（裁决 C）: {cost0}->{cost1}"
+        f"[BUG] 押金占用未进 月度损益 直接成本（裁决 C）: {cost0}->{cost1}"
     )
     assert income1 == income0
-    assert op1 == op0, "挂单押金占用不得进 R2 运营费用段2"
+    assert op1 == op0, "挂单押金占用不得进 月度损益 运营费用段2"
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == (
         profit0 - Decimal("2000")
     )
 
-    # 损失 500：不是第二次现金流出——R2 直接成本、订单利润都不再减。
+    # 损失 500：不是第二次现金流出——月度损益 直接成本、订单利润都不再减。
     lose_deposit(
         seeded_db, dep.id, amount=Decimal("500"), lost_on=TODAY,
         category="OPERATING_COST", reason="对方违约", actor="finance", operator_user_ids=[1],
     )
     seeded_db.expire_all()
-    cost2, income2, op2 = r2_oct()
-    assert cost2 == cost1, f"[BUG] 押金损失被重复计入 R2 直接成本: {cost1}->{cost2}"
-    assert op2 == op0, "[BUG] 挂单押金损失漏进 R2 运营费用段2（净额只在段1体现一次）"
+    cost2, income2, op2 = october_monthly_totals()
+    assert cost2 == cost1, f"[BUG] 押金损失被重复计入 月度损益 直接成本: {cost1}->{cost2}"
+    assert op2 == op0, "[BUG] 挂单押金损失漏进 月度损益 运营费用段2（净额只在段1体现一次）"
     assert order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id] == (
         profit0 - Decimal("2000")
     )
 
-    # 退回 1500：进 R2 收入；净额 = 收入1500 − 支出2000 = −500 = 损失。
+    # 退回 1500：进 月度损益 收入；净额 = 收入1500 − 支出2000 = −500 = 损失。
     return_deposit(
         seeded_db, dep.id, amount=Decimal("1500"), released_on=TODAY, actor="pytest",
     )
     seeded_db.expire_all()
-    cost3, income3, op3 = r2_oct()
-    assert op3 == op0, "挂单押金退回不得进 R2 运营费用段2"
+    cost3, income3, op3 = october_monthly_totals()
+    assert op3 == op0, "挂单押金退回不得进 月度损益 运营费用段2"
     assert income3 == income0 + Decimal("1500")
     assert cost3 == cost0 + Decimal("2000")
-    # R2 押金线净额与订单利润逐笔同源：均为 −500，损失不重复。
-    r2_net = (income3 - income0) - (cost3 - cost0)
+    # 月度损益 押金线净额与订单利润逐笔同源：均为 −500，损失不重复。
+    monthly_net = (income3 - income0) - (cost3 - cost0)
     profit3 = order_cashflow_profit_by_order(seeded_db, order_ids=[order.id])[order.id]
-    assert r2_net == Decimal("-500")
+    assert monthly_net == Decimal("-500")
     assert profit3 == profit0 - Decimal("500")
-    assert r2_net == profit3 - profit0
+    assert monthly_net == profit3 - profit0
 
 
 def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
-    """守卫：挂订单的普通经营支出（非押金）仍进 R2 直接成本（NULL 属性不被误删）。"""
+    """守卫：挂订单的普通经营支出（非押金）仍进 月度损益 直接成本（NULL 属性不被误删）。"""
     from app.business.orders.create import create_order
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
     invest = _pool(seeded_db, "HJ_INVEST")
-    base = r2_monthly_pnl(seeded_db)
+    base = monthly_pnl_report(seeded_db)
     oct_before = next((r for r in base["items"] if r["month"] == "2026-10"), None)
     before_cost = oct_before["cost"] if oct_before else Decimal("0.00")
 
     # accounting_attribute=None 的挂单支出，验证 != DEPOSIT 的 NULL 放行
     _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="300", attribute=None, order_id=order.id)
-    after = r2_monthly_pnl(seeded_db)
+    after = monthly_pnl_report(seeded_db)
     oct_item = next(r for r in after["items"] if r["month"] == "2026-10")
     assert oct_item["cost"] == before_cost + Decimal("300.00")
 

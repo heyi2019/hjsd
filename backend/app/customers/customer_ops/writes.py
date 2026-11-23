@@ -92,7 +92,7 @@ def update_customer(
     user: CurrentUser | None = None,
     **fields: Any,
 ) -> Customer:
-    customer = get_customer(session, customer_id, user)
+    customer = get_customer(session, customer_id, user, for_update=True)
     if customer.status == CustomerStatus.MERGED.value:
         raise Conflict(
             "已合并客户不可修改",
@@ -136,7 +136,9 @@ def update_customer(
         changed_fields=normalized_fields,
     )
 
-    before = {name: getattr(customer, name) for name in CONTACT_FIELDS}
+    before = {name: getattr(customer, name) for name in set(CONTACT_FIELDS) | normalized_fields.keys()}
+    if extras:
+        before["extra_values"] = {key: (customer.form_extra or {}).get(key) for key in extras}
     changed_contacts = False
     for name, value in normalized_fields.items():
         if getattr(customer, name, None) != value:
@@ -164,7 +166,7 @@ def update_customer(
         actor=actor,
         before=before,
         after={
-            **{name: getattr(customer, name) for name in CONTACT_FIELDS},
+            **{name: getattr(customer, name) for name in set(CONTACT_FIELDS) | normalized_fields.keys()},
             **({"extra_values": saved_extras} if saved_extras else {}),
         },
     )
@@ -180,7 +182,7 @@ def set_customer_status(
     extra_values: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
 ) -> Customer:
-    customer = get_customer(session, customer_id, user)
+    customer = get_customer(session, customer_id, user, for_update=True)
     if status not in CustomerStatus.values():
         raise Validation(
             f"客户状态无效，必须为 {CustomerStatus.values()}",

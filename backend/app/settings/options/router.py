@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -26,6 +26,7 @@ from app.settings.auth.session import (
 )
 from app.shared.audit import record_audit
 from app.domain.options import OptionSet
+from app.settings.field_definitions.catalog_seed import accounting_attribute_options, builtin_option_set_policy
 from app.settings.options import schemas
 from app.workbench.reminder_config import REMINDER_CODE, validate_reminder_options
 
@@ -35,6 +36,17 @@ router = APIRouter(tags=["option-sets"])
 # 会导致鉴权被静默跳过（user 收到函数对象本身）。
 _read_access = Depends(get_current_user)
 _write_access = require_permissions(PERM_OPTION_SET_MANAGE)
+
+
+def _output(row: OptionSet) -> schemas.OptionSetOut:
+    result = schemas.OptionSetOut.model_validate(row)
+    if row.code == "FUND_FLOW_ACCOUNTING_ATTRIBUTE":
+        return result.model_copy(update={
+            "editable": False,
+            "options": [schemas.OptionItem(**item) for item in accounting_attribute_options()],
+        })
+    _, fixed = builtin_option_set_policy()
+    return result.model_copy(update={"editable": False}) if row.code in fixed else result
 
 
 @router.get("/option-sets", response_model=schemas.OptionSetListOut)
@@ -50,10 +62,14 @@ def list_option_sets(
     if group is not None:
         stmt = stmt.where(OptionSet.group == group)
     if editable is not None:
-        stmt = stmt.where(OptionSet.editable == editable)
+        _, fixed = builtin_option_set_policy()
+        if editable:
+            stmt = stmt.where(OptionSet.editable.is_(True), OptionSet.code.not_in(fixed))
+        else:
+            stmt = stmt.where(or_(OptionSet.editable.is_(False), OptionSet.code.in_(fixed)))
     rows = db.scalars(stmt).all()
     return schemas.OptionSetListOut(
-        items=[schemas.OptionSetOut.model_validate(row) for row in rows]
+        items=[_output(row) for row in rows]
     )
 
 
@@ -67,7 +83,7 @@ def get_option_set(
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="选项词典不存在")
-    return schemas.OptionSetOut.model_validate(row)
+    return _output(row)
 
 
 @router.post("/option-sets", response_model=schemas.OptionSetOut, status_code=status.HTTP_201_CREATED)
@@ -81,7 +97,10 @@ def create_option_set(
     if payload.code == REMINDER_CODE:
         validate_reminder_options([item.model_dump() for item in payload.options])
     if db.scalars(select(OptionSet).where(OptionSet.code == payload.code)).first():
-        raise AppError(ErrorCode.VALIDATION_ERROR, "选项词典 code 已存在", details={"code": payload.code})
+        raise Validation("选项词典 code 已存在", code=ErrorCode.DUPLICATE_CODE, details={"code": payload.code})
+    _, fixed = builtin_option_set_policy()
+    if payload.code in fixed:
+        raise Validation("系统固定词典由初始化程序维护，不能自行创建", details={"code": payload.code})
     row = OptionSet(
         code=payload.code,
         label=payload.label,
@@ -102,7 +121,7 @@ def create_option_set(
     )
     db.commit()
     db.refresh(row)
-    return schemas.OptionSetOut.model_validate(row)
+    return _output(row)
 
 
 @router.put("/option-sets/{code}", response_model=schemas.OptionSetOut)
@@ -117,6 +136,10 @@ def update_option_set(
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="选项词典不存在")
+    _, fixed = builtin_option_set_policy()
+    fixed_values = code in fixed
+    if fixed_values and payload.editable:
+        raise Validation("系统固定词典不能改为可增删选项", details={"code": code})
     if code == PERIOD_CONFIG_CODE:
         if payload.editable is not None and payload.editable:
             raise Validation("当期设置不能改为可删除选项")
@@ -126,6 +149,9 @@ def update_option_set(
                 raise Validation("每月起始日必须为 1 至 31 的整数")
     if code == REMINDER_CODE and payload.options is not None:
         validate_reminder_options([item.model_dump() for item in payload.options])
+    if code == "FUND_FLOW_ACCOUNTING_ATTRIBUTE" and payload.options is not None:
+        if [item.model_dump() for item in payload.options] != accounting_attribute_options():
+            raise Validation("核算属性取值与名称由系统统一维护")
     before = {
         "label": row.label,
         "group": row.group,
@@ -136,7 +162,9 @@ def update_option_set(
         row.label = payload.label
     if payload.group is not None:
         row.group = payload.group
-    if payload.editable is not None:
+    if fixed_values:
+        row.editable = False
+    elif payload.editable is not None:
         row.editable = payload.editable
     if payload.options is not None:
         incoming = [item.model_dump() for item in payload.options]
@@ -147,7 +175,9 @@ def update_option_set(
         # 增删或改顺序会让业务语义漂移，故值序列必须逐项全等；
         # 但**展示文案允许维护**——这正是全站表格展示同步（T25）的意义所在，
         # 否则 47 项词典里只有 2 项纯字典能改文案，机制形同虚设（2026-10-26 裁决）。
-        current = [{"value": opt["value"], "label": opt["label"]} for opt in (row.options or [])]
+        current = accounting_attribute_options() if code == "FUND_FLOW_ACCOUNTING_ATTRIBUTE" else [
+            {"value": opt["value"], "label": opt["label"]} for opt in (row.options or [])
+        ]
         if [opt["value"] for opt in incoming] != [opt["value"] for opt in current]:
             raise AppError(
                 "该选项词典为后端死枚举：不能增删选项或调整顺序，只能修改展示文案",
@@ -175,7 +205,7 @@ def update_option_set(
     )
     db.commit()
     db.refresh(row)
-    return schemas.OptionSetOut.model_validate(row)
+    return _output(row)
 
 
 @router.delete("/option-sets/{code}")
@@ -191,6 +221,9 @@ def delete_option_set(
     row = db.scalars(select(OptionSet).where(OptionSet.code == code)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="选项词典不存在")
+    builtins, _ = builtin_option_set_policy()
+    if code in builtins:
+        raise Validation("系统内置词典不可删除", details={"code": code})
     record_audit(
         db,
         action="OPTION_SET_DELETE",

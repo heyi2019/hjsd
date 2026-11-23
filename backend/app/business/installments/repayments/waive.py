@@ -14,7 +14,7 @@ from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.domain.enums import AuditAction, InstallmentStatus, ScheduleStatus
 from app.domain.trade import InstallmentSchedule
-from .._shared import SCHEDULE_CLOSED_STATUSES, _merge_form_extra, _positive, _required_text, get_installment
+from .._shared import SCHEDULE_CLOSED_STATUSES, _merge_form_extra, _positive, _required_text, _restore_when_overdue_cleared, get_installment
 from app.shared.installment_amounts import total_receivable
 
 def waive_schedule(
@@ -84,6 +84,7 @@ def waive_schedule(
         )
     installment.updated_by = actor
     session.flush()
+    _restore_when_overdue_cleared(session, installment)
     record_audit(
         session,
         action=AuditAction.INSTALLMENT_WAIVE,

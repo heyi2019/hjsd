@@ -26,12 +26,13 @@ export function CompactActions({
   children,
   onCancel,
   divider = true,
-}: { children: ReactNode; onCancel?: () => void; divider?: boolean }) {
+  cancelDisabled = false,
+}: { children: ReactNode; onCancel?: () => void; divider?: boolean; cancelDisabled?: boolean }) {
   const ctxCancel = useContext(ModalCancelContext);
   const handleCancel = onCancel ?? ctxCancel;
   return (
     <div className={`compact-form-actions${divider ? "" : " no-divider"}`}>
-      <Button onClick={handleCancel}>取消</Button>
+      <Button onClick={handleCancel} disabled={cancelDisabled}>取消</Button>
       {children}
     </div>
   );

@@ -37,6 +37,9 @@ export interface InstallmentOperationOperator {
   operation_key: string;
   operator_user_ids: number[];
   occurred_at: string;
+  period_no?: number | null;
+  flow_no?: string | null;
+  historical_summary?: boolean;
 }
 
 export interface InstallmentOrderContext {

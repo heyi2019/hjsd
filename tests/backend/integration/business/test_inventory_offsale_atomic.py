@@ -32,6 +32,29 @@ def _conditional_receipt(seeded_db, scope, dependency):
     )
 
 
+def test_active_platforms_are_server_derived_and_legacy_whitespace_is_consistent(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1),
+                         actor="pytest", account_snapshot={"game_account": "server-listing-state"})
+    first, _ = register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+                                    form_extra={"consignment_platforms": ["平台甲", "平台乙"], "consignment_price": "120"})
+    unlisted, _ = platform_unlist_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 2), actor="pytest",
+                                               reason="平台下架", form_extra={"consignment_event_id": first.id,
+                                               "consignment_platforms": ["平台甲"], "platform_unlist_scope": "PLATFORM"})
+    # 历史资料可能带空格；读侧与写入前校验必须使用相同的归一化。
+    unlisted.form_extra = {**unlisted.form_extra, "consignment_platforms": [" 平台甲 "]}
+    seeded_db.commit()
+    response = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
+    assert response.status_code == 200, response.text
+    listings = response.json()["orders"][0]["active_consignments"]
+    assert [(item["event_id"], item["platform"], item["price"]) for item in listings] == [(first.id, "平台乙", "120")]
+    assert listings[0]["listed_at"].startswith("2026-11-01")
+    relisted = seeded_client.post(f"/api/orders/{order.id}/events", headers=headers, json={
+        "event_type": "OPERATE", "operation_type": "CONSIGNMENT", "occurred_on": "2026-11-03",
+        "form_extra": {"consignment_platforms": ["平台甲"]},
+    })
+    assert relisted.status_code == 201, relisted.text
+
+
 @pytest.mark.parametrize("dependency", ["platform_ids", "operator_user_ids"])
 def test_consignment_conditions_use_selected_platform_and_operators(seeded_db, seeded_client, headers, dependency):
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),

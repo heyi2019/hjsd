@@ -139,10 +139,10 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_list_custom_columns.py": "F03",
     "test_list_export_csv.py": "E02",
     "test_list_scope_ui_parity.py": "F03",
-    "test_m2.py": "B08",
+    "test_installments_funds_integration.py": "B08",
     "test_import_lifecycle.py": "E03",
     "test_m5_policy.py": "F01",
-    "test_policy_allocation.py": "F01",
+    "test_profit_allocation.py": "B10",
     "test_policy_versioning.py": "F01",
     "test_main_contract.py": "SYS07",
     "test_migration.py": "SYS13",
@@ -159,6 +159,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_order_duplicate_account.py": "B04",
     "test_order_event_cancellable_amount.py": "B03",
     "test_order_execution_edit.py": "B01",
+    "test_order_import.py": "B01",
     "test_order_form_fields.py": "F02",
     "test_order_form_fields_router.py": "F02",
     "test_order_form_fields_guards.py": "F02",
@@ -197,7 +198,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_report_export_columns.py": "E02",
     "test_xlsx_sheet_capacity.py": "E02",
     "test_reporting_contract.py": "E01",
-    "test_reporting_r_consistency.py": "E01",
+    "test_reporting_consistency.py": "E01",
     "test_reporting_service.py": "E01",
     "test_request_schema_contract.py": "SYS07",
     "test_settings.py": "SYS06",
@@ -207,7 +208,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     # 金额与财务口径功能测试归属（首字母须与所在区域目录一致）。
     "test_order_financial_date_shift.py": "B03",          # business — 冲销与成交日期联动
     "test_funds_direction_and_deposit.py": "D05",         # finance — 收支方向与押金报表
-    "test_profit_r2_accounting.py": "E01",                # reporting — 订单利润与 R2 归类
+    "test_profit_monthly_accounting.py": "E01",                # reporting — 订单利润与 月度损益 归类
     "test_data_center_summary.py": "E01",                 # reporting — 数据中心汇总
     "test_inventory_ledger_export.py": "B05",             # business — 库存台账导出
     "test_finance_boundaries.py": "D02",                  # finance — 资金业务边界

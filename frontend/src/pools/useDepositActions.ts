@@ -86,14 +86,6 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     });
   };
 
-  const deleteDeposit = async (depositId: number) => {
-    await write.run(async () => {
-      await depositsApi.remove(depositId);
-      appMessage.success("押金占用已删除");
-      await load();
-    });
-  };
-
   const submitReturn = async (values: Record<string, unknown>) => {
     if (!returnTarget) return;
     const targetId = returnTarget.id;
@@ -168,7 +160,6 @@ export function useDepositActions({ load, write }: DepositActionsDeps) {
     lossForm,
     cancelForm,
     submitDeposit,
-    deleteDeposit,
     submitReturn,
     submitLoss,
     submitCancelDeposit,

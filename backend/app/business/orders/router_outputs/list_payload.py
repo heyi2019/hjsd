@@ -49,7 +49,7 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
     }
     inventory_responsible_ids = {
         item
-        for source_order in source_orders_by_account.values()
+        for source_order in orders
         for item in ((source_order.form_extra or {}).get("business_responsible_ids") or [])
         if isinstance(item, int) and item > 0
     }
@@ -143,6 +143,7 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             "party_created_by": party[3] if party else None,
             "party_created_at": party[4] if party else None,
             "inventory_entry_at": inventory_entry_at,
+            "business_operator": _form_responsible_label(order.form_extra, inventory_operator_names, None),
             "inventory_operator": (
                 _form_responsible_label(
                     source_orders_by_account.get(account.id).form_extra if account and source_orders_by_account.get(account.id) else None,

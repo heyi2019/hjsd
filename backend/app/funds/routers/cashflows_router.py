@@ -7,6 +7,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
+from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -200,25 +201,30 @@ def export_cashflows_csv(
     output = SpooledTemporaryFile(max_size=1024 * 1024, mode="w+b")
     offset = 0
     try:
-        while True:
-            items, total = finance_list_cashflows(
-                db, limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, sort_desc=sort_desc, **filters,
-            ) if can_read else ([], 0)
-            rows = [item.model_dump() for item in _cashflow_outputs(db, items)]
-            pool_ids = {row["pool_id"] for row in rows}
-            pool_names = (
-                dict(db.execute(select(Pool.id, Pool.name).where(Pool.id.in_(pool_ids))).all())
-                if pool_ids else {}
-            )
-            for row in rows:
-                row["pool_name"] = pool_names.get(row["pool_id"], f"账户 {row['pool_id']}")
-            csv_text, meta = build_list_csv(
-                db, "CASHFLOW", rows, include_header=offset == 0,
-            )
-            output.write(csv_text.encode("utf-8"))
-            offset += len(rows)
-            if not rows or offset >= total:
-                break
+        # 鉴权已经使用请求事务，不能在其中途更改隔离级别；独立只读事务固定导出快照。
+        bind = db.get_bind()
+        engine = bind.engine if isinstance(bind, Connection) else bind
+        with engine.connect().execution_options(isolation_level="REPEATABLE READ", postgresql_readonly=True) as connection:
+            with Session(bind=connection, autoflush=False) as snapshot:
+                while True:
+                    items, total = finance_list_cashflows(
+                        snapshot, limit=CASHFLOW_EXPORT_BATCH_SIZE, offset=offset, sort_desc=sort_desc, **filters,
+                    ) if can_read else ([], 0)
+                    rows = [item.model_dump() for item in _cashflow_outputs(snapshot, items)]
+                    pool_ids = {row["pool_id"] for row in rows}
+                    pool_names = (
+                        dict(snapshot.execute(select(Pool.id, Pool.name).where(Pool.id.in_(pool_ids))).all())
+                        if pool_ids else {}
+                    )
+                    for row in rows:
+                        row["pool_name"] = pool_names.get(row["pool_id"], f"账户 {row['pool_id']}")
+                    csv_text, meta = build_list_csv(
+                        snapshot, "CASHFLOW", rows, include_header=offset == 0,
+                    )
+                    output.write(csv_text.encode("utf-8"))
+                    offset += len(rows)
+                    if not rows or offset >= total:
+                        break
         record_audit(
             db, action=AuditAction.LIST_EXPORT, entity_type="list_export", entity_id="CASHFLOW",
             actor=user.username, after={"rows": offset, "column_count": meta["column_count"]},

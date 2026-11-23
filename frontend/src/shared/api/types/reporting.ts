@@ -5,6 +5,7 @@
 export interface MonthlyPnlRow {
   month: string;
   sales_income: string;
+  studio_other_income: string;
   cost: string;
   operating_expense: string;
   rebate_income: string;

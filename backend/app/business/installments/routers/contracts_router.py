@@ -122,27 +122,21 @@ def export_installments_csv(
     outputs = _installment_outputs(db, items, include_details=True)
     rows = [output.model_dump(mode="json") for output in outputs]
     value_labels = list_columns_service.get_value_labels(db, "INSTALLMENT")
-    export_details = inst_queries.list_installment_export_details(
-        db, [output.id for output in outputs]
-    )
-    schedules_by_installment, dispositions_by_installment = export_details
     for row, output in zip(rows, outputs, strict=True):
         # 列表列注册表里「剩余」的列 key 是 remaining，而响应字段是 remaining_receivable；
         # 直接读取输出模型的计算字段，保证导出与列表接口使用同一服务端口径。
         row["remaining"] = output.remaining_receivable
-        schedules = schedules_by_installment.get(output.id, [])
-        dispositions = dispositions_by_installment.get(output.id, [])
         row["installment_note"] = row.get("note")
         row["installment_delivered_on"] = row.get("delivered_on")
         row["installment_first_due_on"] = row.get("first_due_on")
         row["installment_extra_values"] = detail_json(row.get("extra_values") or {}, value_labels)
         row["installment_form_extra"] = detail_json(row.get("form_extra") or {}, value_labels)
         row["installment_schedule"] = detail_json(
-            [schemas.ScheduleOut.model_validate(item).model_dump(mode="json") for item in schedules],
+            [item.model_copy(update={"available_actions": []}).model_dump(mode="json") for item in output.schedules],
             value_labels,
         )
         row["installment_dispositions"] = detail_json(
-            [schemas.DispositionOut.model_validate(item).model_dump(mode="json") for item in dispositions],
+            [item.model_dump(mode="json") for item in output.dispositions],
             value_labels,
         )
     csv_text, meta = build_list_csv(

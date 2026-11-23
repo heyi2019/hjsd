@@ -104,30 +104,48 @@ DETAIL_EXPORT_SUB_GROUPS: dict[str, str] = {
 # 明细类 sheet 的列定义：把原本塞在单个单元格里的 JSON 明细拆成真正的列。
 # 一单多行、以「订单号」与主/详情 sheet 关联，Excel 里可直接筛选、求和、做透视。
 #
-# 列集合与界面「操作明细 / 资金明细」保持同一套业务口径：界面没有的系统内部字段
-# （事件号、流水号、是否过账、金额归属）一律不出现，界面有的「平台」要补上，
-# 否则同一个人从界面切到导出会看到两套列。
+# 展示列与界面业务口径一致；事件号、流水号和来源字段用于导入去重与还原关联。
 ORDER_EVENT_EXPORT_COLUMNS = [
     ("order_no", "订单号", True),
+    ("event_no", "事件号", True),
+    ("import_sequence", "事件顺序", True),
     ("operation_category", "操作分类", True),
     ("event_type", "动作", True),
+    ("operation_type", "运营动作", True),
+    ("sale_mode", "结算方式", True),
+    ("delivery_direction", "交付方向", True),
+    ("portion", "金额归属", True),
+    ("import_pool_code", "资金账户编码", True),
+    ("import_offset_no", "冲销来源事件号", True),
+    ("import_source_type", "来源类型", True),
+    ("import_source_id", "来源编号", True),
+    ("import_is_posted", "已过账", True),
     ("platform", "平台", True),
     ("occurred_on", "动作时间", True),
     ("operator", "操作人", True),
     ("amount", "金额", True),
     ("note", "备注", True),
+    ("reason", "原因", True),
+    ("import_form_extra", "运营详情(JSON)", True),
+    ("import_parent_no", "关联上架事件号", True),
 ]
 
 # 「现金性质」与「方向」是同一信息的两种写法（本方流入⟺收入、本方流出⟺支出，实测一一对应），
-# 只保留业务人员看得懂的「方向」；流水号属系统编号，不导出。
+# 导出流水号与来源编号以便导入时核对关联，避免重复记账。
 CASHFLOW_EXPORT_COLUMNS = [
     ("order_no", "订单号", True),
+    ("flow_no", "流水号", True),
     ("category", "业务类别", True),
+    ("import_category", "业务类别编码", True),
     ("direction", "方向", True),
     ("amount", "金额", True),
     ("occurred_on", "时间", True),
     ("operator", "操作人", True),
     ("pool_name", "资金账户", True),
+    ("pool_code", "资金账户编码", True),
+    ("accounting_attribute", "核算属性", True),
+    ("import_source_type", "来源类型", True),
+    ("import_source_id", "来源编号", True),
     ("note", "备注", True),
 ]
 
@@ -138,6 +156,7 @@ REBATE_EXPORT_COLUMNS = [
     ("channel", "渠道", True),
     ("amount", "返点金额", True),
     ("collected_on", "收到日期", True),
+    ("pool_code", "资金账户编码", True),
     ("operator", "操作人", True),
     ("note", "备注", True),
 ]
@@ -219,13 +238,27 @@ def _order_event_export_rows(order_no: str, detail: dict) -> list[dict[str, obje
     return [
         {
             "order_no": order_no,
+            "event_no": event.get("event_no"),
+            "import_sequence": event.get("import_sequence"),
             "operation_category": _operation_category(event.get("event_type")),
             "event_type": event.get("event_type"),
+            "operation_type": event.get("operation_type"),
+            "sale_mode": event.get("sale_mode"),
+            "delivery_direction": event.get("delivery_direction"),
+            "portion": event.get("portion"),
+            "import_pool_code": event.get("import_pool_code"),
+            "import_offset_no": event.get("import_offset_no"),
+            "import_source_type": event.get("import_source_type"),
+            "import_source_id": event.get("import_source_id"),
+            "import_is_posted": event.get("import_is_posted"),
             "platform": _event_platform(event, detail),
             "occurred_on": event.get("occurred_on"),
             "operator": event.get("operator"),
             "amount": _money_or_none(event.get("amount")),
             "note": event.get("note"),
+            "reason": event.get("reason"),
+            "import_form_extra": event.get("import_form_extra"),
+            "import_parent_no": event.get("import_parent_no"),
         }
         for event in detail.get("events") or []
     ]
@@ -237,12 +270,18 @@ def _cashflow_export_rows(
     return [
         {
             "order_no": order_no,
+            "flow_no": flow.get("flow_no"),
             "category": flow.get("category"),
+            "import_category": flow.get("import_category"),
             "direction": flow.get("direction"),
             "amount": _money_or_none(flow.get("amount")),
             "occurred_on": flow.get("occurred_on"),
             "operator": flow.get("operator"),
             "pool_name": pool_names.get(flow.get("pool_id")),
+            "pool_code": flow.get("pool_code"),
+            "accounting_attribute": flow.get("accounting_attribute"),
+            "import_source_type": flow.get("import_source_type"),
+            "import_source_id": flow.get("import_source_id"),
             "note": flow.get("note"),
         }
         for flow in detail.get("cashflows") or []
@@ -260,6 +299,7 @@ def _rebate_export_rows(order_no: str, detail: dict) -> list[dict[str, object]]:
                 "channel": rebate.get("channel"),
                 "amount": _money_or_none(rebate.get("amount")),
                 "collected_on": rebate.get("collected_on"),
+                "pool_code": rebate.get("pool_code"),
                 "operator": rebate.get("operator"),
                 "note": rebate.get("note"),
             }

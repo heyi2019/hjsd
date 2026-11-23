@@ -1,7 +1,7 @@
 /** applyColumnConfig：按列表列配置过滤 + 排序的纯函数。
  *  口径：无配置原样返回；未知列视为可见并排末尾；隐藏列剔除。 */
 import { describe, expect, it } from "vitest";
-import { MOBILE_HIDE_CLASS, applyColumnConfig, columnKey, formatCustomValue, markMobileHiddenColumns, orderMobileFields, readCustomValue } from "@/shared/lib/listColumns";
+import { MOBILE_HIDE_CLASS, applyColumnConfig, columnKey, formatCustomValue, markMobileHiddenColumns, markMobileIdentityColumn, orderMobileFields, readCustomValue } from "@/shared/lib/listColumns";
 import type { ListScopeConfig } from "@/shared/api/types/forms";
 
 const config: ListScopeConfig = {
@@ -62,6 +62,27 @@ describe("markMobileHiddenColumns", () => {
     expect(marked.map(columnKey)).toEqual(["status", "phone", "created_at"]);
     expect(marked.filter((c) => String((c as { className?: string }).className).includes(MOBILE_HIDE_CLASS)).map(columnKey))
       .toEqual(["phone", "created_at"]);
+  });
+});
+
+describe("markMobileIdentityColumn", () => {
+  it("优先固定订单号，并保留单元格原有属性", () => {
+    const marked = markMobileIdentityColumn([
+      { key: "date", className: "other", onCell: (_: unknown) => ({}) },
+      { key: "order_no", className: "original", onCell: (_: unknown) => ({ className: "cell", title: "订单" }) },
+    ], "order_no");
+    expect(marked[0].className).toBe("other");
+    expect(marked[1].className).toBe("original ui-col-mobile-identity");
+    expect(marked[1].onCell({})).toEqual({ className: "cell ui-col-mobile-identity", title: "订单" });
+  });
+
+  it("首选列隐藏时固定首个移动端可见列", () => {
+    const marked = markMobileIdentityColumn([
+      { key: "order_no", className: `original ${MOBILE_HIDE_CLASS}` },
+      { key: "date", className: "date" },
+    ], "order_no");
+    expect(marked[0].className).not.toContain("ui-col-mobile-identity");
+    expect(marked[1].className).toContain("ui-col-mobile-identity");
   });
 });
 

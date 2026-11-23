@@ -15,7 +15,7 @@ export function propagateSharedOrderExtra(
   drafts: Record<number, OrderDraft>,
   orderIds: number[],
   changes: Record<string, unknown>,
-  originalOrders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "note">> = [],
+  originalOrders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "occurred_at" | "note">> = [],
 ): Record<number, OrderDraft> {
   const sharedChanges = Object.fromEntries(
     Object.entries(changes).filter(([key]) => SHARED_ORDER_FORM_EXTRA_KEYS.has(key)),
@@ -32,7 +32,7 @@ export function propagateSharedOrderExtra(
     const original = originals.get(orderId);
     const current = next[orderId] ?? {
       order_id: orderId,
-      occurred_at: original?.created_at ?? "",
+      occurred_at: original?.occurred_at ?? original?.created_at ?? "",
       note: original?.note ?? "",
       form_extra: {},
     };

@@ -39,7 +39,7 @@ export function OrderProfit({ range }: { range: ReportRange }) {
   return (
     <Card className="glass" title="订单利润明细">
       <ErrorBanner error={error} onRetry={reload} retrying={loading} />
-      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{picker}<TimeOrderControl descending={sortDesc} onChange={setSortDesc} /><ReportExportButton name="order-profit" params={params} /></Space>
+      <Space wrap className="ui-filter-bar ui-filter-bar--spaced">{picker}<TimeOrderControl descending={sortDesc} onChange={setSortDesc} /><ReportExportButton name="order-profit" params={{ ...params, sort_desc: sortDesc }} /></Space>
       <StatRow
         items={[
           { label: "收入合计", amount: data?.total.income ?? "-" },

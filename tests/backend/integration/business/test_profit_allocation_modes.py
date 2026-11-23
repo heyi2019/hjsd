@@ -26,7 +26,7 @@ from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.profit_allocation import service as policy_allocations
 from app.business.profit_allocation.terms import allocation_terms, convert_action_allocation
-from app.operations.r3_commission import r3_commission_reconciliation
+from app.operations.commission import commission_reconciliation
 
 D = date(2026, 10, 17)
 
@@ -193,6 +193,40 @@ def test_allocation_form_uses_server_profit_to_choose_save_mode(
         row = next(item for item in response.json()["form_rows"] if item["allocation_type"] == "BUY")
         assert Decimal(row["allocation_rate"]) == Decimal("60" if zero else "20")
         assert Decimal(row["allocation_amount"]) == Decimal("0" if zero else "100")
+
+
+def test_allocation_form_rejects_stale_order_profit(seeded_client, seeded_db, headers):
+    order_id = _order_with_profit(seeded_db)
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": "100"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": "200"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+        {"allocation_type": "COMPANY", "employee_ids": [], "role": "OWNER", "allocation_amount": None},
+    ]
+    url = f"/api/orders/{order_id}/profit-allocations"
+    stale = seeded_client.put(url, headers=headers, json={"items": items, "amounts_changed": True, "expected_order_profit": "400.00"})
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["code"] == "VERSION_CONFLICT"
+    current = seeded_client.put(url, headers=headers, json={"items": items, "amounts_changed": True, "expected_order_profit": "500.00"})
+    assert current.status_code == 200, current.text
+
+
+def test_rate_edited_form_preserves_rates_when_amounts_round_to_zero(seeded_client, seeded_db, headers):
+    order_id = _order_with_profit(seeded_db, buy="1000.00", sell="1000.01")
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "20", "allocation_amount": "0.00"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "20", "allocation_amount": "0.00"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "20", "allocation_amount": "0.00"},
+        {"allocation_type": "COMPANY", "employee_ids": [], "role": "OWNER", "allocation_rate": "40", "allocation_amount": None},
+    ]
+    response = seeded_client.put(f"/api/orders/{order_id}/profit-allocations", headers=headers, json={
+        "items": items, "amounts_changed": False, "rates_changed": True, "expected_order_profit": "0.01",
+    })
+    assert response.status_code == 200, response.text
+    from app.domain.trade import OrderProfitAllocation
+    saved = seeded_db.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order_id)).all()
+    assert sum((row.allocation_rate for row in saved), Decimal(0)) == Decimal("100.00")
+    assert all(row.allocation_amount == 0 for row in saved)
 
 
 def test_zero_profit_grouped_rates_survive_resaving(seeded_db):
@@ -393,7 +427,7 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
         {"user_id": 1, "role": "OWNER", "allocation_amount": "100"},
         {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
     ])
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     group = next(group for group in report["order_groups"] if group["order_id"] == order_id)
     assert group["profit_base"] == Decimal("500.00")
     small_order = _order_with_profit(seeded_db, buy="100", sell="100.05")
@@ -401,7 +435,7 @@ def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
         {"user_id": 1, "role": "OWNER", "allocation_amount": "0.01"},
         {"user_id": 2, "role": "OWNER", "allocation_rate": "10"},
     ])
-    small_group = next(group for group in r3_commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == small_order)
+    small_group = next(group for group in commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == small_order)
     assert small_group["profit_base"] == Decimal("0.04")
 
 
@@ -482,7 +516,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
         items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "120"}],
     )
 
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     rows = [row for group in report["order_groups"] for row in group["orders"]]
 
     assert {row["user_id"]: row["profit_base"] for row in rows} == {1: Decimal("120.00"), None: Decimal("200.00")}
@@ -494,7 +528,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
             {"user_id": 2, "role": "OWNER", "allocation_rate": "33.33"},
             {"user_id": 3, "role": "OWNER", "allocation_rate": "33.34"},
         ])
-        report = r3_commission_reconciliation(seeded_db)
+        report = commission_reconciliation(seeded_db)
         group = next(group for group in report["order_groups"] if group["order_id"] == small_order)
         assert group["profit_base"] == expected
         assert sum((row["profit_base"] for row in group["orders"]), Decimal("0")) == expected
@@ -505,7 +539,7 @@ def test_commission_report_uses_amount_as_payable_base(seeded_db):
         for detail in group["orders"]:
             if detail["user_id"] is None:
                 continue
-            personal = r3_commission_reconciliation(seeded_db, user_id=detail["user_id"])
+            personal = commission_reconciliation(seeded_db, user_id=detail["user_id"])
             personal_group = next(item for item in personal["order_groups"] if item["order_id"] == small_order)
             assert personal_group["profit_base"] == detail["profit_base"]
 
@@ -528,7 +562,7 @@ def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
     assert [row["allocation_amount"] for row in rows if row["user_id"] is not None] == ["-300.00"]
     assert all(row["allocation_rate"] == "0.00" for row in rows if row["user_id"] is not None)
 
-    report = r3_commission_reconciliation(seeded_db)
+    report = commission_reconciliation(seeded_db)
     entries = [row for group in report["order_groups"] for row in group["orders"]]
     assert {row["user_id"]: row["profit_base"] for row in entries} == {1: Decimal("-250.00"), None: Decimal("-250.00")}
 

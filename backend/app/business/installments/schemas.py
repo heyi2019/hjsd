@@ -37,6 +37,9 @@ class OperationOperatorOut(BaseModel):
     operation_key: str
     operator_user_ids: list[int]
     occurred_at: datetime
+    period_no: int | None = None
+    flow_no: str | None = None
+    historical_summary: bool = False
 
 
 class OperationOperatorsUpdateIn(RequestModel):

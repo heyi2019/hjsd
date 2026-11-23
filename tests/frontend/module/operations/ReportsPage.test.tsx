@@ -3,25 +3,26 @@ import userEvent from "@testing-library/user-event";
 import dayjs from "dayjs";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { ReportsPage } from "@/reporting/ReportsPage";
-import { DataCenterPanel } from "@/reporting/DataCenterPanel";
-import { Commission } from "@/reporting/reports/CommissionReport";
-import { MonthlyPnl } from "@/reporting/reports/MonthlyPnlReport";
-import { BusinessPnl } from "@/reporting/reports/BusinessPnlReport";
-import { OrderProfit } from "@/reporting/reports/OrderProfitReport";
+import { ReportsPage } from "@/operations/ReportsPage";
+import { DataCenterPanel } from "@/operations/DataCenterPanel";
+import { Commission } from "@/operations/reports/CommissionReport";
+import { MonthlyPnl } from "@/operations/reports/MonthlyPnlReport";
+import { BusinessPnl } from "@/operations/reports/BusinessPnlReport";
+import { OrderProfit } from "@/operations/reports/OrderProfitReport";
 import { currentReportPeriod, previousReportPeriod } from "@/shared/lib/reportPeriod";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
 import { antdRangeValues, setAntdDateRange } from "@fixtures/antdRange";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { commissionResponse, dataCenterSummary, orderLedgerSummary, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 
-import { ordersApi } from "@/shared/api/orders.api";
+import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
+import { refreshListColumns } from "@/shared/lib/listColumns";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { useBusinessPeriod } from "@/shared/state/businessPeriod";
-import { useReport } from "@/reporting/reports/shared";
+import { useReport } from "@/operations/reports/shared";
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -84,6 +85,18 @@ async function gotoTab(label: string) {
 }
 
 describe("ReportsPage：经营中心报表", () => {
+  it.each([
+    ["月度损益", MonthlyPnl, "monthly-pnl"],
+    ["订单利润", OrderProfit, "order-profit"],
+    ["分润对账", Commission, "commission"],
+  ] as const)("%s 导出跟随当前时序", async (_label, Component, name) => {
+    renderLight(<Component range={{ params: {}, picker: null }} />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "导出" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenLastCalledWith(name, expect.objectContaining({ sort_desc: true })));
+    await ui.click(screen.getByRole("button", { name: "最旧在前" }));
+    await ui.click(screen.getByRole("button", { name: "导出" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenLastCalledWith(name, expect.objectContaining({ sort_desc: false })));
+  });
   it.each([
     ["月度经营损益", MonthlyPnl, "monthlyPnl", "所选区间无数据"],
     ["业务级损益", BusinessPnl, "businessPnl", "所选区间无业务数据"],
@@ -203,6 +216,38 @@ describe("ReportsPage：经营中心报表", () => {
     expect((await screen.findAllByText("我的收益")).length).toBeGreaterThan(0);
     expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith(expect.objectContaining({ mine: true, ...currentReportPeriod() }));
     expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
+  });
+
+  it("有报表权限时可在我的收益和全员分润间切换，导出与当前视图一致", async () => {
+    renderLight(<ReportsPage initialReportTab="my-earnings" />, { user: "admin" });
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ mine: true })));
+    await ui.click(screen.getByText("全员分润", { selector: ".ant-segmented-item-label" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ all_people: true })));
+    const commissionCalls = vi.mocked(reportsApi.commission).mock.calls;
+    expect(commissionCalls[commissionCalls.length - 1]?.[0]).not.toHaveProperty("mine");
+    await ui.click(screen.getByRole("button", { name: "导出" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenLastCalledWith("commission", expect.objectContaining({ all_people: true })));
+    await ui.click(screen.getByText("我的收益", { selector: ".ant-segmented-item-label" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith(expect.objectContaining({ mine: true })));
+  });
+
+  it("分润员工目录失败时可单独重试，不重拉报表", async () => {
+    vi.mocked(employeesApi.list).mockRejectedValueOnce(new Error("员工目录不可用"));
+    renderLight(<ReportsPage initialReportTab="commission" />, { user: "admin" });
+    const alert = (await screen.findByText(/员工目录加载失败/)).closest('[role="alert"]') as HTMLElement;
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledTimes(1));
+    await ui.click(within(alert).getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(screen.queryByText(/员工目录加载失败/)).not.toBeInTheDocument());
+    expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledTimes(1);
+  });
+
+  it("列表配置隐藏分润人员时同步隐藏分润表对应列", async () => {
+    vi.mocked(listColumnsApi.all).mockResolvedValue([{ code: "RPT_COMMISSION", columns: [{ key: "user_name", is_visible: false, sort_order: 1 }] }] as never);
+    renderLight(<Commission range={{ params: {}, picker: null }} />, { user: "admin" });
+    refreshListColumns();
+    await waitFor(() => expect(listColumnsApi.all).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("columnheader", { name: "分润人员" })).not.toBeInTheDocument());
+    expect(screen.getByRole("columnheader", { name: "订单号" })).toBeInTheDocument();
   });
 
   it("从历史周期进入我的收益时首次请求就使用指定周期", async () => {
@@ -380,7 +425,7 @@ describe("ReportsPage：经营中心报表", () => {
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     await setAntdDateRange(pane, ui, "2026-01-01", "2026-01-31");
     await ui.click(screen.getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-01-31", sort_desc: true }));
   });
 
   it("报表页内导出按钮无筛选也能导出并给出成功反馈", async () => {
@@ -389,7 +434,7 @@ describe("ReportsPage：经营中心报表", () => {
     await gotoTab("经营损益");
     const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
     await ui.click(within(monthlyCard).getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", currentReportPeriod()));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("monthly-pnl", { ...currentReportPeriod(), sort_desc: true }));
     await waitFor(() => expect(successSpy).toHaveBeenCalledWith("报表已导出"));
   });
 
@@ -401,7 +446,7 @@ describe("ReportsPage：经营中心报表", () => {
     // antd RangePicker 强制 start ≤ end：内部自动交换，UI 层不再产生反向区间。
     expect(antdRangeValues(pane)).toEqual(["2026-01-01", "2026-12-31"]);
     await ui.click(screen.getByRole("button", { name: "导出" }));
-    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-12-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledWith("order-profit", { from: "2026-01-01", to: "2026-12-31", sort_desc: true }));
   });
 });
 
@@ -410,7 +455,7 @@ describe("ReportsPage：经营中心报表", () => {
 describe("ReportsPage：各报表渲染与错误态", () => {
   it("经营损益：同时渲染月度趋势与业务拆分", async () => {
     resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), reportResponse([
-      { month: "2026-09", sales_income: "2000.00", cost: "500.00", operating_expense: "100.00", rebate_income: "50.00", operating_profit: "1450.00" },
+      { month: "2026-09", sales_income: "2000.00", studio_other_income: "75.00", cost: "500.00", operating_expense: "100.00", rebate_income: "50.00", operating_profit: "1475.00" },
     ], {}));
     resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([
       { order_type: "HS", main_income: "800.00", cost: "300.00", main_profit: "500.00" },
@@ -419,6 +464,8 @@ describe("ReportsPage：各报表渲染与错误态", () => {
     await gotoTab("经营损益");
     expect(await screen.findByText("2026-09")).toBeInTheDocument();
     expect(screen.getAllByText("2,000.00").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("工作室其他收入")).toBeInTheDocument();
+    expect(screen.getByText("75.00")).toBeInTheDocument();
     expect(await screen.findByText(/HS/)).toBeInTheDocument();
     expect(screen.getAllByText("800.00").length).toBeGreaterThanOrEqual(1);
   });

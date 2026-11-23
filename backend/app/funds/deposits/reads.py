@@ -10,8 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.trade import Deposit
-
-from ._shared import _can_see_pool, _is_scope_all, _visible_pool_ids
+from app.funds.pool_scope import visible_pool_ids
 
 
 def list_deposits(
@@ -23,15 +22,12 @@ def list_deposits(
     limit: int | None = None,
     offset: int = 0,
 ) -> list[Deposit] | tuple[list[Deposit], int]:
+    visible = visible_pool_ids(user, pool_id=pool_id, pool_ids=pool_ids)
+    if visible == []:
+        return ([], 0) if limit is not None else []
     stmt = select(Deposit)
-    if pool_id is not None:
-        if not _can_see_pool(user, pool_id):
-            return ([], 0) if limit is not None else []
-        stmt = stmt.where(Deposit.pool_id == pool_id)
-    elif pool_ids is not None:
-        stmt = stmt.where(Deposit.pool_id.in_(_visible_pool_ids(user, pool_ids)))
-    elif not _is_scope_all(user):
-        stmt = stmt.where(Deposit.pool_id.in_(sorted(user.pool_ids)))  # type: ignore[union-attr]
+    if visible is not None:
+        stmt = stmt.where(Deposit.pool_id.in_(visible))
     total = (session.scalar(select(func.count()).select_from(stmt.subquery())) or 0) if limit is not None else None
     items = list(session.scalars(stmt.order_by(Deposit.id).limit(limit).offset(offset)).all())
     return (items, total) if limit is not None else items
@@ -54,8 +50,9 @@ def deposit_held_total(
             0,
         )
     )
-    if pool_id:
-        stmt = stmt.where(Deposit.pool_id == pool_id)
-    elif not _is_scope_all(user):
-        stmt = stmt.where(Deposit.pool_id.in_(sorted(user.pool_ids)))  # type: ignore[union-attr]
+    visible = visible_pool_ids(user, pool_id=pool_id)
+    if visible == []:
+        return Decimal("0.00")
+    if visible is not None:
+        stmt = stmt.where(Deposit.pool_id.in_(visible))
     return to_money(session.scalar(stmt) or 0)

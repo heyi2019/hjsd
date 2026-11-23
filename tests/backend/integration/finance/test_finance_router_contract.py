@@ -322,9 +322,9 @@ def test_router_update_cashflow_endpoint(seeded_db):
 
 def test_router_delete_cashflow_endpoint(seeded_db):
     flow = _studio_flow(seeded_db)
-    result = delete_cashflow_endpoint(flow.id, db=seeded_db, user=_all_scope_user())
-    assert result is None
-    assert seeded_db.get(type(flow), flow.id) is None
+    with pytest.raises(Validation, match="资金流水不能删除，请使用冲销"):
+        delete_cashflow_endpoint(flow.id, db=seeded_db, user=_all_scope_user())
+    assert seeded_db.get(type(flow), flow.id) is not None
 
 
 # ----------------------------------------------------- 查询层与零头端点补口
@@ -432,5 +432,6 @@ def test_router_delete_deposit_endpoint(seeded_db):
     deposit = create_deposit(
         seeded_db, pool_id=1, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
     )
-    assert delete_deposit_endpoint(deposit.id, db=seeded_db, user=_all_scope_user()) is None
-    assert seeded_db.get(Deposit, deposit.id) is None
+    with pytest.raises(Validation, match="押金不能删除，请使用取消"):
+        delete_deposit_endpoint(deposit.id, db=seeded_db, user=_all_scope_user())
+    assert seeded_db.get(Deposit, deposit.id) is not None

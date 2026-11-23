@@ -5,10 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.business.orders.amount_summaries import order_amount_summaries
-from app.business.inventory._common import scope_filter as account_scope_filter
 from app.core.security import CurrentUser
 from app.domain.notifications import Notification
-from app.domain.trade import Account, Order
+from app.domain.trade import Order
 from app.business.profit_allocation.company_settings import get_company_settings
 from app.business.profit_allocation.terms import allocatable_profit_for, company_rate_for_profit
 from app.shared.scope import owner_scope_filter
@@ -18,16 +17,15 @@ from .schemas import ProfitNotificationDetailOut
 def profit_details_for_notifications(db: Session, notifications: list[Notification], user: CurrentUser) -> list[ProfitNotificationDetailOut]:
     if not notifications:
         return []
-    stmt = select(Order, Account).join(Account, Account.id == Order.account_id).where(
+    stmt = select(Order).where(
         Order.order_no.in_([item.entity_id for item in notifications])
     )
-    for scope in (owner_scope_filter(Order.owner_id, user, db), account_scope_filter(db, user)):
-        if scope is not None:
-            stmt = stmt.where(scope)
-    pairs = db.execute(stmt).all()
-    if not pairs:
+    scope = owner_scope_filter(Order.owner_id, user, db)
+    if scope is not None:
+        stmt = stmt.where(scope)
+    orders = db.scalars(stmt).all()
+    if not orders:
         return []
-    orders = [order for order, _ in pairs]
     amounts_by_id, _ = order_amount_summaries(db, orders)
     orders_by_number = {order.order_no: order for order in orders}
     results = []

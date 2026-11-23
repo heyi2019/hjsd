@@ -6,7 +6,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { accounts, setupInventoryWrite } from "@fixtures/inventoryWriteSetup";
 import { InventoryPanel } from "@/business/inventory/InventoryPanel";
-import { InventoryDeleteDialog } from "@/business/inventory/InventoryPanel/InventoryDeleteDialog";
 import { RecoverySaleModal, PickupSaleModal, ConsignmentSaleModal } from "@/business/shared/sale";
 import { InventoryRebateModal } from "@/business/shared/rebate";
 import { OrderConsignmentModal } from "@/business/shared/operations/consignment";
@@ -14,6 +13,7 @@ import { OrderDetailDeliverySection } from "@/business/shared/order-detail/Order
 import { OrderDetailProfileSection } from "@/business/shared/order-detail/OrderDetailProfileSection";
 import { useOrderDetailEditor } from "@/business/shared/order-detail/editing/use-order-detail-editor";
 import { useInventoryList } from "@/business/inventory/InventoryPanel/useInventoryList";
+import { useInventoryController } from "@/business/inventory/InventoryPanel/useInventoryController";
 import { useExecutionCache } from "@/business/inventory/InventoryPanel/useExecutionCache";
 import { useInventoryActions } from "@/business/inventory/InventoryPanel/useInventoryActions";
 import type { InventoryOrderRow } from "@/business/inventory/InventoryPanel/types";
@@ -27,6 +27,7 @@ import { installmentsApi } from "@/shared/api/installments.api";
 import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
+import { optionSetsApi } from "@/shared/api/options.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
 import { stocksApi } from "@/shared/api/stocks.api";
 import { resolveMock } from "@fixtures/mock-api";
@@ -56,6 +57,13 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => { ui = setupInventoryWrite(); });
 
 describe("InventoryPanel：写入与长路径", () => {
+  it.each([["employee", false], ["operator", true], ["viewer", false]] as const)("%s 库存动作入口与事件及导出权限一致", async (role, allowed) => {
+    renderLight(<InventoryPanel />, { user: role });
+    const row = (await screen.findByText("acc-1")).closest("tr") as HTMLElement;
+    expect(Boolean(within(row).queryByRole("button", { name: "售出" }))).toBe(allowed);
+    expect(Boolean(within(row).queryByRole("button", { name: "运营" }))).toBe(allowed);
+    expect(Boolean(screen.queryByRole("button", { name: "导出" }))).toBe(allowed);
+  });
   it("库存筛选失败时隐藏旧列表和统计，重试后恢复", async () => {
     renderLight(<InventoryPanel />, { user: "admin" });
     expect(await screen.findByText("acc-1")).toBeVisible();
@@ -82,8 +90,7 @@ describe("InventoryPanel：写入与长路径", () => {
         load: async () => undefined, setRows, setError,
         loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution,
-        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
-        removeFromInventory: () => undefined,
+        dropExecutionCache: () => undefined, expandTo: setExpanded,
         editorOpenEditor: async (account) => { setEditing(account.id); return true; },
         editorCancelInlineEdit: () => setEditing(null), inlineEditId: editing,
         editorCancelPendingOpen: () => undefined, editorIsSaving: () => false,
@@ -116,8 +123,7 @@ describe("InventoryPanel：写入与长路径", () => {
         load: async () => undefined, setRows, setError,
         loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution,
-        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
-        removeFromInventory: () => undefined,
+        dropExecutionCache: () => undefined, expandTo: setExpanded,
         editorOpenEditor: async (account) => { setEditing(account.id); return true; },
         editorCancelInlineEdit: () => setEditing(null), inlineEditId: editing,
         editorCancelPendingOpen: () => undefined, editorIsSaving: () => false,
@@ -195,6 +201,29 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(notify).toHaveBeenCalledWith("请填写有效的金额"));
     expect(ordersApi.updateExecution).not.toHaveBeenCalled();
+  });
+
+  it("详情只提交实际修改的账号字段，并携带这些字段的原值用于并发检查", async () => {
+    const account = { ...accounts[0], note: "旧备注" } as Account;
+    const detail = { account, orders: [], detail_view: { finance_rows: [] } } as never;
+    vi.mocked(ordersApi.updateExecution).mockResolvedValue({ ok: true });
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail);
+    function Probe() {
+      const editor = useOrderDetailEditor({ getExecutionDetail: () => detail, onSaved: vi.fn(), onRefreshFailed: vi.fn() });
+      return <><Form form={editor.invEditExtraForm} /><button onClick={() => void editor.openEditor(account)}>编辑</button>
+        <button onClick={() => editor.updateEditingAccount({ note: "新备注" })}>修改备注</button>
+        <button onClick={() => void editor.saveInline()}>保存</button>
+        <span>{`编辑:${editor.inlineEditId ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "编辑" }));
+    await screen.findByText("编辑:1");
+    await ui.click(screen.getByRole("button", { name: "修改备注" }));
+    await ui.click(screen.getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(21, expect.objectContaining({
+      profile: { note: "新备注", form_extra: {} },
+      expected_profile: { note: "旧备注", form_extra: {} },
+    })));
   });
 
   it("保存详情时仅提交修改过的资金明细及其实际字段", async () => {
@@ -412,7 +441,7 @@ describe("InventoryPanel：写入与长路径", () => {
     }]);
     let serverVisible = true;
     vi.mocked(stocksApi.inventoryLedger).mockImplementation(async (params) => (
-      params.offset || !serverVisible ? inventoryLedgerResponse([]) : stale
+      params.offset ? inventoryLedgerResponse([], { total: 11 }) : !serverVisible ? inventoryLedgerResponse([]) : stale
     ) as never);
     function ListProbe() {
       const list = useInventoryList({});
@@ -436,7 +465,79 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(await screen.findByText("acc-1")).toBeInTheDocument();
   });
 
+  it("库存末页售出后回到仍有数据的最后一页", async () => {
+    let total = 11;
+    const row = (index: number) => ({
+      account: accounts[index],
+      order: { id: 21 + index, order_no: `HS000${index + 1}`, order_type: "HS", account_id: index + 1, status: "ACTIVE" },
+    });
+    vi.mocked(stocksApi.inventoryLedger).mockImplementation(async ({ offset }) => (
+      inventoryLedgerResponse(offset ? (total > 10 ? [row(1)] : []) : [row(0)], { total })
+    ) as never);
+    function ListProbe() {
+      const list = useInventoryList({});
+      return <><button onClick={() => list.setPage(2)}>第二页</button>
+        <button onClick={() => { total = 10; void list.load(); }}>售出后刷新</button>
+        <span>{`第${list.page}页:${list.rows.map((item) => item.account.game_account).join(",")}`}</span></>;
+    }
+    renderLight(<ListProbe />, { user: "admin" });
+    await screen.findByText("第1页:acc-1");
+    await ui.click(screen.getByRole("button", { name: "第二页" }));
+    await screen.findByText("第2页:acc-2");
+    await ui.click(screen.getByRole("button", { name: "售出后刷新" }));
+    await screen.findByText("第1页:acc-1");
+  });
+
+  it("库存控制器售出后确认移除，账号重新入库时可以再次显示", async () => {
+    const item = {
+      account: accounts[0],
+      order: { id: 21, order_no: "HS0001", order_type: "HS", account_id: 1, status: "ACTIVE" },
+    };
+    let serverVisible = true;
+    vi.mocked(stocksApi.inventoryLedger).mockImplementation(async () => inventoryLedgerResponse(serverVisible ? [item] : []) as never);
+    function ControllerProbe() {
+      const controller = useInventoryController({});
+      return <><button onClick={() => { serverVisible = false; controller.removeFromInventory(1, 21); void controller.load(); }}>售出</button>
+        <button onClick={() => { serverVisible = true; void controller.load(); }}>重新入库</button>
+        <span>{`库存:${controller.rows.map((row) => row.account.game_account).join(",")}`}</span></>;
+    }
+    renderLight(<ControllerProbe />, { user: "admin" });
+    await screen.findByText("库存:acc-1");
+    await ui.click(screen.getByRole("button", { name: "售出" }));
+    await screen.findByText("库存:");
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalledTimes(2));
+    await ui.click(screen.getByRole("button", { name: "重新入库" }));
+    await screen.findByText("库存:acc-1");
+  });
+
+  it("库存写入完成时按当前筛选刷新，不恢复提交前的旧列表", async () => {
+    const row = (index: number) => ({
+      account: accounts[index],
+      order: { id: 21 + index, order_no: `HS000${index + 1}`, order_type: "HS", account_id: index + 1, status: "ACTIVE" },
+    });
+    vi.mocked(stocksApi.inventoryLedger).mockImplementation(async ({ sort_desc }) => (
+      inventoryLedgerResponse([row(sort_desc ? 0 : 1)])
+    ) as never);
+    function ListProbe() {
+      const list = useInventoryList({});
+      const pendingRefresh = useRef<(() => Promise<void>) | undefined>(undefined);
+      return <><button onClick={() => { pendingRefresh.current = list.load; }}>开始写入</button>
+        <button onClick={() => list.setSortDesc(false)}>切换排序</button>
+        <button onClick={() => void pendingRefresh.current?.()}>写入完成</button>
+        <span>{`库存:${list.rows.map((item) => item.account.game_account).join(",")}`}</span></>;
+    }
+    renderLight(<ListProbe />, { user: "admin" });
+    await screen.findByText("库存:acc-1");
+    await ui.click(screen.getByRole("button", { name: "开始写入" }));
+    await ui.click(screen.getByRole("button", { name: "切换排序" }));
+    await screen.findByText("库存:acc-2");
+    await ui.click(screen.getByRole("button", { name: "写入完成" }));
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenLastCalledWith(expect.objectContaining({ sort_desc: false })));
+    expect(screen.getByText("库存:acc-2")).toBeInTheDocument();
+  });
+
   it("重新进入库存时先恢复第一页和默认库龄，再发一次请求", async () => {
+    vi.mocked(stocksApi.inventoryLedger).mockResolvedValue(inventoryLedgerResponse([], { total: 11 }) as never);
     function ListProbe({ active }: { active: boolean }) {
       const list = useInventoryList({ active, initialAgeGtDays: 30 });
       return <><button onClick={() => list.setAgeGtDays(7)}>选择库龄</button>
@@ -591,8 +692,8 @@ describe("InventoryPanel：写入与长路径", () => {
         load: async () => undefined, setRows, setError,
         loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
-        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
-        removeFromInventory: () => undefined, editorOpenEditor: async () => true,
+        dropExecutionCache: () => undefined, expandTo: setExpanded,
+        editorOpenEditor: async () => true,
         editorCancelInlineEdit: () => undefined, editorCancelPendingOpen: () => undefined,
         editorIsSaving: () => false, editorSaveInline: async () => undefined, inlineEditId: null,
       });
@@ -629,6 +730,7 @@ describe("InventoryPanel：写入与长路径", () => {
       account: accounts[0],
       orders: [{
         order_id: 21, order_no: "HS0001", order_type: "HS", status: "ACTIVE",
+        active_consignments: [{ event_id: 32, platform, price: null, listed_at: "2026-10-15T10:00:00" }],
         cashflows: [{ flow_no: "CF0001", occurred_on: "2026-10-15", direction: "OUT", amount }],
         events: [
           { id: 31, event_type: "BUY", amount, cancellable_amount: amount, portion: "PRINCIPAL", is_posted: true },
@@ -663,6 +765,7 @@ describe("InventoryPanel：写入与长路径", () => {
   ])("库存运营菜单：$change 后显示当前可执行动作", async ({ before, after }) => {
     const detail = (listed: boolean) => ({ account: accounts[0], orders: [{
       order_id: 21, order_no: "HS0001", order_type: "HS", status: "ACTIVE",
+      active_consignments: listed ? [{ event_id: 32, platform: "千寻", price: null, listed_at: "2026-10-15T10:00:00" }] : [],
       events: listed ? [{ id: 32, event_type: "OPERATE", operation_type: "CONSIGNMENT", form_extra: { consignment_platforms: ["千寻"] } }] : [],
     }] }) as never;
     vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail(before));
@@ -842,8 +945,8 @@ describe("InventoryPanel：写入与长路径", () => {
         load: async () => undefined, setRows, setError,
         loadActionExecution: loadStandaloneActionExecution,
         loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
-        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
-        removeFromInventory: () => undefined, editorOpenEditor: async () => true,
+        dropExecutionCache: () => undefined, expandTo: setExpanded,
+        editorOpenEditor: async () => true,
         editorCancelInlineEdit: () => undefined, editorCancelPendingOpen: () => undefined,
         editorIsSaving: () => false, editorSaveInline: async () => undefined, inlineEditId: null,
       });
@@ -862,68 +965,6 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(setError).not.toHaveBeenCalled();
     expect(notifyError).toHaveBeenCalledWith(expect.stringMatching(/HS-2026-0001：.*取消失败/));
     notifyError.mockRestore();
-  });
-
-  it("库存删除等待字段配置时阻止提交，加载完成后允许确认", async () => {
-    let resolveFields!: (value: Awaited<ReturnType<typeof orderFormFieldsApi.list>>) => void;
-    vi.mocked(orderFormFieldsApi.list).mockReturnValueOnce(new Promise((resolve) => { resolveFields = resolve; }));
-    const onConfirm = vi.fn().mockResolvedValue(undefined);
-    renderLight(<InventoryDeleteDialog account={accounts[0] as Account} submitting={false} onCancel={() => undefined} onConfirm={onConfirm} />);
-    const modal = await screen.findByRole("dialog", { name: "删除" });
-    fireEvent.change(within(modal).getByLabelText("删除原因"), { target: { value: "测试原因" } });
-    await ui.click(within(modal).getByRole("button", { name: "确认删除" }));
-    expect(onConfirm).not.toHaveBeenCalled();
-    await act(async () => { resolveFields([]); });
-    await waitFor(() => expect(within(modal).queryByRole("status")).not.toBeInTheDocument());
-    await ui.click(within(modal).getByRole("button", { name: "确认删除" }));
-    await waitFor(() => expect(onConfirm).toHaveBeenCalledWith("测试原因"));
-  });
-
-  it("库存删除提交中重复确认只发送一次", async () => {
-    let finish!: () => void;
-    vi.mocked(ordersApi.deleteOrder).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
-    renderLight(<InventoryPanel />, { user: "admin" });
-    await screen.findByText("acc-1");
-    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "删除" }));
-    const modal = await screen.findByRole("dialog", { name: "删除" });
-    fireEvent.change(within(modal).getByLabelText("删除原因"), { target: { value: "删除测试" } });
-    const form = within(modal).getByLabelText("删除原因").closest("form")!;
-    fireEvent.submit(form);
-    await waitFor(() => expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1));
-    fireEvent.submit(form);
-    await act(async () => { await Promise.resolve(); });
-    expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1);
-    await act(async () => finish());
-  });
-
-  it("删除完成时不会覆盖后来展开的库存订单", async () => {
-    let finish!: () => void;
-    vi.mocked(ordersApi.deleteOrder).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
-    function Probe() {
-      const [expanded, setExpanded] = useState<Key[]>(["21:1"]);
-      const [, setRows] = useState<InventoryOrderRow[]>([]);
-      const [, setError] = useState<{ message: string; code?: string } | null>(null);
-      const actions = useInventoryActions({
-        load: async () => undefined, setRows, setError,
-        loadActionExecution: loadStandaloneActionExecution,
-        loadExecution: async () => undefined, loadOrderExecution: async () => null, loadEditorExecution: async () => null,
-        dropExecutionCache: () => undefined, expandTo: setExpanded, expandedOrderIds: expanded,
-        removeFromInventory: () => undefined, editorOpenEditor: async () => true,
-        editorCancelInlineEdit: () => undefined, editorCancelPendingOpen: () => undefined,
-        editorIsSaving: () => false, editorSaveInline: async () => undefined, inlineEditId: null,
-      });
-      return <><button onClick={() => actions.setDeleteTarget(accounts[0] as Account)}>删除甲</button>
-        <button onClick={() => void actions.submitDelete("原因")}>确认</button>
-        <button onClick={() => { actions.invalidatePendingActions(); setExpanded(["22:2"]); }}>展开乙</button>
-        <span>{`展开:${expanded.join(",")}`}</span></>;
-    }
-    renderLight(<Probe />, { user: "admin" });
-    await ui.click(screen.getByRole("button", { name: "删除甲" }));
-    await ui.click(screen.getByRole("button", { name: "确认" }));
-    await waitFor(() => expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1));
-    await ui.click(screen.getByRole("button", { name: "展开乙" }));
-    await act(async () => finish());
-    expect(screen.getByText("展开:22:2")).toBeInTheDocument();
   });
 
   it("切换返点订单后，旧订单迟到的返点明细不能覆盖当前数据", async () => {
@@ -990,6 +1031,30 @@ describe("InventoryPanel：写入与长路径", () => {
     expect(screen.queryByLabelText("编辑游戏账号/产品")).toBeNull();
   });
 
+  it("库存编辑可分别重试员工和资金账户，并在资金明细中选择加载的账户", async () => {
+    vi.mocked(employeesApi.list).mockRejectedValue(new Error("员工加载失败"));
+    vi.mocked(poolsApi.list).mockRejectedValue(new Error("账户加载失败"));
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue({
+      account: accounts[0],
+      orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", status: "ACTIVE", events: [] }],
+      detail_view: { operation_rows: [], finance_rows: [{ key: "CF1", flow_no: "CF1", type: "成本", direction: "支出", amount: "100.00", occurred_at: "2026-10-15T10:20:00", pool_id: 1, pool_name: "原账户", note: "", operator: "admin" }], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] },
+    } as never);
+    renderLight(<InventoryPanel />, { user: "admin" });
+    await screen.findByText("acc-1");
+    await ui.click(within(screen.getByText("acc-1").closest("tr")!).getByRole("button", { name: "编辑" }));
+    await screen.findByRole("button", { name: "保存修改" });
+    expect(screen.getByText(/员工目录加载失败/)).toBeVisible();
+    expect(screen.getByText(/资金账户加载失败/)).toBeVisible();
+    vi.mocked(employeesApi.list).mockResolvedValue([{ id: 2, username: "staff", display_name: "员工甲", is_active: true }] as never);
+    vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "原账户", status: "ACTIVE" }, { id: 2, name: "新账户", status: "ACTIVE" }] as never);
+    await ui.click(screen.getByRole("button", { name: "重试员工" }));
+    await ui.click(screen.getByRole("button", { name: "重试资金账户" }));
+    await waitFor(() => expect(screen.queryByText(/资金账户加载失败/)).not.toBeInTheDocument());
+    expect(screen.queryByText(/员工目录加载失败/)).not.toBeInTheDocument();
+    await ui.click(screen.getByRole("combobox", { name: "编辑资金明细资金账户 CF1" }));
+    expect(await screen.findByText("新账户", { selector: ".ant-select-item-option-content" })).toBeVisible();
+  });
+
   it("库存编辑加载并保存自定义字段，不把它当作建单账号字段", async () => {
     vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => [
       ...allFormFields().filter((field) => field.order_type_code === scope),
@@ -1035,7 +1100,7 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 
   it("上架提交保留大额寄售价精度", async () => {
-    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [] }] };
+    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [], active_consignments: [] }] };
     vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail as never);
     renderLight(<OrderConsignmentModal account={accounts[0] as never} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
     const platform = await screen.findByRole("combobox", { name: "寄售平台" });
@@ -1047,8 +1112,20 @@ describe("InventoryPanel：写入与长路径", () => {
     await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ form_extra: expect.objectContaining({ consignment_price: "9999999999999999.99" }) })));
   });
 
+  it("寄售平台词典加载失败时提示并允许重试", async () => {
+    vi.mocked(optionSetsApi.list).mockRejectedValueOnce(new Error("网络失败"));
+    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [], active_consignments: [] }] };
+    vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail as never);
+    renderLight(<OrderConsignmentModal account={accounts[0] as never} onClose={vi.fn()} onCreated={vi.fn()} />, { user: "admin" });
+    expect(await screen.findByText("选项词典加载失败，请重新加载")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认上架" })).toBeDisabled();
+    await ui.click(screen.getByRole("button", { name: "重新加载" }));
+    expect(await screen.findByRole("combobox", { name: "寄售平台" })).toBeEnabled();
+    expect(screen.queryByText("选项词典加载失败，请重新加载")).toBeNull();
+  });
+
   it("寄售提交成功后无需等详情刷新即可通知页面关闭", async () => {
-    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [] }] };
+    const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [], active_consignments: [] }] };
     let finish!: (value: never) => void;
     const slowRefresh = new Promise<never>((resolve) => { finish = resolve; });
     vi.mocked(ordersApi.executionDetail).mockResolvedValueOnce(detail as never).mockReturnValueOnce(slowRefresh);
@@ -1070,7 +1147,7 @@ describe("InventoryPanel：写入与长路径", () => {
     vi.mocked(ordersApi.postEvent).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
     vi.mocked(ordersApi.executionDetail).mockImplementation(async (id) => ({
       account: id === 21 ? accounts[0] : accounts[1],
-      orders: [{ order_id: id, order_no: `HS${id}`, order_type: "HS", status: "ACTIVE", events: [] }],
+      orders: [{ order_id: id, order_no: `HS${id}`, order_type: "HS", status: "ACTIVE", events: [], active_consignments: [] }],
     }) as never);
     const onClose = vi.fn();
     const onCreated = vi.fn();

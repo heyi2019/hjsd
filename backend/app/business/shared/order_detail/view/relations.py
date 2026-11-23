@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.domain.parties import Customer, Counterparty, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import Order, OrderFormField, RebateRecord
 
+from ..timestamps import business_timestamp
 from .execution_schemas import ExecutionCounterpartyOut, ExecutionCustomerOut, ExecutionRebateOut
 
 
@@ -72,7 +73,7 @@ def load_relations(db: Session, orders: list[Order]) -> DetailRelations:
                 channel=rebate.channel,
                 amount=rebate.amount,
                 collected_on=rebate.collected_on,
-                collected_at=rebate.created_at,
+                collected_at=business_timestamp(rebate.collected_on, rebate.created_at),
             )
         )
     return DetailRelations(order_extra_values, field_defs_by_type, customers_by_order, counterparties_by_order, rebates_by_order)

@@ -95,6 +95,7 @@ def cancel_installment(
                 form_extra=None,
                 form_extra_scope=None,
                 user=user,
+                allow_installment_payment=True,
             )
             amount = to_money(flow.amount)
             refund_amount += amount

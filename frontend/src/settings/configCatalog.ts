@@ -40,6 +40,7 @@ interface SettingsItemMeta {
 /** 设置页独立页签顺序，配置中心内部顺序也从本文件维护。 */
 export const SETTINGS_TAB_ORDER = [
   "business-dictionary",
+  "order-import",
   "organization",
   "audit",
   "appearance",
@@ -163,6 +164,14 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
     group: "GOV",
     permission: "audit.read",
     readOnly: true,
+    entityTypes: [],
+  },
+  {
+    key: "order-import",
+    label: "订单导入",
+    summary: "下载订单导入模板，预检并导入台账与所选明细",
+    group: "OPS",
+    permission: "order.create",
     entityTypes: [],
   },
   {

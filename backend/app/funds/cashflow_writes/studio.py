@@ -1,4 +1,4 @@
-"""finance.cashflow_writes.studio：工作室手工收支的编辑与删除。"""
+"""finance.cashflow_writes.studio：工作室手工收支的编辑与凭证保留。"""
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -42,14 +42,14 @@ def _assert_editable_studio_cashflow(
             or (flow.direction == Direction.IN.value and flow.accounting_attribute == STUDIO_INCOME_ATTRIBUTE)
         )
     ):
-        raise Validation("仅工作室手工收支可编辑或删除", details={"cashflow_id": flow.id})
+        raise Validation("仅工作室手工收支可编辑", details={"cashflow_id": flow.id})
     if session.scalar(
         select(Cashflow.id).where(
             Cashflow.source_type == CashflowSourceType.REVERSAL.value,
             Cashflow.source_id == flow.flow_no,
         )
     ):
-        raise Validation("已冲销的工作室收支不能编辑或删除", details={"cashflow_id": flow.id})
+        raise Validation("已冲销的工作室收支不能编辑", details={"cashflow_id": flow.id})
     return flow
 
 
@@ -181,23 +181,5 @@ def delete_cashflow(
     actor: str,
     user: CurrentUser | None = None,
 ) -> None:
-    flow = _assert_editable_studio_cashflow(session, cashflow_id, user)
-    before = {
-        "pool_id": flow.pool_id,
-        "occurred_on": flow.occurred_on.isoformat(),
-        "direction": flow.direction,
-        "category": flow.category,
-        "amount": str(to_money(flow.amount)),
-    }
-    flow_no = flow.flow_no
-    session.delete(flow)
-    session.flush()
-    record_audit(
-        session,
-        action=AuditAction.CASHFLOW_DELETE,
-        entity_type="cashflow",
-        entity_id=flow_no,
-        actor=actor,
-        before=before,
-        after={"deleted": True},
-    )
+    _get_cashflow(session, cashflow_id, user, for_update=True)
+    raise Validation("资金流水不能删除，请使用冲销或原业务处理", details={"cashflow_id": cashflow_id})

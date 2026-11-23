@@ -38,8 +38,7 @@ class AuditActionListOut(BaseModel):
 class AuditEntityStatOut(BaseModel):
     """单个 entity_type 的聚合结果。
 
-    注：`AuditLogListOut.total` 语义是「当前页行数」（= len(items)），不是总数，
-    拿它当累计次数会得到错误数字。需要真实累计数请用 /audit-logs/stats。
+    `AuditLogListOut.total` 是筛选后的总数；此模型提供多个对象类型各自的累计数。
     """
 
     model_config = ConfigDict(extra="forbid")

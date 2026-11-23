@@ -15,7 +15,6 @@ import {
   FIXED_LABEL_FIELD_KEYS,
   MANAGED_OPTION_FIELD_KEYS,
   OPTION_FIELD_TYPES,
-  SECTION_ORDER_STORAGE_KEY,
   normalizeOptionItems,
   type OrderFormFieldsPanelProps,
 } from "./OrderFormFieldsPanel.fragments";
@@ -47,7 +46,6 @@ export function useOrderFormFieldsPanelController({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [sectionFilter, setSectionFilter] = useState<string>("ALL");
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
-  const [sectionOrder, setSectionOrder] = useState<string[]>(DEFAULT_SECTION_ORDER);
   const [sectionConfig, setSectionConfig] = useState<{ scope: string; labels: Record<string, string> } | null>(null);
   const [sectionLoading, setSectionLoading] = useState(true);
   const [sectionSaving, setSectionSaving] = useState(false);
@@ -78,12 +76,12 @@ export function useOrderFormFieldsPanelController({
       ...Object.keys(sectionLabels),
       ...rows.map((row) => row.section ?? "EXTRA"),
     ]);
-    const ordered = [...new Set([...sectionOrder.filter((value) => known.has(value)), ...known])];
+    const ordered = [...DEFAULT_SECTION_ORDER, ...[...known].filter((value) => !DEFAULT_SECTION_ORDER.includes(value)).sort()];
     return ordered.map((value) => {
       const option = FIELD_SECTION_OPTIONS.find((item) => item.value === value);
       return { value, label: sectionLabels[value] ?? option?.label ?? value };
     });
-  }, [sectionLabels, sectionOrder, rows]);
+  }, [sectionLabels, rows]);
   const editorFieldTypeOptions = editingField && MANAGED_OPTION_FIELD_KEYS.includes(editingField.field_key)
     ? [{ value: editingField.field_type, label: "联动选择（库内主数据）" }]
     : fieldTypeOptions;
@@ -108,15 +106,6 @@ export function useOrderFormFieldsPanelController({
     count: rows.filter((row) => (row.section ?? "EXTRA") === section.value).length,
     index,
   }));
-
-  useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(SECTION_ORDER_STORAGE_KEY) ?? "null");
-      if (Array.isArray(saved)) setSectionOrder(saved.filter((value): value is string => typeof value === "string"));
-    } catch {
-      // 本地排序配置损坏时回退默认顺序，不影响字段配置。
-    }
-  }, []);
 
   const editSection = (value: string) => {
     const option = orderedSectionOptions.find((item) => item.value === value);
@@ -150,16 +139,12 @@ export function useOrderFormFieldsPanelController({
     const previousKey = editingSectionValue;
     if (!addingSection && !previousKey) return;
     const scope = activeType;
-    const nextOrder = addingSection
-      ? [...orderedSectionOptions.map((item) => item.value), key]
-      : orderedSectionOptions.map((item) => item.value === previousKey ? key : item.value);
     sectionSaveInFlight.current = true;
     setSectionSaving(true);
     try {
       const labels = previousKey && key !== previousKey
         ? await orderFormFieldsApi.renameSection({ order_type_code: scope, from_key: previousKey, to_key: key, label: value })
         : await orderFormFieldsApi.saveSectionLabels({ order_type_code: scope, labels: { [key]: value } });
-      localStorage.setItem(SECTION_ORDER_STORAGE_KEY, JSON.stringify(nextOrder));
       if (activeTypeRef.current !== scope) return;
       if (previousKey && key !== previousKey) {
         setRows((current) => current.map((row) => (
@@ -167,7 +152,6 @@ export function useOrderFormFieldsPanelController({
         )));
       }
       setSectionConfig({ scope, labels });
-      setSectionOrder(nextOrder);
       setEditingSectionValue(null);
       setAddingSection(false);
       setSectionDraft({ value: "", label: "" });
@@ -350,8 +334,6 @@ export function useOrderFormFieldsPanelController({
     setSectionFilter,
     activeFilter,
     setActiveFilter,
-    sectionOrder,
-    setSectionOrder,
     sectionLabels,
     sectionError,
     sectionLoading,

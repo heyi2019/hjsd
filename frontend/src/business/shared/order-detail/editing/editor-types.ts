@@ -48,6 +48,10 @@ export interface OrderDetailEditor {
   updatePartyDraft: (orderId: number, addition: PartyAddition) => void;
   employees: EmployeeOption[];
   pools: Pool[];
+  employeeError: unknown;
+  poolError: unknown;
+  retryEmployees: () => Promise<EmployeeOption[]>;
+  retryPools: () => Promise<Pool[]>;
   ensureEmployees: () => Promise<EmployeeOption[]>;
   invEditExtraForm: ReturnType<typeof Form.useForm>[0];
   savingAccount: boolean;

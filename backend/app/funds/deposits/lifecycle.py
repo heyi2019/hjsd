@@ -27,6 +27,7 @@ from app.shared.form_field_rules import validate_form_extra
 from .._common import _positive, _text
 from ._shared import (
     _assert_returnable,
+    _deposit_actions,
     _locked_deposit,
     _outstanding,
     _status_after_loss,
@@ -66,8 +67,7 @@ def return_deposit(
     deposit.updated_by = actor
     if checked_extra:
         deposit.form_extra = {**(deposit.form_extra or {}), **checked_extra}
-    session.add(
-        Cashflow(
+    flow = Cashflow(
             flow_no=allocate_flow_no(session, Direction.IN.value),
             pool_id=deposit.pool_id,
             occurred_on=released_on,
@@ -82,8 +82,8 @@ def return_deposit(
             note="押金释放",
             created_by=actor,
             updated_by=actor,
-        )
     )
+    session.add(flow)
     session.flush()
     record_audit(
         session,
@@ -96,7 +96,7 @@ def return_deposit(
             "status": deposit.status,
         },
     )
-    upsert_operation_operators(
+    operation = upsert_operation_operators(
         session,
         entity_type="deposit",
         entity_id=deposit.id,
@@ -104,6 +104,8 @@ def return_deposit(
         actor=actor,
         operator_user_ids=operator_user_ids,
     )
+    flow.operator_user_ids = list(operation.operator_user_ids)
+    session.flush()
     return deposit
 
 
@@ -125,9 +127,7 @@ def cancel_deposit(
     保证池内余额与押金台账始终勾稽。已发生退还/损失的走 return/loss。
     """
     deposit = _locked_deposit(session, deposit_id, user)
-    if deposit.status != DepositStatus.PAID.value or to_money(
-        deposit.returned_amount
-    ) > 0 or to_money(deposit.lost_amount) > 0:
+    if "CANCEL" not in _deposit_actions(deposit):
         raise Validation(
             "只有未发生退还/损失的押金可取消",
             details={
@@ -152,8 +152,7 @@ def cancel_deposit(
     deposit.updated_by = actor
     if checked_extra:
         deposit.form_extra = {**(deposit.form_extra or {}), **checked_extra}
-    session.add(
-        Cashflow(
+    flow = Cashflow(
             flow_no=allocate_flow_no(session, Direction.IN.value),
             pool_id=deposit.pool_id,
             occurred_on=cancelled_on,
@@ -168,8 +167,8 @@ def cancel_deposit(
             note=f"押金取消冲正：{text}"[:200],
             created_by=actor,
             updated_by=actor,
-        )
     )
+    session.add(flow)
     session.flush()
     record_audit(
         session,
@@ -185,7 +184,7 @@ def cancel_deposit(
         },
         reason=text,
     )
-    upsert_operation_operators(
+    operation = upsert_operation_operators(
         session,
         entity_type="deposit",
         entity_id=deposit.id,
@@ -193,6 +192,8 @@ def cancel_deposit(
         actor=actor,
         operator_user_ids=operator_user_ids,
     )
+    flow.operator_user_ids = list(operation.operator_user_ids)
+    session.flush()
     return deposit
 
 
@@ -279,7 +280,7 @@ def lose_deposit(
         },
         reason=text_reason,
     )
-    upsert_operation_operators(
+    operation = upsert_operation_operators(
         session,
         entity_type="deposit",
         entity_id=deposit.id,
@@ -287,4 +288,6 @@ def lose_deposit(
         actor=actor,
         operator_user_ids=operator_user_ids,
     )
+    flow.operator_user_ids = list(operation.operator_user_ids)
+    session.flush()
     return flow

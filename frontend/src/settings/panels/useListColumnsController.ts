@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listColumnsApi } from "../../shared/api/orders.api";
 import type { ListColumnConfig, ListCustomFieldOption, ListScopeConfig } from "../../shared/api/types/forms";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
-import { refreshListColumns } from "../../shared/lib/listColumns";
+import { updateListColumnScope } from "../../shared/lib/listColumns";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { appMessage } from "../../shared/ui/appFeedback";
 
@@ -37,7 +37,7 @@ export function useListColumnsController() {
   /** 仅更新响应所属的列表，并通知已挂载列表重排。 */
   const applySaved = useCallback((saved: ListScopeConfig) => {
     setScopes((items) => items.map((item) => (item.code === saved.code ? saved : item)));
-    refreshListColumns();
+    updateListColumnScope(saved);
   }, []);
 
   const load = useCallback(() => listColumnsApi.all(), []);

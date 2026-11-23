@@ -140,6 +140,7 @@ def test_production_bearer_token_requires_database_user(db: Session):
     )
     with pytest.raises(AuthError) as exc:
         get_current_user(
+            request=None,
             authorization=f"Bearer {token}",
             x_dev_user=None,
             settings=settings,
@@ -201,6 +202,27 @@ def test_change_password_success_then_login_with_new_password(client: TestClient
         ).status_code
         == 401
     )
+
+
+def test_password_change_is_required_and_invalidates_old_sessions(client: TestClient):
+    user = _create_user(client, role="OPERATOR")
+    first = _login(client, "alice", "password123")
+    other = _login(client, "alice", "password123")
+    first_header = {"Authorization": f"Bearer {first}"}
+    assert client.get("/api/auth/me", headers=first_header).status_code == 200
+    blocked = client.get("/api/orders", headers=first_header)
+    assert blocked.status_code == 403 and blocked.json()["code"] == "PASSWORD_CHANGE_REQUIRED"
+    changed = client.post("/api/auth/change-password", headers=first_header, json={"old_password": "password123", "new_password": "newpassword1"})
+    assert changed.status_code == 200, changed.text
+    current = changed.json()["access_token"]
+    assert client.get("/api/orders", headers={"Authorization": f"Bearer {current}"}).status_code == 200
+    assert client.get("/api/auth/me", headers=first_header).status_code == 401
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {other}"}).status_code == 401
+    reset = client.post(f"/api/users/{user['id']}/reset-password", headers={"X-Dev-User": "admin"}, json={"password": "resetpass1"})
+    assert reset.status_code == 200
+    assert client.get("/api/auth/me", headers={"Authorization": f"Bearer {current}"}).status_code == 401
+    reset_token = _login(client, "alice", "resetpass1")
+    assert client.get("/api/orders", headers={"Authorization": f"Bearer {reset_token}"}).status_code == 403
 
 def test_logout_without_authorization_header(client: TestClient):
     response = client.post("/api/auth/logout")

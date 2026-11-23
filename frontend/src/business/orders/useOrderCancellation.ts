@@ -25,9 +25,10 @@ export function useOrderCancellation(params: {
   selectedOrder: Order | null;
   setSelectedOrder: (order: Order | null) => void;
   load: () => Promise<void>;
+  refreshCachedLedgerDetail: (orderId: number) => Promise<void>;
   actionRequest: LatestRequest;
 }) {
-  const { selectedOrder, setSelectedOrder, load, actionRequest } = params;
+  const { selectedOrder, setSelectedOrder, load, refreshCachedLedgerDetail, actionRequest } = params;
   const currentOperator = currentDevUser();
   const [cancelOrderTarget, setCancelOrderTarget] = useState<Order | null>(null);
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
@@ -139,7 +140,9 @@ export function useOrderCancellation(params: {
         closeCancelTransaction();
         setSelectedOrder(null);
       }
-      void Promise.resolve().then(load).catch(() => appMessage.warning("交易已取消，但台账刷新失败，请手动刷新"));
+      const orderId = order?.id ?? installment?.order_id;
+      void Promise.all([load(), orderId == null ? undefined : refreshCachedLedgerDetail(orderId)])
+        .catch(() => appMessage.warning("交易已取消，但台账刷新失败，请手动刷新"));
     };
     await cancelWrite.run(async () => {
       try {

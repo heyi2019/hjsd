@@ -1,8 +1,11 @@
-"""REPORT-01 报表功能契约：R2/R3/R5 与订单利润口径。"""
+"""REPORT-01 报表功能契约：月度损益、分润对账、业务损益 与订单利润口径。"""
 from __future__ import annotations
 
+import csv
+import io
 from datetime import date, datetime
 from decimal import Decimal
+from itertools import groupby
 from uuid import uuid4
 
 import pytest
@@ -19,13 +22,16 @@ from app.domain.foundation import Pool
 from app.domain.trade import Account, RebateRecord
 from app.domain.users import User
 from app.funds.cashflows import create_cashflow
+from app.funds.cashflow_writes.reverse import reverse_cashflow
+from app.funds.deposits.lifecycle import lose_deposit
+from app.funds.deposits.writes import create_deposit
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.business.profit_allocation import service as policy_allocations
 from app.operations.profit import order_profit_detail
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
-from app.operations.r3_commission import r3_commission_reconciliation
-from app.operations.r5_business_pnl import r5_business_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
+from app.operations.commission import commission_reconciliation
+from app.operations.business_pnl import business_pnl_report
 
 
 def test_report_viewer_can_read_employee_options_for_operations_filter(
@@ -93,11 +99,94 @@ def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> No
     )
 
 
-# --------------------------------------------------------------------- R2 月度
-class TestR2MonthlyPnl:
+@pytest.mark.parametrize("report_name", ["monthly-pnl", "order-profit", "commission"])
+@pytest.mark.parametrize("descending", [False, True])
+def test_report_export_matches_page_order(seeded_db, seeded_client, headers, report_name, descending):
+    orders = []
+    for occurred_on in (EARLY, D, D):
+        order = _order(seeded_db, trade_date=occurred_on)
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=occurred_on, actor="pytest")
+        post_event(seeded_db, order.id, event_type="SELL", amount="160", occurred_on=occurred_on, actor="pytest")
+        policy_allocations.set_allocations(seeded_db, order.id, items=[
+            {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+            {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+        ], actor="pytest")
+        orders.append(order)
+    response = seeded_client.get(f"/api/reports/{report_name}/export.csv", headers=headers,
+        params={"sort_desc": str(descending).lower(), "all_people": "true"})
+    assert response.status_code == 200, response.text
+    rows = [row for row in csv.DictReader(io.StringIO(response.text.lstrip("\ufeff"))) if row["行类型"] == "明细"]
+    if report_name == "monthly-pnl":
+        assert [row["月份"] for row in rows] == (["2026-10", "2026-09"] if descending else ["2026-09", "2026-10"])
+    else:
+        order_numbers = [order_no for order_no, _rows in groupby(row["订单号"] for row in rows)]
+        expected = [order.order_no for order in orders]
+        assert order_numbers == (list(reversed(expected)) if descending else expected)
+        if report_name == "commission":
+            assert len(rows) > len(order_numbers)  # one group expands to several people, kept together
+
+
+# --------------------------------------------------------------------- 月度损益 月度
+class TestMonthlyPnl:
+    def test_studio_income_and_cost_are_included_once_and_cross_period_reversals_follow_their_dates(self, seeded_db, seeded_client, headers):
+        order = _order(seeded_db)
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=D, actor="pytest")
+        post_event(seeded_db, order.id, event_type="SELL", amount="160", occurred_on=D, actor="pytest")
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        income = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=D, direction="IN", ledger_type="STUDIO",
+            accounting_attribute="SELF_REVENUE", category="OTHER", amount="20", actor="pytest")
+        expense = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=D, direction="OUT", ledger_type="STUDIO",
+            accounting_attribute="OPERATING_EXPENSE", category="RENT", amount="30", actor="pytest")
+        later = date(2026, 11, 2)
+        reverse_cashflow(seeded_db, income.id, reversed_on=later, actor="pytest", reason="修正", form_extra_scope=None)
+        reverse_cashflow(seeded_db, expense.id, reversed_on=later, actor="pytest", reason="修正", form_extra_scope=None)
+
+        october = _month_item(monthly_pnl_report(seeded_db, from_date=D, to_date=D), "2026-10")
+        assert october["sales_income"] == Decimal("160.00")
+        assert october["studio_other_income"] == Decimal("20.00")
+        assert october["cost"] == Decimal("100.00")
+        assert october["operating_expense"] == Decimal("30.00")
+        assert october["operating_profit"] == Decimal("50.00")
+
+        november = _month_item(monthly_pnl_report(seeded_db, from_date=later, to_date=later), "2026-11")
+        assert november["studio_other_income"] == Decimal("-20.00")
+        assert november["operating_expense"] == Decimal("-30.00")
+        assert november["operating_profit"] == Decimal("10.00")
+        params = {"from": D.isoformat(), "to": D.isoformat()}
+        api = seeded_client.get("/api/reports/monthly-pnl", params=params, headers=headers)
+        assert api.status_code == 200, api.text
+        assert api.json()["items"][0]["studio_other_income"] == "20.00"
+        exported = seeded_client.get("/api/reports/monthly-pnl/export.csv", params=params, headers=headers)
+        assert exported.status_code == 200, exported.text
+        exported_rows = list(csv.DictReader(io.StringIO(exported.text.lstrip("\ufeff"))))
+        assert exported_rows[0]["工作室其他收入"] == "20.00"
+        assert exported_rows[0]["经营利润"] == "50.00"
+
+    @pytest.mark.parametrize("ledger_type", ["BUSINESS", "STUDIO"])
+    def test_deposit_loss_does_not_increase_operating_expense(self, seeded_db, ledger_type):
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        assert pool is not None
+        deposit = create_deposit(
+            seeded_db, pool_id=pool.id, amount=Decimal("100"), paid_on=D,
+            ledger_type=ledger_type, actor="pytest",
+        )
+        lose_deposit(
+            seeded_db, deposit.id, amount=Decimal("50"), lost_on=D,
+            category="OPERATING_COST", reason="押金部分损失", actor="pytest",
+        )
+        create_cashflow(
+            seeded_db, pool_id=pool.id, occurred_on=D, direction="OUT",
+            ledger_type="STUDIO", accounting_attribute="OPERATING_EXPENSE",
+            category="RENT", amount=Decimal("25"), actor="pytest",
+        )
+
+        month = _month_item(monthly_pnl_report(seeded_db, from_date=D, to_date=D), "2026-10")
+        assert month["operating_expense"] == Decimal("25.00")
+        assert month["operating_profit"] == Decimal("-25.00")
+
     def test_rejects_reversed_date_range(self, seeded_db):
         with pytest.raises(Validation, match="开始日期不能晚于结束日期"):
-            r2_monthly_pnl(
+            monthly_pnl_report(
                 seeded_db,
                 from_date=date(2026, 10, 31),
                 to_date=date(2026, 10, 1),
@@ -115,19 +204,19 @@ class TestR2MonthlyPnl:
             occurred_on=D, actor="pytest",
         )
 
-        full = r2_monthly_pnl(seeded_db)
+        full = monthly_pnl_report(seeded_db)
         oct_item = _month_item(full, "2026-10")
         assert oct_item["sales_income"] == 1300
         assert oct_item["cost"] == 1000
         assert _month_item(full, "2026-09")["cost"] == 200
 
         # from 过滤：9 月事件被 continue
-        gated = r2_monthly_pnl(seeded_db, from_date=MID_GATE)
+        gated = monthly_pnl_report(seeded_db, from_date=MID_GATE)
         assert [i["month"] for i in gated["items"]] == ["2026-10"]
         assert gated["total"]["sales_income"] == 1300
         assert gated["total"]["operating_profit"] == 300
         # to 过滤：10 月事件被 continue
-        early_only = r2_monthly_pnl(
+        early_only = monthly_pnl_report(
             seeded_db, to_date=date(2026, 9, 30)
         )
         assert [i["month"] for i in early_only["items"]] == ["2026-09"]
@@ -161,7 +250,7 @@ class TestR2MonthlyPnl:
             reason="售出撤销",
         )
 
-        monthly = r2_monthly_pnl(seeded_db)
+        monthly = monthly_pnl_report(seeded_db)
         oct_item = _month_item(monthly, "2026-10")
         # 资金明细口径（11-05 裁决）：撤销售出产生一笔反向资金流水，
         # 收入列仍是已入账的 800，冲销的 800 计入支出；净利仍为 -500。
@@ -195,8 +284,8 @@ def test_order_profit_scopes_downstream_reads_to_requested_trade_dates(seeded_db
     assert captured_order_ids == [[in_range.id]]
 
 
-# --------------------------------------------------------------------- R3 提成
-class TestR3Commission:
+# --------------------------------------------------------------------- 分润对账 提成
+class TestCommission:
     def test_personal_commission_total_reuses_rounding_without_detail_queries(self, seeded_db):
         from sqlalchemy import event
         from app.workbench.overview.service import workbench_summary
@@ -211,7 +300,7 @@ class TestR3Commission:
             ], actor="pytest")
 
         user = CurrentUser.build(id=7, username="seeduser7", roles=["OPERATOR"], owner_scope="SELF")
-        report = r3_commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
+        report = commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
         statements = []
         connection = seeded_db.connection()
 
@@ -226,7 +315,7 @@ class TestR3Commission:
             event.remove(connection, "before_cursor_execute", record)
         assert summary["personal_earnings"] == report["total"]["profit_base"] == Decimal("-2.49")
         assert not any("from accounts where accounts.id in" in sql for sql in statements)
-        # personal_commission_total 只取本人分润总额，不得装配 r3_commission_reconciliation
+        # personal_commission_total 只取本人分润总额，不得装配 commission_reconciliation
         # 那种「两列 + join orders」逐单查最新售出日期的报表明细 SQL（N+1 风险）。
         # 注意：order_amounts.cashflow_totals_by_order 算「回收收入」会发一条三列批量查询
         # （order_id, occurred_on, amount ... where order_id in (...)）——它是口径必需的
@@ -237,7 +326,7 @@ class TestR3Commission:
         ), [sql for sql in statements if "order_events.order_id, order_events.occurred_on" in sql]
 
     def test_commission_limits_profit_calculation_to_order_date_range(self, seeded_db, monkeypatch):
-        import app.operations.r3_commission as commission_service
+        import app.operations.commission as commission_service
 
         orders = []
         for trade_day in (EARLY, D, date(2026, 11, 4)):
@@ -259,13 +348,13 @@ class TestR3Commission:
             return calculate(session, order_ids=order_ids)
 
         monkeypatch.setattr(commission_service, "cashflow_totals_by_order", track_calculation)
-        result = r3_commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
+        result = commission_reconciliation(seeded_db, user=user, mine=True, from_date=MID_GATE, to_date=D)
         assert calculated_ids == [{orders[1].id}]
         assert result["total"] == {"order_count": 1, "profit_base": Decimal("90.00")}
         assert {item["user_id"] for item in _commission_details(result)} == {7}
 
         calculated_ids.clear()
-        all_time = r3_commission_reconciliation(seeded_db, user=user, mine=True)
+        all_time = commission_reconciliation(seeded_db, user=user, mine=True)
         assert calculated_ids == [{order.id for order in orders}]
         assert all_time["total"] == {"order_count": 3, "profit_base": Decimal("270.00")}
 
@@ -303,15 +392,15 @@ class TestR3Commission:
             owner_scope="SELF",
             display_name="种子用户7",
         )
-        data = r3_commission_reconciliation(
+        data = commission_reconciliation(
             seeded_db, user=user, mine=True
         )
 
         assert {item["user_id"] for item in _commission_details(data)} == {7}
         assert data["total"]["order_count"] == 1
         assert data["total"]["profit_base"] == Decimal("90.00")
-        assert r3_commission_reconciliation(seeded_db, user=user)["total"]["order_count"] == 0
-        assert r3_commission_reconciliation(seeded_db, user=user, mine=True, user_id=8)["total"]["order_count"] == 0
+        assert commission_reconciliation(seeded_db, user=user)["total"]["order_count"] == 0
+        assert commission_reconciliation(seeded_db, user=user, mine=True, user_id=8)["total"]["order_count"] == 0
         from app.workbench.overview.service import workbench_summary
         assert workbench_summary(seeded_db, user=user)["personal_earnings"] == Decimal("90.00")
 
@@ -343,7 +432,7 @@ class TestR3Commission:
             id=7, username="seeduser7", roles=["VIEWER"], owner_scope="SELF"
         )
 
-        all_people = r3_commission_reconciliation(
+        all_people = commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True
         )
         assert {item["user_id"] for item in _commission_details(all_people)} == {7, 8, None}
@@ -352,13 +441,13 @@ class TestR3Commission:
             "user_id": 7, "user_name": "离职同事", "is_active": False,
         }
 
-        one_person = r3_commission_reconciliation(
+        one_person = commission_reconciliation(
             seeded_db, user=scoped_user, all_people=True, user_id=8
         )
         assert {item["user_id"] for item in _commission_details(one_person)} == {8}
         assert {person["user_id"] for person in one_person["people"]} == {7, 8}
 
-        personal = r3_commission_reconciliation(seeded_db, user=scoped_user, mine=True)
+        personal = commission_reconciliation(seeded_db, user=scoped_user, mine=True)
         assert {person["user_id"] for person in personal["people"]} == {7}
         response = seeded_client.get("/api/reports/commission", params={"all_people": "true", "user_id": 7}, headers=headers)
         assert response.status_code == 200, response.text
@@ -384,7 +473,7 @@ class TestR3Commission:
             actor="pytest",
         )
 
-        data = r3_commission_reconciliation(seeded_db)
+        data = commission_reconciliation(seeded_db)
         assert data["total"]["order_count"] == 1
         assert len(data["order_groups"]) == 1
         assert data["order_groups"][0]["order_no"] == order.order_no
@@ -394,7 +483,7 @@ class TestR3Commission:
         assert account is not None
         account.inventory_entry_at = datetime(2026, 10, 2, 9, 30)
         seeded_db.flush()
-        data = r3_commission_reconciliation(seeded_db)
+        data = commission_reconciliation(seeded_db)
         assert data["order_groups"][0]["inventory_date"] == date(2026, 10, 2)
         assert data["order_groups"][0]["outbound_date"] == D
         person = next(item for item in _commission_details(data) if item["user_id"] == 7)
@@ -418,7 +507,7 @@ class TestR3Commission:
             actor="pytest",
         )
 
-        data = r3_commission_reconciliation(seeded_db)
+        data = commission_reconciliation(seeded_db)
         person_orders = [item for item in _commission_details(data) if item["user_id"] == 7]
         assert len(person_orders) == 2
         assert {item["order_id"] for item in person_orders} == {
@@ -428,20 +517,20 @@ class TestR3Commission:
 
         # 日期过滤：交易日在区间外 → continue，无数据
         assert (
-            r3_commission_reconciliation(
+            commission_reconciliation(
                 seeded_db, to_date=date(2026, 10, 1)
             )["order_groups"]
             == []
         )
         assert (
-            r3_commission_reconciliation(
+            commission_reconciliation(
                 seeded_db, from_date=date(2026, 10, 10)
             )["order_groups"]
             == []
         )
 
     def test_commission_export_honors_mine_and_user_id(self, seeded_db, seeded_client, headers):
-        """R3 导出必须跟随页面的「我的收益/指定员工」，不能恒定默认全员口径。"""
+        """分润对账 导出必须跟随页面的「我的收益/指定员工」，不能恒定默认全员口径。"""
         import csv
         import io
 
@@ -497,7 +586,7 @@ class TestR3Commission:
         assert [row[name_index] for row in rows[1:] if row[0] == "明细"] == ["离职同事"]
 
 
-# --------------------------------------------------------------------- R5 业务
+# --------------------------------------------------------------------- 业务损益 业务
 # --------------------------------------------------------------------- 订单利润明细
 # --------------------------------------------------------------------- API 日期参数
 class TestReportsApiDateParams:
@@ -602,13 +691,13 @@ class TestReportsApiDateParams:
             id=9, username="operator", roles=["OPERATOR"], owner_scope="SELF"
         )
 
-        data = r5_business_pnl(seeded_db, user=scoped)
+        data = business_pnl_report(seeded_db, user=scoped)
         assert all(row["order_type"] != foreign_order.order_type for row in data["items"])
 
 
 class TestReports:
-    def test_r2_operating_expense_excludes_account_direct_cashflow(self, seeded_db):
-        """账号直接支出资金明细进入直接成本，不进入运营费用（R2 验收口径）。"""
+    def test_monthly_operating_expense_excludes_account_direct_cashflow(self, seeded_db):
+        """账号直接支出资金明细进入直接成本，不进入运营费用（月度损益 验收口径）。"""
         from datetime import date
 
         account = create_account(
@@ -646,15 +735,15 @@ class TestReports:
             order_id=order.id,
             note="账号直接支出",
         )
-        data = r2_monthly_pnl(seeded_db)
+        data = monthly_pnl_report(seeded_db)
         month = [i for i in data["items"] if i["month"] == "2026-10"]
         assert month
         assert month[0]["cost"] == 1300
         assert month[0]["operating_expense"] == 0
 
-    def test_r5_legacy_rebate_columns_are_removed(self, seeded_db):
+    def test_business_pnl_legacy_rebate_columns_are_removed(self, seeded_db):
         """11-05 二次裁决：结算展示列下线，返点金额全站只认 amount。"""
-        data = r5_business_pnl(seeded_db)
+        data = business_pnl_report(seeded_db)
         for item in data["items"]:
             assert {"main_income", "cost", "main_profit"} <= set(item)
             for key in ("settled_rebate", "uncollected_rebate", "full_income"):
@@ -671,8 +760,8 @@ class TestReports:
                 item["income"] - item["cost"]
             )
 
-    def test_r3_drills_down_to_orders(self, seeded_db):
-        data = r3_commission_reconciliation(seeded_db)
+    def test_commission_drills_down_to_orders(self, seeded_db):
+        data = commission_reconciliation(seeded_db)
         assert set(data["total"]) == {"order_count", "profit_base"}
         for order in data["order_groups"]:
             assert order["orders"]
@@ -693,7 +782,7 @@ def _pool1_user(seeded_db) -> CurrentUser:
 
     row = User(
         username=f"r2scope-{uuid4().hex[:8]}",
-        display_name="R2 Scope",
+        display_name="月度损益 Scope",
         password_hash=hash_password("scope-pass-123"),
         role="OPERATOR",
         owner_scope="SELF",
@@ -713,7 +802,7 @@ def _pool1_user(seeded_db) -> CurrentUser:
     )
 
 
-def test_r2_pool_scope_and_date_window_filters(seeded_db):
+def test_monthly_pool_scope_and_date_window_filters(seeded_db):
     """池作用域用户：返点/运营费只认授权池，且发生日窗口外的行被跳过。"""
     user = _pool1_user(seeded_db)
     account_id = create_account(
@@ -751,7 +840,7 @@ def test_r2_pool_scope_and_date_window_filters(seeded_db):
             direction="OUT", accounting_attribute="OPERATING_EXPENSE", category="OFFICE",
             amount=amount, actor="pytest",
         )
-    data = r2_monthly_pnl(
+    data = monthly_pnl_report(
         seeded_db, from_date=date(2026, 10, 1), to_date=date(2026, 10, 31),
         user=user,
     )
@@ -759,6 +848,31 @@ def test_r2_pool_scope_and_date_window_filters(seeded_db):
     assert oct_item["operating_expense"] == Decimal("10")
     # 窗口外返点不进「其中返点」：仅窗口内（无）→ 2026-10 该列为 0
     assert oct_item["rebate_income"] == Decimal("0")
+
+
+def test_visible_order_profit_is_complete_while_studio_amounts_follow_pool_scope(seeded_db):
+    from app.operations.data_center import data_center_summary
+
+    user = _pool1_user(seeded_db)
+    order = _order(seeded_db, trade_date=D)
+    order.owner_id = user.id
+    seeded_db.flush()
+    post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=D, pool_id=1, actor="pytest")
+    post_event(seeded_db, order.id, event_type="SELL", amount="300", occurred_on=D, pool_id=2, actor="pytest")
+    for pool_id, amount in ((1, "20"), (2, "90")):
+        create_cashflow(seeded_db, pool_id=pool_id, occurred_on=D, direction="IN", ledger_type="STUDIO",
+            accounting_attribute="SELF_REVENUE", category="OTHER", amount=amount, actor="pytest")
+
+    assert order_profit_detail(seeded_db, user=user)["total"]["net_profit"] == Decimal("200.00")
+    assert business_pnl_report(seeded_db, user=user)["total"]["main_profit"] == Decimal("200.00")
+    monthly = _month_item(monthly_pnl_report(seeded_db, from_date=D, to_date=D, user=user), "2026-10")
+    assert monthly["sales_income"] == Decimal("300.00")
+    assert monthly["studio_other_income"] == Decimal("20.00")
+    assert monthly["operating_profit"] == Decimal("220.00")
+    summary = data_center_summary(seeded_db, from_date=D, to_date=D, user=user)
+    assert summary["account_sale_profit"] == Decimal("200.00")
+    assert summary["studio_other_income"] == Decimal("20.00")
+    assert summary["profit"] == Decimal("220.00")
 
 
 def test_report_for_export_monthly_pnl_and_order_profit(seeded_db):

@@ -203,6 +203,10 @@ def order_ledger_summary(
             status_counts[str(status)] = status_counts.get(str(status), 0) + count
     return {
         "total_count": sum(status_counts.values()),
+        "in_progress_count": status_counts.get("ACTIVE", 0) + status_counts.get("INSTALLMENT", 0),
+        "completed_count": status_counts.get("COMPLETED", 0),
+        "cancelled_count": status_counts.get("CANCELLED", 0),
+        "type_total": sum(type_counts.values()),
         "status_counts": status_counts,
         "type_counts": type_counts,
         "game_types": _visible_game_types(session, user=user, mine=mine),

@@ -2,7 +2,7 @@
 from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
-from sqlalchemy import inspect, select
+from sqlalchemy import func, inspect, select
 from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
 from app.core.errors import ErrorCode, NotFound, Validation
@@ -61,8 +61,13 @@ def require_default_pool(session: Session) -> Pool:
 
 def _switch_default_pool(session: Session, pool: Pool) -> None:
     """把 pool 设为唯一默认资金账户；其余池的 is_default 一并清掉。"""
+    # 所有默认账户切换共享同一事务锁；等待后再查询，避免并发请求各自看到旧默认值。
+    session.execute(select(func.pg_advisory_xact_lock(1212831572, 1)))
     for other in session.scalars(select(Pool).where(Pool.is_default.is_(True))):
-        other.is_default = False
+        if other.id != pool.id:
+            other.is_default = False
+    # 唯一索引逐语句检查，须先清除旧标记，再写入新的默认账户。
+    session.flush()
     pool.is_default = True
 
 
@@ -168,7 +173,11 @@ def set_pool_status(session: Session, pool_id: int, status: str, *, actor: str) 
     """启用/停用；停用后禁止新增流水（V17 只允许停用不允许删除）。"""
     if status not in PoolStatus.values():
         raise Validation("资金账户状态取值非法", details={"status": status})
-    pool = _get_pool_or_404(session, pool_id)
+    # 与落账共享同一事务锁：等待未提交的写入结束，再读取最新状态。
+    session.execute(select(func.pg_advisory_xact_lock(1212831573, pool_id)))
+    pool = session.get(Pool, pool_id, populate_existing=True)
+    if pool is None:
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     before = _snapshot(pool, ("status",))
     pool.status = status
     pool.updated_by = actor
@@ -220,7 +229,11 @@ def delete_pool(session: Session, pool_id: int, *, actor: str) -> None:
     )
 def assert_pool_usable(session: Session, pool_id: int) -> Pool:
     """写入前的池校验：存在、启用；停用池不得承接新流水。"""
-    pool = _get_pool_or_404(session, pool_id)
+    # 同一账户的多个写入可以并行；状态切换须等所有写入事务结束。
+    session.execute(select(func.pg_advisory_xact_lock_shared(1212831573, pool_id)))
+    pool = session.get(Pool, pool_id, populate_existing=True)
+    if pool is None:
+        raise NotFound("资金账户不存在", details={"pool_id": pool_id})
     if pool.status != PoolStatus.ACTIVE.value:
         raise Validation(
             f"资金账户 {pool.code} 已停用，不可用于新记录",

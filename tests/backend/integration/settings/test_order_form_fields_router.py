@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 
 from app.core.errors import Validation
 from app.domain.trade import OrderFormField
@@ -175,6 +176,31 @@ def test_router_locked_delete_rejected_400(seeded_client, seeded_db, headers):
     assert resp.status_code == 422
     # 行仍在
     assert seeded_db.get(OrderFormField, locked.id) is not None
+
+
+@pytest.mark.parametrize(("scope", "key"), [
+    ("LEAD", "customer_id"), ("LEAD", "request_type"), ("LEAD", "target"),
+    ("LEADCLOSE", "reason"), ("LEADCONVERT", "order_id"),
+])
+def test_required_customer_fields_remain_active_and_required_in_legacy_configuration(seeded_client, seeded_db, headers, scope, key):
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    seed_catalog(seeded_db, actor="pytest")
+    row = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == scope, OrderFormField.field_key == key))
+    row.is_active = False
+    row.required = False
+    row.locked = False
+    seeded_db.commit()
+    url = f"/api/order-form-fields/{row.id}"
+    listed = seeded_client.get("/api/order-form-fields", params={"order_type_code": scope, "include_inactive": "false"}, headers=headers)
+    assert listed.status_code == 200
+    field = next(item for item in listed.json() if item["field_key"] == key)
+    assert field["is_active"] is True and field["required"] is True and field["required_locked"] is True
+    assert seeded_client.patch(f"{url}/active", params={"active": "false"}, headers=headers).status_code == 422
+    assert seeded_client.patch(url, json={"required": False}, headers=headers).status_code == 422
+    assert seeded_client.patch(url, json={"required_when": {"field": "other", "op": "filled"}}, headers=headers).status_code == 422
+    renamed = seeded_client.patch(url, json={"label": "业务名称"}, headers=headers)
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["label"] == "业务名称" and renamed.json()["required_locked"] is True
 
 def test_router_delete_custom_ok(seeded_client, headers):
     created = seeded_client.post(

@@ -55,7 +55,7 @@ const balance = {
   available: "700.00",
 };
 const deposits = [
-  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "HELD", expected_release_on: "2026-11-01" },
+  { id: 11, pool_id: 1, counterparty_id: 99, source_order_id: 7, paid_amount: "500.00", returned_amount: "200.00", remaining_amount: "300.00", status: "PARTIALLY_RETURNED", available_actions: ["RETURN", "LOSS"], expected_release_on: "2026-11-01" },
 ];
 const cashflows = [
   { id: 1, flow_no: "ZC00001", pool_id: 1, occurred_on: "2026-10-17", category: "BUY", direction: "OUT", amount: "500.00", order_no: "HS0001", source_type: "ORDER_EVENT", source_id: "HS0001-EV-BUY-01", source: "ORDER_EVENT", ledger_type: "BUSINESS", accounting_attribute: "SELF_DIRECT_COST" },
@@ -162,7 +162,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("编辑押金回填自定义字段并保留其他操作的历史字段", async () => {
     customReceipt("FUNDDEPOSIT");
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{
-      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
       form_extra: { receipt: "原始凭据", old_action: "历史信息" },
     }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { id: 11 });
@@ -188,7 +188,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       locked: false, is_custom: true, section: "EXTRA",
     }] : []);
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{
-      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
       form_extra: { optional_number: 17, old_action: "历史信息" },
     }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { id: 11 });
@@ -212,7 +212,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       locked: false, is_custom: true, section: "EXTRA",
     }] : []);
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{
-      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
       form_extra: { optional_number: 17 },
     }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { id: 11 });
@@ -265,7 +265,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("取消押金提交配置的自定义字段", async () => {
     customReceipt("FUNDCANCEL");
     vi.mocked(depositsApi.list).mockResolvedValueOnce([{
-      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00",
+      ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
     }] as never);
     resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 11 });
     renderLight(<FundsPage />, { user: "admin" });
@@ -325,8 +325,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
     await pickSelect(modal, 1, /押金池/);
-    await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
-    await ui.type(modal.querySelector("#note") ?? modal, "调拨测试");
+    await ui.type(within(modal).getByLabelText("划转金额"), "100.00");
+    await ui.type(within(modal).getByLabelText("说明"), "调拨测试");
     await ui.click(screen.getByRole("button", { name: /确认划转/ }));
     await waitFor(() => expect(vi.mocked(transfersApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(transfersApi.create).mock.calls[0][0] as Record<string, unknown>;
@@ -342,7 +342,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
     await pickSelect(modal, 1, /押金池/);
-    await ui.type(modal.querySelector("#amount") ?? modal, "-100");
+    await ui.type(within(modal).getByLabelText("划转金额"), "-100");
     await ui.click(screen.getByRole("button", { name: /确认划转/ }));
 
     expect(await screen.findByText("划转金额不能为负数")).toBeInTheDocument();
@@ -377,10 +377,10 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.click(await screen.findByRole("button", { name: /新增对账/ }));
     const modal = modalContent();
     await pickSelect(modal, 0, /经营主池/);
-    await ui.clear(modal.querySelector("#reconciled_on") ?? modal);
-    await ui.type(modal.querySelector("#reconciled_on") ?? modal, "2026-10-18");
-    await ui.type(modal.querySelector("#account_label") ?? modal, "经营账户");
-    await ui.type(modal.querySelector("#statement_balance") ?? modal, "900.00");
+    await ui.clear(within(modal).getByLabelText("对账日期"));
+    await ui.type(within(modal).getByLabelText("对账日期"), "2026-10-18");
+    await ui.type(within(modal).getByLabelText("对账账户"), "经营账户");
+    await ui.type(within(modal).getByLabelText("账面余额"), "900.00");
     await ui.click(screen.getByRole("button", { name: /提交对账/ }));
     await waitFor(() =>
       expect(warningSpy).toHaveBeenCalledWith("同一资金账户、对账账户和日期只能对账一次，请调整对账日期或账户"),
@@ -393,7 +393,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
-    expect(await screen.findByText(/系统余额口径：截至对账日期「已入账」流水的累计/)).toBeInTheDocument();
+    expect(await screen.findByText(/系统余额是创建对账时截至对账日期的已入账流水累计净额/)).toHaveTextContent("不会改变已保存的对账和首次快照");
   });
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {
@@ -406,7 +406,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.click(await screen.findByRole("button", { name: /核销/ }));
     const modal = modalContent();
     await waitFor(() => expect(screen.getByRole("combobox", { name: "操作人" }).closest(".ant-select")).toHaveTextContent("管理员"));
-    await ui.type(modal.querySelector("#reason") ?? modal, "已补录漏记流水");
+    await ui.type(within(modal).getByLabelText("处理说明"), "已补录漏记流水");
     await ui.click(screen.getByRole("button", { name: /确认核销/ }));
     await waitFor(() => expect(vi.mocked(reconciliationsApi.resolve)).toHaveBeenCalledWith(21, "已补录漏记流水", [1], undefined));
   });
@@ -418,8 +418,8 @@ describe("FundsPage：资金写路径深覆盖", () => {
     await ui.click(screen.getByRole("tab", { name: "押金" }));
     await ui.click(await screen.findByRole("button", { name: /释\s*放/ }));
     const modal = modalContent();
-    await ui.type(modal.querySelector("#amount") ?? modal, "100.00");
-    await ui.type(modal.querySelector("#released_on") ?? modal, "2026-10-19");
+    await ui.type(within(modal).getByLabelText("释放金额"), "100.00");
+    await ui.type(within(modal).getByLabelText("释放日期"), "2026-10-19");
     await ui.click(screen.getByRole("button", { name: /确认释放/ }));
     await waitFor(() => expect(vi.mocked(depositsApi.release)).toHaveBeenCalled());
     const [id, payload] = vi.mocked(depositsApi.release).mock.calls[0] as [number, Record<string, unknown>];

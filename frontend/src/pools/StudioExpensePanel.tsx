@@ -24,8 +24,7 @@ import { normalizeError, type NormalizedError } from "../shared/api/client";
 import { formatDateTimeMinute, today } from "../shared/lib/format";
 import { requiredMoneyRules } from "../shared/lib/validators";
 import { FUND_FLOW_SOURCE_LABEL, STUDIO_EXPENSE_ITEM_SET, STUDIO_INCOME_ITEMS } from "../shared/lib/labels";
-import { ConfirmButton,
-  DataTable,
+import { DataTable,
   BusinessActionModal,
   BusinessRegistrationForm,
   ErrorBanner,
@@ -42,6 +41,7 @@ import { ResponsibleEmployeeSelect } from "../shared/forms/ResponsibleEmployeeSe
 import type { FundsPageController } from "./useFundsPageController";
 import { useBusinessPeriod, type PeriodState } from "../shared/state/businessPeriod";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
+import { EmployeeDirectoryError } from "./EmployeeDirectoryError";
 /** 弹窗视觉稿落地：作用域严格限定 .studio-ledger-modal（单一弹窗），不污染全站 .ant-modal。 */
 import "./StudioExpensePanel.css";
 
@@ -105,7 +105,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     count: number;
   } | null>(null);
   const [expenseItems, setExpenseItems] = useState<OptionItem[]>([]);
-  const { activeEmployees: employees } = useEmployeeOptions();
+  const { activeEmployees: employees, error: employeeError, reloadFresh: reloadEmployees } = useEmployeeOptions();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<NormalizedError | null>(null);
 
@@ -113,9 +113,11 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
 
   const [registerOpen, setRegisterOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Cashflow | null>(null);
+  const [reverseTarget, setReverseTarget] = useState<Cashflow | null>(null);
   const [registerDirection, setRegisterDirection] = useState<string>("OUT");
 
   const [registerForm] = Form.useForm();
+  const [reverseForm] = Form.useForm();
   const write = useAsyncAction();
 
   const from = periodState.period?.from ?? "";
@@ -152,6 +154,11 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         }),
       ]);
       if (seq !== loadSeqRef.current) return;
+      if (![result.income, result.expense, result.net].every((value) =>
+        typeof value === "string" && /^-?\d+(?:\.\d+)?$/.test(value))
+        || !Number.isSafeInteger(result.count) || result.count < 0 || !Array.isArray(result.items)) {
+        throw new Error("工作室收支汇总数据不完整，请重新加载");
+      }
       const lastPage = Math.max(1, Math.ceil(result.count / pageSize));
       if (page > lastPage) {
         setPaging({ filterKey, page: lastPage, pageSize });
@@ -206,10 +213,19 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     });
   };
 
-  const deleteStudioCashflow = async (cashflowId: number) => {
+  const submitReverse = async (values: Record<string, unknown>) => {
+    if (!reverseTarget) return;
     await write.run(async () => {
-      await cashflowsApi.remove(cashflowId);
-      appMessage.success("工作室收支已删除");
+      await cashflowsApi.reverse(reverseTarget.id, {
+        reversed_on: dateText(values.reversed_on),
+        reason: String(values.reason ?? "").trim(),
+        operator_user_ids: values.operator_user_ids as number[] | undefined,
+        form_extra: formExtraOrUndefined(values.form_extra),
+        form_extra_scope: "STUDIOREV",
+      });
+      appMessage.success("工作室收支已冲销");
+      setReverseTarget(null);
+      reverseForm.resetFields();
       await Promise.all([loadRef.current(), ctrl?.load()]);
     });
   };
@@ -253,6 +269,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   const expense = summary?.expense ?? "0.00";
   const netTotal = summary?.net ?? "0.00";
   const flowCount = summary?.count ?? 0;
+  const summaryUnavailable = loading || Boolean(error) || !summary;
   const categoryOptions = Array.from(
     new Map([...expenseItems, ...INCOME_ITEMS].map((item) => [item.value, item])).values(),
   );
@@ -285,23 +302,18 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       title: "操作",
       width: 150,
       render: (_v, row) => (
-        // 冲销流水及已冲销的原流水均不可编辑或删除。
+        // 冲销流水及已冲销的原流水均不可编辑或再次冲销。
         row.source_type !== "MANUAL" || row.is_reversed ? null : (
           <Space size={2}>
             <PermissionButton permission="deposit.post" size="small" onClick={() => openEdit(row)}>
               编辑
             </PermissionButton>
-            <ConfirmButton
-              permission="deposit.post"
-              size="small"
-              danger
-              title="删除工作室收支"
-              description="删除后会立即移除这笔工作室收支及其经营统计，且不可恢复。"
-              okText="确认删除"
-              onConfirm={() => deleteStudioCashflow(row.id)}
-            >
-              删除
-            </ConfirmButton>
+            <PermissionButton permission="deposit.post" size="small" danger onClick={() => {
+              write.clearError();
+              reverseForm.resetFields();
+              reverseForm.setFieldsValue({ reversed_on: dayjs(today()) });
+              setReverseTarget(row);
+            }}>冲销</PermissionButton>
           </Space>
         )
       ),
@@ -325,7 +337,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
     >
       <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} retrying={loading} />
-      {!registerOpen && <InlineError error={write.error} />}
+      {!registerOpen && !reverseTarget && <InlineError error={write.error} />}
       <div className="ui-filter-bar studio-expense-filters">
         <BusinessPeriodPicker label="工作室支出日期区间" state={periodState} showAll />
         <ToolbarSelect
@@ -341,10 +353,10 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       <StatRow
         items={[
           // 失败态一律显示「—」（amount: null），不把未知状态当成可信 0
-          { label: "收入", amount: loading || error ? null : income },
-          { label: "支出", amount: loading || error ? null : expense },
-          { label: "净额", amount: loading || error ? null : netTotal },
-          { label: "笔数", kind: "count", amount: loading || error ? null : flowCount },
+          { label: "收入", amount: summaryUnavailable ? null : income },
+          { label: "支出", amount: summaryUnavailable ? null : expense },
+          { label: "净额", amount: summaryUnavailable ? null : netTotal },
+          { label: "笔数", kind: "count", amount: summaryUnavailable ? null : flowCount },
         ]}
       />
       <DataTable<Cashflow>
@@ -367,10 +379,13 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         wrapClassName="studio-ledger-modal"
         title={editTarget ? "编辑工作室收支" : REGISTER_TITLE}
         open={registerOpen}
-        onCancel={closeRegister}
+        closable={!write.pending}
+        maskClosable={!write.pending}
+        onCancel={() => { if (!write.isPending()) closeRegister(); }}
         footer={null}
       >
         <InlineError error={write.error} />
+        <EmployeeDirectoryError error={employeeError} reload={reloadEmployees} />
         <BusinessRegistrationForm
           className="studio-ledger-form"
           layout="horizontal"
@@ -419,6 +434,33 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
           <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>
             {editTarget ? "保存修改" : "登记入账"}
           </PermissionButton>
+          </FieldConfigScope>
+        </BusinessRegistrationForm>
+      </BusinessActionModal>
+
+      <BusinessActionModal
+        size="compact"
+        title="冲销工作室收支"
+        open={Boolean(reverseTarget)}
+        closable={!write.pending}
+        maskClosable={!write.pending}
+        onCancel={() => {
+          if (write.isPending()) return;
+          write.clearError();
+          setReverseTarget(null);
+          reverseForm.resetFields();
+        }}
+        footer={null}
+      >
+        <InlineError error={write.error} />
+        <EmployeeDirectoryError error={employeeError} reload={reloadEmployees} />
+        <BusinessRegistrationForm scope="STUDIOREV" form={reverseForm} onFinish={submitReverse}>
+          <FieldConfigScope scope="STUDIOREV" active={Boolean(reverseTarget)}>
+            <CfgItem name="reversed_on" label="冲销日期" alwaysActive rules={[{ required: true, message: "请选择冲销日期" }]}><DatePicker format="YYYY-MM-DD" /></CfgItem>
+            <CfgItem name="reason" label="冲销原因" alwaysActive rules={[{ required: true, whitespace: true, message: "请填写冲销原因" }]}><Input.TextArea rows={2} /></CfgItem>
+            <ResponsibleEmployeeSelect name="operator_user_ids" label="操作人" employees={employees} />
+            <CustomFieldSections testIdSuffix="studio-reverse" />
+            <PermissionButton permission="deposit.post" type="primary" htmlType="submit" loading={write.pending}>确认冲销</PermissionButton>
           </FieldConfigScope>
         </BusinessRegistrationForm>
       </BusinessActionModal>

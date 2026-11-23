@@ -1,8 +1,7 @@
 import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import { Form, InputNumber, Switch, Typography } from "antd";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
-import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import {
   buildBusinessReminderOptions,
   BUSINESS_REMINDER_CONFIG_CODE,
@@ -13,10 +12,11 @@ import {
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
+import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
 
 export function BusinessReminderSettingsPanel() {
   const [form] = Form.useForm<BusinessReminderConfig>();
-  const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
+  const write = useAsyncAction();
 
   const load = useCallback(async () => {
     const config = await optionSetsApi.get(BUSINESS_REMINDER_CONFIG_CODE);
@@ -26,28 +26,26 @@ export function BusinessReminderSettingsPanel() {
     form.setFieldsValue(DEFAULT_BUSINESS_REMINDER_CONFIG);
   }, [form]);
   const { data: loadedConfig, loading, error: loadError, reload } = useSettingsResource(load, { onError: handleLoadError });
-  const error = mutationError ?? loadError;
+  const error = write.error ?? loadError;
 
   useEffect(() => {
     if (loadedConfig) form.setFieldsValue(loadedConfig);
   }, [form, loadedConfig]);
 
   const reloadSection = useCallback(async () => {
-    setMutationError(null);
+    write.clearError();
     await reload();
-  }, [reload]);
+  }, [reload, write.clearError]);
 
   const save = async (values: BusinessReminderConfig) => {
-    try {
+    if (!loadedConfig || loading || loadError) return;
+    await write.run(async () => {
       await optionSetsApi.update(BUSINESS_REMINDER_CONFIG_CODE, {
         options: buildBusinessReminderOptions({ ...DEFAULT_BUSINESS_REMINDER_CONFIG, ...loadedConfig, ...values }),
       });
       appMessage.success("业务提醒配置已保存");
-      setMutationError(null);
       await reload();
-    } catch (err) {
-      setMutationError(normalizeError(err));
-    }
+    });
   };
 
   return (
@@ -60,7 +58,7 @@ export function BusinessReminderSettingsPanel() {
         layout="horizontal"
         labelAlign="left"
         labelCol={{ flex: "108px" }}
-        wrapperCol={{ flex: "auto" }} form={form} onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || Boolean(error)}>
+        wrapperCol={{ flex: "auto" }} form={form} onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || write.pending || Boolean(error)}>
         <PermissionGate permission="option-set.manage">
           <FieldConfigScope scope="SYSREMIND" active={true}>
             <CfgItem
@@ -76,7 +74,7 @@ export function BusinessReminderSettingsPanel() {
             <CfgItem name="overdueInstallmentsEnabled" label="逾期合约提醒" valuePropName="checked">
               <Switch checkedChildren="开启" unCheckedChildren="关闭" />
             </CfgItem>
-            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit">保存配置</PermissionButton>
+            <PermissionButton permission="option-set.manage" type="primary" htmlType="submit" loading={write.pending}>保存配置</PermissionButton>
           </FieldConfigScope>
         </PermissionGate>
       </BusinessRegistrationForm>

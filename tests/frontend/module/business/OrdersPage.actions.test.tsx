@@ -19,6 +19,7 @@ import { employeesApi } from "@/shared/api/org.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
 import { profitAllocationApi } from "@/shared/api/profitAllocation.api";
 import { poolsApi } from "@/shared/api/pools.api";
+import { notificationsApi } from "@/shared/api/notifications.api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { installmentTotals, orderLedgerSummary, pageResponse, profitAllocationResponse } from "@fixtures/api-responses";
@@ -45,6 +46,7 @@ vi.mock("@/shared/api/orderCashflows.api");
 vi.mock("@/shared/api/customers.api");
 vi.mock("@/shared/api/installments.api");
 vi.mock("@/shared/api/misc.api");
+vi.mock("@/shared/api/notifications.api");
 vi.mock("@/shared/api/options.api");
 vi.mock("@/shared/api/orders.api");
 vi.mock("@/shared/api/org.api");
@@ -234,6 +236,7 @@ beforeEach(() => {
     { id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", status: "ACTIVE" },
   ]);
   vi.mocked(ordersApi.get).mockResolvedValue(order1);
+  vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [12], read_at: "2026-11-23T10:00:00", next_read_id: null });
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({
     account: { id: order1.account_id, stock_no: "KU_00001", game_account: "seller-001", game_type: "原神", status: "WAITING", inventory_type: "RECOVERY" },
     orders: [{ order_id: order1.id, order_no: order1.order_no, order_type: order1.order_type, trade_date: order1.trade_date, status: order1.status, events: [] }],
@@ -298,6 +301,28 @@ async function clickModalOk(modal: HTMLElement) {
 }
 
 describe("OrdersPage：操作与筛选分支", () => {
+  it("分润消息直接打开不在当前页的订单，弹窗打开后才标记已读", async () => {
+    vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order1]));
+    let finish!: (order: Order) => void;
+    vi.mocked(ordersApi.get).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    renderLight(<OrdersPage initialTab="ledger" initialAllocationOrderId={order2.id} initialAllocationNotificationId={12} />, { user: "admin", syncDevUser: true });
+    await waitFor(() => expect(ordersApi.get).toHaveBeenCalledWith(order2.id));
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
+    await act(async () => { finish(order2); });
+    await modalOf(/分润 · DG-2026-0002/);
+    await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([12], "latest"));
+  });
+
+  it("分润消息目标加载失败时保持未读", async () => {
+    vi.mocked(ordersApi.get).mockRejectedValueOnce(new Error("订单不可见"));
+    renderLight(<OrdersPage initialTab="ledger" initialAllocationOrderId={order2.id} initialAllocationNotificationId={12} />, { user: "admin", syncDevUser: true });
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("订单不可见")));
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
+  });
+  it("订单台账保留凭证，管理员也不显示物理删除入口", async () => {
+    await openLedger();
+    expect(within(tableRow("HS-2026-0001")).queryByRole("button", { name: "删除" })).toBeNull();
+  });
   it("订单预览使用缩略图，进入编辑前重新读取原图", async () => {
     const original = "data:image/png;base64,original";
     const preview = "data:image/jpeg;base64,thumbnail";
@@ -409,6 +434,32 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(screen.getByText("最新详情")).toBeInTheDocument();
     expect(screen.queryByText("过时详情")).not.toBeInTheDocument();
     expect(message.error).not.toHaveBeenCalled();
+  });
+  it("详情刷新失败后丢弃旧缓存，且不收起后来展开的其他订单", async () => {
+    let firstCalls = 0;
+    const snapshot = (id: number, description: string) => ({ account: { id, account_description: description }, orders: [] }) as never;
+    vi.mocked(ordersApi.executionDetail).mockImplementation(async (id) => {
+      if (id !== 1) return snapshot(2, "订单乙");
+      firstCalls += 1;
+      if (firstCalls === 2) throw new Error("刷新失败");
+      return snapshot(1, firstCalls === 1 ? "旧详情" : "重试详情");
+    });
+    function Probe() {
+      const ledger = useLedgerInlineEdit();
+      return <><button onClick={() => ledger.handleLedgerExpand(true, { ...order1, id: 1, account_id: 1 })}>展开甲</button>
+        <button onClick={() => ledger.handleLedgerExpand(true, { ...order1, id: 2, account_id: 2 })}>展开乙</button>
+        <button onClick={() => void ledger.refreshCachedLedgerDetail(1)}>刷新甲</button>
+        <span>{`展开:${ledger.expandedOrderIds.join(",")},甲:${ledger.ledgerOrderDetails[1]?.account.account_description ?? "无"}`}</span></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    await ui.click(screen.getByRole("button", { name: "展开甲" }));
+    await screen.findByText("展开:1,甲:旧详情");
+    await ui.click(screen.getByRole("button", { name: "展开乙" }));
+    await screen.findByText("展开:2,甲:旧详情");
+    await ui.click(screen.getByRole("button", { name: "刷新甲" }));
+    await screen.findByText("展开:2,甲:无");
+    await ui.click(screen.getByRole("button", { name: "展开甲" }));
+    await screen.findByText("展开:1,甲:重试详情");
   });
   it("分期订单展示售出金额而不是买入金额合计", async () => {
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([order3]));
@@ -572,7 +623,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(within(second).getByLabelText("分润备注")).toHaveValue(""));
   });
 
-  it("零利润订单未修改金额时保存，保留已有人员分润比例", async () => {
+  it("零利润订单修改比例时保持金额为零并按比例保存", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
       order_profit: "0.00", allocatable_profit: "0.00",
       totals_by_type: { BUY: { allocation_amount: "0.00", allocation_rate: "60.00" } },
@@ -580,10 +631,14 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
+    const rates = within(modal).getAllByLabelText("比例");
+    fireEvent.change(rates[0], { target: { value: "55" } });
+    fireEvent.change(rates[1], { target: { value: "5" } });
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("0.00");
     await clickModalOk(modal);
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
-      expect.objectContaining({ allocation_type: "BUY", allocation_rate: "60.00", allocation_amount: "0.00" }),
-    ]), undefined, false));
+      expect.objectContaining({ allocation_type: "BUY", allocation_rate: "55", allocation_amount: "0.00" }),
+    ]), undefined, false, "0.00", true));
   });
 
   it("公司比例为 100% 但订单有利润时，仍按金额提交", async () => {
@@ -596,7 +651,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await clickModalOk(await modalOf(/分润 · HS-2026-0001/));
     await waitFor(() => expect(profitAllocationApi.set).toHaveBeenCalledWith(1, expect.arrayContaining([
       expect.objectContaining({ allocation_type: "BUY", allocation_rate: "0.00", allocation_amount: "0.00" }),
-    ]), undefined, false));
+    ]), undefined, false, "500.00", false));
   });
 
   it("打开分润配置直接展示后端汇总金额与比例，不逐行换算", async () => {
@@ -610,6 +665,38 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("100.00");
     expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("20.00");
     expect(profitAllocationApi.convert).not.toHaveBeenCalled();
+  });
+
+  it("分润比例和金额按后端总利润即时双向换算，不请求换算接口", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      order_profit: "500.00", allocatable_profit: "300.00",
+      totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "20.00" } },
+    }));
+    vi.mocked(profitAllocationApi.convert).mockClear();
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    const amount = within(modal).getAllByLabelText("金额")[0];
+    const rate = within(modal).getAllByLabelText("比例")[0];
+    expect(rate).not.toHaveAttribute("readonly");
+    fireEvent.change(rate, { target: { value: "25" } });
+    expect(amount).toHaveValue("125.00");
+    fireEvent.change(amount, { target: { value: "100.00" } });
+    expect(rate).toHaveValue("20.00");
+    expect(profitAllocationApi.convert).not.toHaveBeenCalled();
+  });
+
+  it("利润变化导致保存冲突时保留分润草稿", async () => {
+    vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], { order_profit: "500.00" }));
+    vi.mocked(profitAllocationApi.set).mockRejectedValueOnce(new Error("订单利润已变化，请重新打开分润配置"));
+    await openLedger();
+    await openRowMenu("HS-2026-0001", "分润配置");
+    const modal = await modalOf(/分润 · HS-2026-0001/);
+    fireEvent.change(within(modal).getAllByLabelText("比例")[0], { target: { value: "20" } });
+    await clickModalOk(modal);
+    await waitFor(() => expect(message.error).toHaveBeenCalledWith(expect.stringContaining("订单利润已变化，请重新打开分润配置")));
+    expect(modal).toBeVisible();
+    expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("100.00");
   });
 
   it("连续打开不同订单的分润配置，较晚返回的汇总不能覆盖当前订单", async () => {
@@ -648,11 +735,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(screen.queryByText(/分润 · HS-2026-0001/)).not.toBeInTheDocument();
   });
 
-  it("分润比例换算失败时清空旧比例并提示重试", async () => {
+  it("金额输入无效时清空旧比例，有效后即时恢复", async () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
+      order_profit: "500.00",
       totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "10.00" } },
     }));
-    vi.mocked(profitAllocationApi.convert).mockResolvedValue({ value: "10.00" });
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
@@ -661,37 +748,32 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(amount.closest(".money-input")).toHaveTextContent("¥");
     expect(amount).toHaveAttribute("inputmode", "decimal");
     expect(rate).toHaveValue("10.00");
-    vi.mocked(profitAllocationApi.convert).mockRejectedValueOnce(new Error("网络错误"));
+    fireEvent.change(amount, { target: { value: "-" } });
+    expect(rate).toHaveValue("");
     fireEvent.change(amount, { target: { value: "200.00" } });
-    expect(rate).toHaveValue("");
-    fireEvent.blur(amount);
-    await waitFor(() => expect(message.error).toHaveBeenCalledWith("分润比例换算失败，请重试"));
-    expect(rate).toHaveValue("");
+    expect(rate).toHaveValue("40.00");
+    expect(profitAllocationApi.convert).not.toHaveBeenCalled();
   });
 
-  it("关闭分润弹窗后，旧订单的金额换算不能覆盖新订单", async () => {
-    let finishFirst!: (result: { value: string | null }) => void;
-    const firstConversion = new Promise<{ value: string | null }>((resolve) => { finishFirst = resolve; });
+  it("关闭分润弹窗后，新订单按自己的利润换算", async () => {
     vi.mocked(ordersApi.get).mockImplementation(async (id) => id === 1 ? order1 : order2);
     vi.mocked(profitAllocationApi.allocations).mockImplementation(async (id) => profitAllocationResponse([], {
+      order_profit: id === 1 ? "500.00" : "1000.00",
       totals_by_type: id === 1 ? {} : { BUY: { allocation_amount: "200.00", allocation_rate: "20.00" } },
     }));
-    vi.mocked(profitAllocationApi.convert).mockImplementation((id) => id === 1 ? firstConversion : Promise.resolve({ value: "20.00" }));
-
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const first = await modalOf(/分润 · HS-2026-0001/);
     const amount = within(first).getAllByLabelText("金额")[0];
     fireEvent.change(amount, { target: { value: "100.00" } });
-    fireEvent.blur(amount);
-    await waitFor(() => expect(profitAllocationApi.convert).toHaveBeenCalledWith(1, "AMOUNT_TO_RATE", "100.00"));
+    expect(within(first).getAllByLabelText("比例")[0]).toHaveValue("20.00");
     fireEvent.click(first.querySelector(".ant-modal-close") as HTMLElement);
     await waitFor(() => expect(first).not.toBeVisible());
     await openRowMenu("DG-2026-0002", "分润配置");
     const second = await modalOf(/分润 · DG-2026-0002/);
     expect(within(second).getAllByLabelText("比例")[0]).toHaveValue("20.00");
-    await act(async () => finishFirst({ value: "99.00" }));
-    expect(within(second).getAllByLabelText("比例")[0]).toHaveValue("20.00");
+    fireEvent.change(within(second).getAllByLabelText("比例")[0], { target: { value: "50" } });
+    expect(within(second).getAllByLabelText("金额")[0]).toHaveValue("500.00");
   });
 
   it("上一单保存完成时，不关闭后来打开的分润配置", async () => {
@@ -781,7 +863,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
 
-    // 买号两人只占一行，人员多选后填写动作合计；金额是唯一提交口径，比例只读展示。
+    // 买号两人只占一行，人员多选后填写动作合计；比例随金额即时换算。
     expect(within(modal).getByText("买号")).toBeInTheDocument();
     expect(within(modal).getAllByLabelText("比例")).toHaveLength(3);
     const amounts = within(modal).getAllByLabelText("金额");
@@ -796,7 +878,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(extra).toBeUndefined();
     expect(amountsChanged).toBe(true);
     const buyRows = payload.filter((item) => item.allocation_type === "BUY");
-    expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: null, allocation_amount: "300.00" }]);
+    expect(buyRows).toEqual([{ allocation_type: "BUY", employee_ids: [11, 22], role: "BUYER", allocation_rate: "6.00", allocation_amount: "300.00" }]);
     expect(payload).toHaveLength(4);
   });
 
@@ -869,6 +951,24 @@ describe("OrdersPage：操作与筛选分支", () => {
       await clickModalOk(second);
       await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200", note: "第二单" })));
     }
+  });
+
+  it("登记资金收支后刷新已缓存的订单详情和统计", async () => {
+    vi.mocked(orderCashflowsApi.create).mockResolvedValue({} as never);
+    await openLedger();
+    fireEvent.click(tableRow("HS-2026-0001").querySelector(".ant-table-row-expand-icon") as HTMLElement);
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { imagePreviews: true }));
+    await waitFor(() => expect(document.querySelector(".ant-table-expanded-row .order-detail")).toBeInTheDocument());
+    vi.mocked(ordersApi.executionDetail).mockClear();
+    vi.mocked(ordersApi.ledgerSummary).mockClear();
+    await openRowMenu("HS-2026-0001", "资金收支");
+    const modal = await modalOf(/资金收支 · HS-2026-0001/);
+    fireEvent.change(within(modal).getByLabelText("金额"), { target: { value: "100" } });
+    fireEvent.change(within(modal).getByLabelText("收支备注"), { target: { value: "补充收支" } });
+    await clickModalOk(modal);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(ordersApi.executionDetail).toHaveBeenCalledWith(1, { fresh: true, imagePreviews: true }));
+    expect(ordersApi.ledgerSummary).toHaveBeenCalled();
   });
 
   it.each(["成功", "失败"])("上一单资金收支提交%s后，不影响后来打开的订单", async (result) => {
@@ -1165,33 +1265,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(ordersApi.inventoryOffsale).toHaveBeenCalledTimes(1);
     await act(async () => finish({ ok: true }));
     await waitFor(() => expect(modal).not.toBeVisible());
-  });
-
-  it("订单删除提交中重复确认只发送一次", async () => {
-    let finish!: () => void;
-    let finishLabels!: (labels: Record<string, string>) => void;
-    let finishFields!: (fields: ReturnType<typeof allFormFields>) => void;
-    const labelsReady = new Promise<Record<string, string>>((resolve) => { finishLabels = resolve; });
-    const fieldsReady = new Promise<ReturnType<typeof allFormFields>>((resolve) => { finishFields = resolve; });
-    vi.mocked(orderFormFieldsApi.listSectionLabels).mockImplementation((scope) => scope === "ORDDELETE" ? labelsReady : Promise.resolve({}));
-    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "ORDDELETE" ? fieldsReady : allFormFields().filter((field) => field.order_type_code === scope));
-    vi.mocked(ordersApi.deleteOrder).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
-    await openLedger();
-    await openRowMenu("HS-2026-0001", "删除");
-    const modal = await screen.findByRole("dialog", { name: "删除" });
-    await waitFor(() => expect(orderFormFieldsApi.list).toHaveBeenCalledWith("ORDDELETE", true));
-    fireEvent.change(within(modal).getByLabelText("删除原因"), { target: { value: "删除测试" } });
-    const form = within(modal).getByLabelText("删除原因").closest("form")!;
-    await act(async () => { fireEvent.submit(form); });
-    expect(ordersApi.deleteOrder).not.toHaveBeenCalled();
-    await act(async () => { finishFields([]); finishLabels({}); await Promise.all([fieldsReady, labelsReady]); });
-    await waitFor(() => expect(within(modal).queryByText("正在加载字段配置…")).not.toBeInTheDocument());
-    await act(async () => { fireEvent.submit(form); });
-    await waitFor(() => expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1));
-    await act(async () => { fireEvent.submit(form); });
-    expect(ordersApi.deleteOrder).toHaveBeenCalledTimes(1);
-    await act(async () => finish());
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "删除" })).not.toBeInTheDocument());
   });
 
   it("上一笔取消成功后不关闭新订单的取消弹窗", async () => {

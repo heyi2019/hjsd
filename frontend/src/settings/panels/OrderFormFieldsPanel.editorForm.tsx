@@ -141,12 +141,13 @@ export function renderOrderFormFieldEditorForm(params: {
           valuePropName="checked"
           tooltip={condFieldKey ? "已配置条件必填，二者互斥；清空依赖字段即可改回必填" : undefined}
         >
-          <Switch disabled={Boolean(condFieldKey)} />
+          <Switch disabled={Boolean(condFieldKey || editingField?.required_locked)} />
         </CfgItem>
         <CfgItem name="cond_field" label="条件必填·依赖字段">
           <Select
             allowClear
             showSearch
+            disabled={Boolean(editingField?.required_locked)}
             optionFilterProp="label"
             placeholder="不启用"
             options={dependencyOptions}

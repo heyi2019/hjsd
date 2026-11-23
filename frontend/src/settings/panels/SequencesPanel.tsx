@@ -74,6 +74,7 @@ export function SequencesPanel() {
   const load = useCallback(() => sequencesApi.list(), []);
   const { data: loadedRows, loading, error, reload } = useSettingsResource(load);
   const rows = loadedRows ?? [];
+  const notificationSequence = rows.find((row) => row.sequence_key === "NOTIFICATION" && row.near_exhaustion && row.remaining != null);
 
   const byKey = new Map(rows.map((row) => [row.sequence_key, row]));
   const describe = (row: DocumentSequence) => {
@@ -116,6 +117,7 @@ export function SequencesPanel() {
   return (
     <Card className="glass" title="编号序列">
       <ErrorBanner error={error} onRetry={() => void reload()} retrying={loading} />
+      {notificationSequence && <Typography.Paragraph type="warning">通知编号还剩 {notificationSequence.remaining} 个；用尽后需要生成通知的操作会失败，请联系管理员处理。</Typography.Paragraph>}
       <Typography.Paragraph type="secondary" className="ui-card-hint">
         序列编号由后端按域独立发放，本面板只读；库存编号与分期合约号不独立发放，见条目说明。排查断号 / 跳号时对照「当前值」与业务单据最大编号：不一致说明存在发放失败或手工补号，需复查对应批次的导入与冲销记录。
       </Typography.Paragraph>

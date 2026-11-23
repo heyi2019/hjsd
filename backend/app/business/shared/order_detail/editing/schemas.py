@@ -67,6 +67,7 @@ class ExecutionEditRequest(RequestModel):
     orders: list[ExecutionOrderEditItem] = Field(default_factory=list)
     parties: list[ExecutionPartyEditItem] = Field(default_factory=list)
     profile: AccountProfileUpdate | None = None
+    expected_profile: dict[str, object] | None = None
 
 
 __all__ = [

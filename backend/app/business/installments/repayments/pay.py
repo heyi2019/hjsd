@@ -18,7 +18,7 @@ from app.shared.operation_operators import upsert_operation_operators
 from app.core.state_machine import INSTALLMENT_TRANSITIONS, transition
 from app.domain.enums import AuditAction, EventType, InstallmentStatus, ScheduleStatus
 from app.domain.trade import Installment, InstallmentSchedule, Order
-from .._shared import _merge_form_extra, _positive, get_installment
+from .._shared import _merge_form_extra, _positive, _restore_when_overdue_cleared, get_installment
 from app.shared.installment_amounts import total_receivable
 
 def pay(
@@ -91,7 +91,7 @@ def pay(
     resolved_pool_id = pool_id
     if resolved_pool_id is None:
         resolved_pool_id = _resolve_pool(session, order, "PROFIT").id
-    create_cashflow(
+    flow = create_cashflow(
         session,
         pool_id=resolved_pool_id,
         occurred_on=paid_on,
@@ -110,9 +110,11 @@ def pay(
     )
     schedule.received_amount = to_money(schedule.received_amount) + money
     schedule.received_on = paid_on
+    was_overdue = schedule.status == ScheduleStatus.OVERDUE.value
     schedule.status = (
         ScheduleStatus.PAID.value
         if schedule.received_amount + schedule.waived_amount >= schedule.due_amount
+        else ScheduleStatus.OVERDUE.value if was_overdue and schedule.due_on < date.today()
         else ScheduleStatus.PARTIAL.value
     )
     installment.paid_amount = to_money(installment.paid_amount) + money
@@ -134,6 +136,7 @@ def pay(
                 entity="分期合约",
             )
     session.flush()
+    _restore_when_overdue_cleared(session, installment)
 
     record_audit(
         session,
@@ -148,15 +151,17 @@ def pay(
             "status": installment.status,
         },
     )
-    upsert_operation_operators(
+    operation = upsert_operation_operators(
         session,
         entity_type="installment",
         entity_id=installment.inst_no,
-        operation_key=f"PAY:{schedule.id}",
+        operation_key=f"PAY:{schedule.period_no}:{flow.flow_no}",
         actor=actor,
         operator_user_ids=operator_user_ids,
-        occurred_at=None,
+        occurred_at=flow.created_at,
     )
+    # 动作与流水指向同一次收款，默认操作人也保持一致。
+    flow.operator_user_ids = list(operation.operator_user_ids)
     return installment, schedule
 
 
@@ -183,7 +188,7 @@ def _pick_schedule(
             InstallmentSchedule.received_amount + InstallmentSchedule.waived_amount
             < InstallmentSchedule.due_amount,
         )
-        .order_by(InstallmentSchedule.period_no)
+        .order_by(InstallmentSchedule.due_on, InstallmentSchedule.period_no)
         .execution_options(populate_existing=True)
     ).first()
     if schedule is None:

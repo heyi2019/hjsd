@@ -66,10 +66,11 @@ it("切换周期加载期间隐藏旧统计并暂停旧周期跳转", async () =
     const orders = screen.getByTestId("workbench-personal-orders");
     const earnings = screen.getByTestId("workbench-personal-earnings");
     const customers = screen.getByTestId("workbench-personal-customers");
+    const businessCards = ["workbench-inventory", "workbench-installments", "workbench-overdue-installments", "workbench-inventory-overdue"].map((id) => screen.getByTestId(id));
     await within(orders).findByText("7");
     fireEvent.click(screen.getByRole("button", { name: "上期" }));
     await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(previousReportPeriod()));
-    for (const card of [orders, earnings, customers]) {
+    for (const card of [orders, earnings, customers, ...businessCards]) {
       expect(within(card).getByText("-")).toBeInTheDocument();
       expect(card).not.toHaveAttribute("role", "button");
       fireEvent.click(card);
@@ -117,7 +118,7 @@ it("查看消息标记已读时不重复加载业务总览", async () => {
     await screen.findByRole("button", { name: /订单 HS1 待分润/ });
     await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: /订单 HS1 待分润/ }));
-    await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1], "latest"));
+    expect(notificationsApi.markReadBatch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: /库存已超期/ }));
     expect(await screen.findByText("库存提醒")).toBeInTheDocument();
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([2], "latest");

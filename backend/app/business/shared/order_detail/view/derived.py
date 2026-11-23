@@ -155,7 +155,7 @@ def _execution_rows(orders: list[AccountExecutionOrderOut]) -> list[DetailExecut
                 order_id=order.order_id,
                 category="INBOUND",
                 action=ENTRY_ACTION.get(order.order_type, "账号入库"),
-                occurred_at=order.created_at,
+                occurred_at=order.occurred_at or order.created_at,
                 amount=None,
                 operator=order.operator or "-",
                 operator_user_ids=order.operator_user_ids,
@@ -215,8 +215,7 @@ def _finance_rows(
     rows: list[DetailFinanceRowOut] = []
     for order in orders:
         for event in order.events:
-            if event.cashflow:
-                flow = event.cashflow
+            for flow in event.cashflows or ([event.cashflow] if event.cashflow else []):
                 rows.append(DetailFinanceRowOut(
                     key=f"flow-{flow.flow_no}", flow_no=flow.flow_no, type=_finance_type(event.event_type, flow.direction, flow.category, order_type=order.order_type),
                     direction="支出" if flow.direction == "OUT" else "收入", amount=flow.amount,

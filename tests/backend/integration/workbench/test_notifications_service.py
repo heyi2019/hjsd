@@ -87,10 +87,12 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
     unread, cursor = notification_query.inbox_page(seeded_db, recipient_user_id=2, category="latest", cursor=None, limit=10)
     assert [n.id for n in unread] == [b.id]
     assert cursor is None
-    first = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="FIRST")
-    second = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_ALLOCATED", entity_id="SECOND")
-    third = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="THIRD")
-    fourth = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="FOURTH")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
+    profit = {"recipient_user_id": 1, "entity_type": "order", "entity_id": order.order_no}
+    first = _make_unread(seeded_db, notification_type="PROFIT_PENDING", **profit)
+    second = _make_unread(seeded_db, notification_type="PROFIT_ALLOCATED", **profit)
+    third = _make_unread(seeded_db, notification_type="PROFIT_PENDING", **profit)
+    fourth = _make_unread(seeded_db, notification_type="PROFIT_PENDING", **profit)
     notification_service.mark_read_batch(seeded_db, [second.id], recipient_user_id=1, actor="pytest")
     headers = {"X-Dev-User": "admin"}
     page = seeded_client.get("/api/notifications/inbox", params={"category": "sale", "limit": 2}, headers=headers)
@@ -107,7 +109,7 @@ def test_list_notifications_unread_only_filters(seeded_db, seeded_client):
     invalid_cursor = base64.urlsafe_b64encode(json.dumps({"category": "latest", "phase": "read", "snapshot": "2026-11-21T00:00:00", "time": "2026-11-21T00:00:00", "id": 1}).encode()).decode()
     invalid = seeded_client.get("/api/notifications/inbox", params={"category": "latest", "cursor": invalid_cursor}, headers=headers)
     assert invalid.status_code == 422
-    batch = [_make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id=f"BATCH-{i}") for i in range(3)]
+    batch = [_make_unread(seeded_db, notification_type="PROFIT_PENDING", **profit) for _ in range(3)]
     first_page = seeded_client.get("/api/notifications/inbox", params={"category": "sale", "limit": 1}, headers=headers).json()
     assert first_page["items"][0]["id"] == batch[2].id
     notification_service.mark_read_batch(seeded_db, [batch[1].id], recipient_user_id=1, actor="pytest")
@@ -160,9 +162,9 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
     seeded_db.flush()
     response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.status_code == 200, response.text
-    assert response.json() == {"order_no": hidden.order_no, "order_id": None}
+    assert response.json() == {"order_no": None, "order_id": None}
     notification_service.mark_read_batch(seeded_db, [pending.id], recipient_user_id=2, actor="pytest")
-    assert seeded_client.get("/api/notifications/pending-order", params={"notification_id": pending.id}, headers=auth).json() == {"order_no": hidden.order_no, "order_id": None}
+    assert seeded_client.get("/api/notifications/pending-order", params={"notification_id": pending.id}, headers=auth).json() == {"order_no": None, "order_id": None}
     response = seeded_client.get("/api/notifications/pending-order", headers=auth)
     assert response.json() == {"order_no": None, "order_id": None}
     _buy(seeded_db, visible)
@@ -364,8 +366,9 @@ def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_clie
     assert set(repeat.json()["read_ids"]) == {first.id, second.id}
     seeded_db.refresh(first)
     assert first.read_at == initial_read_at
-    older = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="older")
-    newer = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="newer")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
+    older = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
+    newer = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
     notification_service.mark_read_batch(seeded_db, [older.id], recipient_user_id=1, actor="pytest")
     positioned = seeded_client.post("/api/notifications/read", json={"ids": [newer.id], "category": "sale"}, headers={"X-Dev-User": "admin"})
     assert positioned.json()["next_read_id"] == older.id
@@ -376,8 +379,9 @@ def test_concurrent_read_returns_position_after_previous_commit(seeded_db):
     from app.workbench.notifications.router import mark_notifications_read
     from app.workbench.notifications.schemas import NotificationReadRequest
 
-    older = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="old")
-    newer = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_id="new")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
+    older = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
+    newer = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
     older_id, newer_id = older.id, newer.id
     seeded_db.commit()
     engine = seeded_db.get_bind()

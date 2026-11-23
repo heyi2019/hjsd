@@ -1,11 +1,12 @@
 import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 /** 分期：按业务合约类型分列，展示库存分期出售的收款、交付和风险处理。
  * 收款必须选择首付或期次；未结清不可换绑交付。 */
-import { Card, DatePicker, Space, Typography } from "antd";
+import { Card, Space, Typography } from "antd";
+import { BusinessDateRangeFilter } from "../shared/BusinessDateRangeFilter";
 import { useEffect, useState } from "react";
 import type { Dayjs } from "dayjs";
 import { installmentsApi } from "../../shared/api/installments.api";
-import type { Installment, Schedule } from "../../shared/api/types/installments";
+import type { Installment, InstallmentOperationOperator, Schedule } from "../../shared/api/types/installments";
 import { INSTALLMENT_STATUS_LABEL, today } from "../../shared/lib/format";
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { DataTable, ErrorBanner, ExportButton, PermissionButton, Select, StatRow } from "../../shared/ui";
@@ -38,6 +39,7 @@ function ContractTable({
   });
   const {
     arrangeColumns,
+    can,
     cancelForm,
     columns,
     defaultForm,
@@ -73,11 +75,15 @@ function ContractTable({
     totalCount,
     overdueCount,
     employees,
+    employeeError,
+    employeesSettled,
+    reloadEmployees,
+    isOperatorUpdating,
     updateOperationOperators,
   } = controller;
   const employeeNames = new Map(employees.map((employee) => [employee.id, employee.display_name]));
-  const operationLabel = (key: string) => {
-    const [action, period] = key.split(":");
+  const operationLabel = (operation: InstallmentOperationOperator) => {
+    const [action, period] = operation.operation_key.split(":");
     const label: Record<string, string> = {
       CREATE: "建单",
       PAY: "收款",
@@ -90,24 +96,27 @@ function ContractTable({
       WAIVE: "减免",
       EXTEND: "展期",
     };
-    return period ? `${label[action] ?? action}（${period}）` : label[action] ?? action;
+    if (action === "PAY") {
+      const details = [
+        operation.period_no == null ? null : `第${operation.period_no}期`,
+        operation.flow_no ?? (operation.historical_summary ? "历史汇总" : null),
+      ].filter(Boolean);
+      return details.length ? `收款（${details.join("，")}）` : "收款";
+    }
+    return period ? `${label[action] ?? action}（第${period}期）` : label[action] ?? action;
   };
   return (
     <section className="ui-stack">
       <ErrorBanner error={error} onRetry={() => void load()} />
+      <ErrorBanner error={employeeError ? { ...employeeError, message: `员工目录加载失败：${employeeError.message}` } : null} onRetry={() => { void reloadEmployees().catch(() => undefined); }} />
       <ErrorBanner error={totalsError ? { ...totalsError, message: `合计加载失败：${totalsError.message}` } : null} onRetry={() => void load()} />
 
       <Card className="glass" title="分期与回款">
           <Space size={8} wrap className="ui-filter-bar ui-filter-bar--spaced">
-            <DatePicker.RangePicker
-              aria-label="分期日期区间"
-              placeholder={["开始日期", "结束日期"]}
-              format="YYYY-MM-DD"
-              size="small"
-              placement="bottomLeft"
-              classNames={{ popup: { root: "compact-date-range-picker" } }}
+            <BusinessDateRangeFilter
+              label="分期日期区间"
               value={dateRange}
-              onChange={(value) => setDateRange(value?.[0] && value[1] ? [value[0], value[1]] : null)}
+              onChange={setDateRange}
             />
             {status ? <Space size={4}>
               <Typography.Text>合约状态：{configurableLabel("INSTALLMENT_STATUS", status, INSTALLMENT_STATUS_LABEL)}</Typography.Text>
@@ -173,7 +182,7 @@ function ContractTable({
                     rowKey="operation_key"
                     size="small"
                     columns={[
-                      { title: "动作", dataIndex: "operation_key", key: "operation_key", render: (value: string) => operationLabel(value) },
+                      { title: "动作", dataIndex: "operation_key", key: "operation_key", render: (_value: string, operation) => operationLabel(operation) },
                       {
                         title: "操作人",
                         dataIndex: "operator_user_ids",
@@ -183,8 +192,10 @@ function ContractTable({
                             mode="multiple"
                             showSearch
                             optionFilterProp="label"
-                            aria-label={`编辑${operationLabel(operation.operation_key)}操作人`}
+                            aria-label={`编辑${operationLabel(operation)}操作人`}
+                            title={operation.historical_summary ? "历史汇总无法确定对应的单笔流水" : undefined}
                             value={ids}
+                            disabled={!can("order.update") || !employeesSettled || Boolean(employeeError) || Boolean(operation.historical_summary) || isOperatorUpdating(row.id, operation.operation_key)}
                             options={employees.map((employee) => ({ value: employee.id, label: employee.display_name }))}
                             onChange={(next) => void updateOperationOperators(row.id, operation.operation_key, next as number[])}
                           />

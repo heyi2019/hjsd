@@ -1,4 +1,4 @@
-"""INSTALLMENT-01 tests/backend/test_m2：账号、分期、押金、返点（A04 / A05 / A06 / A08）。"""
+"""INSTALLMENT-01 账号、分期、押金和返点的跨业务联动。"""
 from __future__ import annotations
 
 from datetime import date
@@ -48,7 +48,7 @@ def _account(seeded_db, game_account: str):
         actor="pytest",
     )
 
-class TestA04DistributionInstallmentSale:
+class TestDistributionInstallmentSale:
     """分销货源的分期出售：回收、提号可选分期出售，代挂售出仅全款。
 
     原 A04 按「代挂分期」编写；代挂售出收敛为仅全款后，分期链路载体改用提号（TH）。
@@ -172,7 +172,7 @@ class TestA04DistributionInstallmentSale:
             )
         assert exc.value.code == ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE
 
-class TestA05HsStockSale:
+class TestHsStockSale:
     def test_stock_sale_contract_adds_no_new_buy(self, seeded_db):
         account = _account(seeded_db, "hs-acc")
         seeded_db.commit()
@@ -302,7 +302,7 @@ class TestA05HsStockSale:
         ).all()
         assert len(overdue) == 2
 
-class TestA08Deposit:
+class TestDeposit:
     def test_deposit_holds_available_balance_without_profit_impact(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         before = pool_balance(seeded_db, invest.id)
@@ -341,7 +341,7 @@ class TestA08Deposit:
             )
         assert exc.value.code == ErrorCode.PAYMENT_EXCEEDS_RECEIVABLE
 
-class TestA06Rebate:
+class TestRebate:
 
     def test_rebate_requires_active_source_order(self, seeded_db):
         order = create_order(
@@ -360,7 +360,7 @@ class TestA06Rebate:
             )
         assert exc.value.code == ErrorCode.ORDER_STATUS_CONFLICT
 
-class TestM2Api:
+class TestBusinessFinanceIntegrationApi:
     def test_installment_and_payment_endpoints(self, seeded_client, headers, seeded_db):
         account = create_account(
             seeded_db,

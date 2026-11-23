@@ -45,6 +45,7 @@ class ExecutionEventOut(BaseModel):
     note: str | None = None
     form_extra: dict[str, object] = Field(default_factory=dict)
     cashflow: ExecutionCashflowOut | None = None
+    cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)
     operator: str
     operator_user_ids: list[int] | None = None
     operator_names: list[str] = Field(default_factory=list)
@@ -72,12 +73,20 @@ class ExecutionRebateOut(BaseModel):
     collected_at: datetime
 
 
+class ActiveConsignmentOut(BaseModel):
+    event_id: int
+    platform: str
+    price: object | None = None
+    listed_at: datetime
+
+
 class AccountExecutionOrderOut(BaseModel):
     order_id: int
     order_no: str
     order_type: str
     trade_date: date
     created_at: datetime
+    occurred_at: datetime | None = None
     status: str
     note: str | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
@@ -87,6 +96,8 @@ class AccountExecutionOrderOut(BaseModel):
     counterparties: list[ExecutionCounterpartyOut] = Field(default_factory=list)
     rebates: list[ExecutionRebateOut] = Field(default_factory=list)
     events: list[ExecutionEventOut]
+    latest_sale_event_id: int | None = None
+    active_consignments: list[ActiveConsignmentOut] = Field(default_factory=list)
     operator: str
     operator_user_ids: list[int] | None = None
 

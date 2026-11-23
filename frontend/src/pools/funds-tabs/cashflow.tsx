@@ -81,7 +81,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
   return (
     <Card className="glass" title="资金明细">
       <div className="ui-filter-bar funds-cashflow-filters">
-        <SearchInput aria-label="流水搜索" searchButtonLabel="搜索流水" onSearch={(_value, _event, info) => { if (info?.source !== "clear") ctrl.submitCashflowSearch(); }} allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注 / 金额" onChange={(event) => setCashflowKeyword(event.target.value)} />
+        <SearchInput className="ui-filter-search" aria-label="流水搜索" searchButtonLabel="搜索流水" onSearch={(_value, _event, info) => { if (info?.source !== "clear") ctrl.submitCashflowSearch(); }} allowClear value={cashflowKeyword} placeholder="搜索订单号 / 流水号 / 类别 / 备注 / 金额" onChange={(event) => setCashflowKeyword(event.target.value)} />
         <BusinessPeriodPicker label="流水日期区间" state={periodState} showAll />
         <ToolbarSelect aria-label="流水资金账户" allowClear disabled={filtersDisabled || !fundsReady} value={cashflowPoolId} placeholder="全部资金账户" options={pools.map((pool) => ({ value: pool.id, label: pool.name }))} onChange={setCashflowPoolId} />
         <ToolbarSelect aria-label="流水方向" allowClear disabled={filtersDisabled} value={cashflowDirection} placeholder="全部收支" options={flowDirectionOptions ?? []} onChange={setCashflowDirection} />
@@ -110,7 +110,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FundsPageController; 
       <StatRow
         items={[
           { label: "总收入", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowIncome },
-          { label: "总支出", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowExpense },
+          { label: "总支出", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowExpense, hint: "流水毛额，包含冲销和押金损失重分类，与实际现金支出可能不同" },
           { label: "当前结果", kind: "count", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : cashflowTotal },
         ]}
       />

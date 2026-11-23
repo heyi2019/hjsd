@@ -11,7 +11,7 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account, Order
-from app.funds.cashflow_queries import studio_summary
+from app.funds.cashflow_reads.studio import studio_totals_by_date
 from app.funds.deposits.reads import deposit_held_total
 from app.business.orders.queries import order_status_counts
 from app.business.inventory.inventory import inventory_cost_by_entry_date
@@ -30,8 +30,8 @@ def data_center_summary(
 
     订单规模按订单交易日期统计；售出成本和账号售出利润只统计已经出库的账号；
     在途成本统计当前在库账号；押金占用统计可见资金账户的在押金额；
-    工作室收支沿用资金中心的已入账手工收支口径。利润合计明确为「账号售出利润
-    + 工作室其他收入」，工作室成本单独展示，不重复扣减。
+    工作室收支沿用资金中心的已入账手工收支口径。利润合计为账号售出利润
+    加工作室其他收入，再减工作室成本。
     """
     _validate_date_range(from_date, to_date)
     status_counts = order_status_counts(
@@ -74,14 +74,14 @@ def data_center_summary(
         date_to=to_date,
         user=user,
     )
-    studio = studio_summary(
+    studio = studio_totals_by_date(
         session,
         occurred_from=from_date,
         occurred_to=to_date,
         user=user,
     )
-    studio_cost = to_money(studio["expense"])
-    studio_other_income = to_money(studio["income"])
+    studio_other_income = to_money(sum((income for income, _expense in studio.values()), ZERO))
+    studio_cost = to_money(sum((expense for _income, expense in studio.values()), ZERO))
 
     return {
         "order_count": order_count,
@@ -92,5 +92,5 @@ def data_center_summary(
         "studio_cost": studio_cost,
         "account_sale_profit": to_money(account_sale_profit),
         "studio_other_income": studio_other_income,
-        "profit": to_money(account_sale_profit + studio_other_income),
+        "profit": to_money(account_sale_profit + studio_other_income - studio_cost),
     }

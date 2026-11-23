@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 from collections.abc import Sequence
 from typing import Any
 
 from app.core.security import CurrentUser
+from app.core.report_csv import spreadsheet_csv_cell
 from app.business.inventory.collaboration import load_order_execution, load_order_execution_batch
 from app.business.inventory.schemas import AccountOut
+from app.settings.lists import service as list_columns_service
 
 
 INVENTORY_EXPORT_HEADERS = (
@@ -76,10 +79,10 @@ def _detail_text(detail: Any, source_order_id: int | None) -> dict[str, Any]:
         "consignment_platforms": consignment.content if consignment is not None else "-",
         "execution": execution,
         "finance": finance,
-        "expense_count": len(expense_rows),
-        "income_count": len(income_rows),
-        "total_expense": str(detail.finance_summary.total_expense) if detail is not None else "0.00",
-        "total_income": str(detail.finance_summary.total_income) if detail is not None else "0.00",
+        "expense_count": len(expense_rows) if detail is not None else "不可用",
+        "income_count": len(income_rows) if detail is not None else "不可用",
+        "total_expense": str(detail.finance_summary.total_expense) if detail is not None else "不可用",
+        "total_income": str(detail.finance_summary.total_income) if detail is not None else "不可用",
     }
 
 
@@ -147,9 +150,59 @@ def build_inventory_ledger_csv(
         for (_, order), account_out, detail in zip(batch, accounts[start:start + 500], details, strict=True):
             if detail is None:
                 failed_details += 1
-            writer.writerow(_row(account_out, _detail_text(detail, order.id)))
+            writer.writerow([spreadsheet_csv_cell(value) for value in _row(account_out, _detail_text(detail, order.id))])
         del details, detail
     return f"\ufeff{output.getvalue()}", failed_details
 
 
-__all__ = ["build_inventory_ledger_csv"]
+def build_inventory_visible_csv(pairs: Sequence[tuple[Any, Any]], accounts: Sequence[AccountOut], *, db: Any) -> str:
+    """按库存页面的列配置、顺序和行数据导出，不加载展开明细。"""
+    if len(pairs) != len(accounts):
+        raise ValueError("库存与账号数量不匹配")
+    config = list_columns_service.get_config(db, "INVENTORY")
+    columns = [column for column in config["columns"] if column["is_visible"] and column["key"] != "actions"]
+    labels = list_columns_service.get_value_labels(db, "INVENTORY")
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow([spreadsheet_csv_cell(column["label"]) for column in columns])
+    order_types = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}
+    for (_, order), account in zip(pairs, accounts, strict=True):
+        inventory_type = account.inventory_type or order_types.get(order.order_type, "")
+        status = "IN_STOCK" if account.status == "WAITING" else "OUT_OF_STOCK"
+        values = {
+            "stock_no": account.stock_no or "-",
+            "order_no": order.order_no or "-",
+            "inventory_entry_at": _minute(account.inventory_entry_at),
+            "inventory_operator": account.inventory_operator or "-",
+            "cost_amount": account.cost_amount,
+            "account_game_type": account.game_type or "-",
+            "account_game_account": account.game_account or "-",
+            "business_mode": BUSINESS_MODE_LABEL.get(account.business_mode or "", account.business_mode or "-"),
+            "inventory_type": INVENTORY_TYPE_LABEL.get(inventory_type, inventory_type or "-"),
+            "inventory_age": "-" if account.inventory_age_days is None else f"{account.inventory_age_days}天",
+            "status": labels.get("status", {}).get(status, INVENTORY_STATUS_LABEL.get(status, status)),
+        }
+        cells = []
+        for column in columns:
+            key = column["key"]
+            if column.get("custom") and column.get("source_key"):
+                value = (order.form_extra or {}).get(column["source_key"], values.get(column["source_key"]))
+                mapping = column.get("value_labels") or {}
+                if value is None or value == "" or value == []:
+                    value = "-"
+                elif isinstance(value, list):
+                    value = "、".join(mapping.get(str(item), str(item)) for item in value)
+                elif isinstance(value, bool):
+                    value = "是" if value else "否"
+                elif isinstance(value, dict):
+                    value = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+                else:
+                    value = mapping.get(str(value), str(value))
+            else:
+                value = values.get(key, "-")
+            cells.append(spreadsheet_csv_cell(value))
+        writer.writerow(cells)
+    return f"\ufeff{output.getvalue()}"
+
+
+__all__ = ["build_inventory_ledger_csv", "build_inventory_visible_csv"]

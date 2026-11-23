@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 
 from app.shared.audit import record_audit
 from app.domain.enums import AuditAction
@@ -216,6 +216,31 @@ class TestAuditStatsApi:
         assert row["count"] == 0
         assert row["last_actor"] is None
         assert row["last_at"] is None
+
+    def test_stats_batch_query_preserves_order_duplicates_and_last_by_id(self, seeded_client, seeded_db, headers):
+        _audit(seeded_db, action=AuditAction.ORDER_CREATE, actor="first", entity_id=1, entity_type="batch_a")
+        _audit(seeded_db, action=AuditAction.ORDER_CREATE, actor="second", entity_id=2, entity_type="batch_a")
+        _audit(seeded_db, action=AuditAction.ORDER_CREATE, actor="third", entity_id=3, entity_type="batch_b")
+        latest = seeded_db.scalar(select(AuditLog).where(AuditLog.entity_type == "batch_a").order_by(AuditLog.id.desc()))
+        latest.occurred_at = latest.occurred_at.replace(year=2000)
+        seeded_db.flush()
+        statements = []
+        def track(_conn, _cursor, statement, _params, _context, _many):
+            if "audit_logs" in statement.lower():
+                statements.append(statement)
+        connection = seeded_db.connection()
+        event.listen(connection, "before_cursor_execute", track)
+        try:
+            result = seeded_client.get("/api/audit-logs/stats", headers=headers, params={"entity_types": "batch_b,batch_a,missing,batch_a"})
+        finally:
+            event.remove(connection, "before_cursor_execute", track)
+        assert result.status_code == 200, result.text
+        rows = result.json()["items"]
+        assert [item["entity_type"] for item in rows] == ["batch_b", "batch_a", "missing", "batch_a"]
+        assert [item["count"] for item in rows] == [1, 2, 0, 2]
+        assert rows[1]["last_actor"] == "second" and rows[1]["last_at"].startswith("2000-")
+        assert rows[1] == rows[3]
+        assert len(statements) == 1
 
     def test_whitespace_and_empty_input_are_tolerated(self, seeded_client, seeded_db, headers):
         _audit(

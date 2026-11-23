@@ -179,7 +179,7 @@ def inventory_ledger(
 
 
 def total_inventory_cost(session: Session, *, user: CurrentUser | None = None) -> Decimal:
-    return to_money(sum((to_money(row.cost_amount) for row in _inventory_rows(session, user=user)), Decimal("0")))
+    return inventory_cost_by_entry_date(session, user=user)
 
 
 def inventory_cost_by_entry_date(
@@ -297,16 +297,6 @@ def dashboard_inventory_summary(
 def inventory_age_days(row: Account, *, today: date | None = None) -> int | None:
     """库龄（自然日）只以入库存时间为准。"""
     return age_days(row.inventory_entry_at, today=today)
-
-
-def _inventory_rows(session: Session, *, user: CurrentUser | None = None) -> list[Account]:
-    stmt = select(Account).where(
-        Account.inventory_status.in_(INVENTORY_STATUSES),
-    )
-    scope = scope_filter(session, user)
-    if scope is not None:
-        stmt = stmt.where(scope)
-    return list(session.scalars(stmt).all())
 
 
 __all__ = [

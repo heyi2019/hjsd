@@ -3,7 +3,7 @@
 规则（PRD §2.1.1 / V19）：
 - 纯顺序号、不含日期；主业务按类型独立递增（HS/TH/DG 可并存同号）；
 - 事务内递增，取消不回收，编号永不修改、永不复用；
-- padding 仅为最小位数，超过后自动增加位数。
+- padding 通常为最小位数；通知编号固定 NTF0001–NTF9999。
 """
 from __future__ import annotations
 
@@ -16,6 +16,11 @@ from app.domain.enums import Direction, SequenceKey
 from app.domain.foundation import DocumentSequence
 
 DEFAULT_PADDING = 4
+NOTIFICATION_MAX = 9999
+
+
+def _notification_exhausted() -> Validation:
+    return Validation("通知编号已用尽，请联系管理员处理", details={"sequence_key": SequenceKey.NOTIFICATION.value, "max": NOTIFICATION_MAX})
 
 
 def ensure_sequence(
@@ -78,15 +83,17 @@ def allocate_number(session: Session, key: str | SequenceKey) -> str:
             details={"sequence_key": key_value},
         )
     prefix, padding = config
+    statement = update(DocumentSequence).where(DocumentSequence.sequence_key == key_value)
+    if key_value == SequenceKey.NOTIFICATION.value:
+        statement = statement.where(DocumentSequence.current_value < NOTIFICATION_MAX)
     allocated = session.execute(
-        update(DocumentSequence)
-        .where(
-            DocumentSequence.sequence_key == key_value,
-        )
+        statement
         .values(current_value=DocumentSequence.current_value + 1)
         .returning(DocumentSequence.current_value)
     ).scalar()
     if allocated is None:
+        if key_value == SequenceKey.NOTIFICATION.value:
+            raise _notification_exhausted()
         raise Validation("编号序列不存在", code=ErrorCode.VALIDATION_ERROR, details={"sequence_key": key_value})
     return f"{prefix}{allocated:0{padding}d}"
 
@@ -98,13 +105,19 @@ def allocate_numbers(session: Session, key: str | SequenceKey, count: int) -> li
     if count == 0:
         return []
     key_value = key.value if isinstance(key, SequenceKey) else key
+    statement = update(DocumentSequence).where(DocumentSequence.sequence_key == key_value)
+    if key_value == SequenceKey.NOTIFICATION.value:
+        statement = statement.where(DocumentSequence.current_value <= NOTIFICATION_MAX - count)
     config = session.execute(
-        update(DocumentSequence)
-        .where(DocumentSequence.sequence_key == key_value)
+        statement
         .values(current_value=DocumentSequence.current_value + count)
         .returning(DocumentSequence.prefix, DocumentSequence.padding, DocumentSequence.current_value)
     ).first()
     if config is None:
+        if key_value == SequenceKey.NOTIFICATION.value and session.scalar(
+            select(DocumentSequence.id).where(DocumentSequence.sequence_key == key_value)
+        ) is not None:
+            raise _notification_exhausted()
         raise Validation(f"编号序列 {key_value} 尚未初始化，请先执行基础种子", code=ErrorCode.VALIDATION_ERROR, details={"sequence_key": key_value})
     prefix, padding, last = config
     return [f"{prefix}{number:0{padding}d}" for number in range(last - count + 1, last + 1)]
@@ -118,6 +131,8 @@ def format_next_number(
     `peek_number` 与列表页共用同一份格式化口径：调用方若已持有序列行，
     直接用本函数即可，无需再逐行回查数据库。
     """
+    if sequence_key == SequenceKey.NOTIFICATION.value and current_value >= NOTIFICATION_MAX:
+        return "已用尽"
     return f"{prefix}{current_value + 1:0{padding}d}"
 
 

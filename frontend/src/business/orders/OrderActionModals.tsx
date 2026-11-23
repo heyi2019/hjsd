@@ -30,8 +30,11 @@ export function OrderAccountActionModals({ controller }: { controller: OrdersPag
   const saleCommon = {
     account: sale,
     onClose: controller.closeOrderSale,
-    onCreated: async () => {
-      await controller.load();
+    onCreated: async (account: NonNullable<typeof sale>) => {
+      await Promise.all([
+        controller.load(),
+        account.source_order_id == null ? undefined : controller.refreshCachedLedgerDetail(account.source_order_id, account.id),
+      ]);
     },
   };
   const consignment = controller.orderConsignmentTarget;
@@ -46,8 +49,8 @@ export function OrderAccountActionModals({ controller }: { controller: OrdersPag
         account={consignment?.account ?? null}
         orderId={consignment?.orderId}
         onClose={controller.closeOrderConsignment}
-        onCreated={async () => {
-          await controller.load();
+        onCreated={async (account, orderId) => {
+          await Promise.all([controller.load(), controller.refreshCachedLedgerDetail(orderId, account.id)]);
         }}
       />
     </>

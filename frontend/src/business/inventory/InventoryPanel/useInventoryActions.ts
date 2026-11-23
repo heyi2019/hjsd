@@ -36,8 +36,6 @@ export function useInventoryActions(params: {
   loadEditorExecution: (row: Account, orderId: number) => Promise<AccountExecutionDetail | null>;
   dropExecutionCache: (accountId: number) => void;
   expandTo: (ids: Key[]) => void;
-  expandedOrderIds: Key[];
-  removeFromInventory: (accountId: number, orderId?: number) => void;
   // editor 域注入（本地 openEditor/cancelInlineEdit 会再包装一层）
   editorOpenEditor: (account: Account, isCurrent?: () => boolean) => Promise<boolean>;
   editorCancelInlineEdit: () => void;
@@ -51,7 +49,7 @@ export function useInventoryActions(params: {
   const {
     load, setRows, setError,
     loadExecution, loadOrderExecution, loadActionExecution, loadEditorExecution, dropExecutionCache,
-    expandTo, expandedOrderIds, removeFromInventory,
+    expandTo,
     editorOpenEditor, editorCancelInlineEdit, editorCancelPendingOpen, editorIsSaving, editorSaveInline, inlineEditId,
     onNavigate,
   } = params;
@@ -69,10 +67,6 @@ export function useInventoryActions(params: {
   const [platformOffsaleTarget, setPlatformOffsaleTarget] = useState<{ account: Account; records: ActiveConsignment[] } | null>(null);
   const voidWrite = useAsyncAction();
   const voiding = voidWrite.pending;
-  // 删除二次确认：target 非空即弹窗打开，deleting 控制防重与按钮 loading。
-  const [deleteTarget, setDeleteTarget] = useState<Account | null>(null);
-  const deleteWrite = useAsyncAction();
-  const deleting = deleteWrite.pending;
   const [voidForm] = Form.useForm<InventoryCancellationValues>();
   const editIntent = useLatestRequest();
   const editRequestsRef = useRef<Record<string, Promise<AccountExecutionDetail | null>>>({});
@@ -265,36 +259,6 @@ export function useInventoryActions(params: {
       }
     });
   }
-  /** 删除成功后重拉台账：关联订单已清理，上层订单/分期视图也要同步刷新。 */
-  async function submitDelete(reason: string) {
-    if (!deleteTarget) return;
-    const target = deleteTarget;
-    const sourceOrderId = target.source_order_id;
-    if (sourceOrderId == null) {
-      appMessage.error("当前库存没有关联订单，无法删除");
-      return;
-    }
-    const session = actionRequest.current();
-    await deleteWrite.run(async () => {
-      try {
-        await ordersApi.deleteOrder(sourceOrderId, reason);
-        const current = actionRequest.isCurrent(session);
-        if (current) {
-          actionRequest.invalidate();
-          setDeleteTarget(null);
-          if (inlineEditId === target.id) cancelInlineEdit();
-          expandTo(expandedOrderIds.filter((key) => String(key) !== `${sourceOrderId}:${target.id}`));
-        }
-        dropExecutionCache(target.id);
-        appMessage.success(current ? "已删除" : `${target.source_order_no ?? `账号 ${target.id}`}：已删除`);
-        void load();
-      } catch (cause) {
-        // 失败时弹窗保持打开，用户可改原因后重试；错误必须出声，不能「点了没反应」。
-        const message = normalizeError(cause).message;
-        appMessage.error(actionRequest.isCurrent(session) ? message : `${target.source_order_no ?? `账号 ${target.id}`}：${message}`);
-      }
-    });
-  }
   function handleInventoryAction(key: InventoryActionKey, row: Account) {
     if (key === "void") {
       void openVoid(row);
@@ -347,10 +311,6 @@ export function useInventoryActions(params: {
     submitVoid,
     platformOffsaleTarget,
     setPlatformOffsaleTarget,
-    deleteTarget,
-    setDeleteTarget,
-    deleting,
-    submitDelete,
     openProfile,
     openEditor,
     cancelInlineEdit,

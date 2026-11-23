@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
 from app.core.database import get_db
+from app.core.errors import Validation
 from app.core.security import (
     PERM_FINANCE_READ,
     PERM_ORDER_CREATE,
+    PERM_REPORT_EXPORT,
     CurrentUser,
 )
 from app.settings.auth.session import (
@@ -60,6 +62,27 @@ def _detail_value_labels(db: Session) -> dict[str, dict[str, str]]:
 
 export_router = APIRouter(tags=["ORD-01/02 订单与事件"])
 read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
+export_access = require_permissions(PERM_REPORT_EXPORT)
+
+
+def _import_identity_columns(config: dict) -> list[tuple[str, str, bool]]:
+    """回流导入所需的身份字段；其余台账列仍遵循可见列配置。"""
+    visible = [column for column in config["columns"] if column.get("is_visible")]
+    keys = {column["key"] for column in visible}
+    labels = {column["label"] for column in visible}
+    result = []
+    for key, label in (("order_no", "订单号"), ("trade_date", "业务日期"), ("inventory_type", "业务类型")):
+        if key in keys:
+            continue
+        if label in labels:
+            raise Validation("自定义列名与导入必要字段重复", details={"column": label})
+        result.append((key, label, True))
+    # 未绑定库存的历史订单没有入库操作人，但仍可能有业务操作人。
+    if "business_operator" not in keys:
+        if "业务操作人" in labels:
+            raise Validation("自定义列名与导入必要字段重复", details={"column": "业务操作人"})
+        result.append(("business_operator", "业务操作人", True))
+    return result
 
 
 @export_router.get("/orders/export.csv")
@@ -76,9 +99,11 @@ def export_orders_csv(
     account_status: str | None = Query(default=None),
     inventory_operator_ids: list[int] | None = Query(default=None),
     sale_operator_ids: list[int] | None = Query(default=None),
+    sort_desc: bool | None = Query(default=None),
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
+    _exporter: CurrentUser = export_access,
 ) -> Response:
     """订单台账按「设置 → 列表字段」的可见列导出 CSV：同 /orders 筛选口径，全量不分页。
     mine=true 时与「我的订单」视图一致，只导出我负责/我执行的订单。"""
@@ -96,6 +121,7 @@ def export_orders_csv(
         account_status=account_status,
         inventory_operator_ids=inventory_operator_ids,
         sale_operator_ids=sale_operator_ids,
+        sort_desc=sort_desc,
         mine=mine,
         limit=None,
         offset=0,
@@ -120,11 +146,12 @@ def export_orders_csv(
         # 中文文案由静态列字典统一翻译。
         row["business_mode"] = row.get("account_business_mode")
         row["inventory_type"] = _INVENTORY_TYPE_BY_ORDER_TYPE.get(order.order_type)
+    config = list_columns_service.get_config(db, "LEDGER")
     csv_text, meta = build_list_csv(
         db,
         "LEDGER",
         rows,
-        extra_columns=ORDER_DETAIL_EXPORT_COLUMNS,
+        extra_columns=[*_import_identity_columns(config), *ORDER_DETAIL_EXPORT_COLUMNS],
     )
     record_audit(
         db,
@@ -151,9 +178,11 @@ def export_orders_xlsx(
     account_status: str | None = Query(default=None),
     inventory_operator_ids: list[int] | None = Query(default=None),
     sale_operator_ids: list[int] | None = Query(default=None),
+    sort_desc: bool | None = Query(default=None),
     mine: bool = Query(default=False),
     db: Session = Depends(get_db),
     _user: CurrentUser = read_orders,
+    _exporter: CurrentUser = export_access,
 ) -> Response:
     """订单台账导出 Excel：Sheet「主订单信息」= 列表可见列，Sheet「详情信息」= 订单详情全字段。
 
@@ -174,6 +203,7 @@ def export_orders_xlsx(
         account_status=account_status,
         inventory_operator_ids=inventory_operator_ids,
         sale_operator_ids=sale_operator_ids,
+        sort_desc=sort_desc,
         mine=mine,
         limit=None,
         offset=0,
@@ -217,6 +247,7 @@ def export_orders_xlsx(
         for column in config["columns"]
         if column["key"] not in UI_ONLY_KEYS
     ]
+    main_columns.extend(_import_identity_columns(config))
     main_rows = inject_custom_columns(rows, config)
 
     workbook = new_workbook()

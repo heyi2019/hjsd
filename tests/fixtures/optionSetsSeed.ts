@@ -144,6 +144,7 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "GAME_TYPE_UPDATE", label: "编辑游戏类型" },
     { value: "GAME_TYPE_DISABLE", label: "停用游戏类型" },
     { value: "GAME_TYPE_DEFAULT", label: "设置默认游戏类型" },
+    { value: "GAME_TYPE_DELETE", label: "删除游戏类型" },
     { value: "CUSTOMER_CREATE", label: "新建客户" },
     { value: "CUSTOMER_UPDATE", label: "编辑客户" },
     { value: "CONTACT_WRITE", label: "维护联系人" },

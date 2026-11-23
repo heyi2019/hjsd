@@ -133,7 +133,7 @@ def test_data_center_separates_costs_and_combines_profit(seeded_client, seeded_d
         "studio_cost": "30.00",
         "account_sale_profit": "60.00",
         "studio_other_income": "20.00",
-        "profit": "80.00",
+        "profit": "50.00",
     }
 
     installment_order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")

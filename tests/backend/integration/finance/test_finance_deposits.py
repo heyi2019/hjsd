@@ -24,7 +24,7 @@ from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.funds.balances import pool_balance
 from app.customers.counterparties import create_counterparty, set_counterparty_status
-from app.operations.r2_monthly_pnl import r2_monthly_pnl
+from app.operations.monthly_pnl import monthly_pnl_report
 
 TODAY = date(2026, 10, 4)
 
@@ -283,7 +283,7 @@ class TestDepositQueries:
             "600.00"
         )
 
-    def test_deposit_loss_becomes_operating_expense_without_double_holding(
+    def test_deposit_loss_reclassifies_holding_without_new_operating_expense(
         self, seeded_db
     ):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -328,8 +328,8 @@ class TestDepositQueries:
         assert deposit.status == "LOST"
         assert deposit_held_total(seeded_db, pool_id=invest.id) == Decimal("0.00")
 
-        pnl = r2_monthly_pnl(seeded_db)
-        assert pnl["items"][0]["operating_expense"] == Decimal("1000.00")
+        pnl = monthly_pnl_report(seeded_db)
+        assert pnl["total"]["operating_expense"] == Decimal("0.00")
 
     def test_deposit_loss_cannot_exceed_unreleased_balance(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
@@ -390,6 +390,15 @@ class TestDepositLedgerType:
                 seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
                 actor="pytest", ledger_type="STUDIO", source_order_id=order_id,
             )
+
+    def test_database_rejects_studio_deposit_with_source_order(self, seeded_db):
+        order_id = _active_order(seeded_db)
+        deposit = create_deposit(seeded_db, pool_id=1, amount="100", paid_on=TODAY,
+                                 actor="pytest", source_order_id=order_id)
+        with pytest.raises(IntegrityError, match="studio_deposit_no_order"):
+            with seeded_db.begin_nested():
+                deposit.ledger_type = "STUDIO"
+                seeded_db.flush()
 
     def test_invalid_ledger_type_rejected(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")

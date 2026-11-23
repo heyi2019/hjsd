@@ -75,6 +75,10 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
         offset: (requestedPage.page - 1) * requestedPage.pageSize,
       });
       if (listRequestId !== cashflowListRequestRef.current) return;
+      if (typeof result.total_in !== "string" || typeof result.total_out !== "string"
+        || !/^-?\d+(?:\.\d+)?$/.test(result.total_in) || !/^-?\d+(?:\.\d+)?$/.test(result.total_out)) {
+        throw new Error("资金流水汇总数据不完整，请重新加载");
+      }
       const lastPage = Math.max(1, Math.ceil(result.total / requestedPage.pageSize));
       if (requestedPage.page > lastPage) {
         setPaging({ ...requestedPage, page: lastPage });
@@ -83,8 +87,8 @@ export function useCashflowResources(active: boolean, periodState: PeriodState) 
       setCashflows(result.items);
       setCashflowTotal(result.total);
       setCashflowTotals({
-        income: result.total_in ?? "0.00",
-        expense: result.total_out ?? "0.00",
+        income: result.total_in,
+        expense: result.total_out,
       });
       setCashflowsReady(true);
     } catch (err) {

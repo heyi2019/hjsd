@@ -72,15 +72,18 @@ def test_money_equal_tolerance():
 
 
 def test_amount_column_roundtrip_is_lossless_at_business_scale():
-    """DECIMAL(18,2) 列类型往返：9,999,999,999.99 级别必须无损（bind→result 等价 DB 往返）。"""
+    """DECIMAL(18,2) 的有效金额写入时必须保持 Decimal 且不丢失分位。"""
     amt = Amount()
     samples = [
         Decimal("0.01"),
         Decimal("1234.56"),
         Decimal("99999999.99"),
         Decimal("9999999999.99"),
+        Decimal("9007199254740991.99"),
     ]
-    out = [amt.process_result_value(amt.process_bind_param(s, None), None) for s in samples]
+    bound = [amt.process_bind_param(s, None) for s in samples]
+    assert all(isinstance(value, Decimal) for value in bound)
+    out = [amt.process_result_value(value, None) for value in bound]
     assert out == samples
     assert all(isinstance(value, Decimal) for value in out)
 
@@ -89,13 +92,13 @@ def test_amount_column_precision_constants():
     assert (PRECISION, SCALE) == (18, 2)
 
 
-def test_amount_float_sum_matches_decimal():
-    """两万笔两位小数金额经过 float 存储后，聚合结果仍精确到分。"""
+def test_amount_bound_sum_matches_decimal():
+    """两万笔金额绑定后仍可进行精确的十进制求和。"""
     amt = Amount()
     random.seed(7)
-    rows = [round(random.uniform(0.01, 9999.99), 2) for _ in range(20000)]
-    expected = sum(Decimal(str(value)) for value in rows)
-    floats = [amt.process_bind_param(to_money(value), None) for value in rows]
-    assert all(isinstance(value, float) for value in floats)
-    actual = to_money(sum(floats))
+    rows = [Decimal(random.randrange(1, 1000000)) / 100 for _ in range(20000)]
+    expected = sum(rows)
+    values = [amt.process_bind_param(value, None) for value in rows]
+    assert all(isinstance(value, Decimal) for value in values)
+    actual = to_money(sum(values))
     assert actual == expected.quantize(Decimal("0.01"))

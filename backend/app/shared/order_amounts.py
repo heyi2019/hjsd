@@ -354,7 +354,7 @@ def order_profit_flow_by_date(
     from_date: date | None = None,
     to_date: date | None = None,
 ) -> dict[date, tuple[Decimal, Decimal]]:
-    """按发生日汇总非现金收入和支出（R2 按月聚合用）。"""
+    """按发生日汇总非现金收入和支出（月度损益 按月聚合用）。"""
     ids = _resolved_ids(order_ids)
     if ids is not None and not ids:
         return {}

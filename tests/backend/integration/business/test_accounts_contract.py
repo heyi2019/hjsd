@@ -1,6 +1,6 @@
 """API-01 accounts 账号台账契约测试（ACC-01）。
 
-与 test_m2.py 的分工：既有文件已覆盖建账号与账号状态随订单事件流转；
+与 test_installments_funds_integration.py 的分工：后者覆盖跨业务联动；
 本文件补空标识/重复建档校验、查询 404 与状态过滤、库存成本汇总
 （只统计在库与分期中），以及库存台账服务。
 """
@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
@@ -230,6 +230,10 @@ class TestCreateAccountGuards:
         assert result["facet_total"] == 3
         assert result["type_counts"] == {"RECOVERY": 2}
         assert len(statements) == 5
+        date_filtered = inventory_ledger(seeded_db, date_from=date.today() + timedelta(days=1))
+        assert date_filtered["total"] == 0
+        assert date_filtered["facet_total"] == 3
+        assert date_filtered["type_counts"] == {"RECOVERY": 2}
 
         owner = seeded_db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.id)).first()
         owner.team_ids = [42042]
@@ -602,6 +606,22 @@ class TestAccountQueries:
         assert pickup.id in {row["account_id"] for row in inventory(seeded_db)}
         assert total_inventory_cost(seeded_db) == Decimal("300.00")
 
+    def test_total_inventory_cost_does_not_load_every_account(self, seeded_db):
+        account = _account(seeded_db, "aggregate-only")
+        _buy(seeded_db, account, amount="42.00")
+        seeded_db.flush()
+        statements = []
+        def track(_conn, _cursor, statement, _params, _context, _many):
+            if "from stocks" in statement.lower():
+                statements.append(statement.lower())
+        connection = seeded_db.connection()
+        event.listen(connection, "before_cursor_execute", track)
+        try:
+            assert total_inventory_cost(seeded_db) == Decimal("42.00")
+        finally:
+            event.remove(connection, "before_cursor_execute", track)
+        assert len(statements) == 1 and "sum(" in statements[0]
+
 class TestAccountsApi:
     def test_legacy_account_list_and_profile_routes_are_removed(
         self, seeded_client, seeded_db, headers
@@ -917,7 +937,7 @@ class TestAccountsApi:
             "channel": "买号返点",
             "amount": "300.00",
             "collected_on": TODAY.isoformat(),
-            "collected_at": rebate.created_at.isoformat(),
+            "collected_at": datetime.combine(TODAY, rebate.created_at.time()).isoformat(),
         }]
         finance_rows = response.json()["detail_view"]["finance_rows"]
         assert [row["type"] for row in finance_rows] == ["回收成本", "返点收入"]

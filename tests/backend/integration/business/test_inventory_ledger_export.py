@@ -20,6 +20,40 @@ from app.domain.trade import Cashflow, Installment, InstallmentDisposition, Reba
 from app.shared.audit import record_audit
 
 
+def test_visible_inventory_export_uses_configured_columns_and_no_detail_reads(seeded_client, headers, seeded_db, monkeypatch):
+    from app.business.shared.form_config.form_fields import create_order_form_field
+    account = create_account(seeded_db, game_account="=visible", game_type="原神", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    create_order_form_field(seeded_db, order_type_code="HS", field_key="trade_role", label="交易角色", field_type="SELECT",
+                            options=[{"value": "BUYER", "label": "买家"}], actor="pytest")
+    order.form_extra = {"trade_role": "BUYER"}
+    seeded_db.flush()
+    added = seeded_client.post("/api/list-columns/INVENTORY/custom", headers=headers, json={"field_key": "trade_role", "label": "交易角色"})
+    assert added.status_code == 200, added.text
+    columns = added.json()["columns"]
+    selected = ["extra:trade_role", "order_no", "account_game_account"]
+    columns.sort(key=lambda item: selected.index(item["key"]) if item["key"] in selected else len(selected))
+    changed = seeded_client.put("/api/list-columns/INVENTORY", headers=headers, json={"items": [
+        {"column_key": item["key"], "is_visible": item["key"] in selected, "sort_order": index * 10}
+        for index, item in enumerate(columns)
+    ]})
+    assert changed.status_code == 200, changed.text
+    monkeypatch.setattr(inventory_export, "load_order_execution_batch", lambda *_: pytest.fail("可见列导出不应读取完整详情"))
+    response = seeded_client.get("/api/stocks/inventory/ledger/export.csv", headers=headers, params={"mode": "visible"})
+    assert response.status_code == 200, response.text
+    reader = csv.DictReader(io.StringIO(response.text.lstrip("\ufeff")))
+    assert reader.fieldnames == ["交易角色", "订单号", "游戏账号/产品"]
+    assert next(reader) == {"交易角色": "买家", "订单号": order.order_no, "游戏账号/产品": "'=visible"}
+    assert response.headers["X-Inventory-Detail-Failures"] == "0"
+
+
+@pytest.mark.parametrize("role,allowed", [("admin", True), ("operator", True), ("finance", True), ("auditor", True), ("viewer", False), ("employee", False)])
+def test_inventory_and_order_exports_require_export_permission(seeded_client, role, allowed):
+    for path in ("/api/orders/export.csv", "/api/orders/export.xlsx", "/api/stocks/export.csv", "/api/stocks/inventory/ledger/export.csv"):
+        response = seeded_client.get(path, headers={"X-Dev-User": role})
+        assert response.status_code == (200 if allowed else 403), (role, path, response.text[:200])
+
+
 def test_export_recovers_when_batch_loader_is_unavailable(seeded_client, headers, seeded_db, monkeypatch):
     account = create_account(seeded_db, game_account="export-no-batch-loader", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
@@ -54,6 +88,21 @@ def test_inventory_csv_limits_detail_memory_to_each_batch(seeded_db, monkeypatch
     assert len(list(csv.reader(io.StringIO(csv_text)))) == 1002
 
 
+def test_inventory_csv_escapes_formula_like_account_text(monkeypatch):
+    account = SimpleNamespace(source_order_no="", business_mode="SELF", inventory_type="RECOVERY", game_type="",
+                              camp_account="", stock_no="KU", cost_amount=Decimal("-12.50"), inventory_status="IN_STOCK",
+                              inventory_age_days=0, created_by="pytest", channel_region="", bound_phone="",
+                              has_secondary=None, account_description="=1+1", account_images=[], note="@SUM(A1)")
+    monkeypatch.setattr(inventory_export, "load_order_execution_batch", lambda *_: [None])
+    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
+    db = SimpleNamespace(begin_nested=nullcontext)
+    csv_text, _ = inventory_export.build_inventory_ledger_csv([(None, SimpleNamespace(id=1))], [account], db=db, user=user)
+    row = next(csv.DictReader(io.StringIO(csv_text.lstrip("\ufeff"))))
+    assert row["账号描述"] == "'=1+1"
+    assert row["备注"] == "'@SUM(A1)"
+    assert row["成本"] == "-12.50"
+
+
 def test_inventory_csv_keeps_other_batches_when_one_detail_fails(monkeypatch):
     account = SimpleNamespace(source_order_no="", business_mode="SELF", inventory_type="RECOVERY", game_type="",
                               camp_account="", stock_no="KU", cost_amount=Decimal("0"), inventory_status="IN_STOCK",
@@ -79,7 +128,7 @@ def test_inventory_csv_keeps_other_batches_when_one_detail_fails(monkeypatch):
     assert len(rows) == 501
     assert failed == 1
     assert rows[0]["总收入"] == "8"
-    assert rows[1]["总收入"] == "0.00"
+    assert rows[1]["总收入"] == "不可用"
     assert rows[-1]["总收入"] == "8"
 
 

@@ -13,23 +13,26 @@
 """
 from __future__ import annotations
 
-from fastapi import Depends, Header
+import hmac
+
+from fastapi import Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import AuthError, PermissionDenied
+from app.core.errors import AuthError, ErrorCode, PermissionDenied
 from app.core.security import (
     DEV_USERS,
     CurrentUser,
     user_from_payload,
 )
 from app.core.settings import Settings, get_settings
-from app.core.tokens import decode_token
+from app.core.tokens import credential_stamp, decode_token
 from app.domain.users import RevokedToken, User
 from app.shared.scope import owner_scope_filter, owner_scope_ids
 
 
 def get_current_user(
+    request: Request,
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_dev_user: str | None = Header(default=None, alias="X-Dev-User"),
     settings: Settings = Depends(get_settings),
@@ -54,6 +57,14 @@ def get_current_user(
         if account is not None and account.username == payload.get("username"):
             if not account.is_active:
                 raise AuthError("账号已停用，请联系管理员")
+            stamp = payload.get("credential_stamp")
+            if (stamp is None and not settings.is_development) or (
+                stamp is not None and (not isinstance(stamp, str) or not stamp.isascii() or not hmac.compare_digest(stamp, credential_stamp(account.password_hash, settings=settings)))
+            ):
+                raise AuthError("登录凭证已失效，请重新登录", code=ErrorCode.SESSION_INVALIDATED)
+            permitted_paths = {f"{settings.api_prefix}/auth/me", f"{settings.api_prefix}/auth/change-password"}
+            if account.must_change_password and request.url.path not in permitted_paths:
+                raise PermissionDenied("请先修改初始密码", code=ErrorCode.PASSWORD_CHANGE_REQUIRED)
             # JWT 只证明 token 曾由服务签发；角色、数据范围和池授权以当前
             # 数据库记录为准，使停用/改权在旧 token 未过期时也立即生效。
             return CurrentUser.build(

@@ -75,6 +75,7 @@ import { clearApiCache, setDevUser } from "@/shared/api/client";
 import { reportsApi } from "@/shared/api/reports.api";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
+import { poolsApi } from "@/shared/api/pools.api";
 import "@/shared/state/referenceDataEvents";
 
 function apiInstance() {
@@ -99,6 +100,25 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
 
     expect([first, second, third, fourth]).toEqual(["NET-1", "NET-2", "NET-3", "NET-4"]);
     expect((axios as any).__getCallCount()).toBe(4);
+  });
+
+  it("文件下载不缓存也不合并，避免过期文件和 Blob 累积", async () => {
+    const api = apiInstance();
+    const download = () => api.request({ method: "get", url: "/cashflows/export.csv", responseType: "blob" });
+    const first = await download();
+    const second = await download();
+    const [third, fourth] = await Promise.all([download(), download()]);
+    expect([first.data, second.data, third.data, fourth.data]).toEqual(["NET-1", "NET-2", "NET-3", "NET-4"]);
+  });
+
+  it("资金余额每次读取等待最新结果，同时合并并发读取", async () => {
+    const first = await poolsApi.balances();
+    expect(await poolsApi.balances()).not.toBe(first);
+    const [third, fourth] = await Promise.all([poolsApi.balances(), poolsApi.balances()]);
+    expect(third).toBe(fourth);
+    const single = await poolsApi.balance(1);
+    expect(await poolsApi.balance(1)).not.toBe(single);
+    expect((axios as any).__getCallCount()).toBe(5);
   });
 
   it("重新读取经营报表和通知摘要时等待最新结果", async () => {
@@ -151,6 +171,37 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     expect(cached.data).toBe(first.data);
     expect(cached.data).toMatch(/^NET-\d+$/);
     expect((axios as any).__getCallCount()).toBe(1);
+  });
+
+  it("大量不同筛选不会让普通 GET 缓存无限增长", async () => {
+    const api = apiInstance();
+    const oldest = await api.request({ method: "get", url: "/bounded-cache", params: { page: 0 } });
+    for (let page = 1; page <= 256; page += 1) {
+      await api.request({ method: "get", url: "/bounded-cache", params: { page } });
+    }
+    const newest = await api.request({ method: "get", url: "/bounded-cache", params: { page: 256 } });
+    expect(newest.data).toBe("NET-257");
+    const reloadedOldest = await api.request({ method: "get", url: "/bounded-cache", params: { page: 0 } });
+    expect(reloadedOldest.data).not.toBe(oldest.data);
+    expect((axios as any).__getCallCount()).toBe(258);
+  });
+
+  it("强制刷新后的缓存被淘汰时，较早请求仍不能回填旧数据", async () => {
+    const api = apiInstance();
+    const transport = (axios as any).__instances[1];
+    let finishOld!: (value: unknown) => void;
+    transport.request.mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }));
+    const old = api.request({ method: "get", url: "/evicted-refresh" });
+    await Promise.resolve();
+    const fresh = await api.request({ method: "get", url: "/evicted-refresh", refreshCache: true });
+    for (let page = 0; page < 256; page += 1) {
+      await api.request({ method: "get", url: "/evicted-other", params: { page } });
+    }
+    finishOld({ data: "OLD", status: 200, headers: {}, config: { method: "GET" } });
+    await old;
+    const afterEviction = await api.request({ method: "get", url: "/evicted-refresh" });
+    expect(afterEviction.data).not.toBe("OLD");
+    expect(afterEviction.data).not.toBe(fresh.data);
   });
 
   it("要求最新数据时只刷新目标接口，并合并并发刷新请求", async () => {

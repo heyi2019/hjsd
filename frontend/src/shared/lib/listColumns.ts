@@ -15,8 +15,10 @@ import type { ListScopeConfig } from "../api/types/forms";
 type Listener = () => void;
 
 const scopeCache = new Map<string, ListScopeConfig>();
+const scopeRevisions = new Map<string, number>();
 const listeners = new Set<Listener>();
 let inflight: Promise<void> | null = null;
+let revision = 0;
 
 function emit(): void {
   for (const listener of listeners) listener();
@@ -24,13 +26,22 @@ function emit(): void {
 
 function fetchAll(): Promise<void> {
   if (inflight) return inflight;
+  const startedAt = revision;
   // 用 Promise.resolve 包一层：接口缺失（测试里整体 mock 掉 catalog）或同步抛错时
   // 也只会走到 catch，不会把异常抛进渲染流程把列表打白。
   inflight = Promise.resolve()
     .then(() => listColumnsApi?.all?.())
     .then((scopes) => {
-      scopeCache.clear();
-      for (const scope of scopes ?? []) scopeCache.set(scope.code, scope);
+      const received = new Set((scopes ?? []).map((scope) => scope.code));
+      for (const code of scopeCache.keys()) {
+        if (!received.has(code) && (scopeRevisions.get(code) ?? 0) <= startedAt) {
+          scopeCache.delete(code);
+          scopeRevisions.delete(code);
+        }
+      }
+      for (const scope of scopes ?? []) {
+        if ((scopeRevisions.get(scope.code) ?? 0) <= startedAt) scopeCache.set(scope.code, scope);
+      }
     })
     .catch(() => {
       // 接口不可用时保留上次缓存（若有），列表按原样渲染
@@ -43,8 +54,15 @@ function fetchAll(): Promise<void> {
 }
 
 /** 设置页保存后调用：让所有已挂载列表按新配置重排，无需刷新页面。 */
-export function refreshListColumns(): void {
-  void fetchAll();
+export function refreshListColumns(): Promise<void> {
+  return fetchAll();
+}
+
+/** 保存接口返回完整配置，可直接同步页面；较早发出的全量读取不得覆盖它。 */
+export function updateListColumnScope(scope: ListScopeConfig): void {
+  scopeRevisions.set(scope.code, ++revision);
+  scopeCache.set(scope.code, scope);
+  emit();
 }
 
 /** 取列的稳定标识：优先 key，其次字符串 dataIndex，其次路径式 dataIndex。 */
@@ -86,6 +104,22 @@ export function markMobileHiddenColumns<T extends { key?: unknown; dataIndex?: u
       },
     } as T;
   });
+}
+
+/** 移动端固定优先标识列；用户隐藏该列时退回首个仍可见的列。 */
+export function markMobileIdentityColumn<T extends { key?: unknown; dataIndex?: unknown }>(columns: T[], preferredKey: string): T[] {
+  const available = columns.filter((column) => !String((column as T & { className?: string }).className ?? "").split(/\s+/).includes(MOBILE_HIDE_CLASS));
+  const target = available.find((column) => columnKey(column) === preferredKey) ?? available[0];
+  if (!target) return columns;
+  const source = target as T & { className?: string; onCell?: (record: unknown, index?: number) => Record<string, unknown> };
+  return columns.map((column) => column !== target ? column : {
+    ...column,
+    className: [source.className, "ui-col-mobile-identity"].filter(Boolean).join(" "),
+    onCell: (record: unknown, index?: number) => {
+      const cell = source.onCell?.(record, index) ?? {};
+      return { ...cell, className: [cell.className, "ui-col-mobile-identity"].filter(Boolean).join(" ") };
+    },
+  } as T);
 }
 
 /** 移动端卡片字段按列表配置排列；配置未提供时保持页面定义顺序。 */

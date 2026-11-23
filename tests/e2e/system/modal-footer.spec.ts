@@ -9,7 +9,7 @@ import { expect, test } from "@playwright/test";
  *  - 资金收支弹窗是 `BusinessActionModal`（标题「资金收支 · 订单号」），其 footer 就是
  *    标准 antd `.ant-modal-footer`，不再挂 `.business-registration-modal` 类。
  *
- * 自给自足：先用 API 建一张 HS 订单（关联在库 RECOVERY 账号），保证台账里有可点的行，
+ * 自给自足：先用 API 建一张 HS 订单，保证台账里有可点的行，
  * 不依赖其他用例的副作用（旧写法依赖 business-write 提前建单，孤立运行会无行可点）。
  */
 const API_BASE = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
@@ -17,16 +17,11 @@ const ADMIN = { "X-Dev-User": "admin" };
 
 test("业务操作弹窗的取消与保存按钮左右边缘对齐", async ({ page, request }) => {
   // 1) 造一张 HS 订单，确保台账有行可点。
-  const accounts = (await request.get(`${API_BASE}/stocks`, { headers: ADMIN }).then((r) => r.json())) as {
-    items: Array<{ id: number; inventory_status: string; inventory_type?: string }>;
-  };
-  const account = accounts.items.find(
-    (a) => a.inventory_status === "IN_STOCK" && a.inventory_type === "RECOVERY",
-  );
-  expect(account, "缺少 RECOVERY 在库测试账号").toBeTruthy();
   const created = await request.post(`${API_BASE}/orders`, {
     headers: ADMIN,
-    data: { order_type: "HS", account_id: account!.id, trade_date: "2026-10-21" },
+    data: { order_type: "HS", trade_date: "2026-10-21",
+      account_snapshot: { game_account: `e2e-footer-${Date.now()}`, game_type: "王者荣耀" },
+      form_extra: { business_responsible_ids: [1] } },
   });
   expect(created.status()).toBe(201);
   const orderNo = (await created.json()).order_no as string;

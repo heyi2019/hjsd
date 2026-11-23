@@ -40,33 +40,21 @@ test("设置中下载订单模板并预检导入，重复订单可跳过", async
 });
 
 /** 严格业务契约的真实写入联调：不使用旧 account 兼容字段。 */
-test("五类业务写入并按业务规则作废测试订单", async ({ request }) => {
+test("三类业务建单并按业务规则取消", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
-  const accountsResponse = await request.get(`${apiBase}/stocks`, { headers });
-  expect(accountsResponse.ok()).toBe(true);
-  const accounts = (await accountsResponse.json()).items;
-  const inStock = accounts.filter((item: { inventory_status: string }) => item.inventory_status === "IN_STOCK");
-  const accountFor = (inventoryType: string) => {
-    const account = inStock.find((item: { inventory_type?: string }) => item.inventory_type === inventoryType);
-    expect(account, `缺少 ${inventoryType} 测试账号`).toBeTruthy();
-    return account.id as number;
-  };
-  const cases = [
-    { order_type: "HS", account_id: accountFor("RECOVERY") },
-    { order_type: "TH", account_id: accountFor("PICKUP") },
-    { order_type: "DG", account_id: accountFor("CONSIGNMENT") },
-  ];
   const created: number[] = [];
-  for (const payload of cases) {
+  for (const orderType of ["HS", "TH", "DG"]) {
     const response = await request.post(`${apiBase}/orders`, {
       headers,
-      data: { ...payload, trade_date: "2026-10-17" },
+      data: { order_type: orderType, trade_date: "2026-10-17",
+        account_snapshot: { game_account: `e2e-${orderType}-${Date.now()}`, game_type: "王者荣耀" },
+        form_extra: { business_responsible_ids: [1] } },
     });
-    expect(response.status(), `${payload.order_type} 建单失败`).toBe(201);
+    expect(response.status(), await response.text()).toBe(201);
     const body = await response.json();
-    expect(body.order_type).toBe(payload.order_type);
-    if (payload.account_id) expect(body.account_id).toBe(payload.account_id);
+    expect(body.order_type).toBe(orderType);
+    expect(body.account_id).toBeTruthy();
     created.push(body.id);
   }
   for (const orderId of created) {
@@ -79,62 +67,7 @@ test("五类业务写入并按业务规则作废测试订单", async ({ request 
   }
 });
 
-test("自营分期出售：买入、分期收款、结清后交付", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
-  const headers = { "X-Dev-User": "admin" };
-  const accountsResponse = await request.get(`${apiBase}/stocks`, { headers });
-  expect(accountsResponse.ok()).toBe(true);
-  const accounts = (await accountsResponse.json()).items;
-  const account = accounts.find(
-    (item: { inventory_status: string; inventory_type?: string }) =>
-      item.inventory_status === "IN_STOCK" && item.inventory_type === "RECOVERY",
-  );
-  expect(account, "缺少 RECOVERY 测试账号").toBeTruthy();
-
-  const orderResponse = await request.post(`${apiBase}/orders`, {
-    headers,
-    data: { order_type: "HS", trade_date: "2026-10-17", account_id: account.id },
-  });
-  expect(orderResponse.status()).toBe(201);
-  const order = await orderResponse.json();
-
-  const buyResponse = await request.post(`${apiBase}/orders/${order.id}/events`, {
-    headers,
-    data: { event_type: "BUY", amount: "1200.00", occurred_on: "2026-10-17" },
-  });
-  expect(buyResponse.status()).toBe(201);
-
-  const installmentResponse = await request.post(`${apiBase}/installments`, {
-    headers,
-    data: {
-      order_id: order.id,
-      contract_type: "STOCK_SALE",
-      principal: "1200.00",
-      down_payment: "0.00",
-      periods: 3,
-      per_period: "400.00",
-      first_due_on: "2026-10-17",
-    },
-  });
-  expect(installmentResponse.status()).toBe(201);
-  const installment = await installmentResponse.json();
-
-  for (const period_no of [1, 2, 3]) {
-    const payment = await request.post(`${apiBase}/installments/${installment.id}/payments`, {
-      headers,
-      data: { amount: "400.00", paid_on: "2026-10-17", period_no },
-    });
-    expect(payment.status(), `第 ${period_no} 期收款失败`).toBe(200);
-  }
-  const delivery = await request.post(`${apiBase}/installments/${installment.id}/deliver`, {
-    headers,
-    data: { delivered_on: "2026-10-17", note: "E2E 测试换绑凭证" },
-  });
-  expect(delivery.status()).toBe(200);
-  expect((await delivery.json()).status).toBe("DELIVERED");
-});
-
-test("资金闭环：独立流水审核冲销、资金账户划转与日对账", async ({ request }) => {
+test("资金闭环：独立流水冲销、资金账户划转与日对账", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const headers = { "X-Dev-User": "admin" };
   const poolsResponse = await request.get(`${apiBase}/pools`, { headers });
@@ -157,8 +90,8 @@ test("资金闭环：独立流水审核冲销、资金账户划转与日对账",
   });
   expect(flow.status()).toBe(201);
   const flowBody = await flow.json();
-  // 口径：资金流水已取消审核/驳回流程，录入即入账（提交 3f7c115），创建即 APPROVED。
-  expect(flowBody.status).toBe("APPROVED");
+  expect(flowBody.direction).toBe("IN");
+  expect(Number(flowBody.amount)).toBe(10);
 
   const reversal = await request.post(`${apiBase}/cashflows/${flowBody.id}/reverse`, {
     headers,

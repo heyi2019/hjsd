@@ -5,7 +5,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 //  2) 命中新鲜缓存：TTL 内再次 GET 前台瞬时返回缓存值（不阻塞网络）；
 //  3) 写失效：POST 成功后清空 GET 缓存，下一次 GET 重新走网络拿到新值。
 // 注意：client.ts 同时调用 axios.create 两次（api、transport），需按创建顺序区分实例。
-vi.mock("axios", () => {
+vi.mock("axios", async (importOriginal) => {
+  const original = await importOriginal<typeof import("axios")>();
+  const { AxiosHeaders } = original;
   const instances: any[] = [];
   let callCount = 0;
   const transportRequest = async (config: any) => {
@@ -27,7 +29,7 @@ vi.mock("axios", () => {
         response: { use: (fn: any) => resHandlers.push(fn) },
       },
       request: vi.fn(async (config: any) => {
-        let cfg = { ...config, headers: { ...(config.headers || {}) } };
+        let cfg = { ...config, headers: new AxiosHeaders(config.headers) };
         for (const h of reqHandlers.slice().reverse()) cfg = (await h(cfg)) ?? cfg;
         let response: any;
         if (typeof cfg.adapter === "function") {
@@ -45,29 +47,16 @@ vi.mock("axios", () => {
     return inst;
   });
   const apiDefault = {
+    ...original.default,
     create,
-    // 与真实 axios 对齐：AxiosHeaders 构造器接受 headers 对象并支持 set/get
-    AxiosHeaders: class {
-      map: Record<string, any>;
-
-      constructor(h: any) {
-        this.map = h || {};
-      }
-      set(k: string, v: string) {
-        this.map[k] = v;
-        return this;
-      }
-      get(k: string) {
-        return this.map[k];
-      }
-    },
+    AxiosHeaders,
     __instances: instances,
     __getCallCount: () => callCount,
     __resetCalls: () => {
       callCount = 0;
     },
   };
-  return { default: apiDefault, create, __getCallCount: apiDefault.__getCallCount, __resetCalls: apiDefault.__resetCalls };
+  return { ...original, default: apiDefault, create, __getCallCount: apiDefault.__getCallCount, __resetCalls: apiDefault.__resetCalls };
 });
 
 import axios from "axios";

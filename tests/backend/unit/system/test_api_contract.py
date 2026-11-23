@@ -19,6 +19,7 @@ NON_JSON_ROUTES = frozenset(
         ("DELETE", "/api/deposits/{deposit_id}"),
         ("GET", "/api/orders/export.csv"),
         ("GET", "/api/orders/export.xlsx"),
+        ("GET", "/api/order-imports/template.xlsx"),
         ("GET", "/api/stocks/export.csv"),
         ("GET", "/api/customers/export.csv"),
         ("GET", "/api/installments/export.csv"),

@@ -14,6 +14,8 @@ import { buildCustomerOptions, getPartySelectionDelta, groupCustomerIdsByRole, m
 import type { OrderDetailMeta } from "@/business/shared/order-detail/OrderDetail.shared";
 import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { optionSetList } from "@fixtures/api-responses";
 import { renderApp, renderLight } from "@fixtures/render";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { OrderAttachments } from "@/business/shared/order-detail/OrderAttachments";
@@ -51,6 +53,8 @@ beforeEach(() => {
   // OrderDetail 编辑态会按 scope 异步加载字段配置。测试不关心配置接口本身，
   // 固定为空响应并主动等待一次微任务，避免异步清理状态落在测试 act 之外。
   vi.spyOn(orderFormFieldsApi, "list").mockResolvedValue([]);
+  vi.spyOn(orderFormFieldsApi, "listSectionLabels").mockResolvedValue({});
+  vi.spyOn(optionSetsApi, "list").mockResolvedValue(optionSetList());
   vi.spyOn(customersApi, "options").mockResolvedValue([]);
   vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
 });
@@ -885,7 +889,8 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("combobox", { name: "选择买家" })).toBeDisabled();
     await userEvent.click(screen.getByRole("combobox", { name: "选择合作方" }));
     expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    const alert = screen.getByText(/客户名单读取失败/).closest('[role="alert"]') as HTMLElement;
+    await userEvent.click(within(alert).getByRole("button", { name: "重新加载" }));
     await waitFor(() => expect(screen.getByRole("combobox", { name: "选择买家" })).toBeEnabled());
     await userEvent.click(screen.getByRole("combobox", { name: "选择买家" }));
     expect(await screen.findByRole("option", { name: /已有客户/ })).toBeInTheDocument();
@@ -901,7 +906,8 @@ describe("OrderDetail", () => {
     expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeDisabled();
     await userEvent.click(screen.getByRole("combobox", { name: "选择买家" }));
     expect(await screen.findByRole("option", { name: /已有客户/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    const alert = screen.getByText(/渠道名单读取失败/).closest('[role="alert"]') as HTMLElement;
+    await userEvent.click(within(alert).getByRole("button", { name: "重新加载" }));
     await waitFor(() => expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeEnabled());
     await userEvent.click(screen.getByRole("combobox", { name: "选择合作方" }));
     expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();

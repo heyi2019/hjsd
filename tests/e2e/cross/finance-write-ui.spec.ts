@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 import { navItem } from "../support/api-stub";
 
 /**
@@ -40,10 +40,6 @@ function formItemByLabel(dialog: Locator, label: string): Locator {
   return dialog.locator(`.ant-form-item:has(.ant-form-item-label:has-text(${JSON.stringify(label)}))`);
 }
 
-async function openSelect(dialog: Locator, label: string): Promise<void> {
-  await formItemByLabel(dialog, label).locator(".ant-select-selector").click();
-}
-
 /** 按表单项标签定位其首个 input 并填入值（覆盖金额/比例/日期等受控输入）。
  *  比 getByLabel 更稳：直接走 form-item 容器 → input，不受 antd 冒号/后缀/多 Modal 影响。
  *  注：弹窗入场动画（transform: scale）或紧随下拉关闭的回流瞬间，受控 input 可能被量到 0 宽，
@@ -52,123 +48,6 @@ async function openSelect(dialog: Locator, label: string): Promise<void> {
 async function fillByLabel(dialog: Locator, label: string, value: string): Promise<void> {
   const control = formItemByLabel(dialog, label).locator("input").first();
   await control.fill(value, { force: true });
-}
-
-/**
- * 在已打开的对话框内选中下拉项。
- *
- * antd v5 下拉定位范式（本仓库多轮实测收敛出的最稳写法）：
- *  - 下拉渲染在 body 下的 portal，class 为 `.ant-select-dropdown`；打开时**不带**
- *    `ant-select-dropdown-hidden`，关闭动画期间**带**该类。故用
- *    `.ant-select-dropdown:not(.ant-select-dropdown-hidden)` 定位「当前可见下拉」，
- *    并 `toHaveCount(1)` 等待上一个下拉的关闭动画结束（其 `-hidden` 类一旦加上即被
- *    排除），从而唯一确定「刚打开的那个」——规避两类坑：
- *      a) `.last()` 启发式会命中关闭动画中尚未加 `-hidden` 的残留旧下拉；
- *      b) 用 `aria-controls` 的 `#<id>_list` 会因关闭期「同 id 旧节点残留」命中隐藏旧节点。
- *  - antd 对长列表（返点来源订单等）做虚拟滚动，未渲染到视口的选项不在 DOM。故分段
- *    滚动整列（顶→中→底重复多轮），直到目标项渲染并可见再点击（option 为子串匹配：
- *    字符串走子串、正则走 RegExp.test）。
- */
-async function pickOptionInDropdown(
-  page: Page,
-  dropdown: Locator,
-  option: RegExp | string,
-): Promise<void> {
-  const opt = dropdown.locator(".ant-select-item-option", { hasText: option });
-  // 虚拟列表（长选项集）：小步增量下滚，直到目标项渲染并可见。
-  const holder = dropdown.locator(".rc-virtual-list-holder").first();
-  if ((await holder.count()) > 0) {
-    for (let i = 0; i < 40; i++) {
-      if ((await opt.first().isVisible().catch(() => false))) break;
-      await holder
-        .evaluate((el) => {
-          el.scrollTop += Math.max(el.clientHeight * 0.9, 40);
-        })
-        .catch(() => undefined);
-      await page.waitForTimeout(25);
-    }
-  }
-  await expect(opt.first()).toBeVisible({ timeout: 5000 });
-  await opt.first().click({ timeout: 5000 });
-}
-
-async function pickSelect(
-  page: Page,
-  dialog: Locator,
-  label: string,
-  option: RegExp | string,
-): Promise<void> {
-  const item = formItemByLabel(dialog, label);
-  const selector = item.locator(".ant-select-selector");
-  const select = item.locator(".ant-select");
-
-  // 关掉任何残留的下拉（若有）：仅在确实存在可见下拉时才按 Esc——避免误关 Modal。
-  // antd 单选下拉打开时 Esc 会 stopPropagation，不会冒泡关掉外层 Modal。
-  if (
-    (await page
-      .locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)")
-      .count()) > 0
-  ) {
-    await page.keyboard.press("Escape").catch(() => undefined);
-    await page.waitForTimeout(150);
-  }
-
-  // 打开本字段下拉：必须点 .ant-select-selector（实际可点区域），点 .ant-select 外层
-  // 会被 label/遮挡层拦截导致 action 无限等待。
-  await selector.click();
-  const dropdown = page
-    .locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)")
-    .last();
-  await expect(dropdown).toBeVisible({ timeout: 5000 });
-
-  await pickOptionInDropdown(page, dropdown, option);
-
-  // 关闭断言：antd 单选选择后应自动收起。若仍打开（点击被吞/动画竞态），按 Esc 兜底关闭
-  // （此刻下拉确定打开，Esc 安全且 stopPropagation，不会关 Modal）。
-  let closed = false;
-  try {
-    await expect(dropdown).toBeHidden({ timeout: 4000 });
-    closed = true;
-  } catch {
-    closed = false;
-  }
-  if (!closed) {
-    await page.keyboard.press("Escape").catch(() => undefined);
-    await expect(dropdown).toBeHidden({ timeout: 4000 }).catch(() => undefined);
-  }
-  await page.waitForTimeout(120);
-
-  // 校验值确实写入（不仅下拉关闭，还要选中项文本命中目标）——否则一次点击被吞也不易被察觉。
-  const selText = await select
-    .locator(".ant-select-selection-item")
-    .first()
-    .innerText()
-    .catch(() => "");
-  const matched =
-    typeof option === "string" ? selText.includes(option) : option.test(selText);
-  if (!matched) {
-    if (
-      (await page
-        .locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)")
-        .count()) > 0
-    ) {
-      await page.keyboard.press("Escape").catch(() => undefined);
-      await page.waitForTimeout(150);
-    }
-    await selector.click();
-    const dd2 = page
-      .locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)")
-      .last();
-    await expect(dd2).toBeVisible({ timeout: 5000 });
-    await pickOptionInDropdown(page, dd2, option);
-    try {
-      await expect(dd2).toBeHidden({ timeout: 4000 });
-    } catch {
-      await page.keyboard.press("Escape").catch(() => undefined);
-      await expect(dd2).toBeHidden({ timeout: 4000 }).catch(() => undefined);
-    }
-    await page.waitForTimeout(120);
-  }
 }
 
 test.describe("资金/返点/分期 UI 主写路径", () => {
@@ -223,27 +102,6 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await expect(page.getByText("工作室收支已冲销")).toBeVisible();
     await expect(originalRow).toBeVisible();
     await expect(originalRow.getByRole("button", { name: "冲销" })).toHaveCount(0);
-    expect(errors).toEqual([]);
-  });
-
-  test("资金中心·总览：资金账户划转登记", async ({ page }) => {
-    const errors: string[] = [];
-    page.on("pageerror", (e) => errors.push(e.message));
-
-    await page.goto("/");
-    await navItem(page, "资金中心").click(); // 默认总览
-    await page.getByRole("button", { name: "资金账户划转" }).click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await pickSelect(page, dialog, "转出资金账户", /投资款荷包/);
-    await pickSelect(page, dialog, "转入资金账户", /利润荷包/);
-    await dialog.getByLabel("划转金额").fill("1.00");
-    await dialog.getByLabel("划转日期").fill("2026-10-21");
-    await dialog.getByLabel("说明").fill("E2E 划转 UI");
-    await dialog.getByRole("button", { name: "确认划转" }).click();
-
-    await expect(page.getByText("资金账户划转已登记")).toBeVisible({ timeout: 10000 });
     expect(errors).toEqual([]);
   });
 

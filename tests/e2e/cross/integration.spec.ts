@@ -18,7 +18,7 @@ test.describe("real frontend<->backend integration", () => {
   }) => {
     const customersResp = page.waitForResponse(
       (r) =>
-        r.url().includes("/api/customers") && r.request().method() === "GET",
+        new URL(r.url()).pathname === "/api/customers" && r.request().method() === "GET",
     );
 
     await page.goto("/");

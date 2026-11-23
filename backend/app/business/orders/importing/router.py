@@ -15,6 +15,7 @@ from app.settings.lists.service import get_config
 from .parser import MAX_FILE_BYTES, parse_order_import
 from .execute import execute_order_import
 from .preview import preview_order_import
+from .schemas import ImportPreviewOut, ImportResultOut
 from .template import build_order_import_template
 
 router = APIRouter(prefix="/order-imports", tags=["订单导入"])
@@ -32,7 +33,7 @@ def order_import_template(
     return file_response(content, "订单导入模板.xlsx", XLSX_MEDIA_TYPE)
 
 
-@router.post("/preview")
+@router.post("/preview", response_model=ImportPreviewOut, response_model_exclude_none=True)
 async def order_import_preview(
     file: UploadFile = File(...),
     existing: Literal["skip", "update"] = Form(...),
@@ -48,7 +49,7 @@ async def order_import_preview(
         await file.close()
 
 
-@router.post("/execute")
+@router.post("/execute", response_model=ImportResultOut)
 async def order_import_execute(
     file: UploadFile = File(...),
     existing: Literal["skip", "update"] = Form(...),

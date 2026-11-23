@@ -16,15 +16,12 @@ const ADMIN = { "X-Dev-User": "admin" };
 
 test("返点弹窗的内层编辑弹窗可关闭，且不连带关闭外层", async ({ page, request }) => {
   test.setTimeout(60_000);
-  const stocks = (await request.get(`${API_BASE}/stocks?page_size=200`, { headers: ADMIN }).then((r) => r.json())) as {
-    items: Array<{ id: number; game_account: string; inventory_status: string; inventory_type?: string }>;
-  };
-  const account = stocks.items.find((a) => a.inventory_status === "IN_STOCK" && a.inventory_type === "RECOVERY");
-  expect(account, "缺少 RECOVERY 在库账号").toBeTruthy();
+  const gameAccount = `e2e-rebate-modal-${Date.now()}`;
 
   const orderRes = await request.post(`${API_BASE}/orders`, {
     headers: ADMIN,
-    data: { order_type: "HS", account_id: account!.id, trade_date: "2026-11-01" },
+    data: { order_type: "HS", account_snapshot: { game_account: gameAccount, game_type: "王者荣耀" },
+      form_extra: { business_responsible_ids: [1] }, trade_date: "2026-11-01" },
   });
   expect(orderRes.status(), await orderRes.text()).toBe(201);
   const order = (await orderRes.json()) as { id: number };
@@ -42,9 +39,9 @@ test("返点弹窗的内层编辑弹窗可关闭，且不连带关闭外层", as
   expect(created.status(), await created.text()).toBeLessThan(300);
 
   await page.goto("/#/business/inventory");
-  await page.getByLabel("搜索库存账号").fill(account!.game_account);
+  await page.getByRole("searchbox", { name: "搜索库存账号" }).fill(gameAccount);
   const row = page.getByRole("row").filter({
-    has: page.getByRole("cell", { name: account!.game_account, exact: true }),
+    has: page.getByRole("cell", { name: gameAccount, exact: true }),
   }).first();
   await expect(row).toBeVisible();
   await row.getByLabel("返点").click();

@@ -139,7 +139,7 @@ describe("OrdersPage：四类订单台账", () => {
   });
   it("筛选失败后清除旧订单，避免在新条件下操作旧结果", async () => {
     await openLedger("admin");
-    vi.mocked(ordersApi.listPage).mockRejectedValueOnce(new Error("订单查询失败"));
+    vi.mocked(ordersApi.listPage).mockRejectedValue(new Error("订单查询失败"));
     fireEvent.change(screen.getByLabelText("搜索订单"), { target: { value: "不存在" } });
     await ui.click(screen.getByRole("button", { name: "执行订单搜索" }));
     expect(await screen.findByText(/订单查询失败/)).toBeVisible();

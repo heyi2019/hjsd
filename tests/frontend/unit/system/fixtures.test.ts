@@ -46,6 +46,10 @@ describe("测试夹具隔离", () => {
     });
     expect(orderLedgerSummary({ total_count: 2 })).toEqual({
       total_count: 2,
+      in_progress_count: 0,
+      completed_count: 0,
+      cancelled_count: 0,
+      type_total: 0,
       status_counts: {},
       type_counts: {},
       game_types: [],

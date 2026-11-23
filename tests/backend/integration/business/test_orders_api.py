@@ -271,7 +271,7 @@ class TestOrdersApi:
         assert fetched.json()["events"][0]["operator"] == "种子用户9"
         assert fetched.json()["cashflows"][0]["operator"] == "种子用户9"
 
-    def test_detail_cashflows_match_each_event_operator_and_handle_missing_source(
+    def test_detail_cashflows_use_their_own_operator_even_when_the_source_is_missing(
         self, seeded_client, seeded_db, headers
     ):
         order = _order(seeded_db)
@@ -289,9 +289,17 @@ class TestOrdersApi:
 
         flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == buy.event_no))
         flow.source_id = "MISSING-EVENT"
+        sell_flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_id == sell.event_no))
+        sell_flow.operator_user_ids = [9]
         seeded_db.flush()
         response = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
         assert response.status_code == 200, response.text
+        flow_operators = {item["source_id"]: item["operator"] for item in response.json()["cashflows"]}
+        assert flow_operators["MISSING-EVENT"] == "种子用户9"
+        assert flow_operators[sell.event_no] == "种子用户9" != event_operators[sell.event_no]
+        flow.operator_user_ids = None
+        seeded_db.flush()
+        response = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
         assert next(item for item in response.json()["cashflows"] if item["source_id"] == "MISSING-EVENT")["operator"] == "-"
 
     def test_order_detail_aggregates_finance_installment_and_audit(

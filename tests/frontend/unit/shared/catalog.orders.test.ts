@@ -4,7 +4,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // 使用统一分页响应，验证订单列表客户端只读取后端分页信封。
 const TOTAL = 627;
 
-vi.mock("axios", () => {
+vi.mock("axios", async (importOriginal) => {
+  const original = await importOriginal<typeof import("axios")>();
+  const { AxiosHeaders } = original;
   const instances: any[] = [];
   let callCount = 0;
   const transportRequest = async (config: any) => {
@@ -31,8 +33,8 @@ vi.mock("axios", () => {
         response: { use: (fn: any) => resHandlers.push(fn) },
       },
       request: vi.fn(async (config: any) => {
-        let cfg = { ...config, headers: { ...(config.headers || {}) } };
-        for (const h of reqHandlers) cfg = (await h(cfg)) ?? cfg;
+        let cfg = { ...config, headers: new AxiosHeaders(config.headers) };
+        for (const h of reqHandlers.slice().reverse()) cfg = (await h(cfg)) ?? cfg;
         let response: any;
         if (typeof cfg.adapter === "function") {
           response = await cfg.adapter(cfg);
@@ -57,21 +59,9 @@ vi.mock("axios", () => {
     return inst;
   });
   const apiDefault = {
+    ...original.default,
     create,
-    AxiosHeaders: class {
-      map: Record<string, any>;
-
-      constructor(h: any) {
-        this.map = h || {};
-      }
-      set(k: string, v: string) {
-        this.map[k] = v;
-        return this;
-      }
-      get(k: string) {
-        return this.map[k];
-      }
-    },
+    AxiosHeaders,
     __instances: instances,
     __getCallCount: () => callCount,
     __resetCalls: () => {
@@ -79,6 +69,7 @@ vi.mock("axios", () => {
     },
   };
   return {
+    ...original,
     default: apiDefault,
     create,
     __getCallCount: apiDefault.__getCallCount,

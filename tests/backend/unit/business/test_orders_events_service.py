@@ -26,10 +26,10 @@ def test_active_listings_filters_many_unlistings_with_linear_matching():
             type(self).reads += 1
             return super().__str__()
 
-    listed = [SimpleNamespace(id=CountedId(index), form_extra={
+    listed = [SimpleNamespace(id=CountedId(index), event_type="OPERATE", is_posted=True, form_extra={
         "operation_type": "CONSIGNMENT", "consignment_platforms": ["甲", "乙"],
     }) for index in range(200)]
-    unlisted = [SimpleNamespace(form_extra={
+    unlisted = [SimpleNamespace(event_type="OPERATE", is_posted=True, form_extra={
         "operation_type": "UNLIST", "consignment_event_id": index, "consignment_platforms": ["甲"],
     }) for index in range(200)]
 
@@ -46,15 +46,16 @@ def test_active_listings_filters_many_unlistings_with_linear_matching():
     assert CountedId.reads <= 800
 
 
-def test_active_listings_preserves_system_and_raw_platform_matching():
+def test_active_listings_normalizes_platforms_and_ignores_unposted_events():
     events = [
-        SimpleNamespace(id=1, form_extra={"operation_type": "CONSIGNMENT", "consignment_platforms": ["甲", "乙"]}),
-        SimpleNamespace(id=2, form_extra={"operation_type": "CONSIGNMENT", "consignment_platforms": ["甲", "乙"]}),
-        SimpleNamespace(form_extra={"operation_type": "UNLIST", "consignment_event_id": "1", "platform_unlist_scope": "SYSTEM"}),
-        SimpleNamespace(form_extra={"operation_type": "UNLIST", "consignment_event_id": 2, "consignment_platforms": [" 甲 ", {"invalid": True}]}),
+        SimpleNamespace(id=1, event_type="OPERATE", is_posted=True, form_extra={"operation_type": "CONSIGNMENT", "consignment_platforms": ["甲", "乙"]}),
+        SimpleNamespace(id=2, event_type="OPERATE", is_posted=True, form_extra={"operation_type": "CONSIGNMENT", "consignment_platforms": ["甲", "乙"]}),
+        SimpleNamespace(event_type="OPERATE", is_posted=True, form_extra={"operation_type": "UNLIST", "consignment_event_id": "1", "platform_unlist_scope": "SYSTEM"}),
+        SimpleNamespace(event_type="OPERATE", is_posted=True, form_extra={"operation_type": "UNLIST", "consignment_event_id": 2, "consignment_platforms": [" 甲 ", {"invalid": True}]}),
+        SimpleNamespace(event_type="OPERATE", is_posted=False, form_extra={"operation_type": "UNLIST", "consignment_event_id": 2, "consignment_platforms": ["乙"]}),
     ]
     session = SimpleNamespace(scalars=lambda _statement: SimpleNamespace(all=lambda: events))
-    assert active_listings(session, 1) == {(2, "甲"), (2, "乙")}
+    assert active_listings(session, 1) == {(2, "乙")}
 
 
 def test_events_module_posts_event_without_using_facade(seeded_db):

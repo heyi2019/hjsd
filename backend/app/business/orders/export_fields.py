@@ -340,17 +340,20 @@ def _delivery_export_fields(
 def _order_detail_export_fields(
     detail: dict, value_labels: dict[str, dict[str, str]],
     user_names: dict[int, str] | None = None,
+    account_profile: dict[str, object] | None = None,
 ) -> dict[str, str | None]:
-    account = detail.get("account_snapshot") or {}
+    account = account_profile if account_profile is not None else (detail.get("account_snapshot") or {})
     form_extra = _translate_responsible_ids(detail.get("form_extra") or {}, user_names)
     has_secondary = account.get("has_secondary")
-    images = account.get("account_images") or []
+    image_count = account.get("account_image_count")
+    if image_count is None:
+        image_count = len(account.get("account_images") or [])
     return {
         "detail_account_channel_region": account.get("channel_region"),
         "detail_account_bound_phone": account.get("bound_phone"),
         "detail_account_secondary": None if has_secondary is None else ("有" if has_secondary else "无"),
         "detail_account_description": account.get("account_description"),
-        "detail_account_images": f"{len(images)}张" if images else "",
+        "detail_account_images": f"{image_count}张" if image_count else "",
         "detail_order_note": detail.get("note"),
         "detail_order_extra": detail_json(form_extra, value_labels),
         **_delivery_export_fields(detail, value_labels, form_extra),

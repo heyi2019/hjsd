@@ -398,6 +398,42 @@ def test_exported_ledger_updates_existing_order_without_rewriting_derived_column
     assert any("成本" in error for error in mismatch.json()["rows"][0]["errors"])
 
 
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_order_export_uses_current_linked_account_details(seeded_client, seeded_db, headers, extension):
+    from datetime import date
+    from app.business.inventory.profile import update_account_profile
+    from app.business.orders.create import create_order
+
+    order = create_order(
+        seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest",
+        account_snapshot={"game_account": "导出账号", "channel_region": "旧区", "bound_phone": "旧手机号", "has_secondary": True},
+    )
+    update_account_profile(
+        seeded_db, order.account_id, actor="pytest", channel_region="新区", bound_phone=None,
+        has_secondary=False, account_description="最新账号描述",
+        account_images=["data:image/png;base64,one", "data:image/png;base64,two"],
+    )
+    seeded_db.commit()
+
+    response = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+    assert response.status_code == 200, response.text
+    tables = parse_order_import(f"订单.{extension}", response.content)
+    table = tables["details"] if extension == "xlsx" else tables["main"]
+    row = dict(zip(table.headers, table.rows[0].values))
+    assert row["渠道 / 区服"] == "新区"
+    assert row["绑定手机号"] == ""
+    assert row["有无二次"] == "无"
+    assert row["账号描述"] == "最新账号描述"
+    assert row["账号图片"] == "2张"
+    update_account_profile(seeded_db, order.account_id, actor="pytest", account_images=None)
+    seeded_db.commit()
+    response = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+    assert response.status_code == 200, response.text
+    tables = parse_order_import(f"订单.{extension}", response.content)
+    table = tables["details"] if extension == "xlsx" else tables["main"]
+    assert dict(zip(table.headers, table.rows[0].values))["账号图片"] == ""
+
+
 def test_execute_creates_unbound_orders_reserves_numbers_and_is_idempotent_on_skip(seeded_client, seeded_db, headers):
     from datetime import date
     from sqlalchemy import select
@@ -608,6 +644,11 @@ def test_selected_order_details_imports_snapshot_and_note_without_binding_stock(
     assert order.account_snapshot["channel_region"] == "一区"
     assert order.account_snapshot["bound_phone"] == "12345" and order.account_snapshot["has_secondary"] is True
     assert seeded_db.scalar(select(Account.id).where(Account.game_account == "历史账号")) is None
+    exported = seeded_client.get("/api/orders/export.xlsx", headers=headers, params={"keyword": order.order_no})
+    assert exported.status_code == 200, exported.text
+    details_table = parse_order_import("订单.xlsx", exported.content)["details"]
+    detail = dict(zip(details_table.headers, details_table.rows[0].values))
+    assert detail["渠道 / 区服"] == "一区" and detail["绑定手机号"] == "12345"
 
 
 @pytest.mark.parametrize("extension", ["csv", "xlsx"])

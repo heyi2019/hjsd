@@ -84,6 +84,8 @@ test.describe.serial("重写入用例（串行隔离）", () => {
     await saleModal.getByLabel("委托方昵称").fill(buyerName);
     await saleModal.locator('.ant-form-item:has(.ant-form-item-label:has-text("售出操作人")) .ant-select-selector').click();
     await page.getByTitle("系统管理员", { exact: true }).last().click();
+    await saleModal.getByRole("heading", { name: "委托方信息" }).click();
+    await expect(page.locator(".ant-select-dropdown:not(.ant-select-dropdown-hidden)")).toHaveCount(0);
 
     await saleModal.getByPlaceholder("请输入利润（代挂佣金）").fill("200");
 

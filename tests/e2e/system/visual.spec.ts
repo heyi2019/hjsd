@@ -7,6 +7,18 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
  * 拖动/缩放断言会随机红绿（实测同一用例两次跑一红一绿）。
  */
 async function waitStableGeometry(locator: Locator) {
+  // rc-motion 会在渲染后的帧中才给弹窗加进场类；先让进场调度完成，
+  // 再等该类移除，避免把动画开始前的短暂静止误判成最终位置。
+  await locator.evaluate(async (node) => {
+    if (!node.closest(".ant-modal")) return;
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+  });
+  await expect.poll(() => locator.evaluate((node) => {
+    const modal = node.closest<HTMLElement>(".ant-modal");
+    if (!modal) return true;
+    const entering = Array.from(modal.classList).some((name) => /^ant-zoom-(appear|enter)/.test(name));
+    return !entering && Math.abs(modal.getBoundingClientRect().width - modal.offsetWidth) < 1;
+  }), { timeout: 15000 }).toBe(true);
   // 第一判据：入场 scale 动画是否真的结束——transform 回到单位矩阵。
   // 只在低负载时「连续两次采样一致」不够：全量跑时动画偶发卡顿，两帧相同会被误判为已稳定。
   // 轮询窗口按全量实测放宽：机器 load 27 时 rc-motion 的 rAF 动画可停滞 8s 以上

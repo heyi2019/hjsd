@@ -2,6 +2,7 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -17,6 +18,7 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
+from app.domain.trade import Account
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import (
     UI_ONLY_KEYS,
@@ -63,6 +65,22 @@ def _detail_value_labels(db: Session) -> dict[str, dict[str, str]]:
 export_router = APIRouter(tags=["ORD-01/02 订单与事件"])
 read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 export_access = require_permissions(PERM_REPORT_EXPORT)
+
+
+def _account_export_profiles(db: Session, orders: list) -> dict[int, dict[str, object]]:
+    """批量读取当前库存资料；图片只取数量，不加载图片内容。"""
+    account_ids = {order.account_id for order in orders if order.account_id is not None}
+    if not account_ids:
+        return {}
+    image_count = case(
+        (func.json_typeof(Account.account_images) == "array", func.json_array_length(Account.account_images)),
+        else_=0,
+    ).label("account_image_count")
+    profiles = db.execute(select(
+        Account.id, Account.channel_region, Account.bound_phone, Account.has_secondary,
+        Account.account_description, image_count,
+    ).where(Account.id.in_(account_ids))).mappings().all()
+    return {profile["id"]: dict(profile) for profile in profiles}
 
 
 def _import_identity_columns(config: dict) -> list[tuple[str, str, bool]]:
@@ -134,9 +152,10 @@ def export_orders_csv(
     }
     names = user_name_map(db)
     details = _order_details_output(db, orders, _user)
+    account_profiles = _account_export_profiles(db, orders)
     for row, order, detail_output in zip(rows, orders, details, strict=True):
         detail = detail_output.model_dump(mode="json")
-        row.update(_order_detail_export_fields(detail, value_labels, names))
+        row.update(_order_detail_export_fields(detail, value_labels, names, account_profiles.get(order.account_id)))
         # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
         row["party"] = " · ".join(
             part for part in (row.get("party_name"), row.get("party_source")) if part
@@ -231,11 +250,12 @@ def export_orders_xlsx(
     rebate_rows: list[dict[str, object]] = []
     pool_names = _pool_name_map(db)
     details = _order_details_output(db, orders, _user)
+    account_profiles = _account_export_profiles(db, orders)
     for row, order, detail_output in zip(rows, orders, details, strict=True):
         detail = detail_output.model_dump(mode="json")
         order_no = row.get("order_no")
         detail_rows.append(
-            {"order_no": order_no, **_order_detail_export_fields(detail, value_labels, names)}
+            {"order_no": order_no, **_order_detail_export_fields(detail, value_labels, names, account_profiles.get(order.account_id))}
         )
         event_rows.extend(_order_event_export_rows(order_no, detail))
         cashflow_rows.extend(_cashflow_export_rows(order_no, detail, pool_names))

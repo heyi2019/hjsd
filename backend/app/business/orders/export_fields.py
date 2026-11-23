@@ -5,14 +5,17 @@
 """
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
 from app.domain.foundation import Pool
+from app.domain.trade import Account, Order
 from app.domain.users import User
+from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import detail_json
 
 # 订单表单里的经办人字段：存用户 id 数组，导出前翻成姓名。
@@ -184,6 +187,29 @@ def _money_or_none(value: object) -> Decimal | None:
         return to_money(value)
     except ValueError:
         return None
+
+
+def _detail_value_labels(db: Session) -> dict[str, dict[str, str]]:
+    """订单详情的动态字典，供导出和回流核对使用。"""
+    labels = list_columns_service.option_labels_by_code(db, ("COMPENSATION_TYPE",))
+    compensation = labels.get("COMPENSATION_TYPE")
+    return {"compensation_type": compensation} if compensation else {}
+
+
+def _account_export_profiles(db: Session, orders: Sequence[Order]) -> dict[int, dict[str, object]]:
+    """批量读取当前库存资料；图片只取数量，不加载图片内容。"""
+    account_ids = {order.account_id for order in orders if order.account_id is not None}
+    if not account_ids:
+        return {}
+    image_count = case(
+        (func.json_typeof(Account.account_images) == "array", func.json_array_length(Account.account_images)),
+        else_=0,
+    ).label("account_image_count")
+    profiles = db.execute(select(
+        Account.id, Account.channel_region, Account.bound_phone, Account.has_secondary,
+        Account.account_description, image_count,
+    ).where(Account.id.in_(account_ids))).mappings().all()
+    return {profile["id"]: dict(profile) for profile in profiles}
 
 
 def _pool_name_map(db: Session) -> dict[int, str]:
@@ -376,6 +402,8 @@ __all__ = [
     "CASHFLOW_EXPORT_COLUMNS",
     "REBATE_EXPORT_COLUMNS",
     "DETAIL_COLUMNS_MOVED_TO_SHEETS",
+    "_detail_value_labels",
+    "_account_export_profiles",
     "_pool_name_map",
     "user_name_map",
     "_event_platform",

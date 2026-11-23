@@ -1152,19 +1152,26 @@ describe("订单台账统一编辑入口（#15 需求1）", () => {
 
   it("未绑定库存的历史订单展开时仍可查看订单与资金明细", async () => {
     vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([
-      { id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "ACTIVE", account_id: null },
+      { id: 2, order_no: "HS-2026-0002", order_type: "HS", trade_date: "2026-10-02", status: "ACTIVE", account_id: null },
     ]) as never);
     vi.mocked(ordersApi.get).mockResolvedValue({
-      id: 2, order_no: "TH-2026-0002", order_type: "TH", trade_date: "2026-10-02", status: "ACTIVE",
-      account_id: null, note: "导入订单备注", account_snapshot: { game_account: "历史账号" },
+      id: 2, order_no: "HS-2026-0002", order_type: "HS", trade_date: "2026-10-02", status: "ACTIVE",
+      account_id: null, note: "导入订单备注", account_snapshot: {
+        game_account: "历史账号", channel_region: "历史区服", bound_phone: "13800000000",
+        has_secondary: false, account_description: "历史账号描述",
+      },
       events: [], cashflows: [{ flow_no: "SR00123", pool_id: 1, occurred_on: "2026-10-03", direction: "IN", category: "OTHER", amount: "25.00", operator: "admin" }], rebates: [],
     } as never);
     renderLight(<OrdersPage />, { user: "admin" });
     await accountUi.click(await screen.findByRole("tab", { name: "订单台账" }));
-    const row = (await screen.findByText("TH-2026-0002")).closest("tr")!;
+    const row = (await screen.findByText("HS-2026-0002")).closest("tr")!;
     fireEvent.click(row.querySelector(".ant-table-row-expand-icon") as Element);
     expect(await screen.findByText("导入订单备注")).toBeInTheDocument();
     expect(screen.getByText("历史账号")).toBeInTheDocument();
+    expect(screen.getByText("历史区服")).toBeInTheDocument();
+    expect(screen.getByText("13800000000")).toBeInTheDocument();
+    expect(screen.getByText("无")).toBeInTheDocument();
+    expect(screen.getByText("历史账号描述")).toBeInTheDocument();
     expect(screen.getByText("SR00123")).toBeInTheDocument();
     expect(ordersApi.executionDetail).not.toHaveBeenCalled();
   });

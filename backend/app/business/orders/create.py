@@ -20,6 +20,7 @@ from app.shared.form_field_rules import validate_business_responsible, validate_
 from app.customers.counterparties import assert_counterparty_usable
 from app.customers.customer_merge import assert_customer_usable
 from app.shared.form_values import set_extra_values
+from app.business.inventory._common import validate_account_profile_scope
 from app.business.inventory.profile import get_account
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -86,6 +87,10 @@ def create_order(
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
+        validate_account_profile_scope(
+            {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[definition.code],
+            account_snapshot.get("account_description"), None,
+        )
     # 账号/产品扩展值以库存账号为事实来源；落订单前拆出账号字段，避免订单与库存双写。
     snapshot_extra = dict((account_snapshot or {}).get("extra_values") or {})
     submitted_extra = dict(form_extra or {})
@@ -232,6 +237,7 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            account_description=snap.get("account_description"),
             wallet_realname=wallet_realname, camp_account=camp_account,
             secondary_images=secondary_images,
             wallet_realname_images=wallet_realname_images,
@@ -243,6 +249,7 @@ def create_order(
             session, order_type=definition.code, game_account=game_account, actor=actor,
             game_type=game_type, game_password=game_password, channel_region=channel_region,
             bound_phone=bound_phone, has_secondary=has_secondary, account_note=account_note,
+            account_description=snap.get("account_description"),
             wallet_realname=wallet_realname, camp_account=camp_account,
             secondary_images=secondary_images,
             wallet_realname_images=wallet_realname_images,

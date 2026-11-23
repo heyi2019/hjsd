@@ -131,7 +131,10 @@ def preview_order_import(
             if "events" in sections:
                 warnings.append("操作人按员工名称唯一匹配；买入、售出及取消会同步生成对应资金流水")
             if "details" in sections:
-                warnings.append("账号图片、附件等无法从数量或链接恢复；须另行补充原文件")
+                if action == "update":
+                    warnings.append("已有订单的图片、附件、审计等只读详情仅核对并保留，不会通过导入更改")
+                else:
+                    warnings.append("账号图片、附件等无法从数量或链接恢复；须另行补充原文件")
             for column in _SUMMARY_COLUMNS:
                 if record.get(column, "").strip():
                     warnings.append(f"{column}是汇总值，不能直接作为资金明细导入")
@@ -179,7 +182,7 @@ def preview_order_import(
     actions = {row["order_no"]: row["action"] for row in results}
     if "details" in sections and not any(error["sheet"] == _SECTION_LABELS["details"] for error in detail_errors):
         try:
-            read_details(tables, records, actions)
+            read_details(session, tables, records, actions, user)
         except Validation as exc:
             columns = exc.details.get("columns") or []
             detail_errors.append({"sheet": exc.details.get("sheet", _SECTION_LABELS["details"]),

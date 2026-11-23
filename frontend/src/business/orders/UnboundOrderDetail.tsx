@@ -35,6 +35,9 @@ export function UnboundOrderDetail({ orderId }: { orderId: number }) {
       <Descriptions.Item label="游戏账号/产品">{snapshot?.game_account || "-"}</Descriptions.Item>
       <Descriptions.Item label="游戏/产品类型">{snapshot?.game_type || "-"}</Descriptions.Item>
       <Descriptions.Item label="渠道 / 区服">{snapshot?.channel_region || "-"}</Descriptions.Item>
+      <Descriptions.Item label="绑定手机号">{snapshot?.bound_phone || "-"}</Descriptions.Item>
+      <Descriptions.Item label="有无二次">{snapshot?.has_secondary == null ? "-" : snapshot.has_secondary ? "有" : "无"}</Descriptions.Item>
+      <Descriptions.Item label="账号描述" span={2}>{snapshot?.account_description || "-"}</Descriptions.Item>
       <Descriptions.Item label="订单备注">{order.note || "-"}</Descriptions.Item>
     </Descriptions>
     <Typography.Text strong>操作明细</Typography.Text>

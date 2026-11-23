@@ -2,7 +2,6 @@
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query, Response
-from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -18,7 +17,6 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.enums import AuditAction
-from app.domain.trade import Account
 from app.settings.lists import service as list_columns_service
 from app.settings.lists.export import (
     UI_ONLY_KEYS,
@@ -39,7 +37,9 @@ from app.business.orders.export_fields import (
     ORDER_DETAIL_EXPORT_COLUMNS,
     ORDER_EVENT_EXPORT_COLUMNS,
     REBATE_EXPORT_COLUMNS,
+    _account_export_profiles,
     _cashflow_export_rows,
+    _detail_value_labels,
     _order_detail_export_fields,
     _order_event_export_rows,
     _pool_name_map,
@@ -52,35 +52,9 @@ from app.business.orders.export_fields import (
 _INVENTORY_TYPE_BY_ORDER_TYPE = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}
 
 
-def _detail_value_labels(db: Session) -> dict[str, dict[str, str]]:
-    """明细 JSON 列额外的动态字典：按 JSON 字段键取 option_sets 选项词典翻译。
-
-    首批只接包赔类型（COMPENSATION_TYPE，管理员可编辑）；明细键翻译的静态部分
-    由 lists.export_labels 承担，动态字典优先于静态表。
-    """
-    labels = list_columns_service.option_labels_by_code(db, ("COMPENSATION_TYPE",))
-    compensation = labels.get("COMPENSATION_TYPE")
-    return {"compensation_type": compensation} if compensation else {}
-
 export_router = APIRouter(tags=["ORD-01/02 订单与事件"])
 read_orders = require_permissions(PERM_ORDER_CREATE, PERM_FINANCE_READ, require_all=False)
 export_access = require_permissions(PERM_REPORT_EXPORT)
-
-
-def _account_export_profiles(db: Session, orders: list) -> dict[int, dict[str, object]]:
-    """批量读取当前库存资料；图片只取数量，不加载图片内容。"""
-    account_ids = {order.account_id for order in orders if order.account_id is not None}
-    if not account_ids:
-        return {}
-    image_count = case(
-        (func.json_typeof(Account.account_images) == "array", func.json_array_length(Account.account_images)),
-        else_=0,
-    ).label("account_image_count")
-    profiles = db.execute(select(
-        Account.id, Account.channel_region, Account.bound_phone, Account.has_secondary,
-        Account.account_description, image_count,
-    ).where(Account.id.in_(account_ids))).mappings().all()
-    return {profile["id"]: dict(profile) for profile in profiles}
 
 
 def _import_identity_columns(config: dict) -> list[tuple[str, str, bool]]:

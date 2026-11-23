@@ -87,6 +87,32 @@ def test_custom_column_rejects_ambiguous_options_and_lossy_numbers():
         read_custom_order_values({"业务类型": "代挂"}, "DG", {("DG", "业务类型"): None})
 
 
+def test_readonly_detail_json_compares_values_and_types():
+    from app.business.orders.importing.detail_reference import same_readonly_detail
+
+    assert same_readonly_detail('{"a": 1, "b": [true]}', '{"b":[true],"a":1}')
+    assert not same_readonly_detail('{"a": true}', '{"a":1}')
+    assert not same_readonly_detail('{"a": 1}', '{"a":1.0}')
+
+
+def test_detail_reference_respects_order_scope_and_audit_permission(seeded_db):
+    import json
+    from datetime import date
+    from app.business.orders.create import create_order
+    from app.business.orders.importing.detail_reference import detail_reference_values
+    from app.core.security import CurrentUser
+
+    own = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest", owner_id=1)
+    other = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest", owner_id=2)
+    limited = CurrentUser.build(id=1, username="seeduser1", roles=["OPERATOR"], owner_scope="SELF")
+    admin = CurrentUser.build(id=17, username="admin", roles=["ADMIN"], owner_scope="ALL")
+    references = detail_reference_values(seeded_db, {own.order_no, other.order_no}, limited, workbook=True)
+    assert set(references) == {own.order_no}
+    assert json.loads(references[own.order_no]["审计记录"]) == []
+    admin_reference = detail_reference_values(seeded_db, {own.order_no}, admin, workbook=True)
+    assert json.loads(admin_reference[own.order_no]["审计记录"])
+
+
 def test_preview_rejects_ambiguous_custom_column_names(seeded_client, seeded_db, headers):
     from app.domain.lists import ListCustomColumn
     from app.domain.trade import OrderFormField
@@ -630,10 +656,10 @@ def test_selected_order_details_imports_snapshot_and_note_without_binding_stock(
     main.append(["订单号", "业务日期", "业务类型", "游戏账号/产品", "游戏/产品类型"])
     main.append(["DG0960", "2026-10-17", "代挂", "历史账号", "手游"])
     details = book.create_sheet("详情信息")
-    details.append(["订单标识", "账号详情", None, None, "订单信息"])
-    details.append([None, None, None, None, None])
-    details.append(["订单号", "渠道 / 区服", "绑定手机号", "有无二次", "订单备注"])
-    details.append(["DG0960", "一区", "12345", "有", "历史订单备注"])
+    details.append(["订单标识", "账号详情", None, None, None, "订单信息"])
+    details.append([None, None, None, None, None, None])
+    details.append(["订单号", "渠道 / 区服", "绑定手机号", "有无二次", "账号描述", "订单备注"])
+    details.append(["DG0960", "一区", "12345", "有", "历史账号描述", "历史订单备注"])
     output = BytesIO()
     book.save(output)
     response = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "skip", "sections": "details"},
@@ -643,12 +669,142 @@ def test_selected_order_details_imports_snapshot_and_note_without_binding_stock(
     assert order.account_id is None and order.note == "历史订单备注"
     assert order.account_snapshot["channel_region"] == "一区"
     assert order.account_snapshot["bound_phone"] == "12345" and order.account_snapshot["has_secondary"] is True
+    assert order.account_snapshot["account_description"] == "历史账号描述"
     assert seeded_db.scalar(select(Account.id).where(Account.game_account == "历史账号")) is None
+    fetched = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
+    assert fetched.status_code == 200, fetched.text
+    snapshot = fetched.json()["account_snapshot"]
+    assert snapshot["bound_phone"] == "12345" and snapshot["has_secondary"] is True
+    assert snapshot["account_description"] == "历史账号描述"
     exported = seeded_client.get("/api/orders/export.xlsx", headers=headers, params={"keyword": order.order_no})
     assert exported.status_code == 200, exported.text
     details_table = parse_order_import("订单.xlsx", exported.content)["details"]
     detail = dict(zip(details_table.headers, details_table.rows[0].values))
     assert detail["渠道 / 区服"] == "一区" and detail["绑定手机号"] == "12345"
+    assert detail["账号描述"] == "历史账号描述"
+    repeated = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "update", "sections": "details"},
+                                  files={"file": ("订单.xlsx", output.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert repeated.status_code == 200, repeated.text
+    details.cell(4, 5, "尝试覆盖描述")
+    changed = BytesIO()
+    book.save(changed)
+    changed_preview = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "update", "sections": "details"},
+                                         files={"file": ("订单.xlsx", changed.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert changed_preview.status_code == 200, changed_preview.text
+    assert any("账号描述" in item["message"] for item in changed_preview.json()["detail_errors"])
+    rejected = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "update", "sections": "details"},
+                                  files={"file": ("订单.xlsx", changed.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert rejected.status_code == 422, rejected.text
+    seeded_db.refresh(order)
+    assert order.account_snapshot["account_description"] == "历史账号描述"
+    main.cell(2, 1, "TH0960")
+    main.cell(2, 3, "提号")
+    details.cell(4, 1, "TH0960")
+    invalid = BytesIO()
+    book.save(invalid)
+    preview = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "skip", "sections": "details"},
+                                 files={"file": ("订单.xlsx", invalid.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert preview.status_code == 200, preview.text
+    assert any("仅适用于回收或代挂" in item["message"] for item in preview.json()["detail_errors"])
+    assert seeded_db.scalar(select(Order.id).where(Order.order_no == "TH0960")) is None
+
+
+def test_order_creation_keeps_account_description_on_inventory_and_enforces_scope(seeded_client, seeded_db, headers):
+    from app.domain.trade import Account
+
+    payload = {"order_type": "DG", "trade_date": "2026-10-17",
+               "account_snapshot": {"game_account": "普通建单-描述", "account_description": "代挂介绍"}}
+    created = seeded_client.post("/api/orders", headers=headers, json=payload)
+    assert created.status_code == 201, created.text
+    assert seeded_db.get(Account, created.json()["account_id"]).account_description == "代挂介绍"
+    payload["order_type"] = "TH"
+    payload["account_snapshot"]["game_account"] = "提号-描述不允许"
+    denied = seeded_client.post("/api/orders", headers=headers, json=payload)
+    assert denied.status_code == 422, denied.text
+    assert "仅适用于回收或代挂" in denied.text
+
+
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_exported_details_can_update_the_same_order_without_rewriting_readonly_fields(seeded_client, seeded_db, headers, extension):
+    import csv
+    from datetime import date
+    from io import StringIO
+    from app.business.inventory.profile import update_account_profile
+    from app.business.orders.create import create_order
+    from app.domain.trade import Account
+
+    order = create_order(
+        seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest",
+        account_snapshot={"game_account": "详情回流", "channel_region": "一区", "account_description": "账号介绍"},
+        form_extra={"business_responsible_ids": [1]},
+    )
+    update_account_profile(seeded_db, order.account_id, actor="pytest", account_images=["data:image/png;base64,one"])
+    seeded_db.commit()
+    exported = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+    assert exported.status_code == 200, exported.text
+    mime = "text/csv" if extension == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    def submit(path):
+        return seeded_client.post(f"/api/order-imports/{path}", headers=headers,
+                                  data={"existing": "update", "sections": "details"},
+                                  files={"file": (f"订单.{extension}", exported.content, mime)})
+    preview = submit("preview")
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["rows"][0]["action"] == "update", preview.json()
+    assert any("只读详情" in warning for warning in preview.json()["rows"][0]["warnings"])
+    assert preview.json()["detail_errors"] == [], preview.json()
+    if extension == "csv":
+        reader = csv.DictReader(StringIO(exported.content.decode("utf-8-sig")))
+        rows = list(reader)
+        rows[0]["订单扩展字段"] = '{"业务负责人":"错误人员"}'
+        output = StringIO(newline="")
+        writer = csv.DictWriter(output, fieldnames=reader.fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+        modified = output.getvalue().encode()
+    else:
+        book = load_workbook(BytesIO(exported.content))
+        sheet = book["详情信息"]
+        headers_row = [cell.value for cell in sheet[3]]
+        sheet.cell(4, headers_row.index("订单扩展字段") + 1, '{"业务负责人":"错误人员"}')
+        output = BytesIO()
+        book.save(output)
+        modified = output.getvalue()
+    rejected = seeded_client.post("/api/order-imports/preview", headers=headers,
+                                  data={"existing": "update", "sections": "details"},
+                                  files={"file": (f"订单.{extension}", modified, mime)})
+    assert rejected.status_code == 200, rejected.text
+    assert any("订单扩展字段" in item["message"] for item in rejected.json()["detail_errors"])
+    result = submit("execute")
+    assert result.status_code == 200, result.text
+    assert result.json()["updated"] == 1
+    seeded_db.refresh(order)
+    assert order.form_extra["business_responsible_ids"] == [1]
+    assert seeded_db.get(Account, order.account_id).account_images == ["data:image/png;base64,one"]
+
+
+def test_detail_import_rechecks_readonly_values_after_preview(seeded_client, seeded_db, headers):
+    from datetime import date
+    from app.business.orders.create import create_order
+    from app.business.orders.mutations import update_order
+
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest",
+                         account_snapshot={"game_account": "并发详情回流"},
+                         form_extra={"business_responsible_ids": [1]})
+    seeded_db.commit()
+    exported = seeded_client.get("/api/orders/export.xlsx", headers=headers, params={"keyword": order.order_no})
+    assert exported.status_code == 200, exported.text
+    def submit(path):
+        return seeded_client.post(f"/api/order-imports/{path}", headers=headers,
+                                  data={"existing": "update", "sections": "details"},
+                                  files={"file": ("订单.xlsx", exported.content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    preview = submit("preview")
+    assert preview.status_code == 200 and not preview.json()["detail_errors"], preview.text
+    update_order(seeded_db, order.id, actor="other", form_extra={"business_responsible_ids": [2]}, form_extra_scope="DG")
+    seeded_db.commit()
+    rejected = submit("execute")
+    assert rejected.status_code == 422, rejected.text
+    seeded_db.refresh(order)
+    assert order.form_extra["business_responsible_ids"] == [2]
 
 
 @pytest.mark.parametrize("extension", ["csv", "xlsx"])

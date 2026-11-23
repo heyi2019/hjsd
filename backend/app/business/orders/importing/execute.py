@@ -66,7 +66,7 @@ def _execute_order_import(
     if preview["detail_errors"] or any(row["errors"] for row in preview["rows"]):
         raise Validation("导入期间订单状态发生变化，请重新预检", details={"preview": preview})
     actions = {row["order_no"]: row["action"] for row in preview["rows"]}
-    detail_values = read_details(tables, records, actions) if "details" in sections else {}
+    detail_values = read_details(session, tables, records, actions, user) if "details" in sections else {}
     custom_columns = configured_order_columns(session)
 
     created = updated = skipped = 0
@@ -105,7 +105,7 @@ def _execute_order_import(
                 current = (getattr(account, key, None) if account else None) or snapshot.get(key) or ""
                 if value and value != current:
                     raise Validation("更新订单的账号资料需在订单详情中处理", details={"order_no": number, "field": column})
-            for key in ("channel_region", "bound_phone", "has_secondary"):
+            for key in ("channel_region", "bound_phone", "has_secondary", "account_description"):
                 current = getattr(account, key, None) if account else snapshot.get(key)
                 if key in details and details[key] != current:
                     raise Validation("更新订单的账号资料需在订单详情中处理", details={"order_no": number, "field": key})
@@ -130,7 +130,7 @@ def _execute_order_import(
             continue
         account = record.get("游戏账号/产品", "").strip()
         game_type = record.get("游戏/产品类型", "").strip()
-        snapshot_extra = {key: details[key] for key in ("channel_region", "bound_phone", "has_secondary") if key in details}
+        snapshot_extra = {key: details[key] for key in ("channel_region", "bound_phone", "has_secondary", "account_description") if key in details}
         if (game_type or snapshot_extra or account_fields) and not account:
             raise Validation("填写账号详情时须同时填写游戏账号/产品", details={"order_no": number})
         snapshot = {"game_account": account, **({"game_type": game_type} if game_type else {}), **snapshot_extra} if account else None

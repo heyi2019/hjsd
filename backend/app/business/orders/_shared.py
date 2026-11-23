@@ -170,7 +170,7 @@ def _validate_participant_roles(
 
 
 # --------------------------------------------------------------------- 订单
-def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, value_added_service: str | None = None, wallet_realname: str | None = None, camp_account: str | None = None, secondary_images: list[str] | None = None, wallet_realname_images: list[str] | None = None, extra_values: Mapping[str, Any] | None = None) -> Account:
+def _create_inline_inventory_account(session: Session, *, order_type: str, game_account: str, actor: str, game_type: str | None, game_password: str | None, channel_region: str | None, bound_phone: str | None, has_secondary: bool | None, account_note: str | None, account_description: str | None = None, value_added_service: str | None = None, wallet_realname: str | None = None, camp_account: str | None = None, secondary_images: list[str] | None = None, wallet_realname_images: list[str] | None = None, extra_values: Mapping[str, Any] | None = None) -> Account:
     mode, inventory_type = {
         "HS": ("SELF", "RECOVERY"),
         "TH": ("DISTRIBUTION", "PICKUP"),
@@ -181,6 +181,7 @@ def _create_inline_inventory_account(session: Session, *, order_type: str, game_
         business_mode=mode, inventory_type=inventory_type, game_password=game_password,
         channel_region=channel_region, bound_phone=bound_phone,
         has_secondary=has_secondary, note=account_note,
+        account_description=account_description,
         value_added_service=value_added_service,
         wallet_realname=wallet_realname,
         camp_account=camp_account,

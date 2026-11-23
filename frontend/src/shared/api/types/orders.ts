@@ -71,6 +71,7 @@ export interface Order {
     bound_phone?: string | null;
     bound_phone_owner?: string | null;
     has_secondary?: boolean | null;
+    account_description?: string | null;
     /** 二次验证佐证图（data URL，最多 3 张）；仅「有无二次」为有时的上传结果。 */
     secondary_images?: string[] | null;
     wallet_realname?: string | null;

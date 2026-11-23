@@ -13,9 +13,7 @@ import { defineConfig, devices } from "@playwright/test";
  *     由 vite 代理到本套 E2E 后端端口（ERP_E2E_BACKEND_PORT=8124）——后端无 CORS 中间件，
  *     必须用同源代理而非跨域直连，否则请求被浏览器拦截。
  *
- * 数据策略：复用常驻 e2e 库，不再每次重建。e2e_backend.sh 默认（不清数据）只补缺失表
- * + 幂等播种；e2e_db.py 的夹具按 (business_mode, inventory_type) 补足 IN_STOCK 账号，
- * 故用例消耗在库账号后下一轮仍能补齐，自动化直接复用既有库（省 5–15s 启动 + 重播种子）。
+ * 数据策略：通过 npm run test:e2e 创建本次独有的临时库，成功后清理；失败时保留供排查。
  *
  * 隔离端口：8123/5173 被常驻 dev 后端/前端占用，E2E 独占 8124/5181，彻底绕开业务环境。
  * 可用环境变量覆盖：
@@ -23,6 +21,9 @@ import { defineConfig, devices } from "@playwright/test";
  *   ERP_E2E_FRONTEND_PORT    前端监听端口（默认 5181）
  */
 const E2E_BACKEND_PORT = process.env.ERP_E2E_BACKEND_PORT ?? "8124";
+if (process.env.HEIJIN_EPHEMERAL_E2E !== "1") {
+  throw new Error("请使用 npm run test:e2e 启动，确保 E2E 使用隔离临时库。");
+}
 const E2E_FRONTEND_PORT = process.env.ERP_E2E_FRONTEND_PORT ?? "5181";
 const E2E_FRONTEND_BASE = `http://127.0.0.1:${E2E_FRONTEND_PORT}`;
 // 真实后端联调用例（auth-login / business-write / finance-write-ui 等）的 API 基址：
@@ -86,9 +87,7 @@ export default defineConfig({
       timeout: 180000,
     },
     {
-      // E2E 后端：e2e_backend.sh 起独立 PG 库（heijin_erp_e2e）+ uvicorn。
-      // 不再注入 E2E_RESET=1：复用常驻 e2e 库，由 e2e_db.py 的夹具按类型补足 IN_STOCK
-      // 账号，避免每次跑测都 drop+create+重播种子（省 5–15s）。人工/自动化行为一致。
+      // E2E 后端使用运行入口创建的独立临时库与 uvicorn。
       // reuseExistingServer:false 保证每次强制重启 uvicorn，避免复用错的后端实例。
       command: `ERP_E2E_BACKEND_PORT=${E2E_BACKEND_PORT} bash ../backend/scripts/e2e_backend.sh`,
       url: `http://127.0.0.1:${E2E_BACKEND_PORT}/api/auth/me`,

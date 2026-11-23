@@ -169,3 +169,44 @@ def test_manual_db_marks_are_registered() -> None:
         f"DECLARED_DB_FILES 里以下文件已不再手工标 db：{stale}\n"
         "条目失效必须删除，否则守卫会替一个不存在的声明背书。"
     )
+
+
+def test_temporary_database_names_are_safe_and_distinct():
+    from scripts.ephemeral_test_db import make_database_name, validate_owned_database
+
+    first = make_database_name("test")
+    second = make_database_name("test")
+    assert first != second
+    assert validate_owned_database(first, "test")
+    assert not validate_owned_database("heijin_erp_dev", "test")
+    assert not validate_owned_database("heijin_erp_test", "test")
+    assert not validate_owned_database(first, "e2e")
+
+
+def test_failed_e2e_retention_is_not_used_for_other_runs():
+    from scripts.ephemeral_test_db import should_retain
+
+    assert should_retain("e2e", 1)
+    assert not should_retain("e2e", 0)
+    assert not should_retain("test", 1)
+
+
+def test_temporary_database_rejects_development_and_remote_targets():
+    from scripts.ephemeral_test_db import database_urls
+
+    with pytest.raises(ValueError, match="测试库与开发库相同"):
+        database_urls("test", {
+            "DATABASE_URL": "postgresql://u:p@localhost:5433/heijin_erp_test",
+            "TEST_DATABASE_URL": "postgresql://u:p@127.0.0.1:5433/heijin_erp_test",
+        })
+    with pytest.raises(ValueError, match="仅允许本机"):
+        database_urls("test", {"TEST_DATABASE_URL": "postgresql://u:p@example.com/heijin_erp_test"})
+
+
+def test_ci_can_use_its_disposable_base_service_without_reusing_it():
+    from sqlalchemy.engine import make_url
+    from scripts.ephemeral_test_db import database_urls
+
+    base = "postgresql://u:p@127.0.0.1:5432/heijin_erp_test"
+    _, target = database_urls("test", {"GITHUB_ACTIONS": "true", "DATABASE_URL": base, "TEST_DATABASE_URL": base})
+    assert make_url(target).database != "heijin_erp_test"

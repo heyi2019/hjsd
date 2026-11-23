@@ -119,8 +119,8 @@ cd backend
 按「是否连库」分两条通道：
 
 ```text
-.venv/bin/python3 -m pytest ../tests/backend -m "not db"   # 快通道：不连 PostgreSQL，当前 316 例
-.venv/bin/python3 -m pytest ../tests/backend -m db         # 连库通道：当前 1360 例
+../scripts/ops/test-local.sh ../tests/backend -m "not db"  # 快通道
+../scripts/ops/test-local.sh ../tests/backend -m db        # 数据库通道，运行时临时库
 ```
 
 标记不是人写的，也不是目录名，而是**从夹具依赖派生**：全仓唯一创建引擎的夹具是 `v1_engine`，
@@ -155,7 +155,7 @@ npm run test:full            # fast + quick + react，轻量层并发、重层�
 npm run test:full:all        # 再加 react-deep（发版前），约 182s
 npm run test:panel business  # 只跑某区域：tests/frontend/<unit|module>/business
 npm run test:changed         # 按 git 变更自动选区域（改 src/orders → business）
-npm run test:e2e             # Playwright + 真实后端 + 独立库 heijin_erp_e2e（16 spec / 57 例，与 manifest 一致）
+npm run test:e2e             # Playwright + 真实后端 + 每轮独立临时库
 ```
 
 CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_suite=true` → `test:ci` 全量（发版收口）；
@@ -254,9 +254,10 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 - 后端测试只认 `TEST_DATABASE_URL`，**刻意不回落 `DATABASE_URL`**；库名必须含 `test`，
   且命中 `release`/`prod` 等黑名单或与 `DATABASE_URL` 同库时直接 abort（夹具会 TRUNCATE 全表）。
-- E2E 用 `heijin_erp_e2e`，常驻复用、每轮不清数据（`e2e_db.py` 默认 keep 分支补表 + 幂等播种，
-  夹具按类型补足 `IN_STOCK` 账号供重复跑测；CI 全新空库由 keep 分支建表初始化），
-  绝不触碰 dev/test/release。
+- 本机 `scripts/ops/test-local.sh` 和 `run_regression.py` 每轮创建独立测试库，退出后回收；
+  测试库地址必须是本机 PostgreSQL，且不得与开发库相同。
+- E2E 必须用 `npm run test:e2e` 启动：每轮创建独立临时库，成功后回收；失败或中断时保留，
+  至少 24 小时后在下次 E2E 启动时回收无连接的过期库。不会清理未标记的库。
 
 ## 6. 当前已知缺口
 
@@ -298,7 +299,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 **职责边界**：只验证跨层集成后才暴露的用户可见承诺（弹窗是否真的关掉、深链是否落到正确页面、写操作后界面是否真的变化）。jsdom 能测的（纯逻辑、单组件渲染）不在这里重复——组件测试里 `onClose` 是 `vi.fn()`，父组件不会真的把 `open` 置 false，antd Modal 关闭后 DOM 也不移除，所以「点了关闭按钮」在单测里全绿、真实浏览器里弹窗关不掉。凡「点了之后界面是否真的消失 / 退回」的断言只能放这里，且必须断言**界面结果**而非「回调被调用」。
 
-**环境**：独立库 `heijin_erp_e2e`，常驻复用、每轮不清数据；`e2e_db.py` 默认 keep 分支只补缺失表 + 幂等播种，夹具按 `(business_mode, inventory_type)` 补足 `IN_STOCK` 账号。CI 的 postgres service 是全新空库，同理由 keep 分支的 `create_all` 初始化。**绝不触碰** `heijin_erp_dev` / `heijin_erp_test` / ECS 生产库 `heijin_erp`。E2E 按需本地运行，不作为发布门禁。
+**环境**：`npm run test:e2e` 每次创建独立临时 E2E 库，初始化表和测试数据；成功后删除，失败或中断后保留至少 24 小时，下次 E2E 启动时清理过期且没有连接的已标记库。**绝不触碰** `heijin_erp_dev` / `heijin_erp_test` / ECS 生产库 `heijin_erp`。E2E 按需本地运行。
 
 **快照**：`visual.spec.ts-snapshots/` 必须与 spec 同目录整目录搬迁，快照按 spec 路径定位，spec 动而快照留原地会导致 `visual.spec.ts` 全部失败。
 

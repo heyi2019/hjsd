@@ -1,6 +1,6 @@
-"""E2E 隔离库：默认**不清数据**（只补表与种子），`--reset` 才重建清空。
+"""E2E 隔离库初始化：默认补表与种子，`--reset` 才重建清空。
 
-两种模式（默认 keep 是用户裁决：E2E 库同时当「第五个可查看环境」，不能每次启动就清空）：
+两种手工初始化模式：
   - `python scripts/e2e_db.py`（默认）：create_all 补缺失表 + 幂等播种，**不删任何行**，
     已有单据/库存/流水原样保留；自动化（playwright webServer）与人工启动都走这条。
     夹具按 (business_mode, inventory_type) 补足 IN_STOCK 账号，用例消耗后下一轮自动补齐，
@@ -8,8 +8,8 @@
   - `python scripts/e2e_db.py --reset`（或 `E2E_RESET=1`）：drop_all + create_all + TRUNCATE，
     得到干净起点；仅供人工需要彻底清空时使用，自动化已不再注入 E2E_RESET。
 
-注意：库 heijin_erp_e2e 一直存在，跑完的数据原样留着。CI 的 postgres service 每次是
-全新空库，由默认 keep 分支的 create_all + 幂等播种完成初始化，同样不需要 --reset。
+自动化通过 npm run test:e2e 创建每轮临时库，本脚本负责建表和播种；外层入口负责
+成功清理及失败保留。手工运行时，不会删除指定 E2E 数据库。
 
 
 设计对齐 `tests/backend/conftest.py` 的 `v1_engine` 夹具：
@@ -209,15 +209,13 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
     """确保 E2E 库可用并播种基础数据；返回实际使用的库名（供诊断）。
 
     两种模式：
-      - `keep=True`（默认，给人看数据用）：**不删任何行**。只 create_all 补齐缺失的表，
+      - `keep=True`（默认）：**不删任何行**。只 create_all 补齐缺失的表，
         再跑一遍播种（全部函数都有 existing 守卫，天然幂等）。已有单据/库存/流水原样保留。
       - `keep=False`（`--reset`，仅人工需要干净起点时用）：drop_all + create_all 强制把表
         结构对齐当前 ORM（含 CHECK 约束、新增列等），再 TRUNCATE 全表，得到干净起点。
         避免「库已存在 → create_all 不改旧表」导致的约束落后。
 
-    选择默认 keep 的原因：E2E 库同时被当作第五个「可查看环境」，每次启动都清空会让人
-    打开页面就看不到数据。自动化复用常驻库，靠夹具补足 IN_STOCK 账号保证可重复跑测，
-    只有人工需要彻底清空时才显式传 --reset / 设 E2E_RESET=1。
+    自动化入口每次创建临时库；手工使用已有 E2E 库时保留数据，除非显式使用 --reset。
     业务库绝不可走这条路（见文件头铁律）。
     """
     url = _e2e_database_url()
@@ -253,11 +251,11 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
 def _seed_e2e_fixtures(db) -> None:
     """E2E 业务夹具：客户 + 干净在库账户，供建单 / 售出 / 资金等真实写入联调用例。
 
-    关键修正：E2E 套件串行共享同一常驻库，用例会「消耗」在库账号（建单后出库）。
+    E2E 套件同一轮共享一个临时库，用例会「消耗」在库账号（建单后出库）。
     早期实现只在 `count()==0` 时一次性补满，导致不清数据复用库时第二轮就找不到
     IN_STOCK 账号而失败——这也是当初 playwright 被迫每次 `E2E_RESET=1` 全量重建的根因。
     现改为**按 (business_mode, inventory_type) 确保每种都有足量的 IN_STOCK 账号**，
-    不足即补，从而可去掉每次重建、直接复用常驻库（省 5–15s 启动 + 重播种子）。
+    不足即补，以保证夹具可以安全重复执行。
 
     补足编号必须取**全库最大号 +1**，不能按类型各自维护递增段：三段起点
     20000 / 20100 / 20200 仅隔 100，而每轮消耗约 12 个账号，SELF 段涨过 20100

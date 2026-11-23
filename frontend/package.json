@@ -24,9 +24,9 @@
     "test:serial": "vitest run --project=react --no-file-parallelism",
     "test:watch": "vitest",
     "guard": "node scripts/ui_guards.mjs",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
-    "test:e2e:update": "playwright test --update-snapshots"
+    "test:e2e": "bash ../scripts/ops/test-e2e.sh",
+    "test:e2e:headed": "bash ../scripts/ops/test-e2e.sh --headed",
+    "test:e2e:update": "bash ../scripts/ops/test-e2e.sh --update-snapshots"
   },
   "dependencies": {
     "@ant-design/icons": "^5.6.1",

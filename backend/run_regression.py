@@ -661,7 +661,7 @@ def main() -> int:
         runner, test_env = pytest_runtime()
         print(f"=== 执行 {label}：{len(paths)} 个后端文件，Python: {runner} ===", flush=True)
         result = subprocess.run(
-            [runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
+            [runner, "scripts/ephemeral_test_db.py", "test", "--", runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
             cwd=ROOT,
             env=test_env,
             check=False,
@@ -716,7 +716,7 @@ def main() -> int:
     runner, test_env = pytest_runtime()
     print(f"=== 执行 {label}：{len(paths)} 个后端文件，Python: {runner} ===", flush=True)
     result = subprocess.run(
-        [runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
+        [runner, "scripts/ephemeral_test_db.py", "test", "--", runner, "-m", "pytest", "-q", *pytest_parallel_args, *[_pytest_arg(x) for x in paths]],
         cwd=ROOT,
         env=test_env,
         check=False,

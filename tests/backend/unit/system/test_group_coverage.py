@@ -91,7 +91,7 @@ def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
         monkeypatch.setattr(rr.sys, "argv", args)
         assert rr.main() == 0
     assert len(calls) == 2
-    assert all(command[:3] == ["test-python", "-m", "pytest"] and kwargs["env"]["PYTHONPATH"] == "isolated"
+    assert all(command[:7] == ["test-python", "scripts/ephemeral_test_db.py", "test", "--", "test-python", "-m", "pytest"] and kwargs["env"]["PYTHONPATH"] == "isolated"
                for command, kwargs in calls)
 
 

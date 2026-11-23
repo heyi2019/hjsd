@@ -8,7 +8,7 @@
 与后端完全相同的记录格式，追加进同一份 results.jsonl，报告侧无需任何特判。
 
 用法：
-    npx playwright test            # playwright.config.ts 已配 json reporter
+    npm run test:e2e               # playwright.config.ts 已配 json reporter
     python3 scripts/record_e2e_results.py --json test-results/playwright-report.json
 
 关联口径：case_index.json 的 E2E 键为 `tests/e2e/<区域>/<规格文件名>::<标题>`
@@ -158,7 +158,7 @@ def main() -> int:
         report_path = (FRONTEND / report_path).resolve()
     if not report_path.exists():
         print(f"[e2e] 找不到 Playwright JSON：{report_path}")
-        print("[e2e] 请先执行 `npx playwright test`（playwright.config.ts 已配 json reporter）")
+        print("[e2e] 请先执行 `npm run test:e2e`（playwright.config.ts 已配 json reporter）")
         return 2
 
     index: dict = _load_case_index()

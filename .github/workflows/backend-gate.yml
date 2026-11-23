@@ -1,9 +1,6 @@
 name: backend-gate
 
 on:
-  push:
-    branches: [main, master, dev]
-  pull_request:
   workflow_dispatch:
     inputs:
       full_suite:
@@ -32,8 +29,7 @@ on:
 
 jobs:
   backend-tests:
-    # main/master 由 main-ci-cd 调用；PR、dev push 和手动触发照常执行。
-    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
+    # 由 main-ci-cd 在正式发布时调用，也可手动触发。
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -144,7 +140,7 @@ jobs:
           BASE_URL: "postgresql+psycopg://erp_app:erp_app@127.0.0.1:5432"
         run: bash scripts/check_baseline.sh
 
-      # 发版使用调用方传入的原始 push 范围；dev / PR 使用事件的 base 和 head。
+      # 发版使用调用方传入的原始 push 范围；手动触发可指定范围。
       # 无法确定完整范围时运行全量，避免静默漏测。
       - name: Determine test scope (分层策略)
         id: scope

@@ -1,9 +1,6 @@
 name: lint-gate
 
 on:
-  push:
-    branches: [main, master, dev]
-  pull_request:
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -18,8 +15,7 @@ concurrency:
 jobs:
   lint:
     # 与后端门禁保持一致：python:3.12
-    # main/master 由 main-ci-cd 调用；PR、dev push 和手动触发照常执行。
-    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
+    # 由 main-ci-cd 在正式发布时调用，也可手动触发。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

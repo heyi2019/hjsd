@@ -6,12 +6,9 @@ name: frontend-gate
 #   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过
 # 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，
 # 不能靠脚本自己读工作区，必须显式喂「本次 commit diff」。
-# main/master 的 push 不重复跑：由 main-ci-cd 在 release sha 上统一调用一轮，
-# 并由它把「原始 push 范围」的变更路径集经 changed_paths 传入，天然不含自动发版改的版本文件。
+# 正式发布由 main-ci-cd 在 release sha 上调用，并传入原始 push 范围；
+# 日常推送不自动运行，必要时可手动指定范围触发。
 on:
-  push:
-    branches: [main, master, dev]
-  pull_request:
   workflow_dispatch:
     inputs:
       full_suite:
@@ -44,7 +41,6 @@ permissions:
 jobs:
   frontend-tests:
     name: Frontend checks and tests
-    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
@@ -114,7 +110,6 @@ jobs:
 
   frontend-build:
     name: Frontend build
-    if: ${{ inputs.release_sha || github.event_name != 'push' || (github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:

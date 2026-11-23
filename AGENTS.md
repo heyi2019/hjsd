@@ -40,6 +40,6 @@
 ## 3. GitHub CI 闭环（验收场）
 
 - `.github/workflows/`：`backend-gate` / `frontend-gate` / `lint-gate` / `main-ci-cd` / `deploy-production` / `rollback`。
-- main 的 push 由 `main-ci-cd` 调用三道门禁，均检出同一个 release sha，全部成功后调用生产部署；PR 直接触发门禁。
-- `dev` 的直接 push 也触发三道门禁；普通 dev / PR / 发布按完整提交范围选测，无法判断范围或生产重建时退回全量。main/master 不重复跑直接 push 门禁。
+- main 的 push 由 `main-ci-cd` 调用三道门禁，均检出同一个 release sha，全部成功后调用生产部署。
+- 日常先本地按影响测试；`dev` 推送和 PR 不自动触发云端门禁，必要时可手动触发。正式发布时按完整提交范围选测，无法判断范围或生产重建时退回全量。
 - CI 能拦语法、pyflakes、测试回归；**拦不住业务语义跑偏**——第 1 节的口径必须靠 agent 自觉遵守。

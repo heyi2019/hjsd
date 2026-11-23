@@ -45,7 +45,7 @@ describe("发布门禁与部署契约", () => {
         const verify = gate.jobs[name].steps.find((step: any) => step.name === "Verify release commit");
         expect(verify?.env?.EXPECTED_RELEASE_SHA).toBe("${{ inputs.release_sha }}");
         expect(verify?.run).toContain("git rev-parse HEAD");
-        if (name !== "browser-e2e") expect(gate.jobs[name].if).toContain("inputs.release_sha");
+        if (name !== "browser-e2e") expect(gate.jobs[name].if).toBeUndefined();
       }
     }
   });
@@ -76,12 +76,20 @@ describe("发布门禁与部署契约", () => {
     expect(verify?.run).toContain("git rev-parse HEAD");
   });
 
-  it("开发分支后端门禁按真实提交范围选测", () => {
+  it("后端手动门禁保留按指定变更范围选测", () => {
     const gate = workflow("backend-gate.yml");
-    expect(gate.on.push.branches).toContain("dev");
+    expect(gate.on.workflow_dispatch.inputs.changed_paths.type).toBe("string");
     const checkout = gate.jobs["backend-tests"].steps.find((step: any) => String(step.uses ?? "").startsWith("actions/checkout@"));
     expect(checkout?.with?.["fetch-depth"]).toBe(0);
     const scope = gate.jobs["backend-tests"].steps.find((step: any) => step.id === "scope");
     expect(scope.run).toContain("scripts/ops/ci_test_scope.py");
+  });
+
+  it("日常推送和 PR 不自动运行云端门禁，正式发布仍会运行", () => {
+    for (const file of ["lint-gate.yml", "frontend-gate.yml", "backend-gate.yml"]) {
+      const triggers = workflow(file).on;
+      expect(Object.keys(triggers).sort()).toEqual(["workflow_call", "workflow_dispatch"]);
+    }
+    expect(workflow("main-ci-cd.yml").on.push.branches).toEqual(["main"]);
   });
 });

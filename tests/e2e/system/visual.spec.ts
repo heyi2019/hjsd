@@ -80,8 +80,11 @@ async function dragMouseSteps(
  */
 test.describe("UI visual baseline", () => {
   test("工作台 desktop", async ({ page }) => {
+    // 周期选择器显示当前日期区间；固定截图日期，避免跨月后视觉测试误报。
+    await page.clock.setFixedTime(new Date("2026-11-23T12:00:00Z"));
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
     await expect(page).toHaveScreenshot("workbench-desktop.png", {
       animations: "disabled",
       caret: "hide",
@@ -101,8 +104,10 @@ test.describe("UI visual baseline", () => {
 
   test("工作台 mobile", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.clock.setFixedTime(new Date("2026-11-23T12:00:00Z"));
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
     await expect(page).toHaveScreenshot("workbench-mobile.png", {
       animations: "disabled",
       caret: "hide",

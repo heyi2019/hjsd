@@ -44,6 +44,7 @@ DECLARED_DB_FILES = {
     "test_order_execution_edit.py",  # 账号编辑并发测试使用独立临时数据库
     "test_leads_contract.py",  # 客户合并和需求状态并发使用独立临时数据库
     "test_cashflow_totals.py",  # 导出快照并发验证使用独立连接
+    "test_notifications_service.py",  # 已读并发测试使用独立连接观察接收人锁
 }
 
 _SELF_ENGINE = re.compile(r"create_engine\s*\(")

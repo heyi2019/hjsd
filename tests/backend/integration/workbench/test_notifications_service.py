@@ -22,6 +22,8 @@ from app.workbench.notifications import service as notification_service
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 
+pytestmark = pytest.mark.db
+
 
 def _make_unread(seeded_db, **kwargs):
     return notification_service.create_notification(
@@ -375,36 +377,72 @@ def test_batch_read_marks_only_owned_notifications_and_is_idempotent(seeded_clie
     assert positioned.json()["read_at"]
 
 
-def test_concurrent_read_returns_position_after_previous_commit(seeded_db):
+def test_concurrent_read_returns_position_after_previous_commit(v1_engine):
+    from time import monotonic, sleep
+    from uuid import uuid4
+    from sqlalchemy import create_engine, text
+    from app.domain.base import Base
+    from app.settings.field_definitions.seeds import seed_foundation
     from app.workbench.notifications.router import mark_notifications_read
     from app.workbench.notifications.schemas import NotificationReadRequest
 
-    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
-    older = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
-    newer = _make_unread(seeded_db, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
-    older_id, newer_id = older.id, newer.id
-    seeded_db.commit()
-    engine = seeded_db.get_bind()
-    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
-    reached = Event()
+    schema = f"notification_read_{uuid4().hex[:12]}"
+    with v1_engine.begin() as connection:
+        connection.execute(text(f'CREATE SCHEMA "{schema}"'))
+    engine = create_engine(v1_engine.url, connect_args={"options": f"-c search_path={schema}"})
+    try:
+        Base.metadata.create_all(engine)
+        with Session(engine, autoflush=False) as setup:
+            seed_foundation(setup, actor="pytest")
+            setup.add(User(id=1, username="admin", display_name="admin", password_hash="test", role="ADMIN", owner_scope="ALL"))
+            setup.flush()
+            order = create_order(setup, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)
+            older = _make_unread(setup, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
+            newer = _make_unread(setup, recipient_user_id=1, notification_type="PROFIT_PENDING", entity_type="order", entity_id=order.order_no)
+            older_id, newer_id = older.id, newer.id
+            setup.commit()
 
-    def read_newer():
-        with Session(engine) as session:
-            def before(_conn, _cursor, statement, _params, _context, _many):
-                if "for update" in statement.lower() and "users" in statement.lower():
-                    reached.set()
-            event.listen(session.connection(), "before_cursor_execute", before)
-            result = mark_notifications_read(NotificationReadRequest(ids=[newer_id], category="sale"), db=session, user=user)
-            session.commit()
-            return result
+        user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"], owner_scope="ALL")
+        reached = Event()
+        worker_pid = []
 
-    with Session(engine) as first, ThreadPoolExecutor(max_workers=1) as executor:
-        first.scalar(select(User.id).where(User.id == user.id).with_for_update())
-        pending = executor.submit(read_newer)
-        assert reached.wait(10)
-        mark_notifications_read(NotificationReadRequest(ids=[older_id], category="sale"), db=first, user=user)
-        first.commit()
-        assert pending.result(timeout=10).next_read_id == older_id
+        def read_newer():
+            with Session(engine) as session:
+                connection = session.connection()
+                worker_pid.append(connection.exec_driver_sql("select pg_backend_pid()").scalar_one())
+                def before(_conn, _cursor, statement, _params, _context, _many):
+                    if "for update" in statement.lower() and "users" in statement.lower():
+                        reached.set()
+                event.listen(connection, "before_cursor_execute", before)
+                result = mark_notifications_read(NotificationReadRequest(ids=[newer_id], category="sale"), db=session, user=user)
+                session.commit()
+                return result
+
+        with Session(engine) as first, ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                assert first.scalar(select(User.id).where(User.id == user.id).with_for_update()) == user.id
+                pending = executor.submit(read_newer)
+                assert reached.wait(10), "并发读取没有尝试获取接收人锁"
+                deadline = monotonic() + 10
+                with engine.connect() as observer:
+                    while monotonic() < deadline:
+                        blocked = observer.scalar(text("select cardinality(pg_blocking_pids(:pid))"), {"pid": worker_pid[0]})
+                        if blocked:
+                            break
+                        assert not pending.done(), "并发读取未等待接收人锁"
+                        sleep(0.01)
+                    else:
+                        pytest.fail("没有观察到并发读取等待接收人锁")
+                mark_notifications_read(NotificationReadRequest(ids=[older_id], category="sale"), db=first, user=user)
+                first.commit()
+                result = pending.result(timeout=10)
+                assert result.read_ids == [newer_id] and result.next_read_id == older_id
+            finally:
+                first.rollback()
+    finally:
+        engine.dispose()
+        with v1_engine.begin() as connection:
+            connection.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
 
 
 TODAY = date(2026, 10, 4)

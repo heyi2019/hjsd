@@ -95,6 +95,24 @@ def test_changed_and_group_regressions_use_selected_runtime(monkeypatch):
                for command, kwargs in calls)
 
 
+def test_frontend_module_regression_uses_repository_relative_test_path(monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "frontend").mkdir(parents=True)
+    relative = "tests/frontend/module/finance/example.test.tsx"
+    test_file = repo / relative
+    test_file.parent.mkdir(parents=True)
+    test_file.write_text("// test fixture\n", encoding="utf-8")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    npx = bin_dir / "npx"
+    npx.write_text('#!/bin/sh\nfor arg in "$@"; do target="$arg"; done\ntest -f "../$target"\n', encoding="utf-8")
+    npx.chmod(0o755)
+    monkeypatch.setattr(rr, "REPO", repo)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
+
+    assert rr.run_frontend_files([relative]) == 0
+
+
 def _ci_scope(repo: Path, **overrides: str) -> dict[str, str]:
     env = {**os.environ, "CI_EVENT_NAME": "push", "CI_FULL_SUITE": "false", "CI_CHANGED_PATHS": "",
            "CI_BASE_SHA": "", "CI_HEAD_SHA": "", **overrides}

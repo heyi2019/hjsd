@@ -56,7 +56,7 @@ def _pytest_arg(path: str) -> str:
 def run_frontend_files(relpaths: list[str]) -> int:
     """用 vitest 运行指定前端测试文件，并把结果写入测试结果库。
 
-    relpaths 形如 frontend/src/...，转换为前端目录下的 src/... 传给 vitest。
+    relpaths 是仓库根相对路径；Vitest 的 root 也是仓库根，因此原样传入。
 
     两个曾踩过的坑：
       1. 旧实现用 `npm run test:fast -- <files>`（即 `--project=fast`），而 fast 项目
@@ -69,7 +69,7 @@ def run_frontend_files(relpaths: list[str]) -> int:
     if not relpaths:
         return 0
     fe_root = REPO / "frontend"
-    files = [p[len("frontend/"):] for p in relpaths]
+    files = list(relpaths)
     print(f"[frontend] 运行 {len(files)} 个模块相关前端测试文件：")
     for f in files:
         print(f"  - {f}")

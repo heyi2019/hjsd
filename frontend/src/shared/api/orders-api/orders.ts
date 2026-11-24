@@ -1,4 +1,5 @@
 import { api, type CacheAwareRequestConfig } from "../client";
+import { idempotencyConfig } from "../idempotency";
 import type { PageResponse } from "../types/common";
 import type { EventPostResult } from "../types/order-events";
 import type { Order } from "../types/orders";
@@ -201,5 +202,6 @@ export const ordersApi = {
       form_extra_scope?: string;
       form_extra?: Record<string, unknown>;
     },
-  ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
+    key?: string,
+  ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload, idempotencyConfig(key)).then((r) => r.data),
 };

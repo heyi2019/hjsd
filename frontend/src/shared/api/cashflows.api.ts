@@ -1,8 +1,9 @@
 import { api } from "./client";
+import { idempotencyConfig } from "./idempotency";
 import type { Cashflow } from "./types/finance";
 
 export const cashflowsApi = {
-  create: (data: Record<string, unknown>) => api.post<Cashflow>("/cashflows", data).then(r => r.data),
+  create: (data: Record<string, unknown>, key?: string) => api.post<Cashflow>("/cashflows", data, idempotencyConfig(key)).then(r => r.data),
   update: (id: number, data: Record<string, unknown>) => api.put<Cashflow>(`/cashflows/${id}`, data).then(r => r.data),
   reverse: (id: number, data: {reversed_on: string; reason: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown>; form_extra_scope?: string}) => api.post<Cashflow>(`/cashflows/${id}/reverse`, data).then(r => r.data),
   list: (params?: {

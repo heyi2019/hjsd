@@ -233,6 +233,7 @@ docker compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_
             created = True
             with dump.open("rb") as stream:
                 subprocess.run([*pg_restore, "-d", name, "--no-owner", "--single-transaction"], stdin=stream, check=True)
+            call([PY313, "-m", "scripts.ensure_idempotency_records", "--apply", "--drill-db", name], env=env)
             call([PY313, str(ROOT / "deploy/scripts/schema_diff.py"), name], env=env)
         finally:
             if created:

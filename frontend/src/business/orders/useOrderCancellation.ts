@@ -14,6 +14,7 @@ import { cancelRefundSuccess } from "../../shared/lib/cancellationCopy";
 import { formExtraOrUndefined } from "../../shared/lib/formExtra";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useIdempotencyDraft } from "../../shared/hooks/useIdempotencyDraft";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 import { pickCancelableEvent, resolveCancelAmount, resolveCancellationOperators, type CancelFormScope } from "./helpers";
 
@@ -34,6 +35,7 @@ export function useOrderCancellation(params: {
   const [cancelInstallmentTarget, setCancelInstallmentTarget] = useState<Installment | null>(null);
   const [cancelScope, setCancelScope] = useState<CancelFormScope>("ORDERCANC");
   const cancelWrite = useAsyncAction();
+  const idempotency = useIdempotencyDraft();
   const cancelSubmitting = cancelWrite.pending;
   const [cancelPools, setCancelPools] = useState<Pool[]>([]);
   const [cancelEmployees, setCancelEmployees] = useState<Array<{ id: number; username: string; display_name: string; is_active: boolean }>>([]);
@@ -190,7 +192,7 @@ export function useOrderCancellation(params: {
               note: cancelScope === "INVREFUND" ? "取消：冲销入库并入账" : "取消：原路退款",
               form_extra_scope: cancelScope,
               form_extra: formExtra,
-            });
+            }, idempotency.get(session).key);
             success(cancelScope === "INVREFUND"
               ? `取消已登记：入账 ¥${money(result.event.amount)}，已进入公司钱包`
               : `取消已登记：退款 ¥${money(result.event.amount)}，已按原资金账户退还客户`);

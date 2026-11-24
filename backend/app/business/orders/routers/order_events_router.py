@@ -1,11 +1,13 @@
 """订单事件与客户角色接口。"""
 
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.errors import PermissionDenied, Validation
+from app.core.errors import NotFound, PermissionDenied, Validation
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.core.security import (
     PERM_FINANCE_ORDER_EVENT_POST,
@@ -18,8 +20,9 @@ from app.core.security import (
 from app.settings.auth.session import (
     require_permissions,
 )
-from app.domain.trade import Account, Order, OrderEvent
+from app.domain.trade import Account, Cashflow, Order, OrderEvent
 from app.shared.audit import record_audit
+from app.shared.idempotency import reserve_idempotency, complete_idempotency
 from app.shared.form_field_rules import validate_form_extra
 from app.business.orders import schemas
 from app.shared.order_access import get_order as orders_get_order
@@ -173,9 +176,30 @@ def post_event(
     payload: schemas.EventCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_events,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> schemas.EventPostResult:
     order = orders_get_order(db, order_id, user)
     event_type = payload.event_type.strip().upper()
+    if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
+        if event_type not in {"BUY", "SELL"}:
+            raise PermissionDenied(
+                "财务只能登记买号或售出事件",
+                details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
+            )
+    if idempotency_key is not None and payload.pool_id is not None and not user.can_see_pool(payload.pool_id):
+        raise NotFound("资金账户不存在", details={"pool_id": payload.pool_id})
+    record, replay = reserve_idempotency(db, user_id=user.id, scope=f"orders/{order_id}/events", key=idempotency_key, payload=payload)
+    if replay is not None:
+        pool_ids = {replay["event"]["pool_id"]}
+        if replay["cashflow_no"] is not None:
+            flow = db.scalar(select(Cashflow).where(Cashflow.flow_no == replay["cashflow_no"]))
+            if flow is None:
+                raise NotFound("资金流水不存在")
+            pool_ids.add(flow.pool_id)
+        for pool_id in pool_ids:
+            if pool_id is not None and not user.can_see_pool(pool_id):
+                raise NotFound("资金账户不存在", details={"pool_id": pool_id})
+        return schemas.EventPostResult.model_validate(replay)
     if payload.finalize_sale_cancel:
         order = db.execute(select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True)).scalar_one()
         offset = db.get(OrderEvent, payload.offset_event_id) if payload.offset_event_id else None
@@ -185,12 +209,6 @@ def post_event(
         ).order_by(OrderEvent.id.desc()).limit(1))
         if order.order_type not in {"HS", "TH"} or event_type != "CANCEL" or offset is None or offset.order_id != order.id or offset.event_type != "SELL" or not offset.is_posted or offset.id != latest_sell_id or account is None or account.status != "SOLD" or order.status != "COMPLETED":
             raise Validation("取消售出必须选择该订单已售出的流水")
-    if user.has(PERM_FINANCE_ORDER_EVENT_POST) and not user.has(PERM_ORDER_EVENT_POST):
-        if event_type not in {"BUY", "SELL"}:
-            raise PermissionDenied(
-                "财务只能登记买号或售出事件",
-                details={"allowed_event_types": ["BUY", "SELL"], "event_type": event_type},
-            )
     operation_type = (payload.operation_type or "").strip().upper()
     if event_type == "OPERATE" and operation_type == "UNLIST" and str((payload.form_extra or {}).get("platform_unlist_scope") or "").strip().upper() == "SYSTEM":
         raise Validation("本系统下架请通过下架操作执行")
@@ -247,10 +265,12 @@ def post_event(
     order_events = list(
         db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all()
     )
-    return schemas.EventPostResult(
+    result = schemas.EventPostResult(
         event=_event_output(event, _operator_names(db, [event]), cancellable_by_event(order_events)),
         cashflow_no=flow.flow_no if flow else None,
     )
+    complete_idempotency(record, result)
+    return result
 @router.post("/orders/{order_id}/customer-roles", response_model=schemas.OrderOut)
 def add_order_customer_role(
     order_id: int,

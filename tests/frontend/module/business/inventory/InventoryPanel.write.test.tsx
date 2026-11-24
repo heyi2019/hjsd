@@ -1053,7 +1053,7 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(await screen.findByText("盼之", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByRole("spinbutton", { name: "寄售价格" }), "9999999999999999.99");
     await ui.click(screen.getByRole("button", { name: "确认上架" }));
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ form_extra: expect.objectContaining({ consignment_price: "9999999999999999.99" }) })));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(21, expect.objectContaining({ form_extra: expect.objectContaining({ consignment_price: "9999999999999999.99" }) }), expect.stringMatching(/^[0-9a-f]{32}$/)));
   });
 
   it("寄售平台词典加载失败时提示并允许重试", async () => {
@@ -1153,7 +1153,7 @@ describe("InventoryPanel：写入与长路径", () => {
       form_extra_scope: "CONSIGN",
       operator_user_ids: [1],
       form_extra: expect.objectContaining({ receipt: "寄售凭据" }),
-    })));
+    }), expect.stringMatching(/^[0-9a-f]{32}$/)));
     expect(vi.mocked(ordersApi.postEvent).mock.calls[0][1].form_extra).not.toHaveProperty("optional_number");
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   });

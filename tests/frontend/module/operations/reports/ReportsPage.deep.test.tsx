@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -150,6 +150,31 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     expect(successSpy).toHaveBeenCalledWith("报表已导出");
     createUrl.mockRestore();
     revokeUrl.mockRestore();
+  });
+
+  it("报表导出失败显示错误，按钮恢复后可重试成功", async () => {
+    let rejectExport!: (error: Error) => void;
+    vi.mocked(reportsApi.exportCsv).mockImplementationOnce(() => new Promise((_, reject) => { rejectExport = reject; }));
+    const errorSpy = vi.spyOn(appMessage, "error").mockImplementation((() => undefined) as never);
+    const successSpy = vi.spyOn(appMessage, "success").mockImplementation((() => undefined) as never);
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    renderLight(<ReportsPage />, { user: "admin" });
+    await gotoTab("经营损益");
+    const monthlyCard = screen.getByText("月度经营损益").closest(".ant-card") as HTMLElement;
+    const button = within(monthlyCard).getByRole("button", { name: "导出" });
+
+    await ui.click(button);
+    expect(button).toHaveClass("ant-btn-loading");
+    await act(async () => { rejectExport(new Error("导出暂时不可用")); });
+    expect(errorSpy).toHaveBeenCalledWith("Error: 导出暂时不可用");
+    expect(button).not.toHaveClass("ant-btn-loading");
+    expect(button).toBeEnabled();
+
+    await ui.click(button);
+    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("报表已导出"));
+    expect(vi.mocked(reportsApi.exportCsv)).toHaveBeenCalledTimes(2);
+    expect(button).not.toHaveClass("ant-btn-loading");
   });
 
   it("统计周期变更同时触发月度与业务损益重新请求", async () => {

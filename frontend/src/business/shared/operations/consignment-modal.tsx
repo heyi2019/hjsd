@@ -15,6 +15,7 @@ import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmpl
 import { InventoryAccountSummary } from "../inventory/InventoryAccountSummary";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useIdempotencyDraft } from "../../../shared/hooks/useIdempotencyDraft";
 import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { activeConsignmentListings, availableConsignmentPlatforms } from "./consignment-logic";
 import "./consignment-modal.css";
@@ -30,6 +31,7 @@ export function OrderConsignmentModal(props: {
 }) {
   const [error, setError] = useState<{ message: string; code?: string } | null>(null);
   const write = useAsyncAction();
+  const idempotency = useIdempotencyDraft();
   const submitting = write.pending;
   const [listed, setListed] = useState<ListedPlatform[]>([]);
   const [listingReady, setListingReady] = useState(false);
@@ -103,7 +105,6 @@ export function OrderConsignmentModal(props: {
   const submit = async (values: { platform_ids?: string; consignment_price?: string | null; listed_at?: Dayjs; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) => {
     const account = props.account;
     if (!account || !configReady || platformResource.loading || platformResource.error) return;
-    const listedAt = values.listed_at ?? dayjs();
     if (!values.platform_ids) return;
     if (!sourceOrderId) {
       setError({ message: "当前账号没有可关联的来源订单，无法登记寄售" });
@@ -114,6 +115,8 @@ export function OrderConsignmentModal(props: {
     const submittedSession = session.current();
     await write.run(async () => {
       try {
+        const draft = idempotency.get(submittedSession);
+        const listedAt = values.listed_at ?? dayjs(draft.startedAt);
         await ordersApi.postEvent(orderId, {
           event_type: "OPERATE",
           operation_type: "CONSIGNMENT",
@@ -127,7 +130,7 @@ export function OrderConsignmentModal(props: {
             ...(price === undefined ? {} : { consignment_price: price }),
             listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
           },
-        });
+        }, draft.key);
         appMessage.success(`${values.platform_ids} 已上架，账号仍保持在库`);
         if (session.isCurrent(submittedSession)) {
           form.setFieldsValue({ platform_ids: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });

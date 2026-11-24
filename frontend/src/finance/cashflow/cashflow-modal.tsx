@@ -8,6 +8,8 @@ import { requiredMoneyRules } from "../../shared/lib/validators";
 import { BusinessActionModal, BusinessRegistrationForm, ErrorBanner, MoneyInput, MoneyText, Select as UiSelect } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useAsyncAction } from "../../shared/hooks/useAsyncAction";
+import { useIdempotencyDraft } from "../../shared/hooks/useIdempotencyDraft";
+import dayjs from "dayjs";
 import { useRequestSession } from "../../shared/hooks/useLatestRequest";
 import { createOrderCashflow } from "./cashflow-service";
 import type { CashflowFormValues, CashflowModalProps } from "./types";
@@ -25,6 +27,7 @@ export function CashflowModal({
   const scope = "REFUND";
   const [form] = Form.useForm<CashflowFormValues>();
   const write = useAsyncAction();
+  const idempotency = useIdempotencyDraft();
   const submitting = write.pending;
   // 弹窗会复用表单；关闭或切换目标后，旧请求不能改动新的表单。
   const session = useRequestSession(target);
@@ -59,7 +62,8 @@ export function CashflowModal({
     await write.run(async () => {
       setError(null);
       try {
-        await createOrderCashflow(submittedTarget.orderId, values);
+        const draft = idempotency.get(submittedSession);
+        await createOrderCashflow(submittedTarget.orderId, values, draft.key, dayjs(draft.startedAt).format("YYYY-MM-DD"));
         const isCurrent = session.isCurrent(submittedSession);
         appMessage.success(isCurrent ? "资金收支已登记" : `${submittedTarget.orderNo} 资金收支已登记`);
         if (isCurrent) {

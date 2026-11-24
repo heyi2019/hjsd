@@ -87,6 +87,22 @@ it("业务字典展示账号入库规则：未售出禁止重复，已售出允�
   ).toBeTruthy();
 });
 
+it("FE-222：订单导入模板下载失败显示错误并恢复按钮", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<SettingsPage />, { user: "admin" });
+  await ui.click(screen.getByRole("tab", { name: "订单导入" }));
+  let rejectDownload!: (error: Error) => void;
+  vi.mocked(client.api).get.mockImplementationOnce(() => new Promise((_, reject) => { rejectDownload = reject; }) as never);
+  const button = screen.getByRole("button", { name: "下载导入模板" });
+
+  await ui.click(button);
+  expect(button).toHaveClass("ant-btn-loading");
+  await act(async () => { rejectDownload(new Error("模板下载失败")); });
+  expect(await screen.findByRole("alert")).toHaveTextContent("模板下载失败");
+  expect(button).not.toHaveClass("ant-btn-loading");
+  expect(button).toBeEnabled();
+});
+
 it("订单导入预检与所选文件和选项绑定，改变选项后必须重新预检", async () => {
   const ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(client.api).post.mockResolvedValueOnce({ data: {

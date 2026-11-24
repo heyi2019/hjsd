@@ -499,7 +499,7 @@ describe("InventoryPanel：运营动作 / 退款取消 / 导出", () => {
     await ui.click(await screen.findByText(/千寻（上架于/, { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("下架原因"), "平台停售");
     await ui.click(screen.getByRole("button", { name: "确认下架" }));
-    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "平台停售" })));
+    await waitFor(() => expect(ordersApi.postEvent).toHaveBeenCalledWith(88, expect.objectContaining({ reason: "平台停售" }), expect.stringMatching(/^[0-9a-f]{32}$/)));
   });
 
   it("平台下架后已展开的库存订单详情显示新的下架记录", async () => {

@@ -805,7 +805,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       expect(second).toBeVisible();
       expect(within(second).getByLabelText("金额")).toHaveValue("200");
       await clickModalOk(second);
-      await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200", note: "第二单" })));
+      await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200", note: "第二单" }), expect.stringMatching(/^[0-9a-f]{32}$/)));
     }
   });
 
@@ -874,7 +874,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     fireEvent.change(within(second).getByLabelText("金额"), { target: { value: "200" } });
     fireEvent.change(within(second).getByLabelText("收支备注"), { target: { value: "第二单" } });
     fireEvent.submit(within(second).getByLabelText("金额").closest("form")!);
-    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200" })));
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(2, expect.objectContaining({ amount: "200" }), expect.stringMatching(/^[0-9a-f]{32}$/)));
     expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ orderId: 1 }));
     await act(async () => finishReload());
   });
@@ -906,6 +906,40 @@ describe("OrdersPage：操作与筛选分支", () => {
     await act(async () => { fireEvent.submit(form); });
     expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1);
     expect(within(modal).getByRole("button", { name: /确定/ })).toHaveClass("ant-btn-loading");
+  });
+
+  it("资金收支同一草稿重试复用幂等键，完成后新草稿使用新键", async () => {
+    const pools: Pool[] = [{ id: 7, code: "HJ_INVEST", name: "投资款荷包", pool_type: "INVEST", status: "ACTIVE" }];
+    vi.mocked(orderCashflowsApi.create).mockReset().mockRejectedValueOnce(new Error("网络超时")).mockResolvedValue({} as never);
+    function Probe() {
+      const [target, setTarget] = useState<CashflowTarget | null>(null);
+      return <><button onClick={() => setTarget({ orderId: 1, orderNo: "HS-2026-0001" })}>打开资金收支</button>
+        <CashflowModal target={target} pools={pools} onClose={() => setTarget(null)} onCreated={() => undefined} /></>;
+    }
+    renderLight(<Probe />, { user: "admin" });
+    const openDraft = async () => {
+      await ui.click(screen.getByRole("button", { name: "打开资金收支" }));
+      const modal = await modalOf(/资金收支 · HS-2026-0001/);
+      fireEvent.change(within(modal).getByLabelText("金额"), { target: { value: "100" } });
+      fireEvent.change(within(modal).getByLabelText("收支备注"), { target: { value: "测试" } });
+      return modal;
+    };
+    const modal = await openDraft();
+    await clickModalOk(modal);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(within(modal).getByText(/网络超时/)).toBeVisible());
+    await clickModalOk(modal);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(2));
+    const first = vi.mocked(orderCashflowsApi.create).mock.calls[0][2];
+    const retry = vi.mocked(orderCashflowsApi.create).mock.calls[1][2];
+    expect(first).toMatch(/^[0-9a-f]{32}$/);
+    expect(retry).toBe(first);
+    expect(vi.mocked(orderCashflowsApi.create).mock.calls[1][1]).toEqual(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]);
+    await waitFor(() => expect(modal).not.toBeVisible());
+    const next = await openDraft();
+    await clickModalOk(next);
+    await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledTimes(3));
+    expect(vi.mocked(orderCashflowsApi.create).mock.calls[2][2]).not.toBe(first);
   });
 
   it("较早的售出请求不能打断后来打开的其他订单操作", async () => {
@@ -967,6 +1001,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       expect(orderCashflowsApi.create).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ direction: "OUT", amount: "500", category: "OTHER", occurred_on: today(), pool_id: expect.any(Number), form_extra: { receipt: "凭据1" } }),
+        expect.stringMatching(/^[0-9a-f]{32}$/),
       )
     );
     expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).toMatchObject({ operator_user_ids: [9] });
@@ -999,6 +1034,7 @@ describe("OrdersPage：操作与筛选分支", () => {
     await waitFor(() => expect(orderCashflowsApi.create).toHaveBeenCalledWith(
       1,
       expect.objectContaining({ direction: "IN", amount: "100", category: "OTHER" }),
+      expect.stringMatching(/^[0-9a-f]{32}$/),
     ));
     expect(vi.mocked(orderCashflowsApi.create).mock.calls[0][1]).not.toHaveProperty("accounting_attribute");
   });
@@ -1238,6 +1274,7 @@ describe("OrdersPage：操作与筛选分支", () => {
       expect(ordersApi.postEvent).toHaveBeenCalledWith(
         1,
         expect.objectContaining({ event_type: "CANCEL", finalize_sale_cancel: true, offset_event_id: 102, amount: "300", form_extra_scope: "ORDERCANC" }),
+        expect.stringMatching(/^[0-9a-f]{32}$/),
       )
     );
   });

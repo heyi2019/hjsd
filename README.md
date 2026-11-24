@@ -66,6 +66,7 @@ scripts/ops/test-local.sh -q tests/backend/unit/system/test_settings.py
 # 迁移
 cd backend
 PYTHONPATH=../dependencies/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic upgrade head
+PYTHONPATH=../dependencies/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m scripts.ensure_idempotency_records --apply
 PYTHONPATH=../dependencies/python313-runtime /Users/aries/Applications/Python_3.13/bin/python3 -m alembic check
 cd ..
 

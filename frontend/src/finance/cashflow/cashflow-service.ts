@@ -22,11 +22,11 @@ export function buildCashflowDisplayItems(
   });
 }
 
-export async function createOrderCashflow(orderId: number, values: CashflowFormValues): Promise<void> {
+export async function createOrderCashflow(orderId: number, values: CashflowFormValues, key?: string, fallbackDate = today()): Promise<void> {
   const direction = values.direction === "IN" ? "IN" : "OUT";
   const occurredOn = typeof values.occurred_on === "string"
     ? values.occurred_on.slice(0, 10)
-    : values.occurred_on?.format("YYYY-MM-DD") ?? today();
+    : values.occurred_on?.format("YYYY-MM-DD") ?? fallbackDate;
   await orderCashflowsApi.create(orderId, {
     pool_id: values.pool_id,
     occurred_on: occurredOn,
@@ -37,5 +37,5 @@ export async function createOrderCashflow(orderId: number, values: CashflowFormV
     note: values.note,
     ...(values.operator_user_ids?.length ? { operator_user_ids: values.operator_user_ids } : {}),
     ...(values.form_extra ? { form_extra: values.form_extra } : {}),
-  });
+  }, key);
 }

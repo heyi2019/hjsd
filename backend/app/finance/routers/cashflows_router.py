@@ -2,17 +2,20 @@
 from datetime import date
 from decimal import Decimal
 from tempfile import SpooledTemporaryFile
+from typing import Annotated
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.idempotency import reserve_idempotency, complete_idempotency
+from app.shared.order_access import get_order
 from app.core.database import get_db
-from app.core.errors import Validation
+from app.core.errors import NotFound, Validation
 from app.core.security import (
     PERM_DEPOSIT_POST,
     PERM_FINANCE_READ,
@@ -250,7 +253,16 @@ def create_cashflow(
     payload: schemas.CashflowCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_deposit,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> schemas.CashflowOut:
+    if idempotency_key is not None:
+        if not user.can_see_pool(payload.pool_id):
+            raise NotFound("资金账户不存在", details={"pool_id": payload.pool_id})
+        if payload.order_id is not None:
+            get_order(db, payload.order_id, user)
+    record, replay = reserve_idempotency(db, user_id=user.id, scope="cashflows", key=idempotency_key, payload=payload)
+    if replay is not None:
+        return schemas.CashflowOut.model_validate(replay)
     flow = finance_create_cashflow(
         db,
         pool_id=payload.pool_id,
@@ -273,7 +285,9 @@ def create_cashflow(
         actor=_actor(user),
         user=user,
     )
-    return _cashflow_out(db, flow)
+    result = _cashflow_out(db, flow)
+    complete_idempotency(record, result)
+    return result
 
 
 @router.post("/orders/{order_id}/cashflows", response_model=schemas.CashflowOut, status_code=201)
@@ -282,6 +296,7 @@ def create_order_cashflow(
     payload: schemas.CashflowCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> schemas.CashflowOut:
     """登记订单关联的收入/支出资金明细，不新增业务事件。"""
     if payload.order_id is not None and payload.order_id != order_id:
@@ -289,6 +304,13 @@ def create_order_cashflow(
             "资金明细关联订单与路径订单不一致",
             details={"field": "order_id", "order_id": order_id},
         )
+    if idempotency_key is not None:
+        if not user.can_see_pool(payload.pool_id):
+            raise NotFound("资金账户不存在", details={"pool_id": payload.pool_id})
+        get_order(db, order_id, user)
+    record, replay = reserve_idempotency(db, user_id=user.id, scope=f"orders/{order_id}/cashflows", key=idempotency_key, payload=payload)
+    if replay is not None:
+        return schemas.CashflowOut.model_validate(replay)
     flow = finance_create_cashflow(
         db,
         pool_id=payload.pool_id,
@@ -311,7 +333,9 @@ def create_order_cashflow(
         actor=_actor(user),
         user=user,
     )
-    return _cashflow_out(db, flow)
+    result = _cashflow_out(db, flow)
+    complete_idempotency(record, result)
+    return result
 
 
 @router.put("/cashflows/{cashflow_id}", response_model=schemas.CashflowOut)

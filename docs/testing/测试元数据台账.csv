@@ -42,7 +42,7 @@ FEATURE,SYS11,SYS,CI 质量门禁(lint/前后端测试),.github/workflows; backe
 FEATURE,SYS12,SYS,测试用例库与执行记录,backend/scripts/gen_test_case_library.py; tests/backend/_report,测试用例库与执行记录,中,,,,,,,,,,
 FEATURE,SYS13,SYS,测试种子与迁移基线,backend/alembic/squashed_versions; backend/app/settings/field_definitions,迁移基线与种子,中,,,,,,,,,,
 PROMISE,,,,,,,,MONEY-01,L0,双端,"金额全程 Decimal(18,2)；任何合计不得经 float 中转",分丢失、账对不上，且不可逆,test_money.py,已覆盖,,
-PROMISE,,,,,,,,MONEY-02,L0,后端,成交总额 total 为 gross，不等于本金+利润之和,利润口径虚高，经营数据失真,test_orders_contract.py,待核,,需确认断言直接校验 gross 语义
+PROMISE,,,,,,,,MONEY-02,L0,后端,成交总额 GROSS 按成交事件取值，不用本金与利润推算,利润口径虚高，经营数据失真,test_profit_cashflow_basis.py,已覆盖,,新增一笔支出只改变利润而不改变成交总额和本金
 PROMISE,,,,,,,,POOL-01,L0,后端,资金池余额 = 池内已审核流水的有符号和；批量端点与单池端点同口径,余额错→超额支付或拒付,test_pool_balances_batch.py,已覆盖,FIN-01,
 PROMISE,,,,,,,,CASHFLOW-01,L0,双端,流水合计由服务端计算，不受分页上限影响,报表静默少算,test_cashflow_totals.py;test_studio_cashflow_summary.py,已覆盖,FIN-04,
 PROMISE,,,,,,,,REVERSAL-01,L0,后端,冲销必须成对（reversal_of_id）；原流水不可物理删除,账目无法重建，审计断链,test_finance_reversal_service.py,已覆盖,,
@@ -50,11 +50,11 @@ PROMISE,,,,,,,,REVERSAL-02,L0,后端,同一流水的冲销编辑删除并发时�
 PROMISE,,,,,,,,TRANSFER-01,L0,后端,划转两腿成对且共用 transfer_id，禁止单边落库,资金凭空增减,test_finance_transfers_service.py,已覆盖,,
 PROMISE,,,,,,,,RECON-01,L0,后端,对账判重键 = pool_id + reconciled_on + account_label，重复对账必须拒绝,同一笔对两次，账面虚增,test_finance_reconciliation_service.py,已覆盖,,
 PROMISE,,,,,,,,DEPOSIT-01,L0,后端,押金剩余 = 实收−已退−已损失，不得为负,退超，直接资金损失,test_deposit_remaining.py;test_finance_api.py;test_finance_deposits.py;test_finance_rebates_guards.py;test_finance_reconciliation.py,已覆盖,DEP-01,
-PROMISE,,,,,,,,REBATE-01,L0,后端,返点按规则快照计算；结算不改原规则定义,返点争议，历史单无法复算,test_finance_rebates_service.py;test_rebate_current_contract.py,待核,,需确认快照而非实时规则
+PROMISE,,,,,,,,REBATE-01,L0,后端,返点登记按记录金额确认收入，费率仅留痕；编辑同步更新关联事件和流水,返点收入错计，订单与台账不一致,test_finance_rebates_service.py;test_rebate_current_contract.py;test_rebate_rules_contract.py,已覆盖,,现行口径见数据字典
 PROMISE,,,,,,,,INSTALLMENT-01,L0,后端,减免累加 waived_amount，不改原应收金额,应收被篡改，客户对账争议,test_installment_remaining.py,已覆盖,,
-PROMISE,,,,,,,,INSTALLMENT-02,L0,后端,末期 final_period_adjustment 吸收尾差，分期合计必须闭合,分期不平，尾差长期挂账,test_installments_service.py;test_installments_service_write_paths.py;test_installments_service_defensive.py,待核,,需确认末期尾差断言
+PROMISE,,,,,,,,INSTALLMENT-02,L0,后端,末期 final_period_adjustment 吸收尾差，分期合计必须闭合,分期不平，尾差长期挂账,test_installments_contract.py;test_installments_service.py,已覆盖,,已有测试逐期核对金额、合计和结清状态
 PROMISE,,,,,,,,INSTALLMENT-03,L0,后端,分期收款与取消减免回收等并发操作保持一致,并发操作导致重复记账或合约状态错误,test_installment_payment_concurrency.py,已覆盖,,
-PROMISE,,,,,,,,IDEMPOTENCY-01,L0,后端,重复提交不得产生第二笔流水,重复扣款/重复入账,,缺失（当前行为存在重复记账风险，旧用例已删除）,,待实现事件幂等后新增正向守卫
+PROMISE,,,,,,,,IDEMPOTENCY-01,L0,后端,手工流水、订单关联流水和订单事件用同一提交键重试时只入账一次,重复扣款/重复入账,test_cashflow_totals.py;test_orders_api.py,已覆盖,,覆盖重复请求、并发、回滚及不同提交键独立入账
 PROMISE,,,,,,,,NUMBER-01,L1,后端,单号唯一且分配后不可修改（HS/TH/DG+4、KU_+5、ZC/SR+5）,重号，对外凭证失效,test_numbering.py,已覆盖,,
 PROMISE,,,,,,,,INVENTORY-01,L1,后端,同 game_account + game_type 未售不得重复入库（422）,幽灵库存，资产虚增,test_stock_intake_contract.py;test_order_duplicate_account.py,已覆盖,,
 PROMISE,,,,,,,,INVENTORY-02,L1,后端,仅当无已过账资金事件时，取消订单才回收库存,库存与资金脱钩,test_cancel_inventory_release.py,已覆盖,,

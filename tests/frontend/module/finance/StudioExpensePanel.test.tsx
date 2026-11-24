@@ -442,6 +442,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     await ui.type(modal.querySelector("#note") ?? modal, "10 月工作室房租");
     await ui.click(screen.getByRole("button", { name: /登记入账/ }));
     await waitFor(() => expect(vi.mocked(cashflowsApi.create)).toHaveBeenCalled());
+    expect(vi.mocked(cashflowsApi.create).mock.calls[0][1]).toMatch(/^[0-9a-f]{32}$/);
     const payload = vi.mocked(cashflowsApi.create).mock.calls[0][0] as Record<string, unknown>;
     expect(payload).toMatchObject({
       pool_id: 1,

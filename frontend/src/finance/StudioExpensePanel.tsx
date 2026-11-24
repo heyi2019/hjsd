@@ -36,6 +36,7 @@ import { DataTable,
   StatRow,
 } from "../shared/ui";
 import { useAsyncAction } from "../shared/hooks/useAsyncAction";
+import { useIdempotencyDraft } from "../shared/hooks/useIdempotencyDraft";
 import { useEmployeeOptions } from "../shared/hooks/useEmployeeOptions";
 import { ResponsibleEmployeeSelect } from "../shared/forms/ResponsibleEmployeeSelect";
 import type { FinancePageController } from "./useFinancePageController";
@@ -119,6 +120,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   const [registerForm] = Form.useForm();
   const [reverseForm] = Form.useForm();
   const write = useAsyncAction();
+  const idempotency = useIdempotencyDraft();
 
   const from = periodState.period?.from ?? "";
   const to = periodState.period?.to ?? "";
@@ -203,7 +205,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
         await cashflowsApi.update(editing.id, payload);
         appMessage.success("工作室收支已更新");
       } else {
-        await cashflowsApi.create(payload);
+        await cashflowsApi.create(payload, idempotency.get().key);
         appMessage.success(direction === "OUT" ? "支出已登记" : "收入已登记");
       }
       setRegisterOpen(false);
@@ -231,6 +233,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   };
 
   const openRegister = () => {
+    idempotency.reset();
     write.clearError();
     setEditTarget(null);
     registerForm.resetFields();
@@ -240,6 +243,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   };
 
   const openEdit = (row: Cashflow) => {
+    idempotency.reset();
     write.clearError();
     setEditTarget(row);
     setRegisterDirection(row.direction === "IN" ? "IN" : "OUT");
@@ -258,6 +262,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
   };
 
   const closeRegister = () => {
+    idempotency.reset();
     write.clearError();
     setRegisterOpen(false);
     setEditTarget(null);

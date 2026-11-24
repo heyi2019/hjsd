@@ -407,7 +407,8 @@ def test_existing_users_do_not_have_their_admin_password_reset_on_deploy(tmp_pat
     assert not marker.exists()
 
 
-def test_deploy_accepts_current_schema_without_legacy_policy_table(tmp_path):
+@pytest.mark.parametrize("rollback", [False, True])
+def test_deploy_accepts_current_schema_without_legacy_policy_table(tmp_path, rollback):
     """当前 0001 不含旧策略表，部署不应查询不存在的表而失败。"""
     script, fake_bin = _release_tree(tmp_path)
     docker = fake_bin / "docker"
@@ -419,9 +420,19 @@ def test_deploy_accepts_current_schema_without_legacy_policy_table(tmp_path):
     )
     docker.write_text(contents, encoding="utf-8")
 
-    result = _run(script, fake_bin)
+    arguments = tmp_path / "docker-arguments"
+    result = _run(script, fake_bin, extra_env={
+        "FAKE_DOCKER_ARGUMENTS": str(arguments), "ERP_ROLLBACK": str(int(rollback)),
+    })
 
     assert result.returncode == 0, result.stdout + result.stderr
+    calls = arguments.read_text(encoding="utf-8").splitlines()
+    provision = "scripts.ensure_idempotency_records"
+    if rollback:
+        assert provision not in calls
+    else:
+        backup = next(index for index, value in enumerate(calls) if value.startswith("pg_dump "))
+        assert backup < calls.index(provision) < calls.index("up", backup)
 
 
 def _reset_tree(tmp_path, *, dump_exit=0, admin_password="test-admin-secret"):
@@ -668,3 +679,59 @@ def test_offline_deploy_refuses_missing_rate_limit_image(tmp_path):
     result = _run(script, fake_bin, extra_env={"ERP_SKIP_BUILD": "1", "APP_VERSION": "1.0.1"})
     assert result.returncode != 0
     assert "redis:7.4-alpine" in result.stdout + result.stderr
+
+
+def test_local_release_provisions_only_restored_drill_before_schema_check(monkeypatch):
+    """仅在本地临时库补表；仍执行完整结构对比和线上前后校验。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("local_release_provision_drill", PROJECT_ROOT / "scripts/ops/local_release.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    name = "heijin_erp_drill_" + "a" * 20
+    monkeypatch.setattr(module.secrets, "token_hex", lambda _: "a" * 20)
+    calls = []
+    digests = []
+    def fake_call(args, **kwargs):
+        calls.append(args)
+        return "127.0.0.1:5433" if args[:2] == ["docker", "port"] else ""
+    def fake_run(args, **kwargs):
+        calls.append(args)
+    def digest():
+        digests.append(True)
+        return "same"
+    monkeypatch.setattr(module, "call", fake_call)
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module, "production_schema_digest", digest)
+    assert module.check_production_schema({}) == "same"
+    provision = next(i for i, command in enumerate(calls) if "scripts.ensure_idempotency_records" in command)
+    restore = next(i for i, command in enumerate(calls) if "--single-transaction" in command)
+    diff = next(i for i, command in enumerate(calls) if any(str(x).endswith("schema_diff.py") for x in command))
+    assert restore < provision < diff
+    assert calls[provision][-2:] == ["--drill-db", name]
+    assert calls[diff][-1] == name
+    assert len(digests) == 2
+    changed = iter(("before", "after"))
+    monkeypatch.setattr(module, "production_schema_digest", lambda: next(changed))
+    with pytest.raises(RuntimeError, match="线上数据库结构"):
+        module.check_production_schema({})
+
+
+def test_drill_provision_rejects_nonlocal_or_unowned_database():
+    """补表连接只允许本机 5433 和精确生成的演练库名。"""
+    from scripts.ensure_idempotency_records import drill_database_url
+    from sqlalchemy.engine import make_url
+
+    base = "postgresql+psycopg://erp_app@127.0.0.1:5433/heijin_erp_dev"
+    name = "heijin_erp_drill_" + "a" * 20
+    assert make_url(drill_database_url(base, name)).database == name
+    for invalid_base, invalid_name in [
+        (base, "heijin_erp_dev"), (base, name + "x"),
+        (base.replace("127.0.0.1", "192.0.2.1"), name),
+        (base.replace("5433", "5432"), name),
+        (base.replace("heijin_erp_dev", "production"), name),
+        (base + "?host=192.0.2.1", name),
+    ]:
+        with pytest.raises(ValueError):
+            drill_database_url(invalid_base, invalid_name)

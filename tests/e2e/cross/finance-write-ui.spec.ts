@@ -70,11 +70,32 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await dialog.getByLabel("金额").fill("10.00");
     const note = `E2E 工作室收入 ${Date.now()}`;
     await dialog.getByLabel("备注").fill(note);
+    let firstSubmission: { status: number; key: string | null; flowNo: string } | undefined;
+    await page.route((url) => url.pathname === "/api/cashflows", async (route) => {
+      if (firstSubmission || route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      const upstream = await route.fetch();
+      firstSubmission = {
+        status: upstream.status(),
+        key: await route.request().headerValue("idempotency-key"),
+        flowNo: (await upstream.json()).flow_no,
+      };
+      await route.abort("timedout");
+    });
+    await dialog.getByRole("button", { name: "登记入账" }).click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
+    expect(firstSubmission?.status).toBe(201);
+    expect(firstSubmission?.key).toMatch(/^[0-9a-f]{32}$/);
+
     const posted = page.waitForResponse((r) => r.url().endsWith("/cashflows") && r.request().method() === "POST");
     await dialog.getByRole("button", { name: "登记入账" }).click();
     const response = await posted;
     expect(response.status()).toBe(201);
+    expect(await response.request().headerValue("idempotency-key")).toBe(firstSubmission?.key);
     const flow = await response.json();
+    expect(flow.flow_no).toBe(firstSubmission?.flowNo);
     expect(flow.ledger_type).toBe("STUDIO");
     expect(flow.direction).toBe("IN");
 
@@ -84,6 +105,7 @@ test.describe("资金/返点/分期 UI 主写路径", () => {
     await page.getByRole("searchbox", { name: "流水搜索" }).fill(note);
     await page.getByRole("searchbox", { name: "流水搜索" }).press("Enter");
     await expect(page.getByRole("row").filter({ hasText: flow.flow_no })).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: note })).toHaveCount(1);
 
     await page.getByRole("tab", { name: "工作室运营" }).click();
     const originalRow = page.getByRole("row").filter({ has: page.getByRole("cell", { name: flow.flow_no, exact: true }) });

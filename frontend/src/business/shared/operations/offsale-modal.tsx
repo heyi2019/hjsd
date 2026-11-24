@@ -15,6 +15,7 @@ import { consignmentListings, type ConsignmentListing } from "./consignment-logi
 import { formatDateTimeMinute } from "../../../shared/lib/format";
 import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useIdempotencyDraft } from "../../../shared/hooks/useIdempotencyDraft";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 
 export type ActiveConsignment = ConsignmentListing;
@@ -42,6 +43,7 @@ export function OrderPlatformOffsaleModal(props: {
 }) {
   const [form] = Form.useForm();
   const write = useAsyncAction();
+  const idempotency = useIdempotencyDraft();
   const submitting = write.pending;
   const session = useRequestSession(props.account);
   const employeesRequest = useLatestRequest();
@@ -106,7 +108,8 @@ export function OrderPlatformOffsaleModal(props: {
     await write.run(async () => {
       setError(null);
       try {
-        const unlistedAt = values.unlisted_at ?? dayjs();
+        const draft = idempotency.get(submittedSession);
+        const unlistedAt = values.unlisted_at ?? dayjs(draft.startedAt);
         await ordersApi.postEvent(selected.orderId, {
           event_type: "OPERATE",
           operation_type: "UNLIST",
@@ -122,7 +125,7 @@ export function OrderPlatformOffsaleModal(props: {
             platform_unlisted_at: unlistedAt.format("YYYY-MM-DDTHH:mm"),
             platform_unlist_scope: "PLATFORM",
           },
-        });
+        }, draft.key);
         appMessage.success(`${selected.platform} 已下架，账号仍保留在 ERP 库存`);
         if (session.isCurrent(submittedSession)) {
           form.resetFields();

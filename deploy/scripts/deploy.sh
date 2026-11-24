@@ -203,6 +203,9 @@ echo "  ${pre_state}"
 echo "==> 执行数据库迁移"
 # 已有数据库只应用当前活动迁移链，不覆盖业务数据。
 docker compose run --rm backend alembic upgrade head
+if [ "${ERP_ROLLBACK:-0}" != "1" ]; then
+  docker compose run --rm -T backend python -m scripts.ensure_idempotency_records --apply </dev/null
+fi
 
 echo "==> 迁移完成（发布通道不写入业务数据）"
 

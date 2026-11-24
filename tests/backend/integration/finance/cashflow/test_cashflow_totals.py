@@ -340,3 +340,119 @@ def test_export_uses_one_snapshot_when_rows_change_between_batches(committed_fin
     assert len(numbers) == len(original_numbers)
     assert set(numbers) == set(original_numbers)
     assert "导出期间修改" not in response.text
+
+
+def test_manual_cashflow_same_idempotency_key_replays_without_second_write(seeded_client, seeded_db, headers):
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "IN",
+               "category": "OPERATING", "amount": "17.25", "note": "幂等重试"}
+    request_headers = {**headers, "Idempotency-Key": "cashflow-retry-1"}
+    first = seeded_client.post("/api/cashflows", json=payload, headers=request_headers)
+    second = seeded_client.post("/api/cashflows", json=payload, headers=request_headers)
+    assert first.status_code == second.status_code == 201
+    assert first.json() == second.json()
+    rows = seeded_db.scalars(select(Cashflow).where(Cashflow.note == "幂等重试")).all()
+    assert len(rows) == 1
+    balance = seeded_client.get("/api/pools/1/balance", headers=headers)
+    assert balance.status_code == 200, balance.text
+    assert balance.json()["cash_balance"] == "17.25"
+
+
+def test_cashflow_idempotency_conflict_distinct_keys_and_legacy_requests(committed_finance_client, headers):
+    client, engine = committed_finance_client
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "IN",
+               "category": "OPERATING", "amount": "17.25", "note": "独立提交"}
+    one = {**headers, "Idempotency-Key": "submission-one"}
+    first = client.post("/api/cashflows", json=payload, headers=one)
+    conflict = client.post("/api/cashflows", json={**payload, "amount": "18"}, headers=one)
+    other = client.post("/api/cashflows", json=payload, headers={**headers, "Idempotency-Key": "submission-two"})
+    legacy = client.post("/api/cashflows", json=payload, headers=headers)
+    assert first.status_code == other.status_code == legacy.status_code == 201
+    assert conflict.status_code == 409
+    assert conflict.json()["code"] == "IDEMPOTENCY_KEY_CONFLICT"
+    assert len({first.json()["id"], other.json()["id"], legacy.json()["id"]}) == 3
+    with Session(engine) as session:
+        assert len(session.scalars(select(Cashflow).where(Cashflow.note == "独立提交")).all()) == 3
+
+
+def test_cashflow_failed_request_does_not_consume_key(committed_finance_client, headers):
+    client, engine = committed_finance_client
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "IN",
+               "category": "OPERATING", "amount": "0", "note": "失败重试"}
+    request_headers = {**headers, "Idempotency-Key": "failed-submission"}
+    assert client.post("/api/cashflows", json=payload, headers=request_headers).status_code == 422
+    success = client.post("/api/cashflows", json={**payload, "amount": "12"}, headers=request_headers)
+    assert success.status_code == 201, success.text
+    with Session(engine) as session:
+        assert len(session.scalars(select(Cashflow).where(Cashflow.note == "失败重试")).all()) == 1
+
+
+def test_cashflow_concurrent_retries_commit_once(committed_finance_client, headers):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    client, engine = committed_finance_client
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "IN",
+               "category": "OPERATING", "amount": "25", "note": "并发重试"}
+    request_headers = {**headers, "Idempotency-Key": "concurrent-submission"}
+    barrier = Barrier(2, timeout=10)
+
+    def synchronize_inserts(_conn, _cursor, statement, _params, _context, _many):
+        if statement.startswith("INSERT INTO idempotency_records"):
+            barrier.wait()
+
+    event.listen(engine, "before_cursor_execute", synchronize_inserts)
+    try:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            results = list(executor.map(lambda _: client.post("/api/cashflows", json=payload, headers=request_headers), range(2)))
+    finally:
+        event.remove(engine, "before_cursor_execute", synchronize_inserts)
+    assert [result.status_code for result in results] == [201, 201]
+    assert results[0].json() == results[1].json()
+    with Session(engine) as session:
+        assert len(session.scalars(select(Cashflow).where(Cashflow.note == "并发重试")).all()) == 1
+    balance = client.get("/api/pools/1/balance", headers=headers)
+    assert balance.status_code == 200, balance.text
+    assert balance.json()["cash_balance"] == "25.00"
+
+
+def test_cashflow_idempotency_scopes_user_and_rechecks_current_pool_access(seeded_client, seeded_db):
+    from app.core.security import CurrentUser, build_access_token
+
+    def token(user_id, pools):
+        user = CurrentUser.build(id=user_id, username=f"test-idem-{user_id}", roles=["FINANCE"],
+                                 pool_ids=frozenset(pools), owner_scope="SELF")
+        return {"Authorization": f"Bearer {build_access_token(user)}", "Idempotency-Key": "shared-key"}
+
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "IN",
+               "category": "OPERATING", "amount": "17", "note": "用户隔离"}
+    first = seeded_client.post("/api/cashflows", json=payload, headers=token(101, [1]))
+    other = seeded_client.post("/api/cashflows", json={**payload, "amount": "18"}, headers=token(102, [1]))
+    revoked = seeded_client.post("/api/cashflows", json=payload, headers=token(101, []))
+    assert first.status_code == other.status_code == 201
+    assert first.json()["id"] != other.json()["id"]
+    assert revoked.status_code == 404
+    assert len(seeded_db.scalars(select(Cashflow).where(Cashflow.note == "用户隔离")).all()) == 2
+
+
+def test_cashflow_post_write_failure_rolls_back_key_and_business_write(committed_finance_client, headers, monkeypatch):
+    from app.finance.routers import cashflows_router
+
+    client, engine = committed_finance_client
+    payload = {"pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "IN",
+               "category": "OPERATING", "amount": "17", "note": "事务回滚"}
+    request_headers = {**headers, "Idempotency-Key": "transaction-retry"}
+    original = cashflows_router.complete_idempotency
+
+    def fail_before_completion(record, response):
+        raise RuntimeError("injected failure after business write")
+
+    monkeypatch.setattr(cashflows_router, "complete_idempotency", fail_before_completion)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        client.post("/api/cashflows", json=payload, headers=request_headers)
+    with Session(engine) as session:
+        assert not session.scalars(select(Cashflow).where(Cashflow.note == "事务回滚")).all()
+    monkeypatch.setattr(cashflows_router, "complete_idempotency", original)
+    retry = client.post("/api/cashflows", json=payload, headers=request_headers)
+    assert retry.status_code == 201, retry.text
+    with Session(engine) as session:
+        assert len(session.scalars(select(Cashflow).where(Cashflow.note == "事务回滚")).all()) == 1

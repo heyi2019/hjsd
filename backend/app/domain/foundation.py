@@ -34,6 +34,21 @@ from app.domain.base import AuditMixin, TimestampMixin
 from app.domain.enums import PoolStatus, PoolType
 
 
+class IdempotencyRecord(Base):
+    """一次成功请求及其响应；与业务写入属于同一个事务。"""
+
+    __tablename__ = "idempotency_records"
+    __table_args__ = (UniqueConstraint("user_id", "scope", "key"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    scope: Mapped[str] = mapped_column(String(96), nullable=False)
+    key: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    response: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+
 class Pool(Base, AuditMixin):
     """资金账户主数据：可自由创建，新增池无需改代码（PRD §1.2）。"""
 

@@ -42,6 +42,7 @@ EXPECTED_TABLES = {
     "order_type_defs",
     "document_sequences",
     "audit_logs",
+    "idempotency_records",
     "alembic_version",
 }
 
@@ -355,6 +356,26 @@ def test_upgrade_is_repeatable(migration_db):
         type_count = connection.execute(text("SELECT COUNT(*) FROM order_type_defs")).scalar()
     assert (pool_count, type_count) == (0, 3)
 
+
+
+def test_adds_idempotency_storage_to_existing_database_without_reseeding(migration_db):
+    engine, _target, env = migration_db
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE IF EXISTS idempotency_records"))
+        connection.execute(text("UPDATE order_type_defs SET description = '现有自定义说明' WHERE code = 'HS'"))
+
+    for _ in range(2):
+        result = subprocess.run(
+            [sys.executable, "-m", "scripts.ensure_idempotency_records", "--apply"],
+            cwd=BACKEND_DIR, env={**os.environ, **env}, capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+
+    keys = inspect(engine).get_unique_constraints("idempotency_records")
+    assert any(key["column_names"] == ["user_id", "scope", "key"] for key in keys)
+    with engine.connect() as connection:
+        description = connection.scalar(text("SELECT description FROM order_type_defs WHERE code = 'HS'"))
+        assert description == "现有自定义说明"
 
 
 def test_active_migration_chain_is_single_current_baseline():

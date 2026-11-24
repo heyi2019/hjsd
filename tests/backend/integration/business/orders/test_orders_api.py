@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -367,3 +368,41 @@ class TestOrdersApi:
         assert response.status_code == 200, response.text
         assert "available" in response.json()
 
+
+def test_order_cashflow_idempotency_is_per_order(seeded_client, seeded_db, headers):
+    first_order, second_order = _order(seeded_db), _order(seeded_db)
+    payload = {"pool_id": 1, "occurred_on": D.isoformat(), "direction": "IN",
+               "category": "OTHER", "amount": "100", "note": "订单幂等"}
+    request_headers = {**headers, "Idempotency-Key": "order-cashflow"}
+    path = f"/api/orders/{first_order.id}/cashflows"
+    first = seeded_client.post(path, json=payload, headers=request_headers)
+    replay = seeded_client.post(path, json=payload, headers=request_headers)
+    conflict = seeded_client.post(path, json={**payload, "amount": "101"}, headers=request_headers)
+    another = seeded_client.post(f"/api/orders/{second_order.id}/cashflows", json=payload, headers=request_headers)
+    assert first.status_code == replay.status_code == another.status_code == 201
+    assert first.json() == replay.json()
+    assert first.json()["id"] != another.json()["id"]
+    assert conflict.status_code == 409
+    assert len(seeded_db.scalars(select(Cashflow).where(Cashflow.note == "订单幂等")).all()) == 2
+
+
+def test_order_event_retry_replays_and_different_key_is_new_operation(seeded_client, seeded_db, headers):
+    from app.domain.trade import OrderEvent
+
+    order = _order(seeded_db)
+    payload = {"event_type": "BUY", "amount": "100", "occurred_on": D.isoformat(), "note": "事件幂等"}
+    path = f"/api/orders/{order.id}/events"
+    key = {**headers, "Idempotency-Key": "event-one"}
+    first = seeded_client.post(path, json=payload, headers=key)
+    replay = seeded_client.post(path, json=payload, headers=key)
+    conflict = seeded_client.post(path, json={**payload, "amount": "101"}, headers=key)
+    other = seeded_client.post(path, json=payload, headers={**headers, "Idempotency-Key": "event-two"})
+    assert first.status_code == replay.status_code == other.status_code == 201
+    assert first.json() == replay.json()
+    assert first.json()["event"]["id"] != other.json()["event"]["id"]
+    assert conflict.status_code == 409
+    assert len(seeded_db.scalars(select(OrderEvent).where(OrderEvent.note == "事件幂等")).all()) == 2
+    flows = seeded_db.scalars(select(Cashflow).where(Cashflow.order_id == order.id)).all()
+    assert len(flows) == 2
+    assert {flow.flow_no for flow in flows} == {first.json()["cashflow_no"], other.json()["cashflow_no"]}
+    assert all(flow.amount == Decimal("100.00") for flow in flows)

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import axios, { type AxiosAdapter } from "axios";
+import { cashflowsApi } from "@/shared/api/cashflows.api";
+import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
+import { ordersApi } from "@/shared/api/orders.api";
 import {
   api,
   ACCESS_TOKEN_KEY,
@@ -12,6 +15,28 @@ import {
   logout,
   setDevUser,
 } from "@/shared/api/client";
+
+it("三种资金写入接口通过请求头传递幂等键", async () => {
+  const oldAdapter = api.defaults.adapter;
+  const captured: Array<{ url?: string; key: unknown }> = [];
+  const adapter: AxiosAdapter = async (config) => {
+    captured.push({ url: config.url, key: config.headers.get("Idempotency-Key") });
+    return { data: {}, status: 201, statusText: "Created", headers: {}, config };
+  };
+  try {
+    api.defaults.adapter = adapter;
+    await cashflowsApi.create({ amount: "5.00" }, "cashflow-key");
+    await orderCashflowsApi.create(1, { amount: "5.00" }, "order-flow-key");
+    await ordersApi.postEvent(1, { event_type: "BUY", occurred_on: "2026-11-25" }, "event-key");
+    expect(captured).toEqual([
+      { url: "/cashflows", key: "cashflow-key" },
+      { url: "/orders/1/cashflows", key: "order-flow-key" },
+      { url: "/orders/1/events", key: "event-key" },
+    ]);
+  } finally {
+    api.defaults.adapter = oldAdapter;
+  }
+});
 
 /** 组装一个 axios.isAxiosError 认账的错误对象（不必真发请求）。 */
 function axiosError(opts: {

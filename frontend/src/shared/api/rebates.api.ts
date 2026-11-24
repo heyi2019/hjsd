@@ -4,10 +4,6 @@ import type { Rebate } from "./types/finance";
 export const rebatesApi = {
   list: (params?: { source_order_id?: number }) =>
     api.get<Rebate[]>("/rebates", { params }).then((r) => r.data),
-  exportCsv: () =>
-    api
-      .get<Blob>("/rebates/export.csv", { params: { _t: Date.now() }, responseType: "blob" })
-      .then((r) => r.data),
   create: (payload: Partial<Rebate> & {
     source_order_id: number;
     rebate_type: "BUY" | "SELL";

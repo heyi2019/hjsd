@@ -25,7 +25,7 @@ export function useListColumnsController() {
   const dragKeyRef = useRef<string | null>(null);
 
   const applyScopes = useCallback((items: ListScopeConfig[], preferred?: string) => {
-    // 旧 REBATE 作用域仍供 CSV 导出读取；页面表格使用 REBATE_DETAIL。
+    // 保留旧 REBATE 导出配置的历史记录；页面表格使用 REBATE_DETAIL。
     const visibleItems = items.filter((item) => item.code !== "REBATE");
     setScopes(visibleItems);
     const target = visibleItems.some((item) => item.code === preferred) ? preferred! : visibleItems[0]?.code ?? "";

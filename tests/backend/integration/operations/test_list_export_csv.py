@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import io
 from datetime import date
+from decimal import Decimal
 
 import openpyxl
 import pytest
@@ -18,7 +19,7 @@ from sqlalchemy import event as sqlalchemy_event, select
 
 from app.domain.enums import AuditAction
 from app.domain.foundation import AuditLog
-from app.domain.trade import Order, OrderFormField
+from app.domain.trade import Order, OrderFormField, RebateRecord
 from app.domain.users import User
 from app.settings.lists.export import build_list_csv
 from app.business.orders.export_fields import _event_platform, _order_detail_export_fields
@@ -282,7 +283,13 @@ def test_orders_export_includes_custom_column_with_translated_value(
 
 def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
     """xlsx 导出：主订单 + 详情 + 操作/资金/返点三类明细，详情表头三级且一级为真合并。"""
-    _seed_order(seeded_db, order_no="HS9805", form_extra={"delivery_note": "已交付"})
+    order = _seed_order(seeded_db, order_no="HS9805", form_extra={"delivery_note": "已交付"})
+    seeded_db.add(RebateRecord(
+        rebate_no="HS9805-REB01", source_order_id=order.id, rebate_type="BUY",
+        amount=Decimal("26.50"), collected_on=date(2026, 1, 2),
+        created_by="tester", updated_by="tester",
+    ))
+    seeded_db.flush()
     response = seeded_client.get("/api/orders/export.xlsx", headers=headers)
     assert response.status_code == 200, response.text
     assert response.headers["content-type"].startswith(
@@ -291,6 +298,12 @@ def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
 
     workbook = openpyxl.load_workbook(io.BytesIO(response.content))
     assert workbook.sheetnames == ["主订单信息", "详情信息", "操作明细", "资金明细", "返点明细"]
+    rebate_sheet = workbook["返点明细"]
+    rebate_headers = {rebate_sheet.cell(row=1, column=i).value: i for i in range(1, rebate_sheet.max_column + 1)}
+    assert rebate_sheet.cell(row=2, column=rebate_headers["订单号"]).value == "HS9805"
+    assert rebate_sheet.cell(row=2, column=rebate_headers["返点单号"]).value == "HS9805-REB01"
+    assert rebate_sheet.cell(row=2, column=rebate_headers["返点类型"]).value in ("BUY", "买号返点")
+    assert Decimal(str(rebate_sheet.cell(row=2, column=rebate_headers["返点金额"]).value)) == Decimal("26.50")
 
     main_sheet = workbook["主订单信息"]
     assert main_sheet.cell(row=1, column=1).value == "库存编号"
@@ -462,11 +475,12 @@ def test_cashflows_export_chinese_header(seeded_client, headers, seeded_db):
     assert header[0] == "行类型"
 
 
-def test_rebates_export_chinese_header(seeded_client, headers, seeded_db):
+def test_rebates_export_csv_route_is_retired(app, seeded_client, headers):
+    assert "/api/rebates/export.csv" not in app.openapi()["paths"]
+    assert "/api/rebates" in app.openapi()["paths"]
+    assert "/api/rebates/{rebate_id}" in app.openapi()["paths"]
     response = seeded_client.get("/api/rebates/export.csv", headers=headers)
-    assert response.status_code == 200, response.text
-    assert response.headers["content-type"].startswith("text/csv")
-    assert _headers(response.text)[0] == "行类型"
+    assert response.status_code in (404, 422)
 
 
 def test_export_writes_list_export_audit(seeded_client, headers, seeded_db):

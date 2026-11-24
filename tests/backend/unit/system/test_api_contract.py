@@ -23,7 +23,6 @@ NON_JSON_ROUTES = frozenset(
         ("GET", "/api/stocks/export.csv"),
         ("GET", "/api/customers/export.csv"),
         ("GET", "/api/installments/export.csv"),
-        ("GET", "/api/rebates/export.csv"),
         ("GET", "/api/cashflows/export.csv"),
         ("GET", "/api/stocks/inventory/ledger/export.csv"),
     }

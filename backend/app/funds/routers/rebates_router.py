@@ -1,10 +1,7 @@
 """返点登记与查询 API。"""
-from datetime import date
-
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.shared.audit import record_audit
 from app.core.database import get_db
 from app.core.security import (
     PERM_FINANCE_READ,
@@ -15,7 +12,6 @@ from app.core.security import (
 from app.settings.auth.session import (
     require_permissions,
 )
-from app.domain.enums import AuditAction
 from app.funds import schemas
 from app.funds.rebates import (
     create_rebate as finance_create_rebate,
@@ -23,8 +19,6 @@ from app.funds.rebates import (
     list_rebates as finance_list_rebates,
     update_rebate as finance_update_rebate,
 )
-from app.settings.lists.export import build_list_csv
-from app.settings.lists.file_response import CSV_MEDIA_TYPE, file_response
 from app.shared.order_access import get_order
 
 from ..router_output import _actor, _rebate_out
@@ -41,27 +35,6 @@ def list_rebates(
 ) -> list[schemas.RebateOut]:
     items = finance_list_rebates(db, source_order_id=source_order_id, user=_user)
     return [_rebate_out(item) for item in items]
-
-
-@router.get("/rebates/export.csv")
-def export_rebates_csv(
-    source_order_id: int | None = Query(default=None),
-    db: Session = Depends(get_db),
-    _user: CurrentUser = read_access,
-) -> Response:
-    """返点按可见列导出 CSV，沿用 /rebates 的权限口径。"""
-    outputs = list_rebates(source_order_id=source_order_id, db=db, _user=_user)
-    rows = [output.model_dump() for output in outputs]
-    csv_text, meta = build_list_csv(db, "REBATE", rows)
-    record_audit(
-        db,
-        action=AuditAction.LIST_EXPORT,
-        entity_type="list_export",
-        entity_id="REBATE",
-        actor=_user.username,
-        after={"rows": len(rows), "column_count": meta["column_count"]},
-    )
-    return file_response(csv_text, f"返点-{date.today().isoformat()}.csv", CSV_MEDIA_TYPE)
 
 
 @router.get("/rebates/{rebate_id}", response_model=schemas.RebateOut)

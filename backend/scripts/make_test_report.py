@@ -10,7 +10,7 @@
   - docs/testing/测试报告_YYYYMMDD.md   （模块×层级矩阵、SKIP/ERROR 单列、跨模块覆盖、按功能查询）
   - docs/testing/测试报告_YYYYMMDD.json （机器可读汇总，供 CI 上传/比对）
 
-现役目录只留最新一份；生成新日期报告时，旧日期的 md/json 移入 报告归档/（本地留存、不入库）。
+最新日报写入成功后，旧日期的 md/json 移入 docs/archive/test-reports/local/（本地留存）。
 
 验收对齐：
   - A–F/SYS 各模块用例数 + 最近执行结果
@@ -21,10 +21,12 @@
 from __future__ import annotations
 
 import csv
+import fcntl
 import json
 import os
 import re
 import shutil
+import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
@@ -33,7 +35,7 @@ CASE_CSV = os.path.join(REPO, "docs", "testing", "测试用例库.csv")
 RESULTS = os.path.join(REPO, "docs", "testing", "测试结果库", "results.jsonl")
 CASE_INDEX = os.path.join(REPO, "tests", "backend", "_report", "case_index.json")
 REPORT_DIR = os.path.join(REPO, "docs", "testing")
-REPORT_ARCHIVE = os.path.join(REPORT_DIR, "报告归档")
+REPORT_ARCHIVE = os.path.join(REPO, "docs", "archive", "test-reports", "local")
 
 
 def report_paths(stamp: str) -> tuple[str, str]:
@@ -45,18 +47,45 @@ def report_paths(stamp: str) -> tuple[str, str]:
 
 
 def archive_stale_reports(keep_stamp: str) -> list[str]:
-    """把非当日日期的报告移入 报告归档/（不入库），现役目录只留最新一份。"""
+    """按日期归档旧日报，保留同名历史批次。"""
     if not os.path.isdir(REPORT_DIR):
         return []
-    moved = []
+    stale: dict[str, list[str]] = defaultdict(list)
     for name in sorted(os.listdir(REPORT_DIR)):
-        m = re.fullmatch(r"测试报告_(\d{8})\.(md|json)", name)
-        if not m or m.group(1) == keep_stamp:
-            continue
+        match = re.fullmatch(r"测试报告_(\d{8})\.(md|json)", name)
+        if match and match[1] != keep_stamp and os.path.isfile(os.path.join(REPORT_DIR, name)):
+            stale[match[1]].append(match[2])
+
+    moved = []
+    for stamp, extensions in stale.items():
         os.makedirs(REPORT_ARCHIVE, exist_ok=True)
-        shutil.move(os.path.join(REPORT_DIR, name), os.path.join(REPORT_ARCHIVE, name))
-        moved.append(name)
+        archive_stem = f"测试报告_{stamp}（历史留存）"
+        target_dir = REPORT_ARCHIVE
+        if any(os.path.lexists(os.path.join(target_dir, f"{archive_stem}.{ext}")) for ext in ("md", "json")):
+            target_dir = tempfile.mkdtemp(prefix=f"{stamp}-", dir=REPORT_ARCHIVE)
+
+        created = []
+        try:
+            for ext in extensions:
+                name = f"测试报告_{stamp}.{ext}"
+                target = os.path.join(target_dir, f"{archive_stem}.{ext}")
+                with open(os.path.join(REPORT_DIR, name), "rb") as source, open(target, "xb") as output:
+                    created.append(target)
+                    shutil.copyfileobj(source, output)
+        except OSError:
+            for target in created:
+                os.unlink(target)
+            if target_dir != REPORT_ARCHIVE:
+                os.rmdir(target_dir)
+            raise
+
+        # 归档副本全部写好后才清理同批原文件，失败时仍能重试。
+        for ext in extensions:
+            name = f"测试报告_{stamp}.{ext}"
+            os.unlink(os.path.join(REPORT_DIR, name))
+            moved.append(name)
     return moved
+
 
 MODULES = ["A", "B", "C", "D", "E", "F", "SYS"]
 LAYERS = ["UT", "IT", "E2E"]
@@ -182,7 +211,6 @@ def main() -> None:
     now = now_dt.strftime("%Y-%m-%d %H:%M UTC")
     stamp = now_dt.strftime("%Y%m%d")
     out_md, out_json = report_paths(stamp)
-    archived = archive_stale_reports(stamp)
     L = ["# 宜游轩 ERP 测试报告", "", f"> 生成：{now} ｜ 最近执行 run_id：`{last_run or '无'}` ｜ "
          f"历史执行批次：{len(run_ids)} 次", ""]
     L.append("## 一、模块 × 层级 用例分布与最近结果")
@@ -301,9 +329,6 @@ def main() -> None:
     L.append("> 运行时展开的多个变体按模板归并回同一条，故实跑例数多于定义条数"
              "（E2E 层最明显：模板标题在库里只记一条，实跑按展开后的条数计）。")
 
-    with open(out_md, "w", encoding="utf-8") as f:
-        f.write("\n".join(L))
-
     # 机器可读汇总
     summary = {
         "generated_at": now,
@@ -320,8 +345,21 @@ def main() -> None:
         "pending_criteria": len(pending),
         "weak_criteria": len(weak),
     }
-    with open(out_json, "w", encoding="utf-8") as f:
-        json.dump(summary, f, ensure_ascii=False, indent=2)
+    report_dir_fd = os.open(REPORT_DIR, os.O_RDONLY)
+    try:
+        fcntl.flock(report_dir_fd, fcntl.LOCK_EX)
+        with tempfile.TemporaryDirectory(prefix=".test-report-", dir=REPORT_DIR) as staging:
+            staged_md = os.path.join(staging, "report.md")
+            staged_json = os.path.join(staging, "report.json")
+            with open(staged_md, "w", encoding="utf-8") as f:
+                f.write("\n".join(L))
+            with open(staged_json, "w", encoding="utf-8") as f:
+                json.dump(summary, f, ensure_ascii=False, indent=2)
+            os.replace(staged_json, out_json)
+            os.replace(staged_md, out_md)
+        archived = archive_stale_reports(stamp)
+    finally:
+        os.close(report_dir_fd)
 
     print(f"[report] 用例定义={len(cases)} 历史批次={len(run_ids)} 最近 run={last_run}")
     print(f"[report] 未执行={len(no_exec)} FAIL/ERROR={len(fails)} SKIP={len(skips)} "

@@ -85,6 +85,10 @@ test.describe("UI visual baseline", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
     await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
+    // 页脚版本随发布变化，实际文案由 AppShell 用例校验。截图沿用固定文本比对布局。
+    await page.locator(".sidebar-foot").evaluate((footer) => {
+      footer.textContent = "宜游轩 · 经营工作台";
+    });
     await expect(page).toHaveScreenshot("workbench-desktop.png", {
       animations: "disabled",
       caret: "hide",

@@ -25,7 +25,7 @@
 
 安全边界
 --------
-1. **先归档再替换**：被移除的行按原顺序 `gzip` 到 `测试结果库/archive/`，压缩成功才动原文件。
+1. **先归档再替换**：被移除的行按原顺序 `gzip` 到 `docs/archive/test-results/local/`，压缩成功才动原文件。遇同名归档时停止。
 2. **原子替换**：写 `results.jsonl.tmp` 后 `os.replace`，中途崩溃不会留下半截文件。
 3. **逐行校验**：保留集行数与预算一致、每行都能 `json.loads`、行序与原文一致，任一不符即 abort。
 4. 任何异常都不改动原文件。
@@ -51,7 +51,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_RESULTS = REPO / "docs" / "testing" / "测试结果库" / "results.jsonl"
-DEFAULT_ARCHIVE_DIR = REPO / "docs" / "testing" / "测试结果库" / "archive"
+DEFAULT_ARCHIVE_DIR = REPO / "docs" / "archive" / "test-results" / "local"
 
 
 def iter_records(path: Path):
@@ -170,9 +170,12 @@ def trim(path: Path, archive_dir: Path, keep_recent: int, dry_run: bool) -> dict
 
     archive_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    archive_path = archive_dir / f"results_removed_{stamp}.jsonl.gz"
-    with gzip.open(archive_path, "wt", encoding="utf-8") as fh:
-        fh.writelines(dropped_lines)
+    archive_path = archive_dir / f"执行记录_{stamp}（历史留存）.jsonl.gz"
+    try:
+        with gzip.open(archive_path, "xt", encoding="utf-8") as fh:
+            fh.writelines(dropped_lines)
+    except FileExistsError as exc:
+        raise SystemExit(f"[trim] 已有同名归档 {archive_path}，保留原执行记录。") from exc
     if not archive_path.exists() or archive_path.stat().st_size == 0:
         raise SystemExit("[trim] abort：归档失败，未改动原文件")
 

@@ -65,10 +65,12 @@ if git rev-parse -q --verify "refs/tags/v${NEW_VERSION}" >/dev/null; then
   echo "✗ tag v${NEW_VERSION} 已存在，不能覆盖已有发布版本" >&2
   exit 1
 fi
-if ! python3 - "$NEW_VERSION" <<'PY'
+migration_revision="$(python3 - "$NEW_VERSION" "$HEAD" <<'PY'
 import re
 import sys
 from pathlib import Path
+
+from scripts.ops.release_record_fields import candidate_migration_revision
 
 path = Path("docs/版本管理.md")
 if not path.is_file():
@@ -89,15 +91,15 @@ if matches:
     for field in ("发布日期", "发布时间", "发布状态"):
         if len(re.findall(rf"^\*\*{field}：\*\* 待发布\s*$", body, re.M)) != 1:
             sys.exit(f"✗ V{sys.argv[1]} 已发布或待发布记录格式不完整，不能覆盖")
+print(candidate_migration_revision(sys.argv[2]))
 PY
-then
-  exit 1
-fi
+)"
 if [ "$BUMP_MODE" != "manual" ]; then
   version_output="$(scripts/ops/bump_version.sh "$BUMP_MODE")"
 fi
 
-ROOT="$ROOT" BASE="$BASE" HEAD="$HEAD" RELEASE_VERSION="$NEW_VERSION" BUMP_MODE="$BUMP_MODE" python3 - <<'PY'
+ROOT="$ROOT" BASE="$BASE" HEAD="$HEAD" RELEASE_VERSION="$NEW_VERSION" BUMP_MODE="$BUMP_MODE" \
+  RELEASE_MIGRATION_REVISION="$migration_revision" python3 - <<'PY'
 from __future__ import annotations
 
 import os
@@ -105,10 +107,13 @@ import re
 import subprocess
 from pathlib import Path
 
+from scripts.ops.release_record_fields import with_release_component_versions
+
 root = Path(os.environ["ROOT"])
 base = os.environ["BASE"]
 head = os.environ["HEAD"]
 version = os.environ["RELEASE_VERSION"]
+revision = os.environ["RELEASE_MIGRATION_REVISION"]
 release = root / "docs" / "版本管理.md"
 
 
@@ -162,7 +167,7 @@ if record:
     start = heading.end() + record.start()
     section_end = re.search(r"^#{2,3} ", text[heading.end() + record.end():], re.M)
     end = heading.end() + record.end() + section_end.start() if section_end else len(text)
-    section = text[start:end]
+    section = with_release_component_versions(text[start:end], version, revision)
     existing = re.search(r"<!-- release-commits:start -->.*?<!-- release-commits:end -->", section, re.S)
     if existing:
         section = section[:existing.start()] + summary_block + section[existing.end():]
@@ -176,6 +181,7 @@ else:
         "**发布状态：** 待发布", "", "#### 本次更新内容", "",
         "- 待结合本轮提交核对、补充业务更新说明。", "", summary_block, "",
     ])
+    block = with_release_component_versions(block, version, revision)
     new_text = text[:heading.end()] + "\n\n" + block + "\n" + text[heading.end():].lstrip("\n")
 release.write_text(new_text, encoding="utf-8")
 

@@ -74,6 +74,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.ops.release_record_fields import candidate_migration_revision, with_release_component_versions
+
 root = Path(os.environ["ROOT"])
 base = os.environ["FROM"]
 head = os.environ["TO"]
@@ -179,12 +181,14 @@ if others:
 
 lines += ["<!-- release-commits:end -->"]
 summary_block = "\n".join(lines)
+revision = candidate_migration_revision(head)
 block = "\n".join([
     section_title, "", f"**版本号：** V{version}", "",
     "**发布日期：** 待发布", "", "**发布时间：** 待发布", "",
     "**发布状态：** 待发布", "", "#### 本次更新内容", "",
     "- 待结合本轮提交核对、补充业务更新说明。", "", summary_block, "",
 ])
+block = with_release_component_versions(block, version, revision)
 
 if not write:
     print(block)
@@ -202,6 +206,7 @@ if matches:
     for field in ("发布日期", "发布时间", "发布状态"):
         if len(re.findall(rf"^\*\*{field}：\*\* 待发布\s*$", section, re.M)) != 1:
             sys.exit(f"✗ V{version} 已发布或待发布记录格式不完整，不能覆盖")
+    section = with_release_component_versions(section, version, revision)
     existing = re.search(r"<!-- release-commits:start -->.*?<!-- release-commits:end -->", section, re.S)
     if existing:
         section = section[:existing.start()] + summary_block + section[existing.end():]

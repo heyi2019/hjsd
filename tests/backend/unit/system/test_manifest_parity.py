@@ -73,6 +73,65 @@ def test_backend_result_does_not_claim_missing_log(tmp_path, monkeypatch):
     assert record["evidence"] == ""
 
 
+def test_report_archive_preserves_same_date_files(tmp_path, monkeypatch):
+    """旧归档保留原样，同日期待归档的两份报告按批次放在一起。"""
+    from scripts import make_test_report as generator
+
+    current = tmp_path / "testing"
+    archive = tmp_path / "archive" / "test-reports" / "local"
+    current.mkdir()
+    archive.mkdir(parents=True)
+    monkeypatch.setattr(generator, "REPORT_DIR", str(current))
+    monkeypatch.setattr(generator, "REPORT_ARCHIVE", str(archive))
+    (archive / "测试报告_20261101（历史留存）.md").write_text("原归档")
+    (current / "测试报告_20261101.md").write_text("补充报告")
+    (current / "测试报告_20261101.json").write_text('{"batch": "replacement"}')
+    (current / "测试报告_20261102.md").write_text("普通归档报告")
+    (current / "测试报告_20261102.json").write_text('{"batch": "ordinary"}')
+    (current / "测试报告_20261103.md").write_text("当日报告")
+
+    generator.archive_stale_reports("20261103")
+
+    assert (archive / "测试报告_20261101（历史留存）.md").read_text() == "原归档"
+    batches = list(archive.glob("20261101-*"))
+    assert len(batches) == 1
+    batch = batches[0]
+    assert (batch / "测试报告_20261101（历史留存）.md").read_text() == "补充报告"
+    assert (batch / "测试报告_20261101（历史留存）.json").read_text() == '{"batch": "replacement"}'
+    assert (archive / "测试报告_20261102（历史留存）.md").read_text() == "普通归档报告"
+    assert (archive / "测试报告_20261102（历史留存）.json").read_text() == '{"batch": "ordinary"}'
+    assert sorted(path.name for path in current.iterdir()) == ["测试报告_20261103.md"]
+
+
+def test_failed_report_generation_leaves_previous_report(tmp_path, monkeypatch):
+    """新报告 JSON 写入失败时，上一次报告仍可从现行路径读取。"""
+    from scripts import make_test_report as generator
+
+    archive = tmp_path / "archive"
+    monkeypatch.setattr(generator, "REPORT_DIR", str(tmp_path))
+    monkeypatch.setattr(generator, "REPORT_ARCHIVE", str(archive))
+    monkeypatch.setattr(generator, "load_cases", dict)
+    monkeypatch.setattr(generator, "load_results", list)
+    monkeypatch.setattr(generator, "load_node_index", dict)
+    old_md = tmp_path / "测试报告_20000101.md"
+    old_json = tmp_path / "测试报告_20000101.json"
+    old_md.write_text("上一次报告")
+    old_json.write_text('{"batch": "last"}')
+    new_md = tmp_path / "最新报告.md"
+    new_json = tmp_path / "最新报告.json"
+    new_json.mkdir()
+    monkeypatch.setattr(generator, "report_paths", lambda _stamp: (str(new_md), str(new_json)))
+
+    with pytest.raises(OSError):
+        generator.main()
+
+    assert old_md.is_file()
+    assert old_json.is_file()
+    assert old_md.read_text() == "上一次报告"
+    assert old_json.read_text() == '{"batch": "last"}'
+    assert not archive.exists()
+
+
 def test_case_number_map_uses_published_numbers_when_cache_conflicts(tmp_path, monkeypatch):
     from scripts import gen_test_case_library as generator
 

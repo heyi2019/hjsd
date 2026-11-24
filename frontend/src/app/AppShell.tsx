@@ -14,6 +14,7 @@ import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import type { InitialLedgerFilters } from "../business/orders/useLedgerList";
 import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
+import projectVersion from "../../../VERSION?raw";
 
 const OrdersPage = lazy(() => import("../business/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
@@ -210,7 +211,7 @@ export function AppShell() {
             <span className="nav-item__label">管理</span>
           </button>
         </nav>
-        <div className="sidebar-foot">宜游轩 · 经营工作台</div>
+        <div className="sidebar-foot">V{projectVersion.trim()} @宜游轩技术团队</div>
       </aside>
       <div className="main">
         <header className="topbar view-head">

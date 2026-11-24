@@ -273,7 +273,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 | ~~`vi.mock` 用相对路径，测试文件搬迁后静默失效~~ | **已解决**：`@`/`@fixtures` 别名 + `mock-specifier.test.ts`，74 处存量已清零（基线为空） |
 | ~~E2E 规格散在包内 `frontend/e2e/`~~ | **已解决**：规格统一迁入 `tests/e2e/<区域>/`，快照目录随 `visual.spec.ts` 走 |
 | ~~前端测试只能整层跑，改一个板块要跑全部~~ | **已解决**：`test:panel <区域>` 与 `test:changed`（按 git 变更推断区域） |
-| `results.jsonl` 只增不减，日增约 14 MB | **已解决**：`scripts/trim_test_results.py` 覆盖保持式裁剪，14.61 MB / 102 run → **3.82 MB / 24 run**，被裁行归档进 `测试结果库/archive/`（gitignore）。裁剪后报告「未执行 0 / FAIL 0」与裁剪前逐项一致 |
+| `results.jsonl` 只增不减，日增约 14 MB | **已解决**：`scripts/trim_test_results.py` 覆盖保持式裁剪，14.61 MB / 102 run → **3.82 MB / 24 run**，被裁行归档进 `docs/archive/test-results/local/`（Git 忽略）。裁剪后报告「未执行 0 / FAIL 0」与裁剪前逐项一致 |
 | 后端 `integration` 与 `unit` 的判定仍是「文件内 db 用例多数派」 | **已知取舍**：35 个混层文件（31%），极端如 `test_orders_contract.py` 105 集成 + 1 单元被整体归入 integration。代价是 57 条快用例跟进集成通道；未拆文件，因为拆文件会改 nodeid 与用例编号 |
 | 前端功能映射中的文件路径逐文件二次核对 | **低优先**：映射初版部分路径为探索推断，非阻断 |
 | CI schema 一致性校验（`create_all` vs Alembic） | **低优先**：尚未接入门禁；结构性变更按当期执行单在 ECS 现场比对 |
@@ -320,7 +320,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 ## 8. FE 手工用例 ↔ 自动化映射
 
-`FE-*` 是 `docs/testing/测试用例库.md` 中前端手工用例的稳定编号。现役用例沿用原编号，已下线场景的编号保留供历史追溯。下表是按业务范围整理的自动化入口，逐用例对应关系以统一用例库为准，执行结果另查测试记录。各资产的执行入口见第 5 节，生成物登记见 `docs/README.md` 3.2。`docs/archive/ux-audit/` 是 E2E 和 `ux-audit.mjs` 使用的测试资产。
+`FE-*` 是 `docs/testing/测试用例库.md` 中前端手工用例的稳定编号。现役用例沿用原编号，已下线场景的编号保留供历史追溯。下表是按业务范围整理的自动化入口，逐用例对应关系以统一用例库为准，执行结果另查测试记录。各资产的执行入口见第 5 节，生成物登记见 `docs/README.md` 3.2。现行视觉基线与 Playwright 规格同目录，历史 UX 审计证据见[文档归档](../docs/archive/README.md)。
 
 | 用例范围 | 业务范围 | Vitest 归属（`tests/frontend/module/`） | Playwright 归属（`tests/e2e/`） | 覆盖判断 |
 |---|---|---|---|---|
@@ -355,13 +355,13 @@ Playwright: tests/e2e/cross/business-write.spec.ts
 
 - 运行日志、覆盖率、Playwright HTML 报告和临时截图不入库，走 `.gitignore` 产物规则。
 - 可复用假数据、图片与导入样本放 `tests/fixtures/`；`.env.*-test`、数据库备份及含密钥或业务数据的文件不得提交。
-- 可复现的测试结论与缺陷证据放 `docs/` 现役文档；过期的 `测试报告_YYYYMMDD.*` 由生成器移入 `docs/testing/报告归档/`（不入库），不得用历史报告替代当前结果。
+- 本次测试结论查阅本次报告；过期的 `测试报告_YYYYMMDD.*` 由生成器标记为「历史留存」后移入 `docs/archive/test-reports/local/`。需要纳入 Git 的历史证据登记在[文档归档](../docs/archive/README.md)。
 
 前端自动化已覆盖主要模块，但与 240 条手工用例还不是一对一关系。修复一个问题时补一条自动化关联，避免只增加手工用例数量而不增加可重复的自动化保护。
 
 ## 9. 维护规则
 
 - 本文件是测试资产的唯一索引；新增测试目录或执行入口时同步更新第 1、5、7 节；`FE-*` 用例与自动化的映射见第 8 节。
-- 手工与自动化用例统一在 `docs/testing/测试用例库.md`，自动化清单及报告在 `docs/testing/`；UX 审计证据在 `docs/archive/ux-audit/`，不作为现行通过依据。
+- 手工与自动化用例统一在 `docs/testing/测试用例库.md`，自动化清单及报告在 `docs/testing/`；历史 UX 审计证据登记在[文档归档](../docs/archive/README.md)。
 - Fixture 不得包含真实账号、密码、手机号、客户资料或生产数据。
 - 视觉快照失败先确认是否为预期产品变更，**不得直接按实际图覆盖快照**；拖拽、loading 与退出反馈类失败要复核事件命中与样式清理，**不得靠放宽断言超时掩盖**。

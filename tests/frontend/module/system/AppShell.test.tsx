@@ -48,6 +48,7 @@ import { MemoryRouter } from "react-router-dom";
 import dayjs from "dayjs";
 import { currentReportPeriod, previousReportPeriod } from "@/shared/lib/reportPeriod";
 import { setAntdDateRange } from "@fixtures/antdRange";
+import projectVersion from "../../../../VERSION?raw";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
@@ -169,6 +170,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
       expect(labels.some((l) => l?.includes(item.label))).toBe(true);
     }
     expect(nav.querySelectorAll(".nav-item").length).toBe(navigation.length);
+    expect(within(screen.getByRole("complementary")).getByText(`V${projectVersion.trim()} @宜游轩技术团队`)).toBeVisible();
   });
 
   it("移动端底部入口顺序为业务、客户、工作台、资金、管理", async () => {

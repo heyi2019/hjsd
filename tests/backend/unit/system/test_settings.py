@@ -25,6 +25,22 @@ def _release_record_file(root, section=""):
     return path
 
 
+def _release_script_fixture(root, *script_names):
+    import shutil
+
+    scripts = root / "scripts" / "ops"
+    scripts.mkdir(parents=True)
+    for name in (*script_names, "release_record_fields.py"):
+        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    versions = root / "backend" / "alembic" / "release_versions"
+    versions.mkdir(parents=True)
+    (versions / "release_baseline.py").write_text('revision: str = "0099"\n', encoding="utf-8")
+    (root / "backend" / "alembic.ini").write_text(
+        "[alembic]\nversion_locations = %(here)s/alembic/release_versions\n", encoding="utf-8",
+    )
+    return scripts
+
+
 def test_default_application_version_is_semver_without_release_prefix(monkeypatch):
     """API 对外使用 SemVer；V 前缀只属于系统发布标签。
 
@@ -101,13 +117,9 @@ def test_version_bump_updates_the_project_version_only(tmp_path, mode, expected)
 )
 def test_automatic_release_uses_the_project_version(tmp_path, subject, expected):
     """自动发版按提交类型升项目版本，并生成对应的发布记录。"""
-    import shutil
     import subprocess
 
-    scripts = tmp_path / "scripts" / "ops"
-    scripts.mkdir(parents=True)
-    for name in ("bump_version.sh", "auto_release.sh"):
-        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    scripts = _release_script_fixture(tmp_path, "bump_version.sh", "auto_release.sh")
     auto_script = scripts / "auto_release.sh"
     (tmp_path / "VERSION").write_text("2.3.4\n", encoding="utf-8")
     notes_file = _release_record_file(tmp_path, "### V2.3.4\n**发布状态：** 已发布\n")
@@ -130,6 +142,9 @@ def test_automatic_release_uses_the_project_version(tmp_path, subject, expected)
     assert (tmp_path / "VERSION").read_text(encoding="utf-8").strip() == expected
     notes = notes_file.read_text(encoding="utf-8")
     assert f"### V{expected}" in notes
+    assert f"**前端版本：** V{expected}" in notes
+    assert f"**后端版本：** V{expected}" in notes
+    assert "**数据库迁移编号：** `0099`" in notes
     assert "**发布日期：** 待发布" in notes
     assert "**发布时间：** 待发布" in notes
     assert "**发布状态：** 待发布" in notes
@@ -139,13 +154,9 @@ def test_automatic_release_uses_the_project_version(tmp_path, subject, expected)
 
 def test_automatic_release_preserves_the_chosen_project_version(tmp_path):
     """发布前明确指定的版本不能被提交类型自动升版覆盖。"""
-    import shutil
     import subprocess
 
-    scripts = tmp_path / "scripts" / "ops"
-    scripts.mkdir(parents=True)
-    for name in ("bump_version.sh", "auto_release.sh"):
-        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    scripts = _release_script_fixture(tmp_path, "bump_version.sh", "auto_release.sh")
     version_file = tmp_path / "VERSION"
     version_file.write_text("2.3.4\n", encoding="utf-8")
     notes_file = _release_record_file(tmp_path, "### V2.3.4\n**发布状态：** 已发布\n")
@@ -177,13 +188,9 @@ def test_automatic_release_preserves_the_chosen_project_version(tmp_path):
 
 def test_first_project_version_release_respects_chosen_version(tmp_path):
     """从旧版后端常量迁移到 VERSION 时，也不能覆盖用户指定的版本。"""
-    import shutil
     import subprocess
 
-    scripts = tmp_path / "scripts" / "ops"
-    scripts.mkdir(parents=True)
-    for name in ("bump_version.sh", "auto_release.sh"):
-        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    scripts = _release_script_fixture(tmp_path, "bump_version.sh", "auto_release.sh")
     old_module = tmp_path / "backend" / "app" / "version.py"
     old_module.parent.mkdir(parents=True)
     old_module.write_text('__version__ = "2.3.4"\n', encoding="utf-8")
@@ -221,13 +228,9 @@ def test_first_project_version_release_respects_chosen_version(tmp_path):
 )
 def test_release_marker_selects_the_exact_unreleased_version(tmp_path, chosen, record_state, should_succeed):
     """用户确认的版本即使与当前相同也不可擅自升版或覆盖已有记录。"""
-    import shutil
     import subprocess
 
-    scripts = tmp_path / "scripts" / "ops"
-    scripts.mkdir(parents=True)
-    for name in ("bump_version.sh", "auto_release.sh"):
-        shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / name, scripts / name)
+    scripts = _release_script_fixture(tmp_path, "bump_version.sh", "auto_release.sh")
     version_file = tmp_path / "VERSION"
     version_file.write_text("2.3.4\n", encoding="utf-8")
     section = ""
@@ -261,6 +264,9 @@ def test_release_marker_selects_the_exact_unreleased_version(tmp_path, chosen, r
     if should_succeed:
         notes = notes_file.read_text(encoding="utf-8")
         assert notes.count("### V2.3.4") == 1
+        assert notes.count("**前端版本：** V2.3.4") == 1
+        assert notes.count("**后端版本：** V2.3.4") == 1
+        assert notes.count("**数据库迁移编号：** `0099`") == 1
         if record_state == "pending":
             assert "保留用户填写的内容" in notes
         assert "功能更新" in notes
@@ -325,7 +331,7 @@ def _release_sections(text: str) -> dict[str, str]:
 
 
 def test_release_notes_has_section_for_current_version():
-    """项目版本必须有版本号、发布状态、日期、时间及更新内容。"""
+    """项目版本必须有发布记录，每条记录都有对应的组件版本。"""
     from app.version import __version__ as release_version
 
     release_path = PROJECT_ROOT / "docs" / "版本管理.md"
@@ -343,6 +349,13 @@ def test_release_notes_has_section_for_current_version():
         f"  3) 人工补充实际更新内容"
     )
 
+    for version, section in sections.items():
+        for component in ("前端版本", "后端版本"):
+            matches = re.findall(rf"^\*\*{component}：\*\* (.+)$", section, re.M)
+            assert matches == [f"V{version}"], f"V{version} 的{component}与项目版本不一致"
+        revisions = re.findall(r"^\*\*数据库迁移编号：\*\* `([A-Za-z0-9_-]+)`$", section, re.M)
+        assert len(revisions) == 1, f"V{version} 缺少明确的数据库迁移编号"
+
     body = sections[release_version]
     for required in ("版本号", "发布日期", "发布时间", "发布状态", "本次更新内容"):
         assert required in body, (
@@ -358,7 +371,8 @@ def test_release_time_is_recorded_only_after_confirmed_publication(tmp_path):
 
     notes = _release_record_file(
         tmp_path,
-        "### V2.3.4\n**版本号：** V2.3.4\n**发布日期：** 待发布\n"
+        "### V2.3.4\n**版本号：** V2.3.4\n**前端版本：** V2.3.4\n**后端版本：** V2.3.4\n"
+        "**数据库迁移编号：** `0099`\n**发布日期：** 待发布\n"
         "**发布时间：** 待发布\n**发布状态：** 待发布\n"
         "#### 本次更新内容\n- 用户填写的说明\n",
     )
@@ -372,6 +386,9 @@ def test_release_time_is_recorded_only_after_confirmed_publication(tmp_path):
     assert "**发布日期：** 2026-11-21" in text
     assert "**发布时间：** 12:34:56（北京时间）" in text
     assert "**发布状态：** 已发布" in text
+    assert "**前端版本：** V2.3.4" in text
+    assert "**后端版本：** V2.3.4" in text
+    assert "**数据库迁移编号：** `0099`" in text
     assert "用户填写的说明" in text
 
 
@@ -397,16 +414,13 @@ def test_release_time_rejects_missing_record_or_ambiguous_timestamp(tmp_path, ve
 
 def test_manual_changelog_preserves_the_pending_release_details(tmp_path):
     """手动生成提交摘要不能覆盖已有说明或伪造上线时间。"""
-    import shutil
     import subprocess
 
-    script = tmp_path / "scripts" / "ops" / "changelog.sh"
-    script.parent.mkdir(parents=True)
-    shutil.copy2(PROJECT_ROOT / "scripts" / "ops" / "changelog.sh", script)
+    script = _release_script_fixture(tmp_path, "changelog.sh") / "changelog.sh"
     (tmp_path / "VERSION").write_text("1.0.0\n", encoding="utf-8")
     notes = _release_record_file(
         tmp_path,
-        "### V1.0.0\n**版本号：** V1.0.0\n**发布日期：** 待发布\n"
+        "### V1.0.0\n**版本号：** V1.0.0\n**前端版本：** V0.1.0\n**发布日期：** 待发布\n"
         "**发布时间：** 待发布\n**发布状态：** 待发布\n"
         "#### 本次更新内容\n- 手工填写的说明\n",
     )
@@ -422,11 +436,23 @@ def test_manual_changelog_preserves_the_pending_release_details(tmp_path):
     git("commit", "-qm", "test: baseline")
     baseline = git("rev-parse", "HEAD")
     git("commit", "-q", "--allow-empty", "-m", "fix: 修复登录")
+    migration = tmp_path / "backend" / "alembic" / "release_versions" / "release_baseline.py"
+    migration.write_text('revision = "0199"\n', encoding="utf-8")
+    original = notes.read_text(encoding="utf-8")
+    draft = subprocess.run(["bash", str(script), "--from", baseline], cwd=tmp_path, capture_output=True, text=True)
+    assert draft.returncode == 0, draft.stderr
+    assert "**数据库迁移编号：** `0099`" in draft.stdout
+    assert notes.read_text(encoding="utf-8") == original
+
     result = subprocess.run(["bash", str(script), "--from", baseline, "--write"], cwd=tmp_path, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
     text = notes.read_text(encoding="utf-8")
     assert text.count("### V1.0.0") == 1
     assert "手工填写的说明" in text
+    assert text.count("**前端版本：**") == 1
+    assert "**前端版本：** V1.0.0" in text
+    assert "**后端版本：** V1.0.0" in text
+    assert "**数据库迁移编号：** `0099`" in text
     assert "修复登录" in text
     assert "**发布日期：** 待发布" in text
     assert "**发布时间：** 待发布" in text

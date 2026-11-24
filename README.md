@@ -94,7 +94,7 @@ cd ..
 | `tests/backend` | 后端测试（pytest，按实际磁盘文件数维护） |
 | `frontend/src` | 按业务域拆分，包含 `workbench`、`business`、`customers`、`finance`、`operations`、`settings`；`app` 为应用外壳，`shared` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
-| `docs` | 项目文档和 `testing/` 测试资料。`archive/` 存放历史数据字典和 UX 审查记录。全仓文档地图见 `docs/README.md` |
+| `docs` | 项目文档和 `testing/` 测试资料。`archive/` 集中保存历史文档和审查、测试、UX 证据。全仓文档地图见[文档目录](docs/README.md) |
 | `dependencies` | 本机 Python 依赖及前端依赖入口；不进入 Git 和 Docker 构建上下文 |
 | `runtime/logs`、`runtime/outputs` | 本机运行日志和通用临时产物。临时产物目录目前只有占位文件 |
 | `outputs/local-release` | 本地发布通道生成的镜像压缩包、部署包和校验清单。发布包由本机保存，不提交到 Git |

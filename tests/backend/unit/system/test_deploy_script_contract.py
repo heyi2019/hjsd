@@ -642,11 +642,17 @@ def test_release_workflow_outputs_the_requested_database_mode(tmp_path, version,
     fake_bin.mkdir()
     scripts = repo / "scripts" / "ops"
     scripts.mkdir(parents=True)
-    for name in ("auto_release.sh", "bump_version.sh", "release_reset_requested.py", "ci_test_scope.py"):
+    for name in ("auto_release.sh", "bump_version.sh", "release_record_fields.py", "release_reset_requested.py", "ci_test_scope.py"):
         source = PROJECT_ROOT / "scripts" / "ops" / name
         if source.exists():
             shutil.copy2(source, scripts / name)
     (repo / "VERSION").write_text(f"{version}\n", encoding="utf-8")
+    migrations = repo / "backend" / "alembic" / "squashed_versions"
+    migrations.mkdir(parents=True)
+    (migrations / "release_baseline.py").write_text('revision = "0099"\n', encoding="utf-8")
+    (repo / "backend" / "alembic.ini").write_text(
+        "[alembic]\nversion_locations = %(here)s/alembic/squashed_versions\n", encoding="utf-8",
+    )
     notes = repo / "docs" / "版本管理.md"
     notes.parent.mkdir()
     notes.write_text(
@@ -696,6 +702,11 @@ def test_release_workflow_outputs_the_requested_database_mode(tmp_path, version,
     assert outputs["sha"] == git("rev-parse", "HEAD")
     assert outputs["reset_database"] == expected
     assert outputs["full_suite"] == expected
+    record = notes.read_text(encoding="utf-8")
+    assert f"**前端版本：** V{version}" in record
+    assert f"**后端版本：** V{version}" in record
+    assert "**数据库迁移编号：** `0099`" in record
+    assert "初始版本" in record
     if expected == "false":
         assert outputs["changed_paths"] == "backend/app/business/orders/sample.py"
 

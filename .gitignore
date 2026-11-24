@@ -75,14 +75,17 @@ htmlcov/
 
 # 测试执行结果（按 run_id 追加，历史不覆盖；用例定义为 测试用例库.csv，二者分离）
 docs/testing/测试结果库/results.jsonl
-# 裁剪归档：被 trim_test_results.py 移出主文件的历史行（gzip），只供追查，不进版本库
+# 本地测试报告和裁剪后的流水归档
+docs/archive/test-reports/local/
+docs/archive/test-results/local/
+docs/testing/测试报告_*.md
+docs/testing/测试报告_*.json
+# 兼容旧工作区的本地归档路径
 docs/testing/测试结果库/archive/
+docs/testing/报告归档/
 
 # 测试生成物的内部索引：nodeid ↔ 测试编号的映射表，每次跑测试/跑生成脚本都会重写。
 # CI（backend-gate.yml）与本地均由 scripts/gen_test_case_library.py 重建，入库只会带来
-# 每次执行的无意义 diff（约 584KB）。当日测试报告与 测试用例库.md/.csv 仍入库，
-# 因为它们是「当前测了什么、结果如何」的可读快照。
-# 历史测试报告：make_test_report.py 只保留最新一份，旧日期报告移入此目录，不入库。
-docs/testing/报告归档/
+# 每次执行的索引不入库。测试用例库.md/.csv 仍随测试代码提交。
 tests/backend/_report/case_index.json
 tests/backend/_report/case_number_map.json

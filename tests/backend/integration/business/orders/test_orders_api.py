@@ -363,11 +363,6 @@ class TestOrdersApi:
         response = seeded_client.get("/api/pools/1/balance", headers=viewer_headers)
         assert response.status_code == 404
 
-    def test_pool_balance_endpoint_ok(self, seeded_client, headers):
-        response = seeded_client.get("/api/pools/1/balance", headers=headers)
-        assert response.status_code == 200, response.text
-        assert "available" in response.json()
-
 
 def test_order_cashflow_idempotency_is_per_order(seeded_client, seeded_db, headers):
     first_order, second_order = _order(seeded_db), _order(seeded_db)

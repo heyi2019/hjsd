@@ -104,6 +104,39 @@ def test_case_library_rejects_silent_reclassification(tmp_path, monkeypatch):
     assert generator._check_published_classifications([case]) == {"tests/a.test.ts::case a": "IT-B02-004"}
 
 
+def test_case_library_regenerates_only_automated_section(tmp_path, monkeypatch):
+    from scripts import gen_test_case_library as generator
+
+    path = tmp_path / "cases.md"
+    manual = "# 测试用例库\n\n## 手工用例\n\nFE-001 检查登录。\n\n"
+    path.write_text(
+        manual + "<!-- CASE_LIBRARY_AUTO_BEGIN -->\n旧自动化用例\n<!-- CASE_LIBRARY_AUTO_END -->\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(generator, "OUT_MD", str(path))
+    case = {"测试编号": "UT-A01-001", "功能编号": "A01", "测试名称": "订单汇总",
+            "测试层级": "UT", "优先级": "P2", "合格标准": "按期间统计"}
+    generator._write_md([case], {"A01": {"name": "工作台", "module": "A"}})
+
+    updated = path.read_text(encoding="utf-8")
+    assert updated.startswith(manual)
+    assert updated.count("UT-A01-001") == 1
+    assert "旧自动化用例" not in updated
+
+
+def test_case_library_refuses_to_overwrite_markdown_without_markers(tmp_path, monkeypatch):
+    from scripts import gen_test_case_library as generator
+
+    path = tmp_path / "cases.md"
+    manual = "## 手工用例\n\nFE-001 检查登录。\n"
+    path.write_text(manual, encoding="utf-8")
+    monkeypatch.setattr(generator, "OUT_MD", str(path))
+
+    with pytest.raises(ValueError, match="自动化区块标记"):
+        generator._write_md([], {})
+    assert path.read_text(encoding="utf-8") == manual
+
+
 @pytest.mark.parametrize("body,expected", [
     ('await screen.findByText("保存成功");', 'findByText("保存成功")'),
     ('expectTypeOf(changePassword).parameter(0).toEqualTypeOf<string>();', 'expectTypeOf(changePassword)'),
@@ -118,9 +151,13 @@ def test_frontend_case_criteria_recognizes_implicit_and_type_assertions(body, ex
 def test_e2e_case_method_identifies_disposable_database():
     from scripts import gen_test_case_library as generator
 
-    method = generator.extract_method("E2E", "tests/e2e/example.spec.ts", "", "example")
+    path = "tests/e2e/example.spec.ts"
+    method = generator.extract_method("E2E", path, "", "example")
+    precondition = generator.extract_precond(path, "")
     assert "临时" in method
     assert "常驻" not in method
+    assert "每轮独立临时库" in precondition
+    assert "常驻复用" not in precondition
 
 
 def _manifest() -> dict:
@@ -138,25 +175,30 @@ import catalog as tc  # noqa: E402 — 必须先调整 sys.path
 
 
 def _area_of(path: Path) -> str:
-    """功能编号维持原样；认证与审计测试可随 settings 代码归位。"""
+    """功能编号维持原样；系统功能测试可随 settings 代码归位。"""
     func = tc.BACKEND_FILE_TO_FUNC.get(path.name) or GUARD_AREA.get(path.name)
     assert func, f"{path.name} 既不在 BACKEND_FILE_TO_FUNC 也无守卫区域登记"
     area = path.relative_to(BE_TESTS).parts[1]
-    if area == "settings" and func in {"SYS01", "SYS05"}:
+    if area == "settings" and func in {"SYS01", "SYS05", "SYS06", "SYS08"}:
         return area
     code = func[0] if func[0] in "ABCDEF" else "SYS"
     return _manifest()["regionByCode"][code]
 
 
 def test_system_feature_in_settings_keeps_its_feature_number_but_uses_directory_area(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """系统认证测试可随代码归入 settings，功能编号仍保留 SYS01。"""
-    test_file = tmp_path / "integration" / "settings" / "auth" / "test_auth_contract.py"
-    test_file.parent.mkdir(parents=True)
-    test_file.touch()
+    """系统功能测试可随代码归入 settings，功能编号仍保持不变。"""
     monkeypatch.setattr(sys.modules[__name__], "BE_TESTS", tmp_path)
 
-    assert tc.BACKEND_FILE_TO_FUNC[test_file.name] == "SYS01"
-    assert _area_of(test_file) == "settings"
+    for relative, function in (
+        ("auth/test_auth_contract.py", "SYS01"),
+        ("field_definitions/test_foundation_pools_service.py", "SYS06"),
+        ("attachments/test_attachments_service.py", "SYS08"),
+    ):
+        test_file = tmp_path / "integration" / "settings" / relative
+        test_file.parent.mkdir(parents=True, exist_ok=True)
+        test_file.touch()
+        assert tc.BACKEND_FILE_TO_FUNC[test_file.name] == function
+        assert _area_of(test_file) == "settings"
 
 
 def test_manifest_has_all_three_layers() -> None:

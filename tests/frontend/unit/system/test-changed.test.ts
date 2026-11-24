@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../frontend");
 
-function selected(paths: string): string {
-  return execFileSync(process.execPath, ["scripts/test-changed.mjs", "--list"], {
+function selected(paths: string, ...args: string[]): string {
+  return execFileSync(process.execPath, ["scripts/test-changed.mjs", "--list", ...args], {
     cwd: frontend,
     encoding: "utf8",
     env: { ...process.env, TEST_CHANGED_PATHS: paths },
@@ -14,6 +14,18 @@ function selected(paths: string): string {
 }
 
 describe("前端变更选测", () => {
+  it.each(["package.json", "package-lock.json", "patches/rc-field-form+2.7.1.patch"])(
+    "%s 影响工作区依赖，选择完整前端回归",
+    (changed) => {
+      expect(selected(changed)).toContain("npm run test:full:all");
+      expect(selected(changed, "--ci")).toContain("npm run test:full:all");
+    },
+  );
+
+  it("只有后端变更时，前端门禁选择 quick 测试", () => {
+    expect(selected("backend/app/main.py", "--ci")).toContain("npm run test:quick");
+  });
+
   it("资金收支变更同时覆盖使用它的业务和资金测试", () => {
     const output = selected("frontend/src/finance/cashflow/cashflow-modal.tsx");
     expect(output).toContain("tests/frontend/module/business");

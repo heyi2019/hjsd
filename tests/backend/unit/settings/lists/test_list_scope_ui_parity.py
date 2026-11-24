@@ -48,7 +48,7 @@ PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     "REBATE_DETAIL": "business/shared/rebate/RebateModal.tsx",
     # 资金中心各 Tab 按功能归位，锚点与列数组同处各自 Tab。
     "CASHFLOW": "finance/cashflow/CashflowTab.tsx",
-    "FUND_POOLS": "finance/finance-tabs/overview.tsx",
+    "FUND_POOLS": "finance/overview/OverviewTab.tsx",
     "DEPOSITS": "finance/deposits/DepositSection.tsx",
     "RECONCILIATIONS": "finance/reconciliation/ReconciliationTab.tsx",
     "AUDIT_LOG": "settings/audit/AuditPanel.tsx",
@@ -168,11 +168,6 @@ def panel_columns(scope: str) -> list[tuple[str, str | None]]:
         if found:
             return found
     assert False, f"{columns_file} 里 {marker} 之后没找到可解析的列数组；最近一次解析错误：{errors[-1] if errors else '无'}"
-
-
-def test_frontend_source_available() -> None:
-    """守卫依赖前端源码在场；读不到就明确失败，而不是悄悄跳过。"""
-    assert _FRONTEND_SRC.is_dir(), f"找不到前端源码目录：{_FRONTEND_SRC}"
 
 
 def test_installment_table_exposes_operator_column() -> None:

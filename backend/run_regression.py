@@ -19,6 +19,7 @@ import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -68,39 +69,41 @@ def run_frontend_files(relpaths: list[str]) -> int:
     """
     if not relpaths:
         return 0
-    fe_root = REPO / "frontend"
     files = list(relpaths)
     print(f"[frontend] 运行 {len(files)} 个模块相关前端测试文件：")
     for f in files:
         print(f"  - {f}")
-    json_out = fe_root / "node_modules" / ".cache" / "vitest-module.json"
-    json_out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = ["npx", "vitest", "run", "--reporter=json", f"--outputFile={json_out}", *files]
-    try:
-        r = subprocess.run(cmd, cwd=fe_root, check=False)
-    except FileNotFoundError:
-        print("[frontend] 未检测到 npx，跳过前端模块测试（仅列出文件）")
-        return 0
-    record_frontend(json_out)
-    return r.returncode
+    return _run_frontend_vitest(files)
 
 
 def run_frontend_full() -> int:
     """前端全量（fast / quick / react / react-deep 四档）+ 写入测试结果库。"""
-    fe_root = REPO / "frontend"
-    json_out = fe_root / "node_modules" / ".cache" / "vitest-full.json"
-    json_out.parent.mkdir(parents=True, exist_ok=True)
     print("[frontend] 运行前端全量：fast / quick / react / react-deep")
-    try:
-        r = subprocess.run(
-            ["npx", "vitest", "run", "--reporter=json", f"--outputFile={json_out}"],
-            cwd=fe_root, check=False,
-        )
-    except FileNotFoundError:
-        print("[frontend] 未检测到 npx，跳过前端全量")
-        return 0
-    record_frontend(json_out)
-    return r.returncode
+    return _run_frontend_vitest([])
+
+
+def _run_frontend_vitest(files: list[str]) -> int:
+    """只使用项目安装的 Vitest，每次生成独立报告，避免误读旧结果。"""
+    fe_root = REPO / "frontend"
+    candidates = (fe_root / "node_modules/.bin/vitest", REPO / "node_modules/.bin/vitest")
+    executable = next((path for path in candidates if path.is_file() and os.access(path, os.X_OK)), None)
+    if executable is None:
+        print("[frontend] 未找到本地 Vitest，请先在仓库根目录运行 npm ci", file=sys.stderr)
+        return 1
+    with TemporaryDirectory(prefix="heijin-vitest-") as report_dir:
+        json_out = Path(report_dir) / "vitest.json"
+        cmd = [str(executable), "run", "--reporter=json", f"--outputFile={json_out}", *files]
+        try:
+            result = subprocess.run(cmd, cwd=fe_root, check=False)
+        except OSError as exc:
+            print(f"[frontend] 无法启动本地 Vitest：{exc}", file=sys.stderr)
+            return 1
+        if json_out.is_file() and json_out.stat().st_size:
+            record_frontend(json_out)
+        elif result.returncode == 0:
+            print("[frontend] Vitest 未生成本轮报告，无法确认测试结果", file=sys.stderr)
+            return 1
+        return result.returncode
 
 
 def record_frontend(json_out: Path) -> None:
@@ -110,9 +113,12 @@ def record_frontend(json_out: Path) -> None:
         return
     runner = str(PYTHON) if PYTHON.exists() else sys.executable
     try:
-        subprocess.run([runner, str(script), "--json", str(json_out)], cwd=ROOT, check=False)
-    except Exception as exc:  # noqa: BLE001 - 记录失败不应把绿的回归判红
-        print(f"[frontend] 执行结果未写入结果库：{exc}")
+        subprocess.run(
+            [runner, str(script), "--json", str(json_out), "--transient"],
+            cwd=ROOT, check=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        print(f"[frontend] 执行结果未写入结果库：{exc}", file=sys.stderr)
 
 
 def regression_environment() -> dict[str, str]:
@@ -220,7 +226,7 @@ GROUPS = {
     "foundation": [
         "tests/backend/integration/settings/test_foundation_contract.py",
         "tests/backend/integration/settings/test_foundation_order_types_service.py",
-        "tests/backend/integration/system/test_foundation_pools_service.py",
+        "tests/backend/integration/settings/field_definitions/test_foundation_pools_service.py",
         "tests/backend/integration/settings/test_order_types_api.py",
         "tests/backend/integration/finance/test_pools_api.py",
         "tests/backend/integration/settings/test_form_extra_scopes.py",
@@ -320,7 +326,7 @@ GROUPS = {
         "tests/backend/integration/finance/cashflow/test_cashflow_totals.py",
         "tests/backend/integration/finance/shared/test_cashflow_write_concurrency.py",
         "tests/backend/integration/finance/test_pool_balances_batch.py",
-        "tests/backend/integration/finance/test_studio_cashflow_summary.py",
+        "tests/backend/integration/finance/cashflow/test_studio_cashflow_summary.py",
         # 2026-11-12 金额链路/裁决批次（资金两方向、金额大类口径）
         "tests/backend/integration/finance/shared/test_finance_direction_and_deposit.py",
         "tests/backend/unit/finance/shared/test_finance_boundaries.py",
@@ -353,8 +359,8 @@ GROUPS = {
     "governance": [
         "tests/backend/integration/system/test_attachments_contract.py",
         "tests/backend/integration/settings/audit/test_audit_contract.py",
-        "tests/backend/integration/system/test_attachments_service.py",
-        "tests/backend/integration/workbench/test_contract_message_visibility.py",
+        "tests/backend/integration/settings/attachments/test_attachments_service.py",
+        "tests/backend/integration/workbench/notifications/test_contract_message_visibility.py",
         "tests/backend/integration/workbench/notifications/test_notifications_service.py",
         "tests/backend/integration/workbench/notifications/test_profit_notifications.py",
         "tests/backend/integration/workbench/notifications/test_overdue_notifications.py",
@@ -367,7 +373,7 @@ GROUPS = {
     "platform": [
         "tests/backend/unit/system/test_core_contract.py",
         "tests/backend/integration/settings/lists/test_list_columns.py",
-        "tests/backend/integration/settings/test_list_custom_columns.py",
+        "tests/backend/integration/settings/lists/test_list_custom_columns.py",
         "tests/backend/integration/operations/test_list_export_csv.py",
         "tests/backend/unit/system/test_deploy_script_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
@@ -633,6 +639,31 @@ def main() -> int:
     )
     args = parser.parse_args()
     pytest_parallel_args = ["-n", "4", "--dist=loadfile"] if args.parallel else []
+    if args.type == "e2e":
+        print("暂不支持按模块筛选 E2E；请运行 e2e 执行完整浏览器测试", file=sys.stderr)
+        return 2
+    if args.group == "e2e":
+        if args.backend_only:
+            print("E2E 需要前后端联动，不能使用 --backend-only", file=sys.stderr)
+            return 2
+        specs = sorted((REPO / "tests/e2e").rglob("*.spec.ts"))
+        if not specs:
+            print("未找到 E2E 测试文件", file=sys.stderr)
+            return 1
+        if args.list:
+            print("# 浏览器 E2E（隔离测试库）")
+            for spec in specs:
+                print(spec.relative_to(REPO).as_posix())
+            return 0
+        launcher = REPO / "scripts/ops/test-e2e.sh"
+        if not launcher.is_file():
+            print("缺少隔离 E2E 启动脚本", file=sys.stderr)
+            return 1
+        try:
+            return subprocess.run(["bash", str(launcher)], cwd=REPO, check=False).returncode
+        except OSError as exc:
+            print(f"无法启动 E2E：{exc}", file=sys.stderr)
+            return 1
     if args.group == "lint":
         return run_lint(
             str(PYTHON) if PYTHON.exists() else sys.executable,
@@ -699,20 +730,15 @@ def main() -> int:
         if args.type:
             paths = [f"tests/backend/{f}" for f in module_type_files(module, args.type)]
             label = f"模块 {module} / 类型 {args.type}"
-            if not args.backend_only and args.type in ("it", "e2e"):
+            if not args.backend_only and args.type == "it":
                 fe_paths = frontend_module_files(module)
         else:
             paths = [f"tests/backend/{f}" for f in module_files(module)]
             label = f"模块 {module}（后端 UT+IT）"
             if not args.backend_only:
                 fe_paths = frontend_module_files(module)
-    elif args.group in ("ut", "it", "e2e"):
+    elif args.group in ("ut", "it"):
         ttype = args.group
-        if ttype == "e2e":
-            paths = []
-            label = "E2E（当前无常住 E2E 套件）"
-            print(f"[{label}] 无匹配测试文件")
-            return 0
         paths = [f"tests/backend/{f}" for f in type_files(ttype)]
         label = f"类型 {ttype}"
     else:

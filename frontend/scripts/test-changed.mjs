@@ -10,6 +10,7 @@
  * 用法：
  *   node scripts/test-changed.mjs                # 按 git 变更自动跑对应区域
  *   node scripts/test-changed.mjs --list         # 只打印将执行的命令，不跑
+ *   node scripts/test-changed.mjs --ci           # 无可定位的前端变更时跑 quick
  *   node scripts/test-changed.mjs -- --reporter=dot   # 「--」之后原样透传 vitest
  *
  * CI（frontend-gate）通过 TEST_CHANGED_PATHS 注入本次 commit diff 作为变更源：
@@ -22,6 +23,7 @@
  *   - 变更落在壳层 `frontend/src/app/`、公共层 `frontend/src/shared/` → 运行完整前端测试
  *   - 变更落在分层/构建配置（vitest.config.ts、scripts/test-*.mjs、vite.config.ts、
  *     tsconfig*.json、package.json）→ 分层本身变了，运行完整前端测试
+ *   - 变更落在仓库根的 package.json、package-lock.json 或 patches/ → 运行完整前端测试
  *   - 无前端/测试变更                → 直接退出 0
  *
  * 按区域选测依赖映射中声明的跨域使用方；无法判断影响范围时运行完整前端测试。
@@ -51,6 +53,8 @@ const STRUCTURAL = new Set([
   "scripts/test-changed.mjs",
   "scripts/test-full-sharded.mjs",
 ]);
+const isWorkspaceDependencyChange = (path) =>
+  path === "package.json" || path === "package-lock.json" || path.startsWith("patches/");
 
 /** src 目录 → 区域。新增 src 目录必须在此登记，否则该目录的改动会被判成「未落在业务板块内」。 */
 const SRC_DOMAIN_TO_REGION = {
@@ -87,15 +91,17 @@ const sep = raw.indexOf("--");
 const head = sep >= 0 ? raw.slice(0, sep) : raw;
 const passthrough = sep >= 0 ? raw.slice(sep + 1) : [];
 const listOnly = head.includes("--list") || head.includes("-l");
-const unknownFlags = head.filter((arg) => !["--list", "-l", "--help"].includes(arg));
+const ci = head.includes("--ci");
+const unknownFlags = head.filter((arg) => !["--list", "-l", "--ci", "--help"].includes(arg));
 
 if (head.includes("--help")) {
   console.log(
     [
-      "用法：node scripts/test-changed.mjs [--list] [-- <额外 vitest 参数>]",
+      "用法：node scripts/test-changed.mjs [--list] [--ci] [-- <额外 vitest 参数>]",
       "",
       "按 git 工作区变更自动选择要跑的区域（tests/frontend/<kind>/<区域>）。",
-      "改动涉及 app/shared、夹具或分层配置时运行完整前端测试。",
+      "改动涉及 app/shared、夹具、分层配置或工作区依赖时运行完整前端测试。",
+      "--ci 在无可定位的前端变更时运行 quick 测试。",
     ].join("\n"),
   );
   process.exit(0);
@@ -134,9 +140,11 @@ function changedPaths() {
 }
 
 /** 仓库根相对路径（tests/… 与 frontend/… 同一坐标系）。 */
-const repoChanges = changedPaths().filter((path) => path.startsWith("frontend/") || path.startsWith("tests/"));
+const repoChanges = changedPaths().filter((path) =>
+  path.startsWith("frontend/") || path.startsWith("tests/") || isWorkspaceDependencyChange(path),
+);
 
-if (repoChanges.length === 0) {
+if (repoChanges.length === 0 && !ci) {
   console.log("未发现前端/测试变更，无需跑前端测试。");
   process.exit(0);
 }
@@ -145,6 +153,10 @@ const regions = new Set();
 let globalReason = null;
 
 for (const path of repoChanges) {
+  if (isWorkspaceDependencyChange(path)) {
+    globalReason = `${path}（工作区依赖变更）`;
+    break;
+  }
   const inFrontend = path.startsWith("frontend/");
   const rel = inFrontend ? path.slice("frontend/".length) : path;
 
@@ -208,12 +220,12 @@ if (!bin) {
   process.exit(2);
 }
 
-const runNpm = (script, label) => {
+const runNpm = (script, label, reason) => {
   if (listOnly) {
     console.log(`\n将执行：npm run ${script}`);
     process.exit(0);
   }
-  console.log(`降级为 ${label}：命中 ${globalReason}`);
+  console.log(`${reason}，运行 ${label}。`);
   const child = spawn("npm", ["run", script, ...(passthrough.length ? ["--", ...passthrough] : [])], {
     cwd: FRONTEND,
     stdio: "inherit",
@@ -233,7 +245,9 @@ const runNpm = (script, label) => {
 };
 
 if (globalReason) {
-  runNpm("test:full:all", "完整前端测试");
+  runNpm("test:full:all", "完整前端测试", globalReason);
+} else if (ci && regions.size === 0) {
+  runNpm("test:quick", "quick 测试", "无可定位的前端变更");
 } else if (regions.size === 0) {
   console.log(
     `前端变更未落在测试可定位的区域（${repoChanges.slice(0, 5).join(", ")}${repoChanges.length > 5 ? " …" : ""}），无需跑板块测试。`,

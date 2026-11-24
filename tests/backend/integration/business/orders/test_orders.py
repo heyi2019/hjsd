@@ -8,7 +8,6 @@ from sqlalchemy import select
 from app.business.inventory.profile import create_account
 from app.core.errors import ErrorCode
 from app.domain.enums import AccountStatus
-from app.domain.foundation import Pool
 from app.domain.trade import Account, Cashflow, OrderEvent
 from app.business.installments import create as inst_create
 from app.business.installments.repayments.pay import pay as inst_pay
@@ -35,11 +34,6 @@ def _new_account(seeded_db, *, game_account: str = "acc-001") -> Account:
 
 def _customer(seeded_db, name: str = "甲"):
     return create_customer(seeded_db, display_name=name, actor="pytest")
-
-def _pool(seeded_db, code: str) -> Pool:
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == code))
-    assert pool is not None
-    return pool
 
 def _flows(seeded_db, pool_id: int) -> list[Cashflow]:
     return list(
@@ -196,11 +190,3 @@ class TestOrdersApi:
         )
         assert response.status_code == 403
         assert response.json()["code"] == ErrorCode.PERMISSION_DENIED
-
-    def test_pool_balance_endpoint(self, seeded_client, headers, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        balance = seeded_client.get(
-            f"/api/pools/{invest.id}/balance", headers=headers
-        ).json()
-        assert balance["pool_code"] == "HJ_INVEST"
-        assert balance["cash_balance"] == "0.00"

@@ -6,8 +6,8 @@ import { NAV_LABELS, navItem } from "../support/api-stub";
  * 导航依然完整、页面不白屏（权限门生效但不破坏外壳渲染）。
  *
  * 不拦截后端 API：后端不可达走 ErrorBanner 降级，恰好验证降级不破防。
- * 角色写入走 localStorage key `hj.dev-user`（src/shared/api/client.ts），
- * 与 UI 上的角色 Select 等价，且避开 antd Select 下拉操作的脆弱性。
+ * 测试通过 localStorage key `hj.dev-user`（src/shared/api/client.ts）预设开发身份；
+ * 页面只展示当前角色，不提供角色切换控件。
  */
 test("DEV 态角色展示可见（角色由开发环境配置）", async ({ page }) => {
   const errors: string[] = [];
@@ -17,6 +17,7 @@ test("DEV 态角色展示可见（角色由开发环境配置）", async ({ page
   // 角色是只读展示，不提供运行时下拉切换，避免误导为可自行切换权限。
   await expect(page.locator(".topbar-role")).toContainText("当前角色（开发态）");
   await expect(page.locator(".topbar-role-name")).toContainText("系统管理员");
+  await expect(navItem(page, "工作台")).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -34,13 +35,6 @@ test("预设 viewer 角色后导航仍完整可见", async ({ page }) => {
     await expect(navItem(page, label)).toBeVisible();
   }
   expect(errors).toEqual([]);
-});
-
-test("默认 dev 角色为 admin（不预设即 admin）", async ({ page }) => {
-  await page.goto("/");
-  // 角色只读文本应含「系统管理员」。
-  await expect(page.locator(".topbar-role-name")).toContainText("系统管理员");
-  await expect(navItem(page, "工作台")).toBeVisible();
 });
 
 test("普通员工(employee)看不到经营中心与资金中心导航", async ({ page }) => {

@@ -59,7 +59,7 @@ export const quickTests = [
   "tests/frontend/module/settings/auth/LoginPage.test.tsx",
   "tests/frontend/module/settings/auth/UserCenterPage.test.tsx",
   "tests/frontend/module/settings/SettingsPage.test.tsx",
-  "tests/frontend/module/business/shared/CreateBusinessModal.test.tsx",
+  "tests/frontend/module/business/shared/order-create/CreateBusinessModal.test.tsx",
   "tests/frontend/module/operations/reports/ReportsPage.test.tsx",
   "tests/frontend/module/shared/session.test.tsx",
 ];

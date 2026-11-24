@@ -66,7 +66,7 @@ beforeEach(() => {
   mockOptionSets();
   vi.mocked(orderFormFieldsApi.list).mockImplementation(async () => []);
   // 明细与三项汇总一次取回；「什么算工作室收支」的口径在 backend
-  // tests/v1/test_studio_cashflow_summary.py，这里只验展示。
+  // tests/backend/integration/finance/cashflow/test_studio_cashflow_summary.py，这里只验展示。
   vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary(expenseFlows as never, {
     expense: "3000.00",
     net: "-3000.00",

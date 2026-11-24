@@ -348,11 +348,6 @@ describe("CustomersPage：客户档案", () => {
     await act(async () => { finish(pageResponse([])); await pending; });
     expect(within(stat).getByText("0")).toBeInTheDocument();
   });
-  it("从客户中心深链参数打开指定客户卡片", async () => {
-    renderLight(<CustomersPage focusCustomerId={1} />);
-    expect(await screen.findByText("客户档案 · CUS-0001")).toBeInTheDocument();
-  });
-
   it("深链客户详情不等待客户列表返回", async () => {
     let finish!: (value: Awaited<ReturnType<typeof customersApi.page>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof customersApi.page>>>((resolve) => { finish = resolve; });

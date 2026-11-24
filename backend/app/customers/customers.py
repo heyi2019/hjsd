@@ -1,4 +1,4 @@
-"""customer_center.customers：客户档案的建档、查询、变更、合并与参与方校验。
+"""customers.customers：客户档案的建档、查询、变更、合并与参与方校验。
 
 规则来源：CUS-01。
 
@@ -7,7 +7,7 @@
 - 停用 / 已合并对象不可作为新订单参与方（`CUSTOMER_DISABLED`）；
 - 合并仅管理员：来源置 `MERGED`，迁移参与关系，保留原编号与审计。
 
-实现已拆至 `customer_center/customer_ops/`（queries / writes）；本文件保留整合出口，
+实现位于 `customers/customer_ops/`（queries / writes）；本文件保留整合出口，
 调用方无需改动。
 """
 from __future__ import annotations

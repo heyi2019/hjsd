@@ -148,20 +148,22 @@ pytest 已把传递依赖展开进 `item.fixturenames`，`conftest.py` 的 `pyte
 
 ```text
 cd frontend
-npm run test:fast            # 纯逻辑 + 静态守卫：14 文件 / 96 例 / 8.4s
-npm run test:quick           # 提交前默认：8 文件 / 88 例 / 23.3s
-npm run test:react           # 组件与页面：56 文件 / 756 例 / 116.6s
-npm run test:react-deep      # 重型交互（不含在 test:full 里）：16 文件 / 124 例 / 37.3s
-npm run test:full            # fast + quick + react，轻量层并发、重层串行，约 145s
-npm run test:full:all        # 再加 react-deep（发版前），约 182s
+npm run test:fast            # 纯逻辑与静态守卫
+npm run test:quick           # 常用路径冒烟
+npm run test:react           # 组件与页面
+npm run test:react-deep      # 较重的交互用例
+npm run test:full            # fast + quick + react
+npm run test:full:all        # 四档前端全量，含 react-deep
 npm run test:panel business  # 只跑某区域：tests/frontend/<unit|module>/business
-npm run test:changed         # 按 git 变更自动选区域（改 src/orders → business）
+npm run test:changed         # 按 git 变更自动选区域
 npm run test:e2e             # Playwright + 真实后端 + 每轮独立临时库
 ```
 
+各层现行文件数和收集数见 [manifest.json](manifest.json)。
+
 CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_suite=true` → `test:ci` 全量（发版收口）；
 本次提交有前端/测试变更 → `test:changed`（命中公共层或分层配置时运行完整前端测试）；
-无前端/测试变更 → `test:quick` 冒烟，不静默跳过。E2E 规格变更会运行相应浏览器测试，E2E 共享配置变更运行完整浏览器测试。变更路径由 workflow 算 commit diff 后经
+无前端/测试变更 → `test:quick` 冒烟，不静默跳过。浏览器任务按 E2E 规格变更及订单、资金、认证等关键源码变更选择对应规格；E2E 共享配置变更运行完整浏览器测试。变更路径由 workflow 算 commit diff 后经
 `TEST_CHANGED_PATHS` 注入（CI checkout 后 `git status` 恒为空）。
 
 后端 CI（`backend-gate`）同样默认按 `main-ci-cd` 注入的「原始 push 范围」路径集选测：
@@ -275,7 +277,6 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 | 后端 `integration` 与 `unit` 的判定仍是「文件内 db 用例多数派」 | **已知取舍**：35 个混层文件（31%），极端如 `test_orders_contract.py` 105 集成 + 1 单元被整体归入 integration。代价是 57 条快用例跟进集成通道；未拆文件，因为拆文件会改 nodeid 与用例编号 |
 | 前端功能映射中的文件路径逐文件二次核对 | **低优先**：映射初版部分路径为探索推断，非阻断 |
 | CI schema 一致性校验（`create_all` vs Alembic） | **低优先**：尚未接入门禁；结构性变更按当期执行单在 ECS 现场比对 |
-| 用例「合格标准」标为待确认（约 2200 条） | **已知取舍**：用例缺 docstring 预期句，按「业务规则不明确」标记，非阻断 |
 
 > 测试体系（分层架构、模块编号 A–F + SYS、用例库、执行记录 / 报告链、CI 门禁）已建成；上表为仅存的非阻断未决项，过程留痕见 git 历史。
 
@@ -319,7 +320,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 ## 8. FE 手工用例 ↔ 自动化映射
 
-`FE-001 ~ FE-240` 是前端手工用例锚点（`docs/前端测试用例库.md`），**不得废弃**。下表按业务范围登记自动化归属；「已有关联自动化」只表示对应模块已有测试，**不代表逐用例覆盖，也不代表当前通过**。各资产的执行入口见第 5 节，生成物登记见 `docs/README.md` 3.2；`docs/archive/ux-audit/` 被 E2E 用例与 `ux-audit.mjs` 直接读取，**不可删**。
+`FE-*` 是 `docs/testing/测试用例库.md` 中前端手工用例的稳定编号。现役用例沿用原编号，已下线场景的编号保留供历史追溯。下表是按业务范围整理的自动化入口，逐用例对应关系以统一用例库为准，执行结果另查测试记录。各资产的执行入口见第 5 节，生成物登记见 `docs/README.md` 3.2。`docs/archive/ux-audit/` 是 E2E 和 `ux-audit.mjs` 使用的测试资产。
 
 | 用例范围 | 业务范围 | Vitest 归属（`tests/frontend/module/`） | Playwright 归属（`tests/e2e/`） | 覆盖判断 |
 |---|---|---|---|---|
@@ -337,7 +338,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 新增或补齐自动化时，在手工用例表格中增加「自动化路径」字段，格式统一为：
 
 ```text
-Vitest: tests/frontend/module/business/shared/CreateBusinessModal.test.tsx
+Vitest: tests/frontend/module/business/shared/order-create/CreateBusinessModal.test.tsx
 或
 Playwright: tests/e2e/cross/business-write.spec.ts
 ```
@@ -361,6 +362,6 @@ Playwright: tests/e2e/cross/business-write.spec.ts
 ## 9. 维护规则
 
 - 本文件是测试资产的唯一索引；新增测试目录或执行入口时同步更新第 1、5、7 节；`FE-*` 用例与自动化的映射见第 8 节。
-- 手工用例在 `docs/前端测试用例库.md`，自动生成的用例库与报告在 `docs/testing/`；UX 审计证据在 `docs/archive/ux-audit/`，不作为现行通过依据。
+- 手工与自动化用例统一在 `docs/testing/测试用例库.md`，自动化清单及报告在 `docs/testing/`；UX 审计证据在 `docs/archive/ux-audit/`，不作为现行通过依据。
 - Fixture 不得包含真实账号、密码、手机号、客户资料或生产数据。
 - 视觉快照失败先确认是否为预期产品变更，**不得直接按实际图覆盖快照**；拖拽、loading 与退出反馈类失败要复核事件命中与样式清理，**不得靠放宽断言超时掩盖**。

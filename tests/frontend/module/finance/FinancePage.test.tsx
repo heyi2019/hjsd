@@ -208,12 +208,6 @@ describe("FinancePage：资金账户卡片", () => {
     expect(headers[0]).toBe("可用余额");
   });
 
-  it("渲染资金账户与可用余额", async () => {
-    renderLight(<FinancePage />, { user: "admin" });
-    expect(await screen.findByRole("cell", { name: /经营主池/ })).toBeInTheDocument();
-    expect(screen.getAllByText("700.00").length).toBeGreaterThanOrEqual(1);
-  });
-
   it("资金账户请求较慢时，押金与对账仍可同时开始加载", async () => {
     let releasePools!: (value: typeof pools) => void;
     let depositsStarted = false;
@@ -271,6 +265,7 @@ describe("FinancePage：资金账户卡片", () => {
     expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
   });
 
+  // FE-228：资金账户失败时禁用划转，且不等待其他资源即可展示错误。
   it("账户读取失败时，无需等押金列表即可提示总览不可用", async () => {
     let finishDeposits!: (value: Awaited<ReturnType<typeof depositRows>>) => void;
     const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositRows>>>((resolve) => { finishDeposits = resolve; });
@@ -448,21 +443,6 @@ describe("FinancePage：资金账户卡片", () => {
     expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeEnabled();
   });
 
-  it("后端不可达 → 错误条落地", async () => {
-    vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
-    renderLight(<FinancePage />, { user: "admin" });
-    await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
-  });
-
-  it("FE-228：资金账户主数据失败时总览不可用且划转入口禁用", async () => {
-    vi.mocked(poolsApi.list).mockRejectedValueOnce(new Error("pools down"));
-    renderLight(<FinancePage />, { user: "admin" });
-
-    expect(await screen.findByText("资金账户卡片")).toBeInTheDocument();
-    expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
-    expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();
-  });
-
   it("押金失败后可独立重试，不必等待正在加载的对账", async () => {
     let finish!: (value: Awaited<ReturnType<typeof reconciliationRows>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof reconciliationRows>>>((resolve) => { finish = resolve; });
@@ -622,10 +602,11 @@ describe("FinancePage：资金账户卡片", () => {
   });
 
   it("P1/FE-244：资金总览数据失败时不显示零统计且禁用划转", async () => {
-    vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "pools down" });
+    vi.mocked(poolsApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<FinancePage />, { user: "admin" });
 
     expect(await screen.findByText("资金账户卡片")).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Network Error");
     expect(screen.getByText("现金头寸合计").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByText("可用余额合计").closest(".ui-stat")).toHaveTextContent("不可用");
     expect(screen.getByRole("button", { name: /资金账户划转/ })).toBeDisabled();

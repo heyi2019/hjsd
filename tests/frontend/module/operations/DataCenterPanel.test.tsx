@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
@@ -27,17 +27,6 @@ beforeEach(() => {
 });
 
 describe("DataCenterPanel：经营指标", () => {
-  it("只读取一次数据中心汇总", async () => {
-    let resolveDataCenter: (value: typeof summary) => void = () => undefined;
-    vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((resolve) => { resolveDataCenter = resolve; }));
-
-    renderLight(<DataCenterPanel />, { user: "admin" });
-    expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
-
-    resolveDataCenter(summary);
-    expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
-  });
-
   it("不重复展示资金中心的余额、资金账户数量和资金账户明细", async () => {
     renderLight(<DataCenterPanel />, { user: "admin" });
     await screen.findByText("订单总数");
@@ -47,7 +36,11 @@ describe("DataCenterPanel：经营指标", () => {
   });
 
   it("展示三类成本、利润构成和利润合计", async () => {
+    let resolveDataCenter: (value: typeof summary) => void = () => undefined;
+    vi.mocked(reportsApi.dataCenter).mockReturnValue(new Promise((resolve) => { resolveDataCenter = resolve; }));
     renderLight(<DataCenterPanel />, { user: "admin" });
+    expect(vi.mocked(reportsApi.dataCenter)).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveDataCenter(summary); });
     expect(await screen.findByText("售出成本", { selector: ".ui-stat__label" })).toBeInTheDocument();
     expect(screen.getByText("售出成本").closest(".ui-stat")?.textContent).toContain("100.00");
     expect(screen.getByText("在途成本").closest(".ui-stat")?.textContent).toContain("70.00");

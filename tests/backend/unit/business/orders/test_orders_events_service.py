@@ -11,7 +11,6 @@ from app.domain.trade import Cashflow
 from app.business.shared.operations.consignment import register_consignment
 from app.business.orders import events
 from app.business.orders.create import create_order
-from app.business.orders.events import _opposite_direction, post_event
 from app.business.shared.listing_state import active_listings
 
 
@@ -80,11 +79,6 @@ def test_events_module_posts_event_without_using_facade(seeded_db):
     assert flow is not None
     assert flow.source_type == "ORDER_EVENT"
     assert flow.source_id == event.event_no
-
-
-def test_order_facade_re_exports_event_service():
-    assert post_event is events.post_event
-    assert _opposite_direction is events._opposite_direction
 
 
 def test_operate_event_records_business_action_without_cashflow(seeded_db):

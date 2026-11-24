@@ -17,6 +17,8 @@ npm install
 # 1) 配置（一次性）—— .env 必须在**仓库根目录**
 cp .env.example .env
 #   生产环境务必替换 JWT_SECRET_KEY（≥32 位随机串）
+#   前端本机配置：已有文件时保留原配置
+[ -e frontend/.env.local ] || cp frontend/.env.example frontend/.env.local
 
 # 2) 建库 + 种子（迁移到 head 并写入基础种子）
 cd backend && .venv/bin/python scripts/v1_init_db.py && cd ..
@@ -49,7 +51,10 @@ cd frontend && VITE_BACKEND_PORT=8123 npm run dev -- --host 0.0.0.0 --port 5188 
 
 ### 配置约定
 
-- `.env` 查找顺序：`ERP_ENV_FILE` 覆盖 → 仓库根 `.env` → `backend/.env`。
+- 后端 `.env` 查找顺序：`ERP_ENV_FILE` 覆盖 → 仓库根 `.env` → `backend/.env`。
+- 从 `frontend` 目录启动 Vite 时，前端环境文件放在 `frontend` 目录；本机可由 `frontend/.env.example` 创建 `frontend/.env.local`。启动命令中显式设置的环境变量优先。
+- `VITE_API_BASE` 控制前端请求地址，开发环境推荐 `/api`；`VITE_BACKEND_PORT` 控制 Vite 代理的后端端口。根目录 `.env` 中的同名 `VITE_API_BASE` 不会被上述前端启动方式自动读取；前端镜像构建时由 Dockerfile 设置为 `/api`。
+- 根目录 `.env` 与 `frontend/.env.local` 是本机配置，均不提交到 Git；`.env.example` 是可提交的配置模板。
 - 本地开发使用 PostgreSQL 的 `heijin_erp_dev`；测试使用独立的 `heijin_erp_test`，运行前必须确认两者隔离。
 
 ## 开发命令
@@ -89,9 +94,10 @@ cd ..
 | `tests/backend` | 后端测试（pytest，按实际磁盘文件数维护） |
 | `frontend/src` | 按业务域拆分，包含 `workbench`、`business`、`customers`、`finance`、`operations`、`settings`；`app` 为应用外壳，`shared` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
-| `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 ux-audit 的 E2E 证据（JSON 与截图），历史文档已于 2026-11-11 全部清退 |
+| `docs` | 项目文档和 `testing/` 测试资料。`archive/` 存放历史数据字典和 UX 审查记录。全仓文档地图见 `docs/README.md` |
 | `dependencies` | 本机 Python 依赖及前端依赖入口；不进入 Git 和 Docker 构建上下文 |
-| `runtime/logs` `runtime/outputs` | 本机日志和临时生成物，内容默认不提交 |
+| `runtime/logs`、`runtime/outputs` | 本机运行日志和通用临时产物。临时产物目录目前只有占位文件 |
+| `outputs/local-release` | 本地发布通道生成的镜像压缩包、部署包和校验清单。发布包由本机保存，不提交到 Git |
 
 ## 关键业务约束
 

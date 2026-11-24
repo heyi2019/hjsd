@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 """宜游轩 ERP 测试用例库生成器（A—F + SYS 测试编号体系）。
 
-扫描后端 pytest + 前端 vitest 测试文件，自动生成：
+扫描后端 pytest、前端 Vitest 和 Playwright 测试文件，自动生成：
   - docs/testing/测试用例库.csv   （12 核心字段 + 测试名称/功能名称/关联旧编号/流程编号/备注）
-  - docs/testing/测试用例库.md    （按功能编号分组的可读视图）
+  - docs/testing/测试用例库.md    （只刷新自动化区块，保留手工章节）
   - tests/backend/_report/case_index.json   （nodeid -> 测试用例编号，供执行记录器关联）
   - tests/backend/_report/case_number_map.json（本地持久化序号；不入库）
 
@@ -32,6 +32,8 @@ FRONTEND = os.path.join(REPO, "frontend")
 # 功能编号由 catalog.load_registry() 从合并台账 FEATURE 记录读取，本脚本不直接引用台账路径。
 OUT_CSV = os.path.join(REPO, "docs/testing", "测试用例库.csv")
 OUT_MD = os.path.join(REPO, "docs/testing", "测试用例库.md")
+AUTO_BEGIN = "<!-- CASE_LIBRARY_AUTO_BEGIN -->"
+AUTO_END = "<!-- CASE_LIBRARY_AUTO_END -->"
 REPORT_DIR = os.path.join(REPO, "tests", "backend", "_report")
 CASE_MAP = os.path.join(REPORT_DIR, "case_number_map.json")
 CASE_INDEX = os.path.join(REPORT_DIR, "case_index.json")
@@ -458,8 +460,8 @@ def extract_priority(test_type: str, relpath: str, fname: str, func_id: str) -> 
 
 def extract_precond(relpath: str, body: str) -> str:
     if relpath.startswith("tests/e2e/"):
-        return ("vite build+preview(5181) + uvicorn(8124) + PG 独立库 heijin_erp_e2e"
-                "（常驻复用、每轮不清数据；默认 keep 分支补表 + 幂等播种 + 按类型补足 IN_STOCK 账号）")
+        return ("vite build+preview(5181) + uvicorn(8124) + PostgreSQL 每轮独立临时库"
+                "（自动建表和播种，成功后清理，失败时保留供排查）")
     if is_frontend_test(relpath):
         return "组件挂载；mock 网络层(apiMock)；局部渲染"
     items = []
@@ -666,6 +668,7 @@ def main() -> None:
     _assert_unique("测试编号", [c["测试编号"] for c in cases])
     _assert_unique("nodeid", list(index))
 
+    _write_md(cases, reg)
     json.dump(number_map, open(CASE_MAP, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     json.dump(index, open(CASE_INDEX, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
 
@@ -681,8 +684,6 @@ def main() -> None:
             row["功能名称"] = reg.get(c["功能编号"], {}).get("name", "")
             row["关联旧编号(BIZ)"] = reg.get(c["功能编号"], {}).get("old", "")
             w.writerow(row)
-
-    _write_md(cases, reg)
 
     by_type = {}
     by_module = {}
@@ -747,13 +748,19 @@ def _stage(ttype, func, rel, tname, doc, body, fname, primary, related, flow) ->
 
 
 def _write_md(cases: list[dict], reg: dict) -> None:
+    with open(OUT_MD, encoding="utf-8") as f:
+        existing = f.read()
+    prefix, begin, rest = existing.partition(AUTO_BEGIN + "\n")
+    _, end, suffix = rest.partition(AUTO_END)
+    if not (begin and end and existing.count(AUTO_BEGIN) == 1 and existing.count(AUTO_END) == 1):
+        raise ValueError(f"{OUT_MD} 的自动化区块标记缺失、重复或顺序错误，无法安全更新")
+
     groups: dict[str, list[dict]] = {}
     for c in cases:
         groups.setdefault(c["功能编号"], []).append(c)
-    lines = ["# 宜游轩 ERP 测试用例库", "",
+    lines = ["", "## 自动化用例", "",
              f"> 生成时间：{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} ｜ "
-             "自动生成（scripts/gen_test_case_library.py）｜ 编号规则见《测试规范》",
-             "", "## 总览", ""]
+             "按功能编号列出后端、前端和 E2E 用例。编号规则见《测试规范》。", ""]
     by_type: dict[str, int] = {}
     for c in cases:
         by_type[c["测试层级"]] = by_type.get(c["测试层级"], 0) + 1
@@ -763,7 +770,7 @@ def _write_md(cases: list[dict], reg: dict) -> None:
     lines.append("")
     for func in sorted(groups):
         meta = reg.get(func, {})
-        lines.append(f"## {func} {meta.get('name', '')}（模块 {meta.get('module','')}）")
+        lines.append(f"### {func} {meta.get('name', '')}（模块 {meta.get('module','')}）")
         if meta.get("old"):
             lines.append(f"- 关联旧编号：{meta['old']}")
         lines.append("")
@@ -777,7 +784,7 @@ def _write_md(cases: list[dict], reg: dict) -> None:
             lines.append(f"| {c['测试编号']} | {name} | {c['测试层级']} | {c['优先级']} | {crit} |")
         lines.append("")
     with open(OUT_MD, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+        f.write(prefix + begin + "\n".join(lines) + "\n" + end + suffix)
 
 
 if __name__ == "__main__":

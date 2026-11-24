@@ -102,15 +102,167 @@ def test_frontend_module_regression_uses_repository_relative_test_path(monkeypat
     test_file = repo / relative
     test_file.parent.mkdir(parents=True)
     test_file.write_text("// test fixture\n", encoding="utf-8")
+    bin_dir = repo / "node_modules" / ".bin"
+    bin_dir.mkdir(parents=True)
+    vitest = bin_dir / "vitest"
+    vitest.write_text('#!/bin/sh\nfor arg in "$@"; do case "$arg" in --outputFile=*) out=${arg#--outputFile=};; esac; target="$arg"; done\ntest -f "../$target" || exit 2\nprintf "{}" > "$out"\n', encoding="utf-8")
+    vitest.chmod(0o755)
+    monkeypatch.setattr(rr, "REPO", repo)
+    recorded = []
+    monkeypatch.setattr(rr, "record_frontend", lambda path: recorded.append((path, path.read_text())))
+
+    assert rr.run_frontend_files([relative]) == 0
+    assert len(recorded) == 1
+    report, contents = recorded[0]
+    assert contents == "{}"
+    assert not report.exists()
+
+
+@pytest.mark.parametrize("full", [False, True])
+def test_frontend_regression_rejects_missing_local_vitest(monkeypatch, tmp_path, full):
+    repo = tmp_path / "repo"
+    (repo / "frontend").mkdir(parents=True)
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     npx = bin_dir / "npx"
-    npx.write_text('#!/bin/sh\nfor arg in "$@"; do target="$arg"; done\ntest -f "../$target"\n', encoding="utf-8")
+    npx.write_text('#!/bin/sh\nexit 0\n', encoding="utf-8")
     npx.chmod(0o755)
-    monkeypatch.setattr(rr, "REPO", repo)
     monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}")
+    monkeypatch.setattr(rr, "REPO", repo)
 
-    assert rr.run_frontend_files([relative]) == 0
+    result = rr.run_frontend_full() if full else rr.run_frontend_files(["tests/frontend/example.test.ts"])
+    assert result != 0
+
+
+@pytest.mark.parametrize("full", [False, True])
+def test_frontend_regression_never_records_stale_report(monkeypatch, tmp_path, full):
+    repo = tmp_path / "repo"
+    cache = repo / "frontend" / "node_modules" / ".cache"
+    cache.mkdir(parents=True)
+    old = cache / ("vitest-full.json" if full else "vitest-module.json")
+    old.write_text('{"old":true}', encoding="utf-8")
+    bin_dir = repo / "node_modules" / ".bin"
+    bin_dir.mkdir(parents=True)
+    vitest = bin_dir / "vitest"
+    vitest.write_text('#!/bin/sh\nexit 17\n', encoding="utf-8")
+    vitest.chmod(0o755)
+    npx = tmp_path / "npx"
+    npx.write_text('#!/bin/sh\nexit 17\n', encoding="utf-8")
+    npx.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}")
+    monkeypatch.setattr(rr, "REPO", repo)
+    recorded = []
+    monkeypatch.setattr(rr, "record_frontend", lambda path: recorded.append(path.read_text()))
+
+    result = rr.run_frontend_full() if full else rr.run_frontend_files(["tests/frontend/example.test.ts"])
+    assert result == 17
+    assert recorded == []
+    assert old.read_text(encoding="utf-8") == '{"old":true}'
+
+
+def test_frontend_regression_rejects_success_without_a_report(monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "frontend").mkdir(parents=True)
+    bin_dir = repo / "node_modules" / ".bin"
+    bin_dir.mkdir(parents=True)
+    for path in (bin_dir / "vitest", tmp_path / "npx"):
+        path.write_text('#!/bin/sh\nexit 0\n', encoding="utf-8")
+        path.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}")
+    monkeypatch.setattr(rr, "REPO", repo)
+    recorded = []
+    monkeypatch.setattr(rr, "record_frontend", lambda path: recorded.append(path))
+
+    assert rr.run_frontend_files(["tests/frontend/example.test.ts"]) != 0
+    assert recorded == []
+
+
+def test_frontend_failed_run_records_only_its_fresh_report(monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "frontend").mkdir(parents=True)
+    bin_dir = repo / "node_modules" / ".bin"
+    bin_dir.mkdir(parents=True)
+    command = '#!/bin/sh\nfor arg in "$@"; do case "$arg" in --outputFile=*) out=${arg#--outputFile=};; esac; done\nprintf "new" > "$out"\nexit 17\n'
+    for path in (bin_dir / "vitest", tmp_path / "npx"):
+        path.write_text(command, encoding="utf-8")
+        path.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ.get('PATH', '')}")
+    monkeypatch.setattr(rr, "REPO", repo)
+    recorded = []
+    monkeypatch.setattr(rr, "record_frontend", lambda path: recorded.append(path.read_text()))
+
+    assert rr.run_frontend_files(["tests/frontend/example.test.ts"]) == 17
+    assert recorded == ["new"]
+
+
+def test_frontend_result_recorder_uses_published_index_on_clean_checkout(tmp_path):
+    import json
+    import shutil
+
+    repo = tmp_path / "repo"
+    scripts = repo / "backend/scripts"
+    scripts.mkdir(parents=True)
+    for name in ("record_frontend_results.py", "_git.py", "_result_rank.py"):
+        shutil.copy2(BACKEND / "scripts" / name, scripts / name)
+    library = repo / "docs/testing/测试用例库.csv"
+    library.parent.mkdir(parents=True)
+    library.write_text(
+        "测试编号,自动化测试文件及函数,测试函数标识\n"
+        "IT-D01-001,tests/frontend/module/finance/example.test.tsx,case example\n",
+        encoding="utf-8-sig",
+    )
+    report = repo / "frontend/report.json"
+    report.parent.mkdir(parents=True)
+    report.write_text(json.dumps({"testResults": [{
+        "name": str(repo / "tests/frontend/module/finance/example.test.tsx"),
+        "assertionResults": [{"title": "case example", "status": "passed", "duration": 1}],
+    }]}), encoding="utf-8")
+
+    result = subprocess.run([sys.executable, str(scripts / "record_frontend_results.py"), "--json", str(report), "--transient"],
+                            cwd=repo, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    output = repo / "docs/testing/测试结果库/results.jsonl"
+    row = json.loads(output.read_text(encoding="utf-8"))
+    assert row["case_no"] == "IT-D01-001" and row["status"] == "PASS"
+    assert row["evidence"] == ""
+
+
+def test_e2e_list_shows_real_browser_specs_without_launch(monkeypatch, tmp_path, capsys):
+    repo = tmp_path / "repo"
+    spec = repo / "tests/e2e/finance/finance.spec.ts"
+    spec.parent.mkdir(parents=True)
+    spec.touch()
+    monkeypatch.setattr(rr, "REPO", repo)
+    monkeypatch.setattr(rr.sys, "argv", ["run_regression.py", "e2e", "--list"])
+
+    assert rr.main() == 0
+    assert "tests/e2e/finance/finance.spec.ts" in capsys.readouterr().out
+
+
+def test_e2e_runs_isolated_launcher_and_propagates_exit_code(monkeypatch, tmp_path):
+    repo = tmp_path / "repo"
+    spec = repo / "tests/e2e/finance/finance.spec.ts"
+    spec.parent.mkdir(parents=True)
+    spec.touch()
+    launcher = repo / "scripts/ops/test-e2e.sh"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text('#!/bin/sh\nprintf called > "$E2E_PROBE_LOG"\nexit 23\n', encoding="utf-8")
+    marker = tmp_path / "launcher-called"
+    monkeypatch.setenv("E2E_PROBE_LOG", str(marker))
+    monkeypatch.setattr(rr, "REPO", repo)
+    monkeypatch.setattr(rr.sys, "argv", ["run_regression.py", "e2e"])
+
+    assert rr.main() == 23
+    assert marker.read_text() == "called"
+
+
+@pytest.mark.parametrize("list_only", [False, True])
+def test_module_e2e_filter_fails_closed_when_not_supported(monkeypatch, list_only):
+    args = ["run_regression.py", "B", "--type", "e2e"]
+    if list_only:
+        args.append("--list")
+    monkeypatch.setattr(rr.sys, "argv", args)
+    assert rr.main() != 0
 
 
 def _ci_scope(repo: Path, **overrides: str) -> dict[str, str]:
@@ -123,7 +275,36 @@ def _ci_scope(repo: Path, **overrides: str) -> dict[str, str]:
 
 
 @pytest.mark.parametrize(("paths", "full", "mode", "expected"), [
-    ("frontend/src/finance/FinancePage.tsx", "false", "none", ""),
+    ("docs/研发流程.md", "false", "none", ""),
+    (
+        "frontend/src/business/shared/order-create/CreateBusinessModal.tsx,backend/app/finance/cashflow/writes/create.py",
+        "false", "selected",
+        "tests/e2e/cross/business-write.spec.ts,tests/e2e/cross/orders-lifecycle.spec.ts,"
+        "tests/e2e/cross/finance-write-ui.spec.ts,tests/e2e/finance/other-integration.spec.ts",
+    ),
+    (
+        "backend/app/business/orders/create.py,frontend/src/finance/cashflow/CashflowTab.tsx",
+        "false", "selected",
+        "tests/e2e/cross/business-write.spec.ts,tests/e2e/cross/orders-lifecycle.spec.ts,"
+        "tests/e2e/cross/finance-write-ui.spec.ts,tests/e2e/finance/other-integration.spec.ts",
+    ),
+    (
+        "frontend/src/business/shared/operations/offsale-modal.tsx", "false", "selected",
+        "tests/e2e/cross/business-write.spec.ts,tests/e2e/cross/orders-lifecycle.spec.ts",
+    ),
+    (
+        "backend/app/business/shared/operations/consignment.py", "false", "selected",
+        "tests/e2e/cross/business-write.spec.ts,tests/e2e/cross/orders-lifecycle.spec.ts",
+    ),
+    (
+        "tests/e2e/system/auth-login.spec.ts,frontend/src/settings/auth/LoginPage.tsx",
+        "false", "selected", "tests/e2e/system/auth-login.spec.ts,tests/e2e/system/role-switch.spec.ts",
+    ),
+    (
+        "backend/app/settings/auth/service.py", "false", "selected",
+        "tests/e2e/system/auth-login.spec.ts,tests/e2e/system/role-switch.spec.ts",
+    ),
+    ("backend/requirements-dev.lock.txt", "false", "all", ""),
     ("tests/e2e/system/fallback.spec.ts", "false", "selected", "tests/e2e/system/fallback.spec.ts"),
     ("tests/e2e/support/api-stub.ts", "false", "all", ""),
     ("tests/e2e/system/deleted.spec.ts", "false", "all", ""),

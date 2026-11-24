@@ -24,29 +24,14 @@ def test_order_event_accounting_attribute_is_business_mapped(
     assert accounting_attribute_for_order_event(order_type, event_type) == expected
 
 
-def test_cashflow_stores_accounting_attribute() -> None:
-    from datetime import date
-    from decimal import Decimal
-
-    from app.domain.trade import Cashflow
-
-    flow = Cashflow(
-        flow_no="E2E-ATTR",
-        pool_id=1,
-        occurred_on=date(2026, 10, 17),
-        direction="OUT",
-        amount=Decimal("10.00"),
-        accounting_attribute=AccountingAttribute.TH_DIRECT_COST.value,
-    )
-    assert flow.accounting_attribute == AccountingAttribute.TH_DIRECT_COST.value
-
-
 @pytest.mark.parametrize(
     ("category", "direction", "expected"),
     [
         ("DEPOSIT_RELEASE", "IN", "DEPOSIT"),
         ("TRANSFER", "IN", "INTERNAL_TRANSFER"),
         ("OFFICE", "OUT", "OPERATING_EXPENSE"),
+        ("REBATE", "IN", "REBATE_INCOME"),
+        ("REVERSAL", "IN", "REVERSAL"),
     ],
 )
 def test_manual_cashflow_gets_default_accounting_attribute(
@@ -64,24 +49,6 @@ def test_order_event_accounting_attribute_undefined_raises() -> None:
         accounting_attribute_for_order_event("ZZ", "BUY")
     with pytest.raises(ValueError, match="未定义订单事件核算属性"):
         accounting_attribute_for_order_event("HS", "NOPE")
-
-
-@pytest.mark.parametrize(
-    ("category", "direction", "expected"),
-    [
-        ("REBATE", "IN", AccountingAttribute.REBATE_INCOME.value),
-        ("REVERSAL", "IN", AccountingAttribute.REVERSAL.value),
-    ],
-)
-def test_manual_cashflow_rebate_and_reversal_branches(
-    category: str, direction: str, expected: str
-) -> None:
-    assert (
-        accounting_attribute_for_manual_cashflow(
-            category=category, direction=direction
-        )
-        == expected
-    )
 
 
 def test_text_required_empty_raises_validation() -> None:

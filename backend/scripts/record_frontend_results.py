@@ -19,6 +19,7 @@ vitest 的 `title` 即 `it()/test()` 第一个字符串参数，两者逐字对�
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import re
@@ -32,6 +33,7 @@ from _result_rank import RESULT_RANK as _RANK
 REPO = Path(__file__).resolve().parents[2]
 FRONTEND = REPO / "frontend"
 CASE_INDEX = REPO / "tests" / "backend" / "_report" / "case_index.json"
+CASE_LIBRARY_CSV = REPO / "docs" / "testing" / "测试用例库.csv"
 
 RESULTS = REPO / "docs" / "testing" / "测试结果库" / "results.jsonl"
 
@@ -96,9 +98,25 @@ def _match_template(templates: dict, key: str) -> str | None:
     return cands[0] if len(cands) == 1 else None
 
 
+def _load_case_index() -> dict:
+    """忽略的本地索引不存在时，从入库用例库还原用例映射。"""
+    if CASE_INDEX.exists():
+        return json.loads(CASE_INDEX.read_text(encoding="utf-8"))
+    out: dict[str, str] = {}
+    with CASE_LIBRARY_CSV.open(encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            rel = row.get("自动化测试文件及函数") or ""
+            name = row.get("测试函数标识") or ""
+            number = row.get("测试编号") or ""
+            if rel and name and number:
+                out[f"{rel}::{name}"] = number
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="把 vitest JSON 结果写入测试结果库")
     ap.add_argument("--json", required=True, help="vitest --reporter=json 的输出文件")
+    ap.add_argument("--transient", action="store_true", help="原始报告用完即回收，不记录文件名作为证据")
     ap.add_argument("--dry-run", action="store_true", help="只统计不写入")
     args = ap.parse_args()
 
@@ -109,7 +127,7 @@ def main() -> int:
         print(f"[fe] 找不到 vitest JSON：{report_path}")
         return 2
 
-    index: dict = json.loads(CASE_INDEX.read_text(encoding="utf-8"))
+    index: dict = _load_case_index()
     data = json.loads(report_path.read_text(encoding="utf-8"))
     tests = data.get("testResults") or []
 
@@ -161,7 +179,7 @@ def main() -> int:
     commit = git_commit(REPO)
     run_id = f"{now.strftime('%Y%m%d-%H%M%S')}-{commit}-fe"
     env = "ci" if (os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS")) else "local"
-    evidence = str(report_path.name)
+    evidence = "" if args.transient else report_path.name
 
     if not args.dry_run and matched:
         RESULTS.parent.mkdir(parents=True, exist_ok=True)

@@ -249,35 +249,55 @@ test("治理权限：viewer 拒绝报表导出，审计可追溯业务操作", a
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const viewerExport = await request.get(`${apiBase}/reports/order-profit/export.csv`, { headers: { "X-Dev-User": "viewer" } });
   expect(viewerExport.status()).toBe(403);
-  const adminAudit = await request.get(`${apiBase}/audit-logs`, { headers: { "X-Dev-User": "admin" }, params: { entity_type: "order", limit: 20 } });
+  const adminHeaders = { "X-Dev-User": "admin" };
+  const created = await request.post(`${apiBase}/orders`, { headers: adminHeaders, data: { order_type: "DG", trade_date: "2026-10-17", form_extra: { business_responsible_ids: [1] } } });
+  expect(created.status(), await created.text()).toBe(201);
+  const order = await created.json();
+  const adminAudit = await request.get(`${apiBase}/audit-logs`, { headers: adminHeaders, params: { entity_type: "order", entity_id: order.order_no, action: "ORDER_CREATE" } });
   expect(adminAudit.status()).toBe(200);
-  expect((await adminAudit.json()).items).toBeDefined();
-});
-
-test("数据范围：管理员可配置用户资金账户范围", async ({ request }) => {
-  const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
-  const headers = { "X-Dev-User": "admin" };
-  const pools = await request.get(`${apiBase}/pools`, { headers });
-  const pool = (await pools.json())[0];
-  const updated = await request.patch(`${apiBase}/users/2`, { headers, data: { owner_scope: "TEAM", pool_ids: [pool.id], team_ids: [] } });
-  expect(updated.status()).toBe(200);
-  const body = await updated.json();
-  expect(body.owner_scope).toBe("TEAM");
-  expect(body.pool_ids).toContain(pool.id);
+  expect((await adminAudit.json()).items).toEqual(expect.arrayContaining([
+    expect.objectContaining({ entity_type: "order", entity_id: order.order_no, action: "ORDER_CREATE" }),
+  ]));
 });
 
 test("数据范围：非管理员只能看到授权资金账户", async ({ request }) => {
   const apiBase = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8123/api";
   const adminHeaders = { "X-Dev-User": "admin" };
   const pools = await request.get(`${apiBase}/pools`, { headers: adminHeaders });
+  expect(pools.status()).toBe(200);
   const poolList = await pools.json();
   expect(poolList.length).toBeGreaterThanOrEqual(2);
   const authorized = poolList[0].id as number;
-  const update = await request.patch(`${apiBase}/users/2`, { headers: adminHeaders, data: { owner_scope: "TEAM", pool_ids: [authorized], team_ids: [] } });
+
+  const username = `e2e_pool_scope_${Date.now()}`;
+  const password = "temporary-pool-scope-123";
+  const created = await request.post(`${apiBase}/users`, {
+    headers: adminHeaders,
+    data: { username, display_name: "E2E 资金范围测试", password, role: "OPERATOR", owner_scope: "SELF" },
+  });
+  expect(created.status()).toBe(201);
+  const { id } = await created.json();
+  const login = await request.post(`${apiBase}/auth/login`, { data: { username, password } });
+  expect(login.status()).toBe(200);
+  const changed = await request.post(`${apiBase}/auth/change-password`, {
+    headers: { Authorization: `Bearer ${(await login.json()).access_token}` },
+    data: { old_password: password, new_password: "updated-pool-scope-123" },
+  });
+  expect(changed.status()).toBe(200);
+  const headers = { Authorization: `Bearer ${(await changed.json()).access_token}` };
+
+  const unscoped = await request.get(`${apiBase}/pools`, { headers });
+  expect(unscoped.status()).toBe(200);
+  expect(await unscoped.json()).toEqual([]);
+  const update = await request.patch(`${apiBase}/users/${id}`, {
+    headers: adminHeaders,
+    data: { owner_scope: "TEAM", pool_ids: [authorized], team_ids: [] },
+  });
   expect(update.status()).toBe(200);
-  const scoped = await request.get(`${apiBase}/pools`, { headers: { "X-Dev-User": "operator" } });
+  expect(await update.json()).toMatchObject({ owner_scope: "TEAM", pool_ids: [authorized] });
+  const scoped = await request.get(`${apiBase}/pools`, { headers });
   expect(scoped.status()).toBe(200);
-  expect((await scoped.json()).every((pool: { id: number }) => pool.id === authorized)).toBe(true);
+  expect((await scoped.json()).map((pool: { id: number }) => pool.id)).toEqual([authorized]);
 });
 
 

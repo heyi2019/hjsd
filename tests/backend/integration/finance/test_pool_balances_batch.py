@@ -18,6 +18,7 @@ from sqlalchemy import event
 from app.domain.trade import Cashflow
 from app.finance.balances import pool_balances
 from app.finance.cashflow.cashflows import create_cashflow
+from app.settings.field_definitions.pools import get_pool_by_code
 
 TODAY = date(2026, 10, 4)
 
@@ -65,23 +66,29 @@ def _flow(seeded_db, pool_id: int, *, direction: str, amount: str, note: str):
 def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
     seeded_client, seeded_db, headers
 ):
-    _flow(seeded_db, 1, direction="IN", amount="1200.10", note="批量入")
-    _flow(seeded_db, 1, direction="OUT", amount="200.05", note="批量出")
+    profit_pool = get_pool_by_code(seeded_db, "HJ_PROFIT")
+    assert profit_pool is not None
+    _flow(seeded_db, profit_pool.id, direction="IN", amount="1200.10", note="批量入")
+    _flow(seeded_db, profit_pool.id, direction="OUT", amount="200.05", note="批量出")
     seeded_db.commit()
 
     batch = seeded_client.get("/api/pools/balances", headers=headers)
     assert batch.status_code == 200, batch.text
     body = batch.json()
 
-    assert body["items"], "至少应返回种子里已有的资金账户"
+    items_by_code = {item["pool_code"]: item for item in body["items"]}
+    assert items_by_code["HJ_INVEST"]["cash_balance"] == "0.00"
+    assert items_by_code["HJ_PROFIT"]["cash_balance"] == "1000.05"
     for item in body["items"]:
         single = seeded_client.get(
             f"/api/pools/{item['pool_id']}/balance", headers=headers
         )
         assert single.status_code == 200, single.text
-        assert item["cash_balance"] == single.json()["cash_balance"]
-        assert item["available"] == single.json()["available"]
-        assert item["deposit_held"] == single.json()["deposit_held"]
+        balance = single.json()
+        assert item["pool_code"] == balance["pool_code"]
+        assert item["cash_balance"] == balance["cash_balance"]
+        assert item["available"] == balance["available"]
+        assert item["deposit_held"] == balance["deposit_held"]
 
     totals = body["totals"]
     assert Decimal(totals["cash_balance"]) == sum(

@@ -102,18 +102,6 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledTimes(2));
   });
 
-  it("业务总览计数：订单总量与我的当期客户数", async () => {
-    vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({
-      orders: { total_count: 3 },
-      personal_customers: 2,
-    }));
-    renderLight(<WorkbenchPage />, { user: "admin" });
-    const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
-    const customerCard = (await screen.findByText("我的当期客户数")).closest(".ui-stat") as HTMLElement;
-    expect(await within(totalCard).findByText("3")).toBeInTheDocument();
-    expect(await within(customerCard).findByText("2")).toBeInTheDocument();
-  });
-
   it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {
     vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({
       orders: { total_count: 3 },
@@ -126,9 +114,11 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledTimes(1));
     const orderCard = (await screen.findByText("我的当期订单")).closest(".ui-stat") as HTMLElement;
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
+    const customerCard = (await screen.findByText("我的当期客户数")).closest(".ui-stat") as HTMLElement;
     const earningsCard = screen.getByText("我的当期收益").closest(".ui-stat") as HTMLElement;
     expect(within(orderCard).getByText("2")).toBeInTheDocument();
     expect(within(totalCard).getByText("3")).toBeInTheDocument();
+    expect(within(customerCard).getByText("2")).toBeInTheDocument();
     expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();
     expect(within(earningsCard).getByText("当期 · 本人分润基数")).toBeInTheDocument();
     expect(within(earningsCard).queryByText("999.99")).toBeNull();

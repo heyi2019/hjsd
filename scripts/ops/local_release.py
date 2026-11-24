@@ -244,7 +244,7 @@ docker compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_
     return after
 
 
-def run_gates(commit: str) -> tuple[list[str], str]:
+def run_gates(commit: str, version: str) -> tuple[list[str], str]:
     base_env = dict(os.environ)
     for key in ("PYTHONPATH", "DATABASE_URL", "TEST_DATABASE_URL", "E2E_DATABASE_URL", "BASE_URL", "BASELINE_DB"):
         base_env.pop(key, None)
@@ -253,21 +253,59 @@ def run_gates(commit: str) -> tuple[list[str], str]:
     env["PYTHONPATH"] = os.pathsep.join((str(ROOT / "dependencies/python313-runtime"), str(ROOT / "backend")))
     env["PYTHON"] = PY313
     env["BASELINE_DB"] = "heijin_erp_drill_" + secrets.token_hex(10)
-    print("\n==> 依赖锁文件一致性", flush=True)
-    check_locks(base_env)
-    completed = ["依赖锁文件一致性"]
-    for title, cwd, args in gate_commands():
-        print(f"\n==> {title}", flush=True)
-        call(args, cwd=cwd, env=env if title in {"迁移基线", "后端全量"} else base_env)
+    started = datetime.now(timezone.utc)
+    reports = ROOT / "outputs" / "local-release" / "reports"
+    reports.mkdir(parents=True, exist_ok=True, mode=0o700)
+    run_dir = Path(tempfile.mkdtemp(prefix=f"{version}-{commit[:12]}-{started:%Y%m%dT%H%M%SZ}-", dir=reports))
+    path = run_dir / "release-test-report.md"
+
+    commands = gate_commands()
+    gates = ["依赖锁文件一致性", *[entry[0] for entry in commands], "线上结构恢复演练"]
+    completed: list[str] = []
+    failed = gates[0]
+    try:
+        print(f"\n==> {failed}", flush=True)
+        check_locks(base_env)
+        completed.append(failed)
+        for title, cwd, args in commands:
+            failed = title
+            print(f"\n==> {title}", flush=True)
+            call(args, cwd=cwd, env=env if title in {"迁移基线", "后端全量"} else base_env)
+            if git("rev-parse", "HEAD") != commit or git("status", "--porcelain", "--untracked-files=normal"):
+                raise RuntimeError("门禁期间代码发生变化，发布中止")
+            completed.append(title)
+        failed = gates[-1]
+        print(f"\n==> {failed}", flush=True)
+        schema_digest = check_production_schema(env)
         if git("rev-parse", "HEAD") != commit or git("status", "--porcelain", "--untracked-files=normal"):
             raise RuntimeError("门禁期间代码发生变化，发布中止")
-        completed.append(title)
-    print("\n==> 线上结构恢复演练", flush=True)
-    schema_digest = check_production_schema(env)
-    if git("rev-parse", "HEAD") != commit or git("status", "--porcelain", "--untracked-files=normal"):
-        raise RuntimeError("门禁期间代码发生变化，发布中止")
-    completed.append("线上结构恢复演练")
-    return completed, schema_digest
+        completed.append(failed)
+        failed = ""
+        return completed, schema_digest
+    finally:
+        finished = datetime.now(timezone.utc)
+        result = "失败" if failed else "通过"
+        report = [
+            "# ERP 发布前全量测试报告",
+            "",
+            "| 项目 | 内容 |",
+            "| --- | --- |",
+            f"| ERP 版本 | `{version}` |",
+            f"| 候选提交 | `{commit}` |",
+            "| 通道 | 本地发布 |",
+            "| 范围 | 后端全量、前端全量、浏览器 E2E 及发布预检 |",
+            f"| 开始时间 | {started.isoformat(timespec='seconds')} |",
+            f"| 结束时间 | {finished.isoformat(timespec='seconds')} |",
+            f"| 结果 | {result} |",
+            "",
+            "| 阶段 | 结果 |",
+            "| --- | --- |",
+        ]
+        for gate in gates:
+            status = "通过" if gate in completed else "失败" if gate == failed else "未执行"
+            report.append(f"| {gate} | {status} |")
+        path.write_text("\n".join(report) + "\n", encoding="utf-8")
+        print(f"\n全量测试报告：{path}", flush=True)
 
 
 def sha256(path: Path) -> str:
@@ -406,7 +444,7 @@ def main() -> int:
     if args.action == "check":
         print("候选版本与提交检查通过；尚未运行完整门禁，也未部署。")
         return 0
-    gates, schema_digest = run_gates(commit)
+    gates, schema_digest = run_gates(commit, version)
     if remote_state() != production:
         raise RuntimeError("线上状态在检查期间发生变化，已中止")
     if candidate_state(production) != (commit, version):

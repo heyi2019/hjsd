@@ -34,6 +34,66 @@ def test_local_release_rejects_same_version_or_different_commit():
 
 
 
+@pytest.mark.parametrize("fail_e2e", [False, True])
+def test_local_full_release_retains_versioned_report(tmp_path, monkeypatch, fail_e2e):
+    """全量门禁成功或失败，均按批次保留含 ERP 版本、候选提交与阶段状态的报告。"""
+    import importlib.util
+
+    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
+    spec = importlib.util.spec_from_file_location("local_release_report", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    commit = "a" * 40
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "check_locks", lambda _env: None)
+    monkeypatch.setattr(module, "check_production_schema", lambda _env: "b" * 64)
+    monkeypatch.setattr(module, "git", lambda operation, *_: commit if operation == "rev-parse" else "")
+
+    def call_gate(args, **_):
+        if fail_e2e and "test:e2e" in args:
+            raise subprocess.CalledProcessError(7, args)
+
+    monkeypatch.setattr(module, "call", call_gate)
+    monkeypatch.setattr(module.sys, "argv", ["local_release.py", "prepare"])
+    monkeypatch.setattr(module, "remote_state", lambda: {"version": "1.0.0"})
+    monkeypatch.setattr(module, "candidate_state", lambda _production: (commit, "1.0.1"))
+    bundles = []
+
+    def build_package(*args):
+        bundles.append(args)
+        return tmp_path / "bundle"
+
+    monkeypatch.setattr(module, "build_package", build_package)
+    for _ in range(2):
+        if fail_e2e:
+            with pytest.raises(subprocess.CalledProcessError) as error:
+                module.main()
+            assert error.value.returncode == 7
+        else:
+            assert module.main() == 0
+
+    expected_bundle = (commit, "1.0.1", {"version": "1.0.0"}, module.required_gates()[:-1], "b" * 64)
+    assert bundles == ([] if fail_e2e else [expected_bundle, expected_bundle])
+
+    reports = sorted((tmp_path / "outputs/local-release/reports").glob("1.0.1-aaaaaaaaaaaa-*/release-test-report.md"))
+    assert len(reports) == 2
+    for path in reports:
+        report = path.read_text(encoding="utf-8")
+        assert "ERP 版本 | `1.0.1`" in report
+        assert f"候选提交 | `{commit}`" in report
+        assert "| 后端全量 | 通过 |" in report
+        assert "| 前端全量 | 通过 |" in report
+        if fail_e2e:
+            assert "| 结果 | 失败 |" in report
+            assert "| 浏览器 E2E | 失败 |" in report
+            assert "| 前端生产构建 | 未执行 |" in report
+        else:
+            assert "| 结果 | 通过 |" in report
+            assert "| 浏览器 E2E | 通过 |" in report
+            assert "| 线上结构恢复演练 | 通过 |" in report
+
+
 def test_local_cd_accepts_intact_bundle_then_rejects_tampering(tmp_path):
     import hashlib
     import importlib.util

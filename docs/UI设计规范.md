@@ -147,7 +147,7 @@
 | 维度 | 规范 |
 |---|---|
 | 动效 | 只用于打开/关闭浮层、加载完成和状态切换；短、可预测、可中断；不以动效传递唯一信息 |
-| 深色模式 | 默认跟随系统，**同时提供顶栏三态切换（跟随系统 / 浅色 / 深色）**，选择持久化在 `localStorage`（键 `heijin-theme-mode`）；`data-theme` 打到 `documentElement`，antd 侧由 `darkAlgorithm` 同步；每个组件必须同时检查浅色和深色表现 |
+| 深色模式 | 无已保存选择时默认浅色；**顶栏提供三态切换（跟随系统 / 浅色 / 深色）**，选择持久化在 `localStorage`（键 `heijin-theme-mode`）；`data-theme` 打到 `documentElement`，antd 侧由 `darkAlgorithm` 同步；每个组件必须同时检查浅色和深色表现 |
 | 透明度 | 毛玻璃只用于非数据承载的导航或中性浮层；降低透明度时退化为不透明表面 |
 | 对比度 | 正文最少 4.5:1，大字最少 3:1；小字号不使用轻字重 |
 | 键盘与焦点 | 焦点环可见；键盘顺序符合视觉顺序；弹窗关闭后焦点回到触发控件 |
@@ -198,13 +198,13 @@
 
 **权限门控**：`ConfirmButton` 的 `permission` 可选，需权限的操作传 `permission` 由 `PermissionGate` 门控；`ConfirmDialog` 不做权限门控，由触发页面在调用前把关，避免双重拦截。
 
-**测试约定**：测试环境用 `rc-motion` 桩（`src/test/motion-stub.tsx`），必须遵守 `visible === false && removeOnLeave` 时不渲染 children 的语义 —— 硬编码 `visible: true` 会让 antd Button 总渲染 loading 图标（`aria-label="loading"`），把可访问名污染为「loading 删除」。涉及两级确认按钮的断言优先用可访问名精确匹配 `within(dialog).getByRole("button", { name: "删除" })`；仅在同文案多处出现时退回 `within(...).getByText(...)`，不要用正则绕过可访问名不匹配。
+**测试约定**：测试环境用 `rc-motion` 桩（`tests/fixtures/motion-stub.tsx`），必须遵守 `visible === false && removeOnLeave` 时不渲染 children 的语义 —— 硬编码 `visible: true` 会让 antd Button 总渲染 loading 图标（`aria-label="loading"`），把可访问名污染为「loading 删除」。涉及两级确认按钮的断言优先用可访问名精确匹配 `within(dialog).getByRole("button", { name: "删除" })`；仅在同文案多处出现时退回 `within(...).getByText(...)`，不要用正则绕过可访问名不匹配。
 
 > antd Modal 禁止嵌在受控 Modal 的 children 中，确认框同级渲染；裸 Modal 必须包 `ConfigProvider button={{autoInsertSpace:false}}`。
 
 ## 10. 维护规则
 
-登录与首次改密页是独立的品牌入口：PC 和 H5 均使用浅色页面与卡片，输入框和主按钮高度为 46px；工作台的明暗主题不改变其配色。
+登录与首次改密页是独立的品牌入口：桌面和移动 Web 均使用浅色页面与卡片，输入框和主按钮高度为 36px；工作台的明暗主题不改变其配色。
 
 | 变更 | 规则 |
 |---|---|

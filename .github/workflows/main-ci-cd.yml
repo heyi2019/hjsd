@@ -103,8 +103,46 @@ jobs:
       changed_paths: ${{ needs.prepare-release.outputs.changed_paths }}
       full_suite: ${{ fromJSON(needs.prepare-release.outputs.full_suite) }}
 
-  deploy:
+  full-release-report:
+    name: Record full release test report
     needs: [prepare-release, lint, frontend, backend]
+    if: ${{ always() && needs.prepare-release.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate full release report
+        if: ${{ needs.prepare-release.outputs.full_suite == 'true' }}
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+          RELEASE_SHA: ${{ needs.prepare-release.outputs.sha }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/release-test-report.md"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          {
+            printf '# 发布前全量测试报告\n\n'
+            printf -- '- ERP 版本：%s\n' "$RELEASE_VERSION"
+            printf -- '- 候选提交：%s\n' "$RELEASE_SHA"
+            printf -- '- 测试范围：前端完整测试与构建、浏览器 E2E、后端完整回归及静态门禁\n'
+            printf -- '- 工作流：%s（第 %s 次运行尝试）\n\n' "$run_url" "$GITHUB_RUN_ATTEMPT"
+            printf '| 门禁 | 结果 |\n|---|---|\n'
+            printf '| lint | %s |\n| frontend（含浏览器 E2E） | %s |\n| backend | %s |\n' "$LINT_RESULT" "$FRONTEND_RESULT" "$BACKEND_RESULT"
+            printf '\n结果为各门禁任务状态；失败、取消或跳过时，范围内的测试不一定全部执行。详细测试结果见本次工作流日志及各门禁产物。\n'
+          } > "$report"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload full release report
+        if: ${{ needs.prepare-release.outputs.full_suite == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-release-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-test-report.md
+          if-no-files-found: error
+
+  deploy:
+    needs: [prepare-release, lint, frontend, backend, full-release-report]
     uses: ./.github/workflows/deploy-production.yml
     with:
       release_sha: ${{ needs.prepare-release.outputs.sha }}

@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -20,7 +22,41 @@ describe("发布门禁与部署契约", () => {
       expect(jobs[job]?.with?.release_sha).toBe(sha);
       expect(jobs[job]?.if).toBeUndefined();
     }
-    expect(jobs.deploy?.needs).toEqual(["prepare-release", "lint", "frontend", "backend"]);
+    const report = jobs["full-release-report"];
+    expect(report.needs).toEqual(["prepare-release", "lint", "frontend", "backend"]);
+    expect(report.if).toContain("always()");
+    expect(report.if).toContain("needs.prepare-release.result == 'success'");
+    const generate = report.steps.find((step: any) => step.name === "Generate full release report");
+    const upload = report.steps.find((step: any) => String(step.uses ?? "").startsWith("actions/upload-artifact@"));
+    expect(generate.if).toContain("needs.prepare-release.outputs.full_suite == 'true'");
+    expect(upload.if).toContain("needs.prepare-release.outputs.full_suite == 'true'");
+    expect(upload.with.name).toContain("github.run_id");
+    expect(upload.with.name).toContain("github.run_attempt");
+    expect(upload.with.path).toContain("release-test-report.md");
+    expect(upload.with["if-no-files-found"]).toBe("error");
+    const temp = mkdtempSync(path.join(os.tmpdir(), "release-report-test-"));
+    try {
+      const summary = path.join(temp, "summary");
+      writeFileSync(summary, "");
+      const env = { ...process.env, RUNNER_TEMP: temp, GITHUB_STEP_SUMMARY: summary,
+        GITHUB_SERVER_URL: "https://github.example", GITHUB_REPOSITORY: "example/erp", GITHUB_RUN_ID: "123", GITHUB_RUN_ATTEMPT: "2",
+        RELEASE_VERSION: "1.2.3", RELEASE_SHA: "a".repeat(40), LINT_RESULT: "success", FRONTEND_RESULT: "failure", BACKEND_RESULT: "cancelled" };
+      const result = spawnSync("bash", ["-e", "-c", generate.run], { env, encoding: "utf8" });
+      expect(result.status, result.stderr).toBe(0);
+      const text = readFileSync(path.join(temp, "release-test-report.md"), "utf8");
+      for (const expected of ["1.2.3", "a".repeat(40), "success", "failure", "cancelled", "https://github.example/example/erp/actions/runs/123", "2"]) {
+        expect(text).toContain(expected);
+      }
+      expect(readFileSync(summary, "utf8")).toContain("1.2.3");
+      const skipped = spawnSync("bash", ["-e", "-c", generate.run], {
+        env: { ...env, FRONTEND_RESULT: "skipped" }, encoding: "utf8",
+      });
+      expect(skipped.status, skipped.stderr).toBe(0);
+      expect(readFileSync(path.join(temp, "release-test-report.md"), "utf8")).toContain("skipped");
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+    expect(jobs.deploy?.needs).toEqual(["prepare-release", "lint", "frontend", "backend", "full-release-report"]);
     expect(jobs.deploy.if).toBeUndefined();
     expect(jobs.deploy.uses).toBe("./.github/workflows/deploy-production.yml");
     expect(jobs.deploy.with.release_sha).toBe(sha);

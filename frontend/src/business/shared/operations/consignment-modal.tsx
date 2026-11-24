@@ -195,7 +195,7 @@ export function OrderConsignmentModal(props: {
                 popupMatchSelectWidth
                 popupClassName="consignment-platform-pop"
               />
-            ) : platformResource.loading ? <span className="muted">寄售平台加载中</span> : platformResource.error ? null : (
+            ) : platformResource.loading ? <span className="muted">寄售平台加载中</span> : platformResource.error ? <span className="muted">寄售平台暂不可用</span> : (
               <span className="muted">暂无可用寄售平台，请先在中介业务配置中维护经手平台</span>
             )}
           </CfgItem>

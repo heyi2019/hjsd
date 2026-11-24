@@ -1057,6 +1057,7 @@ describe("InventoryPanel：写入与长路径", () => {
   });
 
   it("寄售平台词典加载失败时提示并允许重试", async () => {
+    const consoleError = vi.spyOn(console, "error");
     vi.mocked(optionSetsApi.list).mockRejectedValueOnce(new Error("网络失败"));
     const detail = { account: accounts[0], orders: [{ order_id: 21, order_no: "HS0001", order_type: "HS", trade_date: "2026-10-15", status: "ACTIVE", events: [], active_consignments: [] }] };
     vi.mocked(ordersApi.executionDetail).mockResolvedValue(detail as never);
@@ -1066,6 +1067,8 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(screen.getByRole("button", { name: "重新加载" }));
     expect(await screen.findByRole("combobox", { name: "寄售平台" })).toBeEnabled();
     expect(screen.queryByText("选项词典加载失败，请重新加载")).toBeNull();
+    expect(consoleError.mock.calls.flat().join(" ")).not.toContain("[antd: Form.Item]");
+    consoleError.mockRestore();
   });
 
   it("寄售提交成功后无需等详情刷新即可通知页面关闭", async () => {

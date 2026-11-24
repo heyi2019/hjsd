@@ -26,6 +26,8 @@ let employees: EmployeeOption[];
 
 function EmployeeSelectors() {
   const [createOpen, setCreateOpen] = useState(false);
+  const [createEmployee, setCreateEmployee] = useState<number>();
+  const [detailEmployee, setDetailEmployee] = useState<number>();
   const lookups = useCreateBusinessLookups(createOpen);
   const editor = useOrderDetailEditor({
     getExecutionDetail: () => undefined,
@@ -33,7 +35,7 @@ function EmployeeSelectors() {
     onRefreshFailed: () => undefined,
   });
   return <>
-    <EmployeeSelectControl aria-label="建单操作人" employees={lookups.employees} />
+    <EmployeeSelectControl aria-label="建单操作人" employees={lookups.employees} value={createEmployee} onChange={(value) => setCreateEmployee(value as number)} />
     <output data-testid="建单员工">{lookups.employees.map((item) => item.display_name).join("、")}</output>
     <output data-testid="建单账户">{lookups.pools.map((item) => item.name).join("、")}</output>
     <output data-testid="建单游戏">{lookups.gameTypes.map((item) => item.name).join("、")}</output>
@@ -43,7 +45,7 @@ function EmployeeSelectors() {
     <button onClick={() => void editor.openEditor({ id: 1, extra_values: {} } as Account)}>编辑订单</button>
     <button onClick={editor.cancelInlineEdit}>关闭编辑</button>
     <output data-testid="编辑状态">{editor.inlineEditId ?? "未编辑"}</output>
-    <EmployeeSelectControl aria-label="详情操作人" employees={editor.employees} />
+    <EmployeeSelectControl aria-label="详情操作人" employees={editor.employees} value={detailEmployee} onChange={(value) => setDetailEmployee(value as number)} />
     <output data-testid="详情在职员工">{editor.employees.filter((item) => item.is_active).map((item) => item.display_name).join("、")}</output>
     <output data-testid="详情账户">{editor.pools.map((item) => item.name).join("、")}</output>
   </>;
@@ -331,6 +333,9 @@ describe("员工变更后的操作人选项", () => {
     await waitFor(() => {
       expect(screen.getByTestId("建单员工")).toHaveTextContent("更名员工");
       expect(screen.getByTestId("详情在职员工")).toHaveTextContent("更名员工");
+      for (const label of ["建单操作人", "详情操作人"]) {
+        expect(screen.getByRole("combobox", { name: label }).closest(".ant-select")).toHaveTextContent("更名员工");
+      }
     });
 
     await act(async () => { await usersApi.update(added.id, { is_active: false }); });

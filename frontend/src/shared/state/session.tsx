@@ -96,6 +96,8 @@ interface SessionValue {
   /** 当前登录人的用户名（users.username）。与 role 分开保存，避免「拿角色当人比」。 */
   username: string;
   displayName: string | null;
+  /** 开发态请求以 X-Dev-User 识别，资料同步返回的用户名可能不同。 */
+  dataOwnerKey: string;
   permissions: Set<string>;
   can: (code: string) => boolean;
   switchUser: (user: string) => void;
@@ -235,7 +237,8 @@ export function SessionProvider({
   }, []);
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[role] ?? []);
-    return { role, username, displayName, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout };
+    const dataOwnerKey = import.meta.env.DEV ? currentDevUser() : username;
+    return { role, username, displayName, dataOwnerKey, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout };
   }, [role, username, displayName, switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

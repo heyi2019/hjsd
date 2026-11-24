@@ -113,7 +113,7 @@ export function AppShell() {
   const businessTab = active === "business" ? (rawBizTab ?? "inventory") : undefined;
   const [userCenterOpen, setUserCenterOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const { role, username, authenticated, mustChangePassword, logout, can } = useSession();
+  const { role, dataOwnerKey, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
@@ -279,7 +279,7 @@ export function AppShell() {
             </ConfirmButton>
           </Space>
         </header>
-        <BusinessPeriodProvider key={username}><main className="page-content">
+        <BusinessPeriodProvider key={dataOwnerKey}><main className="page-content">
           {/* 路由化 + keep-alive：
               1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
               2) 访问过的页面持续挂载，仅非激活态 display:none，避免切导航重挂载丢状态（原 key={active} 的副作用）。

@@ -6,7 +6,7 @@ import { isProfitNotification, useNotifications } from "./useNotifications";
 import "./notifications.css";
 
 export function Notifications(props: Parameters<typeof useNotifications>[0] & { onPartyNavigate?: (path: string) => void }) {
-  const { username, dataOwner, selected, setSelected, notifications, notificationDetails, pendingDetails, notificationError, reminderSyncError, notificationLoading, category, setCategory, retryItem, setReload, retryReminders, failedDetails, detailsRetrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedReminders, openNotification, ordered } = useNotifications(props);
+  const { ownerIsCurrent, selected, setSelected, notifications, notificationDetails, pendingDetails, notificationError, reminderSyncError, notificationLoading, category, setCategory, retryItem, setReload, retryReminders, failedDetails, detailsRetrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedReminders, openNotification, ordered } = useNotifications(props);
   return (
     <section aria-label="我的消息" className="notifications--expanded">
       <Card className="glass" title="我的消息">
@@ -43,13 +43,13 @@ export function Notifications(props: Parameters<typeof useNotifications>[0] & { 
         {notificationLoading ? <Spin size="small" /> : null}
         </div>
       </Card>
-      {props.active !== false && dataOwner === username && selected?.notification_type === "PROFIT_ALLOCATED" && <ProfitNotificationModal
+      {props.active !== false && ownerIsCurrent && selected?.notification_type === "PROFIT_ALLOCATED" && <ProfitNotificationModal
         selected={selected}
         summary={notificationDetails[selected.id]}
         onClose={() => setSelected(null)}
         onPartyNavigate={props.onPartyNavigate ? (path) => { setSelected(null); props.onPartyNavigate?.(path); } : undefined}
       />}
-      {props.active !== false && dataOwner === username && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}{(selected.notification_type === "INVENTORY_AGING" || selected.notification_type === "INSTALLMENT_OVERDUE") && <p className="muted">提醒生成时的记录，当前状态可能已变化</p>}</Modal>}
+      {props.active !== false && ownerIsCurrent && selected && selected.notification_type !== "PROFIT_ALLOCATED" && <Modal open title={selected.title} onCancel={() => setSelected(null)} footer={null}>{selected.message}{(selected.notification_type === "INVENTORY_AGING" || selected.notification_type === "INSTALLMENT_OVERDUE") && <p className="muted">提醒生成时的记录，当前状态可能已变化</p>}</Modal>}
     </section>
   );
 }

@@ -4,7 +4,7 @@ import type { NotificationItem } from "../../shared/api/types/common";
 
 type Options = {
   active: boolean;
-  username: string;
+  dataOwnerKey: string;
   category: NotificationCategory;
   selected: NotificationItem | null;
   loading: boolean;
@@ -34,15 +34,15 @@ export function useReminderSync(options: Options) {
     needsRefresh.current = false;
     setError(false);
     return () => { request.current = null; needsRefresh.current = false; };
-  }, [options.active, options.username]);
+  }, [options.active, options.dataOwnerKey]);
   useEffect(() => { refreshWhenSafe(); }, [options.active, options.category, options.selected, options.loading, options.notificationCount]);
 
   const start = () => {
     setError(false);
     if (!request.current) {
-      const owner = current.current.username;
+      const owner = current.current.dataOwnerKey;
       const pending = notificationsApi.syncReminders().then((result) => {
-        if (result.created > 0 && request.current === pending && current.current.active && current.current.username === owner) {
+        if (result.created > 0 && request.current === pending && current.current.active && current.current.dataOwnerKey === owner) {
           needsRefresh.current = true;
           refreshWhenSafe();
         }

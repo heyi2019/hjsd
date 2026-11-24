@@ -150,14 +150,17 @@ async function renderShell(options: { user?: string; initialPath?: string } = {}
 }
 
 describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => {
-  it("从客户中心直接进入时不加载未访问的工作台，首次进入工作台再预热", async () => {
+  it("进入工作台首屏后，建单资料等到点击建单时再加载", async () => {
     await renderShell({ user: "admin", initialPath: "/customers" });
-    await screen.findByRole("tab", { name: "客户档案" });
+    await screen.findByRole("tab", { name: "客户档案" }, { timeout: 15_000 });
     expect(document.querySelector(".workbench-page")).toBeNull();
-    expect(poolsApi.list).not.toHaveBeenCalled();
-    expect(gameTypesApi.list).not.toHaveBeenCalled();
     await ui.click(within(screen.getByRole("navigation", { name: "主导航" })).getByRole("button", { name: "工作台" }));
     expect(await screen.findByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ })).toBeVisible();
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalled());
+    expect(poolsApi.list).not.toHaveBeenCalled();
+    expect(gameTypesApi.list).not.toHaveBeenCalled();
+    await ui.click(screen.getByRole("button", { name: /自营·回收/ }));
+    expect(await screen.findByText("新建回收订单", {}, { timeout: 15_000 })).toBeVisible();
     await waitFor(() => expect(poolsApi.list).toHaveBeenCalled());
     expect(gameTypesApi.list).toHaveBeenCalled();
   });

@@ -1,7 +1,10 @@
-import { useState } from "react";
-import { CreateBusinessModal, type BusinessOrderType } from "../../business/shared/order-create/CreateBusinessModal";
+import { lazy, Suspense, useState } from "react";
+import type { BusinessOrderType } from "../../business/shared/order-create/CreateBusinessModal";
 import type { BusinessCenterEntryTab } from "../../business/businessCenter";
 import { EntryCard, EntryRow, PermissionGate } from "../../shared/ui";
+
+const CreateBusinessModal = lazy(() => import("../../business/shared/order-create/CreateBusinessModal")
+  .then(({ CreateBusinessModal }) => ({ default: CreateBusinessModal })));
 
 export function QuickAccess({ onNavigate, onCreated }: {
   onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void;
@@ -39,12 +42,16 @@ export function QuickAccess({ onNavigate, onCreated }: {
           </section>
         </PermissionGate>
       </EntryRow>
-      <CreateBusinessModal
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onCreated={() => { setCreateOpen(false); onCreated?.(); }}
-        initialOrderType={createType}
-      />
+      {createOpen ? (
+        <Suspense fallback={<div role="status">正在打开建单表单…</div>}>
+          <CreateBusinessModal
+            open
+            onClose={() => setCreateOpen(false)}
+            onCreated={() => { setCreateOpen(false); onCreated?.(); }}
+            initialOrderType={createType}
+          />
+        </Suspense>
+      ) : null}
     </>
   );
 }

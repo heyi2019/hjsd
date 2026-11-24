@@ -1,7 +1,10 @@
-import { CreateBusinessModal } from "../shared/order-create/CreateBusinessModal";
+import { lazy, Suspense } from "react";
 import { OrderConsignmentModal } from "../shared/operations";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../shared/sale";
 import { type OrdersPageController } from "./useOrdersPageController";
+
+const CreateBusinessModal = lazy(() => import("../shared/order-create/CreateBusinessModal")
+  .then(({ CreateBusinessModal }) => ({ default: CreateBusinessModal })));
 
 export function CreateBusinessModalWrapper({ controller }: { controller: OrdersPageController }) {
   const {
@@ -11,17 +14,20 @@ export function CreateBusinessModalWrapper({ controller }: { controller: OrdersP
     setCreateType,
     setInventoryRefreshKey,
   } = controller;
+  if (!createType) return null;
   return (
+    <Suspense fallback={<div role="status">正在打开建单表单…</div>}>
       <CreateBusinessModal
-        open={Boolean(createType)}
+        open
         onClose={() => setCreateType(undefined)}
         onCreated={async () => {
           setInventoryRefreshKey((key) => key + 1);
           if (activeTab !== "ledger") return;
           await load();
         }}
-        initialOrderType={createType ?? "HS"}
+        initialOrderType={createType}
       />
+    </Suspense>
   );
 }
 

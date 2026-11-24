@@ -69,8 +69,7 @@ export function CreateBusinessModal(props: {
   const initializedFormRef = useRef(false);
   const userChangedFormRef = useRef(false);
   const formId = "business-order-form";
-  // 表单字段配置改为常驻预热：弹窗随页面挂载即加载，不再等 open 才拉取。
-  // 不同业务类型通过 orderType 变化自动切换配置（get/post 走已落地的 GET 缓存层）。
+  // 弹窗打开时按业务类型读取字段配置。
   const { config, ready: configReady = true, error: configError, retry: retryConfig } = useOrderFormConfig(orderType);
   const { labels } = useOrderFormSectionLabels(orderType);
   // 关闭弹窗即清空表单：antd Form 默认 preserve=true，destroyOnHidden 只销毁 DOM 不丢表单实例值，

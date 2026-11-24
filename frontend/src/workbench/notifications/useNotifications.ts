@@ -13,8 +13,8 @@ export function isProfitNotification(item: NotificationItem) {
 }
 
 export function useNotifications({ onPendingProfitNotificationsClick, active = true }: { onPendingProfitNotificationsClick?: (id?: number) => void | Promise<void>; active?: boolean }) {
-  const { username } = useSession();
-  const [dataOwner, setDataOwner] = useState(username);
+  const { dataOwnerKey } = useSession();
+  const [dataOwner, setDataOwner] = useState(dataOwnerKey);
   const [selected, setSelected] = useState<NotificationItem | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationError, setNotificationError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
   const detailState = useNotificationDetails((generation) => cursor.current.generation === generation);
   const scrollRef = useRef<HTMLDivElement>(null);
   const busy = useRef(new Set<number>());
-  const reminderSync = useReminderSync({ active, username, category, selected, loading: notificationLoading, notificationCount: notifications.length, busy, scrollRef, onRefresh: () => setReload((n) => n + 1) });
+  const reminderSync = useReminderSync({ active, dataOwnerKey, category, selected, loading: notificationLoading, notificationCount: notifications.length, busy, scrollRef, onRefresh: () => setReload((n) => n + 1) });
   const loadMore = async () => {
     const state = cursor.current;
     if (!active || state.loading || state.done) return;
@@ -51,12 +51,12 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
       if (cursor.current.generation === generation) { state.loading = false; setNotificationLoading(false); }
     }
   };
-  useEffect(() => { setSelected(null); }, [active, category, username]);
+  useEffect(() => { setSelected(null); }, [active, category, dataOwnerKey]);
   useEffect(() => {
     if (!active) return;
     cursor.current = { done: false, generation: cursor.current.generation + 1, loading: true };
     const generation = cursor.current.generation;
-    setDataOwner(username);
+    setDataOwner(dataOwnerKey);
     setNotifications([]);
     detailState.reset();
     setNotificationError(null);
@@ -70,7 +70,7 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
     return () => { cursor.current.generation += 1; };
     // 加载由 active 和用户重试触发；滚动时使用当前游标。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, reload, category, username]);
+  }, [active, reload, category, dataOwnerKey]);
   useEffect(() => {
     const el = scrollRef.current;
     if (active && el && !notificationLoading && hasMore && !notificationError && el.scrollHeight <= el.clientHeight + 1) void loadMore();
@@ -142,8 +142,9 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
       busy.current.delete(item.id);
     }
   };
-  const ordered = dataOwner === username ? notifications : [];
+  const ownerIsCurrent = dataOwner === dataOwnerKey;
+  const ordered = ownerIsCurrent ? notifications : [];
   const retryDetails = () => detailState.retry(cursor.current.generation);
   const retryReminders = reminderSync.retry;
-  return { username, dataOwner, selected, setSelected, notifications, notificationDetails: detailState.details, pendingDetails: detailState.pending, notificationError, reminderSyncError: reminderSync.error, notificationLoading, category, setCategory, retryItem, setReload, retryReminders, failedDetails: detailState.failed, detailsRetrying: detailState.retrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedReminders: reminderSync.refreshWhenSafe, openNotification, ordered };
+  return { ownerIsCurrent, selected, setSelected, notifications, notificationDetails: detailState.details, pendingDetails: detailState.pending, notificationError, reminderSyncError: reminderSync.error, notificationLoading, category, setCategory, retryItem, setReload, retryReminders, failedDetails: detailState.failed, detailsRetrying: detailState.retrying, retryDetails, hasMore, scrollRef, loadMore, refreshSyncedReminders: reminderSync.refreshWhenSafe, openNotification, ordered };
 }

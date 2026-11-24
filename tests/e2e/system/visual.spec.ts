@@ -83,7 +83,10 @@ test.describe("UI visual baseline", () => {
     // 周期选择器显示当前日期区间；固定截图日期，避免跨月后视觉测试误报。
     await page.clock.setFixedTime(new Date("2026-11-23T12:00:00Z"));
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
+    const greeting = page.getByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ });
+    await expect(greeting).toBeVisible();
+    // 问候随时间和账号变化，截图继续使用固定标题比对布局。
+    await greeting.evaluate((heading) => { heading.textContent = "今天从这里开始"; });
     await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
     // 页脚版本随发布变化，实际文案由 AppShell 用例校验。截图沿用固定文本比对布局。
     await page.locator(".sidebar-foot").evaluate((footer) => {
@@ -110,7 +113,18 @@ test.describe("UI visual baseline", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.clock.setFixedTime(new Date("2026-11-23T12:00:00Z"));
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
+    const greeting = page.getByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ });
+    await expect(greeting).toBeVisible();
+    // 问候随时间和账号变化，截图继续使用固定标题比对布局。
+    await greeting.evaluate((heading) => { heading.textContent = "今天从这里开始"; });
+    const brand = page.getByRole("heading", { name: "宜游轩", exact: true });
+    await expect(brand).toBeVisible();
+    await expect(brand.locator(".app-brand__mark")).toBeVisible();
+    // 品牌由上面的断言覆盖，截图继续使用固定页名比较原有布局。
+    await page.locator(".topbar__title").evaluate((title) => {
+      title.querySelector<HTMLElement>(".topbar__brand")!.style.display = "none";
+      title.querySelector<HTMLElement>(".topbar__page")!.style.display = "block";
+    });
     await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
     await expect(page).toHaveScreenshot("workbench-mobile.png", {
       animations: "disabled",
@@ -136,6 +150,7 @@ test.describe("UI visual baseline", () => {
     await expect(page.getByRole("menuitem", { name: "设置" })).toBeVisible();
     await page.getByRole("menuitem", { name: "经营中心" }).click();
     await expect(page.locator(".topbar__page")).toHaveText("经营中心");
+    await expect(page.locator(".topbar").getByRole("heading", { name: "宜游轩", exact: true })).toBeVisible();
     await expect(page.getByRole("dialog", { name: "更多" })).toBeHidden();
   });
 

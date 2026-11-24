@@ -310,7 +310,7 @@ test("建单流程：关闭未保存表单时可继续编辑或确认放弃", as
   const confirm = page.locator(".heijin-fast-confirm");
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "今天从这里开始" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ })).toBeVisible();
 
   await page.getByText("自营·回收").first().click();
   await expect(mainModal).toBeVisible();

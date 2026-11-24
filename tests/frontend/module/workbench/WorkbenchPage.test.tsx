@@ -3,6 +3,7 @@ import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { WorkbenchPage } from "@/workbench/WorkbenchPage";
+import * as sessionApi from "@/shared/api/client";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
@@ -89,7 +90,20 @@ it("工作台展示业务总览指标和业务提醒", async () => {
       installments: { total_count: 1, overdue_count: 1 },
     }));
 
-    renderLight(<WorkbenchPage />, { user: "admin" });
+    const profile = vi.spyOn(sessionApi, "currentUser").mockResolvedValue({ id: 1, username: "admin", role: "admin", display_name: "张三" });
+    vi.setSystemTime(new Date(2026, 10, 25, 9));
+    try {
+      renderLight(<WorkbenchPage />, { user: "admin", syncDevUser: true });
+      expect(await screen.findByRole("heading", { name: "上午好，张三" })).toBeInTheDocument();
+      for (const [hour, greeting] of [[11, "中午好"], [18, "晚上好"], [0, "凌晨好"]] as const) {
+        vi.setSystemTime(new Date(2026, 10, 25, hour));
+        fireEvent(window, new Event("focus"));
+        expect(screen.getByRole("heading", { name: `${greeting}，张三` })).toBeInTheDocument();
+      }
+    } finally {
+      vi.useRealTimers();
+      profile.mockRestore();
+    }
 
     expect(screen.getByRole("button", { name: /售出库存账号/ })).toBeInTheDocument();
     const overview = await screen.findByRole("region", { name: "我的业务总览" });

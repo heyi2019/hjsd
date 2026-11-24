@@ -60,7 +60,7 @@
     background: color-mix(in srgb, var(--color-surface) 92%, transparent);
     backdrop-filter: blur(18px) saturate(150%);
   }
-  .app-brand, .sidebar-foot { display: none; }
+  .sidebar .app-brand, .sidebar-foot { display: none; }
   .nav-list {
     width: 100%;
     margin: 0;
@@ -122,6 +122,8 @@
     border-bottom: var(--border-w) solid var(--glass-border);
   }
   .topbar__title { flex: 0 0 100%; }
+  .topbar__page { display: none; }
+  .topbar__brand { display: flex; }
   .topbar-actions { width: 100%; justify-content: flex-start; overflow-x: auto; }
   .ui-filter-bar > * { flex: 1 1 100%; min-width: 0; }
   .ui-filter-bar.ant-space > * { flex: 0 1 auto; max-width: 100%; }
@@ -158,18 +160,25 @@
     inset-inline-start: 0;
     z-index: 2;
     /* 两层背景：玻璃层压实底上，保证常驻列不透明（单写 --glass 会透出滚过去的内容）。 */
-    background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
+    --sticky-table-cell-base: var(--color-bg);
+    background: linear-gradient(var(--glass), var(--glass)), var(--sticky-table-cell-base);
   }
   .ant-table-wrapper .ant-table-thead > tr > th:first-child { z-index: 3; }
   /* 订单表带展开列：固定按列 key 标记的订单号，不固定展开按钮。 */
   .orders-ledger .ant-table-tbody > tr > td:first-child,
-  .orders-ledger .ant-table-thead > tr > th:first-child { position: static; z-index: auto; background: unset; }
+  .orders-ledger .ant-table-thead > tr > th:first-child {
+    --sticky-table-cell-base: initial;
+    position: static;
+    z-index: auto;
+    background: unset;
+  }
   .orders-ledger .ant-table-tbody > tr > td.ui-col-mobile-identity,
   .orders-ledger .ant-table-thead > tr > th.ui-col-mobile-identity {
     position: sticky;
     inset-inline-start: 0;
     z-index: 2;
-    background: linear-gradient(var(--glass), var(--glass)), var(--color-bg);
+    --sticky-table-cell-base: var(--color-bg);
+    background: linear-gradient(var(--glass), var(--glass)), var(--sticky-table-cell-base);
   }
   .orders-ledger .ant-table-thead > tr > th.ui-col-mobile-identity { z-index: 3; }
   /* 移动端隐藏列按列 key 打标（见 listColumns.ts 的 markMobileHiddenColumns）：
@@ -186,18 +195,6 @@
     position: static !important;
     inset-inline-end: auto !important;
   }
-  /* 客户档案移动端优先保留编号、名字、状态和操作；联系方式与表单扩展字段在详情中查看。 */
-  .customer-table .ant-table { min-width: 0 !important; width: 100%; }
-  .customer-table .ant-table table { table-layout: fixed !important; width: 100% !important; }
-  .customer-table .ant-table-thead > tr > th.ant-table-cell-fix-right,
-  .customer-table .ant-table-tbody > tr > td.ant-table-cell-fix-right {
-    position: static !important;
-    inset-inline-end: auto !important;
-  }
-  .customer-table .ant-table-thead > tr > th,
-  .customer-table .ant-table-tbody > tr > td { overflow: hidden; text-overflow: ellipsis; }
-  .customer-table .ant-table-thead > tr > th:last-child,
-  .customer-table .ant-table-tbody > tr > td:last-child { width: 96px; white-space: nowrap; overflow: visible; }
 }
 
 /* <768px（含平板竖屏）表格口径：全部列保留、容器内横滑，不做次要列隐藏。

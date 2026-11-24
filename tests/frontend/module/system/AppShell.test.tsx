@@ -157,7 +157,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
     expect(poolsApi.list).not.toHaveBeenCalled();
     expect(gameTypesApi.list).not.toHaveBeenCalled();
     await ui.click(within(screen.getByRole("navigation", { name: "主导航" })).getByRole("button", { name: "工作台" }));
-    expect(await screen.findByText("今天从这里开始")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ })).toBeVisible();
     await waitFor(() => expect(poolsApi.list).toHaveBeenCalled());
     expect(gameTypesApi.list).toHaveBeenCalled();
   });
@@ -192,6 +192,9 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
   it("默认落工作台，标题区显示当前页名", async () => {
     await renderShell();
     expect(document.querySelector(".topbar__page")?.textContent).toBe("工作台");
+    const mobileBrand = document.querySelector(".topbar__brand");
+    expect(mobileBrand).toHaveTextContent("宜游轩");
+    expect(mobileBrand?.querySelector(".app-brand__mark")).toHaveAttribute("aria-hidden", "true");
   });
 
   it("点击左侧业务中心默认打开库存中心", async () => {
@@ -217,6 +220,7 @@ describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => 
         expect(document.querySelector(".topbar__page")?.textContent).toBe(item.label),
         { timeout: 10_000 },
       );
+      expect(document.querySelector(".topbar__brand")).toHaveTextContent("宜游轩");
       // 页面自身标题（h2）也要对上：顶栏与页头同名，故用 All 变体
       expect(screen.getAllByRole("heading", { name: item.label }).length).toBeGreaterThanOrEqual(1);
       // 高亮态随之切换

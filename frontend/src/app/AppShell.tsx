@@ -16,6 +16,8 @@ import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 import projectVersion from "../../../VERSION?raw";
 
+const brandMark = <span className="app-brand__mark" aria-hidden="true">宜</span>;
+
 const OrdersPage = lazy(() => import("../business/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
 const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
 const FinancePage = lazy(() => import("../finance/FinancePage").then(({ FinancePage }) => ({ default: FinancePage })));
@@ -177,7 +179,7 @@ export function AppShell() {
     <div className="app-shell">
       <aside className="sidebar glass">
         <div className="app-brand">
-          <span className="app-brand__mark" aria-hidden="true">宜</span>
+          {brandMark}
           宜游轩 <span>ERP</span>
         </div>
         <nav className="nav-list" aria-label="主导航" ref={navRef}>
@@ -217,6 +219,7 @@ export function AppShell() {
         <header className="topbar view-head">
           <div className="topbar__title">
             <h1 className="topbar__page">{item?.label ?? "用户中心"}</h1>
+            <h1 className="app-brand topbar__brand">{brandMark}宜游轩</h1>
           </div>
           <Space size="small" className="topbar-actions">
             <div className="theme-switch" role="radiogroup" aria-label="主题切换">

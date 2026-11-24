@@ -95,6 +95,7 @@ interface SessionValue {
   role: string;
   /** 当前登录人的用户名（users.username）。与 role 分开保存，避免「拿角色当人比」。 */
   username: string;
+  displayName: string | null;
   permissions: Set<string>;
   can: (code: string) => boolean;
   switchUser: (user: string) => void;
@@ -120,12 +121,14 @@ export function SessionProvider({
   // 与 X-Dev-User 直通口径一致）；有 token 时由 /auth/me 分别回填真实角色与用户名。
   const [role, setRole] = useState<string>(currentDevUser());
   const [username, setUsername] = useState<string>(currentDevUser());
+  const [displayName, setDisplayName] = useState<string | null>(null);
   // DEV 态始终视为已登录，使用 X-Dev-User 直通，不受残留生产 token 或首次改密状态影响。
   const [authenticated, setAuthenticated] = useState<boolean>(() => import.meta.env.DEV || Boolean(localStorage.getItem(ACCESS_TOKEN_KEY)));
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const sessionGeneration = useRef(0);
   const userRefreshVersion = useRef(0);
+  const syncDevProfile = import.meta.env.DEV && syncDevUser && authenticated;
   useEffect(() => {
     let active = true;
     const generation = sessionGeneration.current;
@@ -135,19 +138,20 @@ export function SessionProvider({
     // 开发态也要从后端同步当前用户：X-Dev-User 是角色别名，不能直接拿来匹配
     // users.username，否则负责人控件无法默认选中真实操作对象。组件测试可显式关闭，
     // 避免纯组件用例依赖本地后端。
-    if (isDev && !syncDevUser) return;
+    if (isDev && !syncDevProfile) return;
     if (!token && !isDev) return;
     const refreshVersion = ++userRefreshVersion.current;
     void currentUserApi().then((current) => {
       if (!active || generation !== sessionGeneration.current || refreshVersion !== userRefreshVersion.current) return;
       if (token && !isDev) setRole(current.role.toLowerCase());
       setUsername(current.username);
+      setDisplayName(current.display_name ?? null);
       if (!isDev) setMustChangePassword(Boolean(current.must_change_password));
     }).catch(() => {
       // 网络故障保留会话；实际 401 由客户端统一失效通知处理。
     });
     return () => { active = false; };
-  }, [syncDevUser]);
+  }, [syncDevProfile]);
   useEffect(() => {
     const onExpired = (event: Event) => {
       const message = (event as CustomEvent<{ message?: string }>).detail?.message;
@@ -172,6 +176,7 @@ export function SessionProvider({
         if (!active || generation !== sessionGeneration.current || version !== userRefreshVersion.current || localStorage.getItem(ACCESS_TOKEN_KEY) !== token) return;
         setRole(current.role.toLowerCase());
         setUsername(current.username);
+        setDisplayName(current.display_name ?? null);
         setMustChangePassword(Boolean(current.must_change_password));
       } catch { /* 客户端负责会话失效，网络错误不改变现有状态。 */ }
     };
@@ -186,6 +191,7 @@ export function SessionProvider({
     // dev 直通时「当前身份」本身就是这个 dev 用户名，role 与 username 同步。
     setRole(next);
     setUsername(next);
+    setDisplayName(null);
   }, []);
   const login = useCallback(async (account: string, password: string) => {
     const generation = ++sessionGeneration.current;
@@ -194,6 +200,7 @@ export function SessionProvider({
       persistDevUser("admin");
       setRole("admin");
       setUsername("admin");
+      setDisplayName(null);
       setMustChangePassword(false);
       setAuthenticated(true);
       return;
@@ -203,6 +210,7 @@ export function SessionProvider({
     setRole(loggedIn.role.toLowerCase());
     // 用户名必须单独存：角色来自 users.role，用户名来自 users.username，二者不可互相代替。
     setUsername(loggedIn.username);
+    setDisplayName(loggedIn.display_name ?? null);
     setMustChangePassword(Boolean(loggedIn.must_change_password));
     setAuthenticated(true);
   }, []);
@@ -227,8 +235,8 @@ export function SessionProvider({
   }, []);
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[role] ?? []);
-    return { role, username, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout };
-  }, [role, username, switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout]);
+    return { role, username, displayName, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout };
+  }, [role, username, displayName, switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

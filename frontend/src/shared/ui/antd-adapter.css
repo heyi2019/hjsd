@@ -77,7 +77,8 @@
 }
 
 :where(.ant-table-tbody > tr:hover > td) {
-  background: var(--brand-soft) !important;
+  /* 固定列高亮时仍保留实色底，避免横滑中的内容透出。 */
+  background: linear-gradient(var(--brand-soft), var(--brand-soft)), var(--sticky-table-cell-base, transparent) !important;
 }
 
 /* 分页 active 页码：实心品牌蓝胶囊 + 白字（A11Y E3：白字对品牌蓝渐变最浅段 5.25:1）。

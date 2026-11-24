@@ -1,6 +1,7 @@
 /** 工作台：优先动作 + 当前登录用户的轻量关注卡片。
  * 经营中心保留全局经营总览与人员筛选，工作台只展示当前用户自己的订单/收益。 */
 import { Card } from "antd";
+import { useEffect, useState } from "react";
 import { normalizeError } from "../shared/api/client";
 import { notificationsApi } from "../shared/api/notifications.api";
 import { ErrorBanner, PageHeader } from "../shared/ui";
@@ -11,9 +12,31 @@ import { BusinessOverview } from "./overview/BusinessOverview";
 import { Notifications } from "./notifications/Notifications";
 import { useWorkbenchSummary } from "./overview/useWorkbenchSummary";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
+import { useSession } from "../shared/state/session";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 
+function currentGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 6) return "凌晨好";
+  if (hour < 11) return "上午好";
+  if (hour < 18) return "中午好";
+  return "晚上好";
+}
+
 export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }: { onNavigate?: (key: string, tab?: BusinessCenterEntryTab) => void; onWorkbenchNavigate?: (path: string) => void; active?: boolean }) {
+  const { displayName, username } = useSession();
+  const [greeting, setGreeting] = useState(currentGreeting);
+  useEffect(() => {
+    if (!active) return;
+    const updateGreeting = () => setGreeting(currentGreeting());
+    updateGreeting();
+    const timer = window.setInterval(updateGreeting, 60_000);
+    window.addEventListener("focus", updateGreeting);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", updateGreeting);
+    };
+  }, [active]);
   const periodState = useBusinessPeriod();
   const { summary, error, loading, loadSummary } = useWorkbenchSummary(active && periodState.ready, periodState.period);
   const period = summary?.period ?? null;
@@ -43,9 +66,7 @@ export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }
   };
   return (
     <section className="ui-stack workbench-page">
-      <PageHeader
-        title="今天从这里开始"
-      />
+      <PageHeader title={`${greeting}，${displayName?.trim() || username}`} />
       <QuickAccess onNavigate={onNavigate} onCreated={() => void loadSummary()} />
 
       <div className="workbench-summary">

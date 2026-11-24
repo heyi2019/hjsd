@@ -4,6 +4,7 @@ import { useNotificationDetails } from "./useNotificationDetails";
 import { useReminderSync } from "./useReminderSync";
 import type { NotificationItem } from "../../shared/api/types/common";
 import { useSession } from "../../shared/state/session";
+import { appMessage } from "../../shared/ui/appFeedback";
 
 const PAGE_SIZE = 10;
 
@@ -91,24 +92,32 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
     if (busy.current.has(item.id)) return;
     busy.current.add(item.id);
     const generation = cursor.current.generation;
+    let optimisticRead = false;
     try {
       if (item.notification_type === "PROFIT_PENDING" && item.entity_type === "order") {
         // 目标页实际打开分润后再标记；查询失败或无权查看时消息仍保留未读。
         await onPendingProfitNotificationsClick?.(item.id);
         return;
       }
-      if (!item.read_at) {
-        const result = await notificationsApi.markReadBatch([item.id], category);
-        if (cursor.current.generation !== generation) return;
-        if (!result.read_ids.includes(item.id)) throw new Error("标记已读失败，请重试。");
-        if (category !== "latest" && !result.read_at) {
-          setNotifications((current) => current.filter((entry) => entry.id !== item.id));
-          setNotificationError("消息已不可用。");
-          return;
-        }
+      setNotificationError(null);
+      setRetryItem(null);
+      setSelected(item);
+      if (item.read_at) return;
+
+      optimisticRead = true;
+      const optimisticReadAt = new Date().toISOString();
+      setNotifications((current) => category === "latest"
+        ? current.filter((entry) => entry.id !== item.id)
+        : current.map((entry) => entry.id === item.id ? { ...entry, read_at: optimisticReadAt } : entry));
+
+      const result = await notificationsApi.markReadBatch([item.id], category);
+      if (cursor.current.generation !== generation) return;
+      if (!result.read_ids.includes(item.id) || (category !== "latest" && !result.read_at)) {
+        throw new Error("标记已读失败，请重试。");
+      }
+      if (category !== "latest") {
         setNotifications((current) => {
           const remaining = current.filter((entry) => entry.id !== item.id);
-          if (category === "latest") return remaining;
           const updated = { ...item, read_at: result.read_at };
           const position = remaining.findIndex((entry) => entry.id === result.next_read_id);
           if (position >= 0) {
@@ -118,11 +127,17 @@ export function useNotifications({ onPendingProfitNotificationsClick, active = t
           return remaining;
         });
       }
-      setNotificationError(null);
-      setRetryItem(null);
-      setSelected(item);
     } catch {
-      if (cursor.current.generation === generation) { setNotificationError("标记已读失败，请重试。"); setRetryItem(item); }
+      if (cursor.current.generation !== generation) return;
+      if (optimisticRead) {
+        setNotifications((current) => category === "latest"
+          ? [...current.filter((entry) => entry.id !== item.id), item]
+            .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? "") || b.id - a.id)
+          : current.map((entry) => entry.id === item.id ? { ...entry, read_at: item.read_at } : entry));
+        void appMessage.error("未能保存已读状态，已恢复未读。");
+      }
+      setNotificationError("标记已读失败，请重试。");
+      setRetryItem(item);
     } finally {
       busy.current.delete(item.id);
     }

@@ -111,16 +111,18 @@ it("消息分类展示最新、售出和库存", async () => {
   });
 it("合约提醒可查看并标记已读", async () => {
     vi.mocked(notificationsApi.list).mockImplementation(async ({ category }) => ({ items: category === "contract" ? [{ id: 12, notification_type: "INSTALLMENT_OVERDUE", title: "分期逾期提醒", message: "订单 HS12 第 1 期已逾期", entity_type: "installment_schedule", entity_id: "12", created_at: "2026-11-21T09:30:00", read_at: null }] : [], next_cursor: null }));
-    vi.mocked(notificationsApi.markReadBatch).mockResolvedValue({ read_ids: [12], read_at: "2026-11-21T10:00:00", next_read_id: null });
+    let finish!: (value: Awaited<ReturnType<typeof notificationsApi.markReadBatch>>) => void;
+    vi.mocked(notificationsApi.markReadBatch).mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
     renderLight(<Notifications />, { user: "admin" });
     fireEvent.click(screen.getByRole("tab", { name: "合约消息" }));
     const item = await screen.findByRole("button", { name: /订单 HS12/ });
     expect(within(item).getByText("未读")).toBeInTheDocument();
     expect(within(item).getByText("提醒生成时的记录，当前状态可能已变化")).toBeInTheDocument();
     fireEvent.click(item);
-    expect(await screen.findByText("分期逾期提醒")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "分期逾期提醒" })).toBeInTheDocument();
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([12], "contract");
     expect(within(item).getByText("已读")).toBeInTheDocument();
+    await act(async () => { finish({ read_ids: [12], read_at: "2026-11-21T10:00:00", next_read_id: null }); });
   });
 
 it("未读消息逐页滚动加载且不自动标已读", async () => {
@@ -291,14 +293,24 @@ it("停留工作台时定时刷新，滚动查看期间不打断", async () => {
 
 it("标记已读失败时保留未读并可重试", async () => {
     vi.mocked(notificationsApi.list).mockResolvedValue({ items: [{ id: 1, title: "提醒", message: "测试消息", entity_type: "other", entity_id: "x", read_at: null }], next_cursor: null });
-    vi.mocked(notificationsApi.markReadBatch).mockRejectedValueOnce(new Error("网络不可用"));
+    let fail!: (reason: Error) => void;
+    vi.mocked(notificationsApi.markReadBatch).mockReturnValueOnce(new Promise((_, reject) => { fail = reject; }));
+    const feedback = vi.spyOn(appMessage, "error").mockImplementation(() => undefined as never);
     renderLight(<WorkbenchPage />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: /测试消息/ }));
+    const dialog = screen.getByRole("dialog", { name: "提醒" });
+    expect(within(dialog).getByText("测试消息")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /测试消息/ })).not.toBeInTheDocument();
+    await act(async () => { fail(new Error("网络不可用")); });
     expect(await screen.findByText("标记已读失败，请重试。")).toBeInTheDocument();
+    expect(feedback).toHaveBeenCalledWith("未能保存已读状态，已恢复未读。");
     expect(within(screen.getByRole("button", { name: /测试消息/ })).getByText("未读")).toBeInTheDocument();
+    expect(dialog).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: "重试" }));
     await waitFor(() => expect(notificationsApi.markReadBatch).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByRole("button", { name: /测试消息/ })).toBeNull());
+    feedback.mockRestore();
   });
 
 it("已读消息可再次打开而不重复标记", async () => {

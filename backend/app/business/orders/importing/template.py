@@ -4,12 +4,17 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from openpyxl.utils import get_column_letter
+from openpyxl.workbook.defined_name import DefinedName
+from openpyxl.worksheet.datavalidation import DataValidation
+
 from app.business.orders.export_fields import (
     CASHFLOW_EXPORT_COLUMNS, DETAIL_COLUMNS_MOVED_TO_SHEETS,
     DETAIL_EXPORT_HEADER_GROUPS, DETAIL_EXPORT_SUB_GROUPS, ORDER_DETAIL_EXPORT_COLUMNS,
     ORDER_EVENT_EXPORT_COLUMNS, REBATE_EXPORT_COLUMNS,
 )
 from app.core.errors import Validation
+from app.domain.enums import AccountingAttribute
 from app.settings.lists.export import UI_ONLY_KEYS
 from app.settings.lists.scopes import LIST_SCOPES
 from app.settings.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
@@ -18,7 +23,9 @@ _REQUIRED = ("order_no", "trade_date", "inventory_type")
 _SECTIONS = frozenset({"details", "events", "cashflows", "rebates"})
 
 
-def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: set[str]) -> bytes:
+def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: set[str], *,
+                                pool_codes: Sequence[str] = (), operators: Sequence[str] = (),
+                                custom_choices: Mapping[str, Sequence[str]] | None = None) -> bytes:
     unknown = sections - _SECTIONS
     if unknown:
         raise Validation("导入明细类型无效", details={"sections": sorted(unknown)})
@@ -73,4 +80,42 @@ def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: 
     ):
         notes.append([line])
     notes.column_dimensions["A"].width = 90
+    notes.append(["带下拉箭头的单元格可选择系统选项；多名操作人仍可手工用顿号分隔。"])
+    choices = {
+        "主订单信息": {"业务类型": ["回收", "提号", "代挂"], "业务操作人": operators},
+        "详情信息": {"有无二次": ["有", "无"]},
+        "操作明细": {"动作": ["买入", "售出", "交付", "取消", "运营", "返点"],
+                     "运营动作": ["寄售", "下架", "更新图片", "更新描述"],
+                     "结算方式": ["全款"], "交付方向": ["买号", "卖号"],
+                     "金额归属": ["本金", "利润", "总额"], "已过账": ["是"],
+                     "资金账户编码": pool_codes, "操作人": operators},
+        "资金明细": {"方向": ["收入", "支出"], "资金账户编码": pool_codes,
+                     "核算属性": list(AccountingAttribute.values()),
+                     "来源类型": ["MANUAL", "ORDER_EVENT"], "操作人": operators},
+        "返点明细": {"返点类型": ["买号返点", "卖号返点"], "资金账户编码": pool_codes,
+                     "操作人": operators},
+    }
+    choices["主订单信息"].update(custom_choices or {})
+    options = workbook.create_sheet("下拉选项")
+    options.sheet_state = "hidden"
+    for sheet_name, fields in choices.items():
+        if sheet_name not in workbook:
+            continue
+        sheet = workbook[sheet_name]
+        header_row = 3 if sheet_name == "详情信息" else 1
+        headers = {cell.value: cell.column for cell in sheet[header_row]}
+        for label, values in fields.items():
+            values = list(dict.fromkeys(value for value in values if value))
+            if label not in headers or not values:
+                continue
+            option_column = options.max_column if options.cell(1, 1).value is None else options.max_column + 1
+            for row, value in enumerate(values, 1):
+                options.cell(row=row, column=option_column, value=value)
+            name = f"import_options_{option_column}"
+            letter = get_column_letter(option_column)
+            workbook.defined_names.add(DefinedName(name, attr_text=f"'下拉选项'!${letter}$1:${letter}${len(values)}"))
+            validation = DataValidation(type="list", formula1=name, allow_blank=True, showErrorMessage=False)
+            sheet.add_data_validation(validation)
+            col = get_column_letter(headers[label])
+            validation.add(f"{col}{header_row + 1}:{col}{header_row + 5000}")
     return xlsx_bytes(workbook)

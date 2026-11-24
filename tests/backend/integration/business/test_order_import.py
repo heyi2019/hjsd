@@ -239,6 +239,26 @@ def test_csv_line_numbers_and_row_limit_include_multiline_fields(monkeypatch):
         parse_order_import("订单.csv", content)
 
 
+def test_template_dropdowns_use_supported_values_and_current_authorized_pools(seeded_client, seeded_db, headers):
+    from app.domain.foundation import Pool
+
+    seeded_db.add(Pool(code="TEMPLATE_POOL", name="模板测试账户", pool_type="OTHER", status="ACTIVE"))
+    seeded_db.commit()
+    response = seeded_client.get("/api/order-imports/template.xlsx", params=[("sections", "events"), ("sections", "cashflows"), ("sections", "rebates")], headers=headers)
+    assert response.status_code == 200
+    workbook = load_workbook(BytesIO(response.content))
+    assert workbook["下拉选项"].sheet_state == "hidden"
+    for sheet, label, expected in [("主订单信息", "业务类型", "回收"), ("资金明细", "资金账户编码", "TEMPLATE_POOL"), ("返点明细", "返点类型", "买号返点"), ("操作明细", "动作", "运营")]:
+        ws = workbook[sheet]
+        index = next(cell.column for cell in ws[1] if cell.value == label)
+        cell = ws.cell(row=2, column=index)
+        validation = next(rule for rule in ws.data_validations.dataValidation if cell.coordinate in rule.sqref)
+        reference = workbook.defined_names[validation.formula1].attr_text
+        assert reference.startswith("'下拉选项'!")
+        assert expected in [item.value for row in workbook["下拉选项"][reference.split("!")[1].replace("$", "")] for item in row]
+    assert parse_order_import("模板.xlsx", response.content)["main"].rows == ()
+
+
 def test_template_includes_visible_columns_required_identifiers_and_selected_details():
     columns = [
         {"key": "order_no", "label": "订单号", "is_visible": False},
@@ -246,12 +266,15 @@ def test_template_includes_visible_columns_required_identifiers_and_selected_det
         {"key": "account_game_type", "label": "游戏/产品类型", "is_visible": False},
         {"key": "actions", "label": "操作", "is_visible": True},
     ]
-    content = build_order_import_template(columns, {"events", "cashflows", "rebates"})
+    content = build_order_import_template(columns, {"details", "events", "cashflows", "rebates"}, custom_choices={"成本": ["示例选项"]})
     workbook = load_workbook(BytesIO(content))
-    assert workbook.sheetnames == ["主订单信息", "操作明细", "资金明细", "返点明细", "填写说明"]
+    assert workbook.sheetnames == ["主订单信息", "详情信息", "操作明细", "资金明细", "返点明细", "填写说明", "下拉选项"]
     headers = [cell.value for cell in workbook["主订单信息"][1]]
     assert headers == ["订单号", "业务日期", "业务类型", "业务操作人", "成本"]
     assert workbook["主订单信息"].max_row == 1
+    secondary_col = next(cell.column for cell in workbook["详情信息"][3] if cell.value == "有无二次")
+    assert any(workbook["详情信息"].cell(4, secondary_col).coordinate in rule.sqref for rule in workbook["详情信息"].data_validations.dataValidation)
+    assert any(workbook["主订单信息"].cell(2, 5).coordinate in rule.sqref for rule in workbook["主订单信息"].data_validations.dataValidation)
     assert "订单号" in [cell.value for cell in workbook["操作明细"][1]]
     assert {"事件号", "运营动作", "运营详情(JSON)", "关联上架事件号"}.issubset({cell.value for cell in workbook["操作明细"][1]})
     assert "返点单号" in [cell.value for cell in workbook["返点明细"][1]]
@@ -271,7 +294,7 @@ def test_template_and_preview_api_are_read_only_and_follow_duplicate_choice(seed
     seeded_db.commit()
     template = seeded_client.get("/api/order-imports/template.xlsx", params=[("sections", "events"), ("sections", "rebates")], headers=headers)
     assert template.status_code == 200, template.text
-    assert load_workbook(BytesIO(template.content)).sheetnames == ["主订单信息", "操作明细", "返点明细", "填写说明"]
+    assert load_workbook(BytesIO(template.content)).sheetnames == ["主订单信息", "操作明细", "返点明细", "填写说明", "下拉选项"]
     content = f"订单号,业务日期,业务类型,成本\n{order.order_no},2026-10-17,回收,100\nHS9998,2026-10-18,回收,200\n".encode()
     count = seeded_db.scalar(select(func.count()).select_from(Order))
     for choice, expected in (("skip", "skip"), ("update", "update")):

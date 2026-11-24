@@ -8,6 +8,9 @@ frontend/test-results
 backend/.venv
 backend/data
 backend/backups
+backend/scripts/e2e_db.py
+backend/scripts/e2e_backend.sh
+backend/scripts/ephemeral_test_db.py
 backups
 backend/.pytest_cache
 backend/__pycache__

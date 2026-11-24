@@ -23,7 +23,7 @@
       ],
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
-        "files": 137,
+        "files": 138,
         "cases": 2172,
         "kinds": {
           "unit": {
@@ -39,10 +39,10 @@
             }
           },
           "integration": {
-            "files": 107,
+            "files": 108,
             "cases": 1782,
             "byArea": {
-              "business": 44,
+              "business": 45,
               "customer": 8,
               "finance": 20,
               "operations": 7,
@@ -65,11 +65,11 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 96,
+        "files": 100,
         "layers": {
           "fast": 29,
           "quick": 9,
-          "react": 46,
+          "react": 50,
           "deep": 12
         },
         "cases": {
@@ -88,7 +88,7 @@
           },
           "module": {
             "workbench": 4,
-            "business": 19,
+            "business": 23,
             "customer": 2,
             "finance": 4,
             "operations": 3,

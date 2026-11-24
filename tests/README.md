@@ -1,6 +1,6 @@
 # 测试资产索引
 
-更新时间：2026-11-04（测试体系整体重构完成）
+目录结构以当前仓库和 `tests/manifest.json` 为准。
 
 本文件回答四个问题：**测试在哪、怎么跑、新测试放哪、怎么判断一个测试有没有价值**。
 
@@ -19,12 +19,12 @@ tests/
 ├── backend/                      pytest
 │   ├── conftest.py               11 个共享夹具 + 测试库硬校验 + db 标记派生（唯一一份）
 │   ├── _repo.py                  仓库根定位（禁写 parents[N]，层数一变就错）
-│   ├── unit/<区域>/              不连库的纯逻辑与静态守卫（30 文件 / 290 例）
-│   ├── integration/<区域>/       连真实 PG 的接口与服务测试（81 文件 / 1397 例）
+│   ├── unit/<区域>/              不连库的纯逻辑与静态守卫
+│   ├── integration/<区域>/       连真实 PG 的接口与服务测试
 │   └── _report/                  生成物（case_index.json 等），gitignore
 ├── frontend/                     vitest（root = 仓库根）
-│   ├── unit/<区域>/              不挂载 React 的纯逻辑（24 文件）
-│   └── module/<区域>/            组件与页面测试（70 文件，含 16 个 .deep 重型）
+│   ├── unit/<区域>/              不挂载 React 的纯逻辑
+│   └── module/<区域>/            组件与页面测试（含 .deep 重型测试）
 ├── e2e/                          Playwright
 │   ├── <区域>/*.spec.ts          按功能分布；cross/ 集中放跨页面与端到端业务流程
 │   └── support/api-stub.ts       规格共用夹具

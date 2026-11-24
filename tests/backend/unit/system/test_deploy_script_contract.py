@@ -33,29 +33,6 @@ def test_local_release_rejects_same_version_or_different_commit():
         module.validate_candidate("dev", commit, commit, True, "1.0.1", "1.0.0")
 
 
-def test_local_cd_refuses_modified_artifact(tmp_path):
-    import importlib.util
-    import json
-
-    path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
-    spec = importlib.util.spec_from_file_location("local_release_bundle", path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    (tmp_path / "images.tar.gz").write_bytes(b"modified")
-    (tmp_path / "deployment.tar.gz").write_bytes(b"source")
-    (tmp_path / "manifest.json").write_text(json.dumps({
-        "version": "1.0.1", "commit": "a" * 40,
-        "production": {"version": "1.0.0", "backend_image": "sha256:" + "b" * 64,
-                       "frontend_image": "sha256:" + "c" * 64},
-        "images": ["heijin-local-backend:1.0.1-aaaaaaaaaaaa", "heijin-local-frontend:1.0.1-aaaaaaaaaaaa"],
-        "gates": module.required_gates(),
-        "schema_sha256": "d" * 64,
-        "sha256": {"images.tar.gz": "0" * 64, "deployment.tar.gz": "0" * 64},
-    }))
-    with pytest.raises(ValueError, match="校验"):
-        module.validate_bundle(tmp_path)
-
 
 def test_local_cd_accepts_intact_bundle_then_rejects_tampering(tmp_path):
     import hashlib

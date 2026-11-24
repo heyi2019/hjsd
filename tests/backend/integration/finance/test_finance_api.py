@@ -457,7 +457,7 @@ class TestFinanceApi:
         assert rows[0]["balance"] == "500.00"
         assert rows[0]["reconciliation_id"] == created.json()["id"]
 
-    def test_manual_cashflow_review_and_reverse_endpoints(
+    def test_manual_cashflow_create_and_reverse_endpoints(
         self, seeded_client, seeded_db, headers
     ):
         created = seeded_client.post(

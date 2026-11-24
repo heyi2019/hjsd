@@ -198,18 +198,6 @@ def test_list_cashflows_transfer_source(seeded_db):
     assert transfer_rows
     assert all(r["source"] == "TRANSFER" for r in transfer_rows)
 
-def test_reverse_cashflow_out_direction(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT")
-    reversal = cashflows.reverse_cashflow(
-        seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
-    )
-    assert reversal.direction == "IN"
-
-def test_reverse_cashflow_rejects_already_reversed(seeded_db):
-    flow = _make_flow(seeded_db, direction="OUT")
-    cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
-    with pytest.raises(Validation, match="该流水已冲销"):
-        cashflows.reverse_cashflow(seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x")
 
 def test_list_cashflows_pool_ids_filter(seeded_db):
     _make_flow(seeded_db, direction="OUT")
@@ -295,15 +283,6 @@ def test_return_deposit_partial(seeded_db):
     )
     assert returned.status == "PARTIALLY_RETURNED"
 
-def test_lose_deposit_rejects_exceeds(seeded_db):
-    deposit = create_deposit(
-        seeded_db, pool_id=1, amount=Decimal("10"), paid_on=TODAY, actor="pytest"
-    )
-    with pytest.raises(Validation, match="损失金额超过未释放余额"):
-        lose_deposit(
-            seeded_db, deposit.id, amount=Decimal("20"), lost_on=TODAY,
-            category="OFFICE", reason="x", actor="pytest",
-        )
 
 def test_lose_deposit_marks_lost(seeded_db):
     deposit = create_deposit(

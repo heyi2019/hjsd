@@ -83,7 +83,7 @@ def test_report_csv_does_not_refill_keys_shared_by_item_and_total():
     assert header == ["row_type", "订单号"]
 
 
-def test_report_csv_without_columns_keeps_legacy_behaviour():
+def test_report_csv_without_columns_uses_report_keys():
     report = {"items": [{"order_no": "HS-1"}]}
     assert _header(report_csv(report)) == ["row_type", "order_no"]
 

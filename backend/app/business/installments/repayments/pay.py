@@ -9,7 +9,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import CashflowSourceType, Direction
 from app.domain.cashflow_attributes import accounting_attribute_for_order_event
 from app.business.collaboration import create_cashflow
-from app.business.orders.events_rules import _resolve_pool
+from app.settings.field_definitions.pools import require_default_pool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
@@ -90,7 +90,7 @@ def pay(
     )
     resolved_pool_id = pool_id
     if resolved_pool_id is None:
-        resolved_pool_id = _resolve_pool(session, order, "PROFIT").id
+        resolved_pool_id = require_default_pool(session).id
     flow = create_cashflow(
         session,
         pool_id=resolved_pool_id,

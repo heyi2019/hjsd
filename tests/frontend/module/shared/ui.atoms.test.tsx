@@ -253,9 +253,9 @@ describe("StatCard：基础容器", () => {
 
 describe("ErrorBanner：给可执行下一步，不只复述报错", () => {
   it("有错误码时同时给出文案与处置提示", () => {
-    render(<ErrorBanner error={{ message: "缺少资金账户路由", code: "POOL_ROUTE_MISSING" }} />);
-    expect(screen.getByText("缺少资金账户路由")).toBeInTheDocument();
-    expect(screen.getByText(/设置 → 主数据/)).toBeInTheDocument();
+    render(<ErrorBanner error={{ message: "未配置唯一的默认资金账户", code: "POOL_ROUTE_MISSING" }} />);
+    expect(screen.getByText("未配置唯一的默认资金账户")).toBeInTheDocument();
+    expect(screen.getByText(/设置 → 配置中心 → 业务主数据 → 资金账户/)).toBeInTheDocument();
   });
 
   it("标准错误对象可以渲染后端不可达提示", () => {

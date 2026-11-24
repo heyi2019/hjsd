@@ -23,6 +23,7 @@ export const fastTests = [
   "tests/frontend/unit/system/vite.config.test.ts",
   // 全量回归层调度守卫：确认轻量层并行且保留失败结果。
   "tests/frontend/unit/system/test-full-sharded-scheduling.test.ts",
+  "tests/frontend/unit/system/test-changed.test.ts",
   // 业务纯逻辑
   "tests/frontend/unit/business/inventory-logic.test.ts",
   "tests/frontend/unit/business/ProfitAllocation.test.ts",
@@ -35,7 +36,6 @@ export const fastTests = [
   "tests/frontend/unit/business/order-operations.test.ts",
   "tests/frontend/unit/business/orderpage-helpers.test.ts",
   "tests/frontend/unit/settings/formScopes.test.ts",
-  "tests/frontend/unit/settings/policyConfigSchema.test.ts",
   "tests/frontend/unit/shared/antdTheme.test.ts",
   "tests/frontend/unit/workbench/businessReminderConfig.test.ts",
   // 共享层 API 客户端与工具函数
@@ -61,7 +61,6 @@ export const quickTests = [
   "tests/frontend/module/system/UserCenterPage.test.tsx",
   "tests/frontend/module/settings/SettingsPage.test.tsx",
   "tests/frontend/module/business/CreateBusinessModal.test.tsx",
-  "tests/frontend/module/settings/PolicySettingsPanel.test.tsx",
   "tests/frontend/module/operations/ReportsPage.test.tsx",
   "tests/frontend/module/shared/session.test.tsx",
 ];

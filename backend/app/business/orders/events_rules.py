@@ -13,8 +13,7 @@ from app.shared.audit import record_audit
 from app.shared.business_numbering import event_no as next_event_no
 from app.core.money import to_money
 from app.domain.foundation import Pool
-from app.settings.field_definitions.order_types import get_order_type_by_code
-from app.settings.field_definitions.pools import assert_pool_usable, require_default_pool
+from app.settings.field_definitions.pools import assert_pool_usable
 from ..shared.validation import _required_text
 from ..shared.cancellation_model import (
     apply_cancellation_account_effect,
@@ -364,30 +363,6 @@ def _post_deliver(
     return event, None
 
 
-def _resolve_pool(
-    session: Session,
-    order: Order,
-    portion: str,
-) -> Pool:
-    """落账资金账户：零本金业务拒绝本金支出，其余一律进唯一活动池。
-
-    2026-11-17 删除业务↔池路由后，池不再由（业务 + 份额）决定；
-    零本金改为业务类型自身的标记（`order_type_defs.is_zero_principal`）。
-    """
-    definition = get_order_type_by_code(session, order.order_type)
-    if (
-        definition is not None
-        and definition.is_zero_principal
-        and portion == "PRINCIPAL"
-    ):
-        raise Validation(
-            f"业务 {order.order_type}（{definition.name}）为零本金型，不能登记本金支出",
-            code=ErrorCode.ZERO_PRINCIPAL_FORBIDDEN,
-            details={"order_type": order.order_type, "portion": portion},
-        )
-    return require_default_pool(session)
-
-
 def _assert_pool_active(session: Session, pool_id: int) -> Pool:
     """停用池不得用于新记录（QLT-01-04：主数据一致性校验）。"""
     return assert_pool_usable(session, pool_id)
@@ -438,5 +413,4 @@ __all__ = [
     "_assert_pool_active",
     "_assert_sellable_order",
     "_post_deliver",
-    "_resolve_pool",
 ]

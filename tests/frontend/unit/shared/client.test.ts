@@ -145,8 +145,8 @@ it("凭证失效时结束对应会话，旧请求和错误密码不会退出新�
 
 describe("errorMessage：展示层统一文案", () => {
   it("带 code 时只展示用户可执行的中文 message", () => {
-    const err = axiosError({ responseData: { code: "POOL_ROUTE_MISSING", message: "缺少资金路由" } });
-    expect(errorMessage(err)).toBe("缺少资金路由");
+    const err = axiosError({ responseData: { code: "POOL_ROUTE_MISSING", message: "未配置唯一的默认资金账户" } });
+    expect(errorMessage(err)).toBe("未配置唯一的默认资金账户");
   });
 
   it("无 code 时只给 message", () => {

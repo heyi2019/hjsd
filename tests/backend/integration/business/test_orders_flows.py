@@ -16,7 +16,6 @@ from app.business.installments import recovery as inst_recovery
 from app.business.installments.repayments.pay import pay as inst_pay
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.customers.counterparties import create_counterparty
 from app.customers.customers import create_customer
 
 TODAY = date(2026, 10, 4)
@@ -243,34 +242,6 @@ class TestA02ThStock:
         assert seeded_db.get(Order, order.id).account_id == account.id
         assert seeded_db.get(Order, order.id).account_snapshot is None
 
-    def test_advance_then_settle(self, seeded_db):
-        peer = create_counterparty(
-            seeded_db, display_name="同行A", type="PEER", actor="pytest"
-        )
-        buyer = _customer(seeded_db)
-        account = _new_account(seeded_db, game_account="th-stock-acc")
-        seeded_db.commit()
-        order = create_order(
-            seeded_db,
-            order_type="TH",
-            trade_date=TODAY,
-            actor="pytest",
-            account_id=account.id,
-            customer_roles=[(buyer.id, "BUYER")],
-            counterparty_roles=[(peer.id, "PEER")],
-        )
-        seeded_db.commit()
-
-        post_event(
-            seeded_db, order.id, event_type="BUY", amount=Decimal("1000"),
-            occurred_on=TODAY, actor="pytest",
-        )
-        seeded_db.commit()
-        post_event(
-            seeded_db, order.id, event_type="SELL", amount=Decimal("1100"),
-            occurred_on=TODAY, actor="pytest", portion="PROFIT",
-        )
-        seeded_db.commit()
 
 class TestA03DgZeroCapital:
     def test_service_income_goes_to_default_pool(self, seeded_db):

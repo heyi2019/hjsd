@@ -1,4 +1,4 @@
-"""API-01 订单建单校验契约：从 TestCreateOrderValidation 拆出（34 tests）。"""
+"""API-01 订单建单校验契约：从 TestCreateOrderValidation 拆出。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
 from sqlalchemy import select
 from app.core.errors import NotFound, Validation
 from app.core.money import to_money
@@ -21,7 +20,6 @@ from app.customers.customers import create_customer, set_customer_status
 from app.domain.trade import Account, Order
 from app.domain.users import User
 from app.settings.field_definitions.order_types import get_order_type_by_code, set_order_type_active
-from app.business.orders import schemas
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 
@@ -313,13 +311,6 @@ class TestCreateOrderValidation:
         with pytest.raises(Validation, match="库存账号业务类型与订单类型不匹配"):
             _order(seeded_db, order_type="HS", account_id=account.id)
 
-    def test_order_create_rejects_operation_form_scope(self):
-        with pytest.raises(ValidationError, match="extra_forbidden"):
-            schemas.OrderCreate(
-                order_type="DG",
-                trade_date=D,
-                form_extra_scope="CONSIGN",
-            )
 
     def test_scoped_user_cannot_attach_foreign_account(self, seeded_db):
         account = Account(

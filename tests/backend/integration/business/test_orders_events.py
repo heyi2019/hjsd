@@ -237,56 +237,6 @@ class TestEventRules:
                 actor="pytest",
             )
 
-    def test_cost_is_not_a_th_event(self, seeded_db):
-        order = create_order(
-            seeded_db, order_type="TH", trade_date=TODAY, actor="pytest"
-        )
-
-        with pytest.raises(Validation, match="事件类型必须为"):
-            post_event(
-                seeded_db,
-                order.id,
-                event_type="COST",
-                amount=Decimal("100"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
-
-    def test_hs_cannot_add_removed_cost_event_after_account_is_sold(self, seeded_db):
-        account = _new_account(seeded_db, game_account="sold-cost-guard")
-        order = create_order(
-            seeded_db,
-            order_type="HS",
-            trade_date=TODAY,
-            actor="pytest",
-            account_id=account.id,
-        )
-        post_event(
-            seeded_db,
-            order.id,
-            event_type="BUY",
-            amount=Decimal("100"),
-            occurred_on=TODAY,
-            actor="pytest",
-        )
-        post_event(
-            seeded_db,
-            order.id,
-            event_type="SELL",
-            amount=Decimal("150"),
-            occurred_on=TODAY,
-            actor="pytest",
-        )
-
-        with pytest.raises(Validation, match="事件类型必须为"):
-            post_event(
-                seeded_db,
-                order.id,
-                event_type="COST",
-                amount=Decimal("10"),
-                occurred_on=TODAY,
-                actor="pytest",
-            )
 
     def test_th_sell_requires_a_buy(self, seeded_db):
         account = _new_account(seeded_db, game_account="th-stock-acc")

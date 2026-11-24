@@ -10,7 +10,7 @@
 空集合上的「磁盘 ⊆ 清单」类断言恒真，守卫看起来全绿。
 
 本守卫的做法：manifest 只存「应该收到多少」，文件集合永远扫磁盘，
-两边对不上就红。目录存在时才校验目录归属，故搬迁前后的结构都能跑。
+两边对不上就红。unit/integration 目录是现行结构，缺失时直接报错。
 """
 
 from __future__ import annotations
@@ -22,8 +22,7 @@ from pathlib import Path
 
 import pytest
 
-# 向上找 pytest.ini 定位仓库根：本文件会被搬进 tests/backend/{unit,integration}/<区域>/，
-# 届时 parents[N] 的层数会变，写死层数必错。
+# 向上找 pytest.ini 定位仓库根，避免依赖固定目录层数。
 def _repo_root() -> Path:
     here = Path(__file__).resolve()
     for candidate in (here, *here.parents):
@@ -105,6 +104,25 @@ def test_case_library_rejects_silent_reclassification(tmp_path, monkeypatch):
     assert generator._check_published_classifications([case]) == {"tests/a.test.ts::case a": "IT-B02-004"}
 
 
+@pytest.mark.parametrize("body,expected", [
+    ('await screen.findByText("保存成功");', 'findByText("保存成功")'),
+    ('expectTypeOf(changePassword).parameter(0).toEqualTypeOf<string>();', 'expectTypeOf(changePassword)'),
+])
+def test_frontend_case_criteria_recognizes_implicit_and_type_assertions(body, expected):
+    from scripts import gen_test_case_library as generator
+
+    _, criteria = generator.extract_criteria(None, body, frontend=True)
+    assert expected in criteria
+
+
+def test_e2e_case_method_identifies_disposable_database():
+    from scripts import gen_test_case_library as generator
+
+    method = generator.extract_method("E2E", "tests/e2e/example.spec.ts", "", "example")
+    assert "临时" in method
+    assert "常驻" not in method
+
+
 def _manifest() -> dict:
     assert MANIFEST_PATH.exists(), f"manifest 不存在：{MANIFEST_PATH}"
     return json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -170,15 +188,10 @@ def test_backend_area_distribution_matches_manifest() -> None:
 
 
 @pytest.mark.parametrize("kind", KINDS)
-def test_kind_directories_match_manifest_when_present(kind: str) -> None:
-    """目录存在时，每个区域的 unit/integration 文件数必须与 manifest 一致。
-
-    旧结构（文件平铺在 tests/backend/ 下）没有这两个目录，跳过；
-    搬迁后自动生效，搬错一半（例如只搬了 unit/）会被 test_no_stray_backend_files 抓到。
-    """
+def test_kind_directories_match_manifest(kind: str) -> None:
+    """现行分层目录必须存在，每个区域的文件数与 manifest 一致。"""
     kind_dir = BE_TESTS / kind
-    if not kind_dir.is_dir():
-        pytest.skip(f"{kind}/ 尚未建立（搬迁前的扁平结构）")
+    assert kind_dir.is_dir(), f"后端测试分层目录缺失：{kind_dir}"
 
     expected = _manifest()["layers"]["backend"]["expected"]["kinds"][kind]["byArea"]
     actual: dict[str, int] = {}
@@ -192,13 +205,15 @@ def test_kind_directories_match_manifest_when_present(kind: str) -> None:
     assert actual == expected, f"{kind}/ 区域分布 {actual} 与 manifest {expected} 不一致"
 
 
-def test_no_stray_backend_files_when_partitioned() -> None:
-    """一旦开始分区，tests/backend 根目录就不许再留 test_*.py（防「搬了一半」）。"""
-    if not any((BE_TESTS / k).is_dir() for k in KINDS):
-        pytest.skip("尚未分区（扁平结构）")
-
+def test_no_stray_backend_files() -> None:
+    """tests/backend 根目录不许留 test_*.py，避免遗漏区域归属。"""
     stray = sorted(p.name for p in BE_TESTS.glob("test_*.py"))
     assert not stray, f"分区后根目录仍残留测试文件：{stray}"
+
+
+def test_kind_case_counts_add_up_to_backend_total() -> None:
+    expected = _manifest()["layers"]["backend"]["expected"]
+    assert sum(expected["kinds"][kind]["cases"] for kind in KINDS) == expected["cases"]
 
 
 def test_case_total_matches_manifest(request: pytest.FixtureRequest) -> None:
@@ -226,6 +241,10 @@ def test_case_total_matches_manifest(request: pytest.FixtureRequest) -> None:
     expected_cases = _manifest()["layers"]["backend"]["expected"]["cases"]
     total = len(request.session.items)
     assert total == expected_cases, f"用例总数 {total}，manifest 记 {expected_cases}"
+    kinds = _manifest()["layers"]["backend"]["expected"]["kinds"]
+    for kind in KINDS:
+        actual = sum(Path(str(item.path)).resolve().is_relative_to(BE_TESTS / kind) for item in request.session.items)
+        assert actual == kinds[kind]["cases"], f"{kind} 用例数 {actual}，manifest 记 {kinds[kind]['cases']}"
 
 
 def test_guards_declare_area() -> None:

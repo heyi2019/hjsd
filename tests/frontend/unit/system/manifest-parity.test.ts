@@ -88,6 +88,11 @@ describe("TESTING-06 前端测试文件与 manifest 一致", () => {
     expect(ALL.length, "tests/frontend 扫不到测试文件：扫描根写错了").toBeGreaterThan(0);
   });
 
+  it("分层清单里的每个测试文件都存在", () => {
+    const missing = [...fastTests, ...quickTests].filter((file) => !existsSync(path.join(REPO, file)));
+    expect(missing, "分层清单含已删除的测试文件").toEqual([]);
+  });
+
   it(`测试文件总数等于 manifest 的 ${expected.files}`, () => {
     const names = ALL.map(relToRepo);
     expect(

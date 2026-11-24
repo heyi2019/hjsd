@@ -13,7 +13,6 @@ from app.business.inventory.profile import create_account
 from app.core.errors import Validation
 from app.domain.foundation import Pool
 from app.domain.enums import CashflowSourceType
-from app.domain.trade import Cashflow
 from app.funds.cashflows import create_cashflow, reverse_cashflow
 from app.funds.rebates import create_rebate, list_rebates
 from app.business.orders.create import create_order
@@ -84,27 +83,6 @@ class TestRebateGuards:
         )
         assert record.rebate_type == "SELL"
 
-    def test_sell_rebate_accepts_recovery_order(self, seeded_db):
-        """2026-10-28 口径：卖号返点不再限 DG，回收单有 SELL 事件即可登记。"""
-        order_id = _active_order(seeded_db)
-        post_event(
-            seeded_db,
-            order_id,
-            event_type="SELL",
-            amount=Decimal("800"),
-            occurred_on=TODAY,
-            actor="pytest",
-        )
-
-        record = create_rebate(
-            seeded_db,
-            source_order_id=order_id,
-            rebate_type="SELL",
-            amount=Decimal("100"),
-            collected_on=TODAY,
-            actor="pytest",
-        )
-        assert record.rebate_type == "SELL"
 
     def test_source_order_notfound(self, seeded_db):
         with pytest.raises(Validation) as exc:
@@ -151,7 +129,7 @@ class TestCashflowLifecycle:
         assert after["expense"] == before["expense"] + Decimal("120.00")
         assert after["cash_balance"] == before["cash_balance"] - Decimal("120.00")
 
-    def test_approved_manual_cashflow_can_be_reversed_once(self, seeded_db):
+    def test_manual_cashflow_can_be_reversed_once(self, seeded_db):
         invest = _pool(seeded_db, "HJ_INVEST")
         flow = create_cashflow(
             seeded_db,
@@ -178,16 +156,3 @@ class TestCashflowLifecycle:
 
         monthly = monthly_pnl_report(seeded_db)
         assert monthly["items"] == []
-
-    def test_business_event_cashflow_must_be_reversed_by_event(self, seeded_db):
-        order_id = _active_order(seeded_db)
-        event = seeded_db.scalar(
-            select(Cashflow).where(Cashflow.order_id == order_id, Cashflow.category == "BUY")
-        )
-        assert event is not None
-        with pytest.raises(Validation, match="业务事件"):
-            reverse_cashflow(
-                seeded_db, event.id, reversed_on=TODAY, actor="finance", reason="错误冲销"
-            )
-
-

@@ -342,7 +342,7 @@ it.each([
 it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () => {
     vi.mocked(ordersApi.create).mockRejectedValueOnce({
       isAxiosError: true,
-      response: { data: { code: "POOL_ROUTE_MISSING", message: "缺少资金账户路由" } },
+      response: { data: { code: "POOL_ROUTE_MISSING", message: "未配置唯一的默认资金账户" } },
       message: "Request failed",
     });
     const { container } = await openTypedModal("TH");
@@ -355,7 +355,7 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     await ui.type(amounts[0], "1000");
     await pickMainPool();
     await ui.click(screen.getByRole("button", { name: /创建订单/ }));
-    expect(await screen.findByText(/设置 → 主数据/)).toBeInTheDocument();
+    expect(await screen.findByText(/设置 → 配置中心 → 业务主数据 → 资金账户/)).toBeInTheDocument();
   });
 
 it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", async () => {

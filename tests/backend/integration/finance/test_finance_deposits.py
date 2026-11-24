@@ -336,7 +336,7 @@ class TestDepositQueries:
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
-        with pytest.raises(Validation, match="未释放余额"):
+        with pytest.raises(Validation, match="损失金额超过未释放余额"):
             lose_deposit(
                 seeded_db,
                 deposit.id,

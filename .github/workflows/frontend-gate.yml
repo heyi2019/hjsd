@@ -2,8 +2,9 @@ name: frontend-gate
 
 # 前端门禁三档（2026-11-11 裁决，替代「每次 push 都跑全量」）：
 #   ① full_suite=true → 前端全量含 deep + 真实后端浏览器联动
-#   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；命中公共层/分层配置自动降级 quick
+#   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；公共层/分层配置运行完整前端测试
 #   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过
+#   E2E 规格变更只运行受影响规格；E2E 共享配置变更或全量档运行完整浏览器测试。
 # 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，
 # 不能靠脚本自己读工作区，必须显式喂「本次 commit diff」。
 # 正式发布由 main-ci-cd 在 release sha 上调用，并传入原始 push 范围；
@@ -43,6 +44,9 @@ jobs:
     name: Frontend checks and tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      e2e_mode: ${{ steps.scope.outputs.e2e_mode }}
+      e2e_paths: ${{ steps.scope.outputs.e2e_paths }}
     defaults:
       run:
         working-directory: frontend
@@ -73,6 +77,7 @@ jobs:
         run: npm run test:fast -- --maxWorkers=4 tests/frontend/unit/system/release-workflow.test.ts
 
       - name: Resolve changed paths
+        id: scope
         working-directory: .
         shell: bash
         env:
@@ -87,6 +92,7 @@ jobs:
           printf '%s\n' "$scope"
           paths="$(printf '%s\n' "$scope" | sed -n 's/^changed_paths=//p')"
           full="$(printf '%s\n' "$scope" | sed -n 's/^full_suite=//p')"
+          E2E_CHANGED_PATHS="$paths" E2E_FULL_SUITE="$full" python3 scripts/ops/e2e_test_scope.py >> "$GITHUB_OUTPUT"
           printf 'TEST_CHANGED_PATHS=%s\n' "$paths" >> "$GITHUB_ENV"
           printf 'TEST_FULL_SUITE=%s\n' "$full" >> "$GITHUB_ENV"
           fe="$(printf '%s' "$paths" | tr ',' '\n' | grep -cE '^(frontend/|tests/)' || true)"
@@ -142,7 +148,8 @@ jobs:
 
   browser-e2e:
     name: Browser tests with isolated backend
-    if: ${{ inputs.full_suite && (github.event_name == 'workflow_dispatch' || inputs.release_sha) }}
+    needs: [frontend-tests]
+    if: ${{ (inputs.full_suite || needs.frontend-tests.outputs.e2e_mode != 'none') && (github.event_name == 'workflow_dispatch' || inputs.release_sha) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -207,7 +214,20 @@ jobs:
 
       - name: Run browser integration tests
         working-directory: frontend
-        run: npm run test:e2e -- --workers=1
+        env:
+          E2E_MODE: ${{ needs.frontend-tests.outputs.e2e_mode }}
+          E2E_PATHS: ${{ needs.frontend-tests.outputs.e2e_paths }}
+        run: |
+          set -euo pipefail
+          if [[ "$E2E_MODE" == "all" ]]; then
+            npm run test:e2e -- --workers=1
+          elif [[ "$E2E_MODE" == "selected" && -n "$E2E_PATHS" ]]; then
+            IFS=, read -r -a specs <<< "$E2E_PATHS"
+            npm run test:e2e -- --workers=1 "${specs[@]}"
+          else
+            echo "无可执行的 E2E 选测范围" >&2
+            exit 1
+          fi
 
       - name: Upload browser test results
         if: always()

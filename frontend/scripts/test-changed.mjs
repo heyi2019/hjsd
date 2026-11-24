@@ -18,15 +18,13 @@
  * 选档规则（2026-11-04 起测试家在仓库根 tests/frontend/）：
  *   - 变更落在 `frontend/src/<domain>/` → 跑该 domain 对应的区域（tests/frontend/<kind>/<区域>）
  *   - 变更落在 `tests/frontend/**`       → 跑变更所在的区域
- *   - 变更落在 `tests/fixtures|config/`  → 夹具/配置影响全部用例，降级跑 quick 档
- *   - 变更落在壳层 `frontend/src/app/`、公共层 `frontend/src/shared/` → 降级跑 quick 档
+ *   - 变更落在 `tests/fixtures|config/`  → 夹具/配置影响全部用例，运行完整前端测试
+ *   - 变更落在壳层 `frontend/src/app/`、公共层 `frontend/src/shared/` → 运行完整前端测试
  *   - 变更落在分层/构建配置（vitest.config.ts、scripts/test-*.mjs、vite.config.ts、
- *     tsconfig*.json、package.json）→ 分层本身变了，降级跑 quick 档
+ *     tsconfig*.json、package.json）→ 分层本身变了，运行完整前端测试
  *   - 无前端/测试变更                → 直接退出 0
  *
- * 已知局限（故意不掩盖）：按区域选测只能覆盖「本区域测试」，跨域耦合（例如改 orders
- * 却由 workbench/WorkbenchPage.test.tsx 断言）测不到。改动跨多域或涉及公共层时，脚本会
- * 主动降级到 quick 档；仍不确定时请直接 `npm run test:quick`。
+ * 按区域选测依赖映射中声明的跨域使用方；无法判断影响范围时运行完整前端测试。
  *
  * 约束：禁裸 npx（项目纪律），直接调用本地 node_modules/.bin/vitest。
  */
@@ -63,10 +61,13 @@ const SRC_DOMAIN_TO_REGION = {
   installments: "business",
   "customer-center": "customer",
   pools: "finance",
+  finance: ["business", "finance"],
   rebates: "finance",
   reporting: "operations",
+  operations: "operations",
   imports: "operations",
   "field-definitions": "settings",
+  settings: "settings",
   users: "settings",
   policy: "settings",
   shared: "shared",
@@ -76,7 +77,7 @@ const SRC_DOMAIN_TO_REGION = {
   notifications: "system",
 };
 
-/** 这些 src 目录被全站依赖，改动必须放大到 quick 档。 */
+/** 这些 src 目录被全站依赖，改动必须放大到完整前端测试。 */
 const GLOBAL_DOMAINS = new Set(["app", "shared"]);
 
 const raw = process.argv.slice(2);
@@ -92,7 +93,7 @@ if (head.includes("--help")) {
       "用法：node scripts/test-changed.mjs [--list] [-- <额外 vitest 参数>]",
       "",
       "按 git 工作区变更自动选择要跑的区域（tests/frontend/<kind>/<区域>）。",
-      "改动涉及 app/shared、夹具或分层配置时自动降级为 quick 档。",
+      "改动涉及 app/shared、夹具或分层配置时运行完整前端测试。",
     ].join("\n"),
   );
   process.exit(0);
@@ -177,7 +178,7 @@ for (const path of repoChanges) {
     globalReason = `src/${domain}/（未登记区域的 src 目录，按区域选测会漏）`;
     break;
   }
-  regions.add(region);
+  for (const name of Array.isArray(region) ? region : [region]) regions.add(name);
 }
 
 /** 区域 → 实际要跑的目录（unit/module 两层，存在才跑）。 */
@@ -220,7 +221,7 @@ const runNpm = (script, label) => {
 };
 
 if (globalReason) {
-  runNpm("test:quick", "quick 档");
+  runNpm("test:full:all", "完整前端测试");
 } else if (regions.size === 0) {
   console.log(
     `前端变更未落在测试可定位的区域（${repoChanges.slice(0, 5).join(", ")}${repoChanges.length > 5 ? " …" : ""}），无需跑板块测试。`,

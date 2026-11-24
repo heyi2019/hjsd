@@ -32,11 +32,7 @@ def _restricted_user() -> CurrentUser:
 
 
 def _seed_recon(seeded_db):
-    """在 HJ_INVEST 池上造两笔已审核流水，建立系统余额基线 50+20=70。
-
-    资金账户账户下线后系统余额即「池内已审核流水有符号和」，原本来自
-    PoolAccount.opening_balance 的 50 改为等额期初流水，基线保持不变。
-    """
+    """在 HJ_INVEST 账户登记两笔收入，建立 50+20=70 的余额基线。"""
     pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
     assert pool is not None, "种子池 HJ_INVEST 缺失"
     for amount in (Decimal("50"), Decimal("20")):

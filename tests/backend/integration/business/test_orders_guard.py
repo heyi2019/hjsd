@@ -1,10 +1,4 @@
-"""STATE-01 orders 域覆盖收口（批2 安全子集）：events.py + service.py 的异常/校验分支守门用例。
-
-仅覆盖 WIP 未触碰的稳定文件（events.py / service.py）；orders/router.py 因 WIP 在改，留待 WIP 落定。
-部分内部守卫直接调用：`_assert_sellable_order` / `_assert_event_allowed` 经 events 命名空间，
-`_get_offset_event`（cancellation_model）/ `_resolve_pool`（events_rules）直连真实定义模块；
-与 test_orders_common.py 对 _common 的手法一致。
-"""
+"""STATE-01 订单事件、取消与资金账户的状态和校验契约。"""
 from __future__ import annotations
 
 from datetime import date
@@ -26,7 +20,6 @@ from app.business.orders._shared import _audit_value
 from app.business.shared.cancellation_model import get_cancellation_offset as _get_offset_event
 from app.business.orders.create import create_order
 from app.business.orders.events import post_event
-from app.business.orders.events_rules import _resolve_pool
 from app.business.orders.mutations import update_order
 from app.business.orders.queries import list_orders
 from app.customers.counterparties import create_counterparty
@@ -98,15 +91,6 @@ def _delivered_hs_order(seeded_db):
 
 
 # --------------------------------------------------------------------- events.py
-def test_removed_cost_event_is_rejected(seeded_db):
-    order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest")
-    seeded_db.commit()
-    with pytest.raises(Validation, match="事件类型必须为"):
-        post_event(
-            seeded_db, order.id, event_type="COST", amount=Decimal("10"),
-            occurred_on=TODAY, actor="pytest",
-        )
-
 
 def test_refund_is_not_an_order_event(seeded_db):
     order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
@@ -180,15 +164,6 @@ def test_hs_sell_requires_account_in_stock(seeded_db):
             occurred_on=TODAY, actor="pytest", portion="PROFIT",
         )
 
-
-def test_hs_removed_cost_event_does_not_require_account(seeded_db):
-    order = create_order(seeded_db, order_type="HS", trade_date=TODAY, actor="pytest")
-    seeded_db.commit()
-    with pytest.raises(Validation, match="事件类型必须为"):
-        post_event(
-            seeded_db, order.id, event_type="COST", amount=Decimal("10"),
-            occurred_on=TODAY, actor="pytest",
-        )
 
 
 def test_th_sell_blocked_when_installment_exists(seeded_db):
@@ -298,14 +273,16 @@ def test_get_offset_event_rejects_non_money_event(seeded_db):
         _get_offset_event(seeded_db, deliver_ev.id, order_id=order.id)
 
 
-def test_resolve_pool_requires_default_pool(seeded_db):
-    unknown_order = Order(order_type="ZZ")
-    # 2026-11-17 删除路由后：落账池=唯一默认池；没有任何池时直接拒绝
+def test_dg_sell_requires_default_pool_when_unselected(seeded_db):
+    order = create_order(
+        seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
+        account_snapshot={"game_account": "no-default-pool", "game_type": "王者荣耀"},
+    )
     for pool in seeded_db.scalars(select(Pool)).all():
         seeded_db.delete(pool)
     seeded_db.flush()
     with pytest.raises(Validation, match="默认资金账户"):
-        _resolve_pool(seeded_db, unknown_order, "PRINCIPAL")
+        post_event(seeded_db, order.id, event_type="SELL", amount=Decimal("100"), occurred_on=TODAY, actor="pytest")
 
 
 # --------------------------------------------------------------------- service.py

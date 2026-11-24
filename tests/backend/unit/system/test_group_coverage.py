@@ -104,6 +104,22 @@ def _ci_scope(repo: Path, **overrides: str) -> dict[str, str]:
     return dict(line.split("=", 1) for line in result.stdout.splitlines())
 
 
+@pytest.mark.parametrize(("paths", "full", "mode", "expected"), [
+    ("frontend/src/pools/FundsPage.tsx", "false", "none", ""),
+    ("tests/e2e/system/fallback.spec.ts", "false", "selected", "tests/e2e/system/fallback.spec.ts"),
+    ("tests/e2e/support/api-stub.ts", "false", "all", ""),
+    ("tests/e2e/system/deleted.spec.ts", "false", "all", ""),
+    ("frontend/src/pools/FundsPage.tsx", "true", "all", ""),
+])
+def test_ci_selects_changed_e2e_specs(paths, full, mode, expected):
+    script = REPO / "scripts/ops/e2e_test_scope.py"
+    assert script.exists(), "E2E 变更需要可执行的选测入口"
+    result = subprocess.run([sys.executable, str(script)], cwd=REPO, check=True, capture_output=True, text=True,
+                            env={**os.environ, "E2E_CHANGED_PATHS": paths, "E2E_FULL_SUITE": full})
+    output = dict(line.split("=", 1) for line in result.stdout.splitlines())
+    assert output == {"e2e_mode": mode, "e2e_paths": expected}
+
+
 def test_ci_scope_includes_all_commits_and_both_sides_of_renames(tmp_path):
     def git(*args):
         return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True).stdout.strip()

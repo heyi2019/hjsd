@@ -377,12 +377,6 @@ def test_reverse_cashflow_rejects_deposit_flow(seeded_db):
             seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
         )
 
-def test_reverse_cashflow_in_direction(seeded_db):
-    flow = _make_flow(seeded_db, direction="IN")
-    reversal = cashflows.reverse_cashflow(
-        seeded_db, flow.id, reversed_on=TODAY, actor="pytest", reason="x"
-    )
-    assert reversal.direction == "OUT"
 
 def test_create_deposit_rejects_user_not_visible(seeded_db):
     with pytest.raises(NotFound, match="资金账户不存在"):

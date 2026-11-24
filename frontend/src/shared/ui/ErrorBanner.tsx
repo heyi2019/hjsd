@@ -6,7 +6,7 @@ const HINTS: Record<string, string> = {
   AUTH_REQUIRED: "请先登录或选择开发用户。",
   TOKEN_EXPIRED: "登录已过期，请重新登录。",
   PERMISSION_DENIED: "当前角色无此权限，请联系管理员。",
-  POOL_ROUTE_MISSING: "尚未配置唯一默认资金账户，请到「设置 → 主数据 → 资金账户」设置默认账户。",
+  POOL_ROUTE_MISSING: "尚未配置唯一默认资金账户，请到「设置 → 配置中心 → 业务主数据 → 资金账户」设置默认账户。",
   POOL_DISABLED: "资金账户已停用，请改用启用中的资金账户。",
   CUSTOMER_DISABLED: "客户已拉黑，不能作为新订单参与方。",
   COUNTERPARTY_DISABLED: "合作方已拉黑，不能作为新订单参与方。",

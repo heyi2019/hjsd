@@ -1,11 +1,6 @@
 """MASTER-01 foundation 主数据契约测试（BAS-02 / BAS-03）。
 
-与 test_foundation_service.py / test_pools_api.py / test_order_types_api.py 的分工：
-既有文件已覆盖种子幂等、池 code 不可改、V17 有流水禁删、无路由不可启用、
-路由 upsert 与停用池拒绝等主路径；本文件补池/业务类型的 404 与取值校验、
-列表的启用过滤、更新池全字段、业务类型更新、路由 portion 校验、
-停用池不可作为默认路由、编号域序列初始化与预览、种子「业务类型缺失跳过路由」
-与 `seed_is_applied`，以及 2 个未测路由端点。
+覆盖资金账户和业务类型的字段校验、状态筛选、更新、编号序列及相关接口。
 """
 from __future__ import annotations
 

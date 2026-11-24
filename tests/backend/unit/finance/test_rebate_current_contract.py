@@ -12,12 +12,8 @@ from app.domain import trade
 from app.funds import rebates, router, schemas
 
 
-def test_rebate_has_only_register_edit_delete_lifecycle():
-    """返点生命周期 = 登记 + 编辑；删除/作废与分次结算均属下线能力。
-
-    函数名保留历史名以维持测试用例索引（UT-D04-001）稳定；断言口径已按
-    2026-11-12 裁决收窄——delete_rebate 一并列入必须不存在的 legacy 名。
-    """
+def test_rebate_has_only_register_and_edit_lifecycle():
+    """返点生命周期 = 登记 + 编辑；删除/作废与分次结算均属下线能力。"""
     legacy_names = (
         "settle_rebate",
         "list_rebate_settlements",

@@ -261,7 +261,7 @@ class EventCreate(BaseModel):
     )
     amount: Decimal = Field(default=Decimal("0"))
     occurred_on: date
-    pool_id: int | None = Field(default=None, description="显式池优先于默认路由")
+    pool_id: int | None = Field(default=None, description="显式资金账户优先于默认资金账户")
     portion: str = "PRINCIPAL"
     delivery_direction: str | None = None
     offset_event_id: int | None = None

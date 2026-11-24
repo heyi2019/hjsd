@@ -159,8 +159,8 @@ npm run test:e2e             # Playwright + 真实后端 + 每轮独立临时库
 ```
 
 CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_suite=true` → `test:ci` 全量（发版收口）；
-本次提交有前端/测试变更 → `test:changed`（命中公共层或分层配置自动降级 quick）；
-无前端/测试变更 → `test:quick` 冒烟，不静默跳过。变更路径由 workflow 算 commit diff 后经
+本次提交有前端/测试变更 → `test:changed`（命中公共层或分层配置时运行完整前端测试）；
+无前端/测试变更 → `test:quick` 冒烟，不静默跳过。E2E 规格变更会运行相应浏览器测试，E2E 共享配置变更运行完整浏览器测试。变更路径由 workflow 算 commit diff 后经
 `TEST_CHANGED_PATHS` 注入（CI checkout 后 `git status` 恒为空）。
 
 后端 CI（`backend-gate`）同样默认按 `main-ci-cd` 注入的「原始 push 范围」路径集选测：

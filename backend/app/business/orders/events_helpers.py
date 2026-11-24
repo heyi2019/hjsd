@@ -27,6 +27,8 @@ from app.domain.enums import (
     SaleMode,
 )
 from app.domain.trade import Account, Installment, Order, OrderEvent
+from app.settings.field_definitions.order_types import get_order_type_by_code
+from app.settings.field_definitions.pools import require_default_pool
 from app.shared.operation_operators import validate_optional_operator_ids
 from app.shared.form_field_rules import validate_form_extra
 
@@ -35,7 +37,7 @@ from ..shared.cancellation_model import (
     get_cancellation_offset as _get_offset_event,
     opposite_cancellation_direction as _opposite_direction,
 )
-from .events_rules import _assert_pool_active, _resolve_pool
+from .events_rules import _assert_pool_active
 from ..shared.delivery_fields import DELIVERY_FIELDS
 
 def _auto_link_recovered_installment_sale(
@@ -256,13 +258,21 @@ def _resolve_event_funding_context(
     accounting_attribute: str | None = None
     resolved_pool_id: int | None = None
     if has_cashflow:
+        if event_type == EventType.BUY.value and portion == Portion.PRINCIPAL.value:
+            definition = get_order_type_by_code(session, order.order_type)
+            if definition is not None and definition.is_zero_principal:
+                raise Validation(
+                    f"业务 {order.order_type}（{definition.name}）为零本金型，不能登记本金支出",
+                    code=ErrorCode.ZERO_PRINCIPAL_FORBIDDEN,
+                    details={"order_type": order.order_type, "portion": portion},
+                )
         accounting_attribute = accounting_attribute_for_order_event(
             order.order_type, event_type
         )
         resolved_pool_id = (
             pool_id
             or (offset.pool_id if offset is not None else None)
-            or _resolve_pool(session, order, portion).id
+            or require_default_pool(session).id
         )
         if user is not None and not user.can_see_pool(resolved_pool_id):
             raise NotFound("资金账户不存在", details={"pool_id": resolved_pool_id})

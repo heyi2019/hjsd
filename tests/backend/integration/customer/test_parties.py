@@ -64,22 +64,6 @@ class TestCustomerNumbering:
         assert third.customer_no != source.customer_no
 
 
-class TestContactOutput:
-    def test_customer_output_returns_full_contact(self, seeded_db):
-        customer = create_customer(
-            seeded_db,
-            display_name="甲",
-            phone="13800001234",
-            wechat="wxabc",
-            qq="123456",
-            actor="pytest",
-        )
-        seeded_db.commit()
-        out = to_customer_out(customer)
-        assert out["phone"] == "13800001234"
-        assert out["wechat"] == "wxabc"
-        assert out["qq"] == "123456"
-
 
 class TestCustomerUsability:
     def test_disabled_customer_rejected(self, seeded_db):
@@ -488,10 +472,3 @@ def test_customer_update_honors_contact_permission(seeded_client):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["phone"] == "13800007777"
-
-def test_customer_update_returns_full_contact_without_read_permission(seeded_db):
-    cust = create_customer(
-        seeded_db, display_name="客户丁", phone="13800006666", actor="pytest"
-    )
-    out = to_customer_out(cust)
-    assert out["phone"] == "13800006666"

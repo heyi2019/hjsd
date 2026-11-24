@@ -331,13 +331,11 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "ReportsPage.details.test.tsx":        "E01",
     "ReportsPage.test.tsx":                "E01",
     "ConfigCenterPanel.test.tsx":          "F01",
-    "PolicySettingsPanel.test.tsx":        "F01",
     "SettingsPage.deep.test.tsx":          "F01",
     "SettingsPage.test.tsx":               "F01",
     "panels.config.test.tsx":              "F01",
     "panels.routes.test.tsx":              "F01",
     "panels.settings.test.tsx":            "F01",
-    "policyConfigSchema.test.ts":          "F01",
     "OrderFormFieldsPanel.test.tsx":       "F02",
     "formScopes.test.ts":                  "F02",
     "ListColumnsPanel.test.tsx":           "F03",
@@ -376,6 +374,7 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "P0P1Round20261101.test.tsx":          "SYS11",
     "release-workflow.test.ts":           "SYS11",
     "manifest-parity.test.ts":             "SYS12",
+    "test-changed.test.ts":                "SYS12",
     "mock-specifier.test.ts":              "SYS12",
 }
 

@@ -350,18 +350,6 @@ class TestAccountEffect:
 
         assert account.status == AccountStatus.WAITING.value
 
-    def test_removed_payment_event_is_rejected(self, seeded_db):
-        order = _order(seeded_db, order_type="TH")
-        with pytest.raises(Validation, match="事件类型必须为"):
-            post_event(
-                seeded_db,
-                order.id,
-                event_type="PAYMENT",
-                amount=Decimal("100"),
-                occurred_on=D,
-                actor="pytest",
-            )
-
 
 class TestPoolBalance:
     def test_pool_balance_service_enforces_pool_visibility(self, seeded_db):

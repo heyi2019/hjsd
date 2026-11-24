@@ -346,21 +346,6 @@ def test_upgrade_is_repeatable(migration_db):
     assert (pool_count, type_count) == (0, 3)
 
 
-def test_current_migration_head_is_exposed():
-    result = _alembic({}, "heads")
-    assert result.returncode == 0, result.stdout + result.stderr
-    stdout = result.stdout.strip()
-    # alembic heads 形如 "0025 (head)"；head 必须真实存在且被 alembic 识别。
-    # 不再硬编码 revision —— 迁移链推进后硬编码值会腐化（此前 0010 已落后于实际 head）。
-    assert "(head)" in stdout, f"alembic heads 未报告 head：\n{stdout}"
-    head_rev = stdout.split()[0]
-    version_files = [
-        p.name for p in (BACKEND_DIR / "alembic" / "squashed_versions").glob("*.py")
-    ]
-    assert any(head_rev in name for name in version_files), (
-        f"head {head_rev} 在活动迁移目录中找不到对应文件：{version_files}"
-    )
-
 
 def test_active_migration_chain_is_single_current_baseline():
     """新环境只允许从当前 ORM 基线 0001 初始化，不加载旧库兼容迁移。"""
@@ -386,11 +371,11 @@ def test_downgrade_and_upgrade_roundtrip(migration_db):
 
 
 def test_orders_status_check_dropped_draft(migration_db):
-    """0011 移除草稿态后：迁移产出的 orders CHECK 必须真的不含 DRAFT。
+    """当前基线产出的 orders CHECK 必须与订单状态枚举一致且不含 DRAFT。
 
     双向断言的原因：`alembic check` 不校验 CHECK 内容，删/加枚举值若漏了迁移它照样报绿。
     ① 当前 OrderStatus 全部可写入 → 防止以后加枚举值却忘了重建表；
-    ② 'DRAFT' 必须被 CHECK 拒绝 → 防止本次迁移没真正生效。
+    ② 'DRAFT' 必须被 CHECK 拒绝 → 防止旧状态重新进入基线。
     跨方言用约束定义文本断言（PG 将 IN 渲染为 = ANY(ARRAY[...])，故只校验成员与排除项）。
     """
     from app.domain.enums import OrderStatus
@@ -435,13 +420,8 @@ def test_retired_product_checks_are_removed(migration_db):
     assert "'DFQ_PRINCIPAL'" not in cashflow_clause
 
 
-def test_account_status_rename_migrates_legacy_rows_without_touching_inventory_status(migration_db):
-    """库存周期状态由 IN_STOCK 更名为 WAITING，库存状态保持独立列不被更名触碰。
-
-    squash 后无法停在中间态复现「已存在旧 status 行」，故改为验证最终 schema：
-    stocks.status 的 CHECK 已更名为 WAITING（不再含 IN_STOCK），且 inventory_status
-    作为独立列共存。
-    """
+def test_account_status_constraint_keeps_inventory_status_independent(migration_db):
+    """账号状态 CHECK 含 WAITING 而不含 IN_STOCK，库存状态保留独立列。"""
     engine, _target, _env = migration_db
     cols = _column_names(engine, "stocks")
     assert "inventory_status" in cols, "库存状态应独立保留为列"

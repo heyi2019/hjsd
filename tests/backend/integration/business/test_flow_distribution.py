@@ -5,7 +5,7 @@
 TH（提号）/ DG（代挂）订单同属分销 business_mode，但其资金结算口径与自营 HS 不同：
 - 核算属性区分回收(SELF_*)与提号/代挂(TH_*/DG_*)；
 - BUY/SELL 落入同一默认业务池，同一池余额 = 收入 − 支出；
-- DG 不允许 BUY（仅全款），且其 SELL 未配置默认 PRINCIPAL 资金账户路由，必须显式 pool_id。
+- DG 不允许 BUY（仅全款）；未显式选择资金账户时，SELL 使用唯一默认账户。
 
 本文件只验证**跨模块资金结算一致性**，不重复单模块规则断言。
 测试分类：服务级集成（seeded_db 校验 DB 状态）。
@@ -25,12 +25,9 @@ from app.domain.trade_models.cashflow import Cashflow
 from app.business.orders import events
 from app.business.orders.create import create_order
 from app.business.inventory.profile import create_account
+from app.settings.field_definitions.order_types import get_order_type_by_code, update_order_type
 
 TODAY = date(2026, 10, 6)
-
-
-def _first_active_pool(session) -> Pool:
-    return session.scalars(select(Pool).where(Pool.status == "ACTIVE")).first()
 
 
 def test_flow_c_th_distribution_fund_settlement(seeded_db):
@@ -61,7 +58,7 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
     assert buy_flow.direction == Direction.OUT.value
     assert sell_flow.direction == Direction.IN.value
 
-    # 分销资金账户路由：BUY 与 SELL 落入同一默认业务池。
+    # BUY 与 SELL 落入同一默认资金账户。
     assert buy_flow.pool_id == sell_flow.pool_id
 
     rows = seeded_db.scalars(
@@ -75,8 +72,29 @@ def test_flow_c_th_distribution_fund_settlement(seeded_db):
     assert seeded_db.get(Order, order.id).status == "COMPLETED"
 
 
+@pytest.mark.parametrize("explicit_pool", [False, True])
+def test_zero_principal_rejects_buy_with_or_without_selected_pool(seeded_db, explicit_pool):
+    definition = get_order_type_by_code(seeded_db, "TH")
+    assert definition is not None
+    update_order_type(seeded_db, definition.id, actor="pytest", is_zero_principal=True)
+    account = create_account(
+        seeded_db, game_account="zero-principal-buy", business_mode="DISTRIBUTION",
+        inventory_type="PICKUP", actor="pytest",
+    )
+    order = create_order(seeded_db, order_type="TH", trade_date=TODAY, actor="pytest", account_id=account.id)
+    default_pool = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True), Pool.status == "ACTIVE"))
+    assert default_pool is not None
+
+    with pytest.raises(Validation, match="零本金型"):
+        events.post_event(
+            seeded_db, order.id, event_type="BUY", amount=Decimal("100"), portion="PRINCIPAL",
+            occurred_on=TODAY, actor="pytest", pool_id=default_pool.id if explicit_pool else None,
+        )
+    assert seeded_db.scalars(select(Cashflow).where(Cashflow.order_id == order.id)).all() == []
+
+
 def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):
-    """BIZ-FLOW-DIST-002：DG 代挂仅全款——拒 BUY；SELLE 必须显式 pool_id。"""
+    """BIZ-FLOW-DIST-002：DG 代挂拒绝 BUY，售出默认进入唯一默认账户。"""
     dg = create_order(
         seeded_db, order_type="DG", trade_date=TODAY, actor="pytest",
         account_snapshot={"game_account": "flow-c-dg-001", "game_type": "王者荣耀"},
@@ -87,7 +105,8 @@ def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):
     assert account.inventory_type == "CONSIGNMENT"
     assert account.status == "WAITING"
 
-    pool = _first_active_pool(seeded_db)
+    pool = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True), Pool.status == "ACTIVE"))
+    assert pool is not None
 
     # DG 不允许 BUY（代挂仅全款）。
     with pytest.raises(Validation):
@@ -96,10 +115,10 @@ def test_flow_c_dg_consignment_sell_and_buy_rejected(seeded_db):
             occurred_on=TODAY, actor="pytest", pool_id=pool.id,
         )
 
-    # DG SELL 核算属性为 DG_REVENUE（2026-11-18 口径改版，原 SERVICE_REVENUE）；必须显式 pool_id（无默认 PRINCIPAL 路由）。
+    # DG SELL 的核算属性为 DG_REVENUE，不指定账户时使用默认账户。
     _sell_evt, sell_flow = events.post_event(
         seeded_db, dg.id, event_type="SELL", amount=Decimal("900"),
-        occurred_on=TODAY, actor="pytest", pool_id=pool.id,
+        occurred_on=TODAY, actor="pytest",
     )
     assert sell_flow.accounting_attribute == AccountingAttribute.DG_REVENUE.value
     assert sell_flow.direction == Direction.IN.value

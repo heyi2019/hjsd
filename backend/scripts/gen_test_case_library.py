@@ -256,6 +256,8 @@ RAISES_RE = re.compile(
 )
 ASSERT_HEAD_RE = re.compile(r'^[ \t]*assert[ \t]+(?!=)', re.M)
 EXPECT_RE = re.compile(r'\bexpect\s*\(')
+TYPE_EXPECT_RE = re.compile(r'\bexpectTypeOf\s*\(')
+AWAIT_FIND_RE = re.compile(r'\bawait\s+(?:[\w$]+\.)?(?:findBy|findAllBy)\w*\s*\(')
 WEAK_CRITERIA = "正常执行不抛异常（用例无显式断言）"
 
 
@@ -272,7 +274,7 @@ def extract_method(test_type: str, relpath: str, body: str, func_id: str) -> str
     if test_type == "UT":
         isolate = "无 DB/纯函数"
     elif test_type == "E2E":
-        isolate = "真实浏览器(chromium)+真实后端+常驻 e2e 库(每轮不清数据，按类型补足 IN_STOCK 账号)"
+        isolate = "真实浏览器(chromium)+独立临时 E2E 库（成功清理，失败保留供排查）"
     elif is_frontend_test(relpath):
         isolate = "组件测试(mount/交互)"
     else:
@@ -315,6 +317,14 @@ def _criteria_from_expect(body: str) -> str:
     """前端：取第一条 `expect(...)` 的完整断言链（含 .toBe/.toEqual 等）。"""
     m = EXPECT_RE.search(body)
     if not m:
+        type_expect = TYPE_EXPECT_RE.search(body)
+        if type_expect:
+            end = _skip_balanced(body, type_expect.end() - 1)
+            return _clip("类型断言（由类型检查验证） " + body[type_expect.start():end], 110)
+        awaited_find = AWAIT_FIND_RE.search(body)
+        if awaited_find:
+            end = _skip_balanced(body, awaited_find.end() - 1)
+            return _clip("等待元素出现 " + body[awaited_find.start():end], 110)
         return ""
     start = m.start()
     end = _skip_balanced(body, m.end() - 1)
@@ -588,7 +598,7 @@ def main() -> None:
         for tname, doc, body in scan_ts(full):
             cases.append(_stage("IT", func, rel, tname, doc, body, fn, primary, related, ""))
 
-    # ---- E2E（Playwright：真实浏览器 + 真实后端 + 常驻 e2e 库）----
+    # ---- E2E（Playwright：真实浏览器 + 每轮独立临时库）----
     # 递归扫 tests/e2e/<区域>/：规格按区域分目录（2026-11-04 迁出包内 e2e/）。
     # 只扫一层会让搬进区域目录的 15 个规格从用例库整批消失；support/ 是夹具不是规格。
     e2e_dir = os.path.join(REPO, "tests", "e2e")

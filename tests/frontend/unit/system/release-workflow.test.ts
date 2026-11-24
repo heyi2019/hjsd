@@ -64,6 +64,16 @@ describe("发布门禁与部署契约", () => {
     expect(browser.if).toContain("workflow_dispatch");
   });
 
+  it("E2E 变更会传递给浏览器任务并选取对应规格", () => {
+    const jobs = workflow("frontend-gate.yml").jobs;
+    expect(jobs["browser-e2e"].needs).toContain("frontend-tests");
+    expect(jobs["frontend-tests"].outputs.e2e_mode).toContain("steps.scope.outputs.e2e_mode");
+    expect(jobs["browser-e2e"].if).toContain("needs.frontend-tests.outputs.e2e_mode");
+    const step = jobs["browser-e2e"].steps.find((item: any) => item.name === "Run browser integration tests");
+    expect(step.env.E2E_PATHS).toContain("needs.frontend-tests.outputs.e2e_paths");
+    expect(step.run).toContain('"${specs[@]}"');
+  });
+
   it("手动部署不能提供已过门禁标记，仍保留原有等待检查", () => {
     const deploy = workflow("deploy-production.yml");
     expect(deploy.on.workflow_call?.inputs?.gates_verified?.type).toBe("boolean");

@@ -21,7 +21,12 @@
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-surface));
 }
 
-/* 宽屏时只给右上角操作入口预留横向空间，资金账户仍保持完整一行。 */
+/* 主金额和资金账户各占一列，避免继承建单表单的多列布局而过窄。 */
+.business-form-layout-build-order .business-registration-form .finance-card-with-expense-action--reserved > .business-registration-group__fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 宽屏时为右上角的支出入口预留空间。 */
 .finance-card-with-expense-action--reserved > .business-registration-group__fields {
   padding-inline-end: 12rem;
 }
@@ -46,6 +51,12 @@
   .finance-card-with-expense-action--reserved > .business-registration-group__fields {
     padding-inline-end: 0;
     padding-block-start: calc(var(--ui-control-height-lg) + var(--space-2));
+  }
+}
+
+@container (max-width: 760px) {
+  .business-form-layout-build-order .business-registration-form .finance-card-with-expense-action--reserved > .business-registration-group__fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

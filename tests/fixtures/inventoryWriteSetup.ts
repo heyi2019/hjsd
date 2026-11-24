@@ -41,7 +41,6 @@ export function setupInventoryWrite() {
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(ordersApi.stockSale), {});
-  resolveMock(vi.mocked(ordersApi.addCustomerRole), { id: 21 });
   resolveMock(vi.mocked(customersApi.page), { items: [{ id: 7, display_name: "买家A", status: "ACTIVE" }], total: 1, limit: 500, offset: 0 });
   vi.mocked(customersApi.options).mockResolvedValue([{ id: 7, customer_no: "C0007", display_name: "买家A" }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
@@ -58,7 +57,6 @@ export function setupInventoryWrite() {
     collected_on: "2026-10-17",
     operator: "何一",
   }] as never);
-  resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
   resolveMock(vi.mocked(installmentsApi.pay), { id: 51 });
   resolveMock(vi.mocked(installmentsApi.previewSalePlan), { per_period_service_fee: "0", per_period: "600" });
   vi.mocked(ordersApi.executionDetail).mockResolvedValue({

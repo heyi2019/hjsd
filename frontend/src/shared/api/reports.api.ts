@@ -1,5 +1,5 @@
 import { api, type CacheAwareRequestConfig } from "./client";
-import type { AuditEntityStat, AuditLogRow } from "./types/ops";
+import type { AuditLogRow } from "./types/ops";
 import type { BusinessPnlReport, CommissionReport, DataCenterSummary, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
 type ReportPeriodParams = { from?: string; to?: string };
@@ -40,13 +40,6 @@ export const auditApi = {
   }) =>
     api.get<{ items: AuditLogRow[]; total: number }>("/audit-logs", { params }).then((r) => r.data),
   actions: () => api.get<{ items: string[] }>("/audit-logs/actions").then((r) => r.data.items),
-  /** 按 entity_type 汇总真实累计数。 */
-  stats: (entityTypes: string[]) =>
-    api
-      .get<{ items: AuditEntityStat[] }>("/audit-logs/stats", {
-        params: { entity_types: entityTypes.join(",") },
-      })
-      .then((r) => r.data.items),
 };
 
 

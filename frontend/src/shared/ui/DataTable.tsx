@@ -24,6 +24,7 @@ export function DataTable<T>(props: {
   /** 前端分页的筛选或时序变化时，重置到第一页；页大小保持不变。 */
   resetKey?: string | number | boolean;
   rowKey?: string | ((row: T) => string);
+  ariaLabel?: string;
   emptyText?: string;
   /** 需要展开行（如分期期次明细）时透传，其余场景不必传。 */
   expandable?: TableProps<T>["expandable"];
@@ -120,6 +121,7 @@ export function DataTable<T>(props: {
     <div className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}>
       <div ref={tableContent} aria-hidden={refreshing || undefined} aria-busy={refreshing || undefined}>
         <Table<T>
+          aria-label={props.ariaLabel}
           size={props.size ?? "small"}
           columns={props.columns}
           dataSource={displayedRows}

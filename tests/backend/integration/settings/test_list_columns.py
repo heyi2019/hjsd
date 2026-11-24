@@ -50,6 +50,25 @@ def test_cashflow_settings_only_offer_columns_present_on_page(seeded_client, hea
     assert "actions" not in keys
 
 
+def test_rebate_page_column_changes_preserve_legacy_export_configuration(seeded_client, headers):
+    legacy = _scope(seeded_client, headers, "REBATE")
+    saved = _save(seeded_client, headers, "REBATE", [
+        {"column_key": column["key"], "is_visible": column["key"] != "amount", "sort_order": index * 10}
+        for index, column in enumerate(legacy["columns"])
+    ])
+    assert saved.status_code == 200, saved.text
+    export_columns = _scope(seeded_client, headers, "REBATE")["columns"]
+
+    page = _scope(seeded_client, headers, "REBATE_DETAIL")
+    saved = _save(seeded_client, headers, "REBATE_DETAIL", [
+        {"column_key": column["key"], "is_visible": column["key"] != "operator", "sort_order": index * 10}
+        for index, column in enumerate(page["columns"])
+    ])
+    assert saved.status_code == 200, saved.text
+    assert _scope(seeded_client, headers, "REBATE")["columns"] == export_columns
+    assert next(column for column in _scope(seeded_client, headers, "REBATE_DETAIL")["columns"] if column["key"] == "operator")["is_visible"] is False
+
+
 def test_save_hides_column_and_reorders(seeded_client, headers, seeded_db):
     ledger = _scope(seeded_client, headers, "LEDGER")
     columns = ledger["columns"]

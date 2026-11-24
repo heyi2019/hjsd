@@ -45,6 +45,7 @@ PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     "CUSTOMER": "customer-center/useCustomerController.tsx",
     "COUNTERPARTY": "customer-center/CounterpartyPanel.tsx",
     "LEAD": "customer-center/CustomerLeadPanel.tsx",
+    "REBATE_DETAIL": "business/shared/rebate/RebateModal.tsx",
     # 资金中心 5 个 Tab 已拆到 funds-tabs/ 子文件，锚点与列数组同处各自 Tab。
     "CASHFLOW": "pools/funds-tabs/cashflow.tsx",
     "FUND_POOLS": "pools/funds-tabs/overview.tsx",
@@ -58,10 +59,10 @@ PANEL_SOURCES: dict[str, str | tuple[str, str]] = {
     "RPT_ORDER_PROFIT": "operations/reports/OrderProfitReport.tsx",
 }
 
-# 返点仍有 CSV 导出作用域，但前端只在订单详情弹窗中展示关联明细，
-# 该明细表不是独立列表，且列口径不同于导出字段；分润对账同理，页面展示订单汇总、
-# 导出展示展开后的人员明细。两者都不纳入列表页一对一静态一致性守卫。
-NON_UI_SCOPES = {"REBATE", "RPT_COMMISSION"}
+# REBATE 是旧 CSV 导出配置，返点弹窗另用 REBATE_DETAIL。
+# RPT_COMMISSION 同时配置订单汇总、人员明细与导出，且人员 ID 仅用于导出；
+# 这两者不适合与单张页面表格逐列比较。
+NON_ONE_TO_ONE_SCOPES = {"REBATE", "RPT_COMMISSION"}
 
 _ARRAY_DECL = re.compile(r"=\s*\[")
 
@@ -197,14 +198,14 @@ def test_lead_table_exposes_operator_column() -> None:
 
 def test_every_registered_scope_has_a_panel() -> None:
     """可渲染列表必须登记面板；导出专用作用域显式列入例外。"""
-    registered = {scope.code for scope in LIST_SCOPES} - NON_UI_SCOPES
+    registered = {scope.code for scope in LIST_SCOPES} - NON_ONE_TO_ONE_SCOPES
     missing = sorted(registered - set(PANEL_SOURCES))
     stale = sorted(set(PANEL_SOURCES) - registered)
     assert not missing, f"注册表有作用域没登记面板来源：{missing}"
     assert not stale, f"面板来源登记了已不存在的作用域：{stale}"
 
 
-@pytest.mark.parametrize("scope_code", [scope.code for scope in LIST_SCOPES if scope.code not in NON_UI_SCOPES])
+@pytest.mark.parametrize("scope_code", [scope.code for scope in LIST_SCOPES if scope.code not in NON_ONE_TO_ONE_SCOPES])
 def test_panel_columns_match_registry(scope_code: str) -> None:
     """界面列必须与注册表逐列同 key、同中文名、同顺序。
 

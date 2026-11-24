@@ -19,10 +19,6 @@ export function money(value: string | number | null | undefined): string {
   return num.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export function signedMoney(value: string | number | null | undefined): string {
-  return money(value);
-}
-
 export function today(): string {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, "0");

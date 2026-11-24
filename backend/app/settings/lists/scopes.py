@@ -156,6 +156,17 @@ LIST_SCOPES: tuple[ListScope, ...] = (
         ),
     ),
     ListScope(
+        code="REBATE_DETAIL",
+        label="返点明细",
+        columns=(
+            ListColumn("rebate_type", "类型"),
+            ListColumn("amount", "金额"),
+            ListColumn("collected_on", "返点日期"),
+            ListColumn("operator", "操作人"),
+            ListColumn("actions", "操作"),
+        ),
+    ),
+    ListScope(
         code="CASHFLOW",
         label="资金流水",
         columns=(

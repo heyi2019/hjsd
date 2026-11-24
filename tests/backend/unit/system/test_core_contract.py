@@ -157,19 +157,8 @@ class TestErrorHelpers:
 class TestSecurityScopes:
     def test_permission_combinators(self):
         admin = CurrentUser.build(id=1, username="admin", roles=[ROLE_ADMIN])
-        assert admin.has_all(["customer.read", "order.create"]) is True
         assert admin.has_any(["customer.read", "no.such.perm"]) is True
-        assert admin.has_all(["no.such.perm"]) is False
         assert admin.has_any(["no.such.perm"]) is False
-
-    def test_can_see_owner(self):
-        admin = CurrentUser.build(id=1, username="admin", roles=[ROLE_ADMIN])
-        scoped = CurrentUser.build(
-            id=9, username="operator", roles=[ROLE_OPERATOR], owner_scope="SELF"
-        )
-        assert admin.can_see_owner(4242) is True
-        assert scoped.can_see_owner(9) is True
-        assert scoped.can_see_owner(10) is False
 
     def test_owner_scope_ids_self_and_team(self, seeded_db):
         from app.domain.users import User

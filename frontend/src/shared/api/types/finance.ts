@@ -121,6 +121,7 @@ export interface Rebate {
   created_at?: string;
   operator?: string;
   operator_user_ids?: number[] | null;
+  form_extra?: Record<string, unknown> | null;
 }
 
 export interface Reconciliation { id: number; pool_id: number; reconciled_on: string; account_label: string; system_balance: string; statement_balance: string; difference: string; status: string; reason?: string | null; note?: string | null; operator?: string | null; operation_operators?: DepositOperationOperator[] }

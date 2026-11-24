@@ -12,9 +12,6 @@ export const optionSetsApi = {
     api.get<OptionSetList>("/option-sets", { params }).then((r) => r.data),
   get: (code: string) =>
     api.get<OptionSet>(`/option-sets/${code}`).then((r) => r.data),
-  create: (payload: Partial<OptionSet>) =>
-    api.post<OptionSet>("/option-sets", payload).then((r) => optionSetsChanged(r.data)),
   update: (code: string, payload: Partial<OptionSet>) =>
     api.put<OptionSet>(`/option-sets/${code}`, payload).then((r) => optionSetsChanged(r.data)),
-  remove: (code: string) => api.delete(`/option-sets/${code}`).then(optionSetsChanged),
 };

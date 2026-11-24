@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   filterRetiredOrderTypeOptions,
   filterRetiredOrderTypes,
-  filterRetiredValueAddedServiceOptions,
 } from "@/shared/lib/retiredProducts";
 
 describe("已下线产品过滤", () => {
@@ -11,13 +10,6 @@ describe("已下线产品过滤", () => {
       { value: "HS", label: "回收" },
       { value: "DFQ", label: "代分期" },
     ])).toEqual([{ value: "HS", label: "回收" }]);
-  });
-
-  it("增值服务选项不再显示 ADVANCE_PURCHASE", () => {
-    expect(filterRetiredValueAddedServiceOptions([
-      { value: "STOCK_SALE", label: "分期" },
-      { value: "ADVANCE_PURCHASE", label: "代分期" },
-    ])).toEqual([{ value: "STOCK_SALE", label: "分期" }]);
   });
 
   it("业务类型主数据列表不再显示 DFQ", () => {

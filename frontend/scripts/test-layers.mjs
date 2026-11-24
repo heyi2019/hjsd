@@ -27,7 +27,6 @@ export const fastTests = [
   // 业务纯逻辑
   "tests/frontend/unit/business/inventory-logic.test.ts",
   "tests/frontend/unit/business/ProfitAllocation.test.ts",
-  "tests/frontend/unit/business/InventoryPanel-helpers.test.ts",
   "tests/frontend/unit/business/OrderDetailEditPayload.test.ts",
   "tests/frontend/unit/business/StocksApiRoutes.test.ts",
   "tests/frontend/unit/business/consignment-logic.test.ts",

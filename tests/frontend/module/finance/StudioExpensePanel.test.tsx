@@ -366,7 +366,6 @@ describe("StudioExpensePanel：工作室支出", () => {
     expect(within(row).queryByRole("button", { name: "删除" })).toBeNull();
     await ui.click(within(row).getByRole("button", { name: "冲销" }));
     const modal = await screen.findByRole("dialog", { name: /冲销工作室收支/ });
-    expect(cashflowsApi.remove).not.toHaveBeenCalled();
     await ui.type(within(modal).getByLabelText("冲销原因"), "登记错误");
     await ui.click(within(modal).getByRole("button", { name: "确认冲销" }));
     await waitFor(() => expect(cashflowsApi.reverse).toHaveBeenCalledWith(51, expect.objectContaining({

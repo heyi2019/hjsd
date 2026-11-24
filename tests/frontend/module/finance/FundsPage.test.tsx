@@ -18,10 +18,12 @@ import { transfersApi } from "@/shared/api/transfers.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
-import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
+import { cashflowPage, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { BusinessPeriodProvider, useBusinessPeriod } from "@/shared/state/businessPeriod";
 import { previousReportPeriod } from "@/shared/lib/reportPeriod";
+const depositRows = vi.fn<() => Promise<Awaited<ReturnType<typeof depositsApi.page>>["items"]>>();
+const reconciliationRows = vi.fn<() => Promise<Awaited<ReturnType<typeof reconciliationsApi.page>>["items"]>>();
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -70,11 +72,11 @@ const cashflows = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(depositsApi.page).mockImplementation(async ({ limit, offset }) => {
-    const items = await depositsApi.list();
+    const items = await depositRows();
     return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
   });
   vi.mocked(reconciliationsApi.page).mockImplementation(async ({ limit, offset }) => {
-    const items = await reconciliationsApi.list();
+    const items = await reconciliationRows();
     return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
   });
 
@@ -85,11 +87,10 @@ beforeEach(() => {
     pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
     { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" },
   ));
-  resolveMock(vi.mocked(depositsApi.list), deposits);
+  resolveMock(vi.mocked(depositRows), deposits);
   resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(cashflows, { total_in: "800.00", total_out: "500.00" }));
-  resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "500.00" }));
   vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([]));
-  vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
+  vi.mocked(reconciliationRows).mockResolvedValue([]);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
     { id: 2, username: "finance", display_name: "财务", is_active: true },
@@ -293,12 +294,12 @@ describe("FundsPage：资金账户卡片", () => {
       if (depositsStarted && reconciliationsStarted) releasePools(pools);
     };
     vi.mocked(poolsApi.list).mockImplementationOnce(() => new Promise((resolve) => { releasePools = resolve; }));
-    vi.mocked(depositsApi.list).mockImplementationOnce(async () => {
+    vi.mocked(depositRows).mockImplementationOnce(async () => {
       depositsStarted = true;
       releaseWhenBothStart();
       return deposits;
     });
-    vi.mocked(reconciliationsApi.list).mockImplementationOnce(async () => {
+    vi.mocked(reconciliationRows).mockImplementationOnce(async () => {
       reconciliationsStarted = true;
       releaseWhenBothStart();
       return [];
@@ -309,12 +310,12 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("押金和对账尚未完成时，资金总览先显示余额并允许划转", async () => {
-    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
-    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
-    const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
-    const pendingReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finishReconciliations = resolve; });
-    vi.mocked(depositsApi.list).mockReturnValueOnce(pendingDeposits);
-    vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pendingReconciliations);
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositRows>>) => void;
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationRows>>) => void;
+    const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositRows>>>((resolve) => { finishDeposits = resolve; });
+    const pendingReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationRows>>>((resolve) => { finishReconciliations = resolve; });
+    vi.mocked(depositRows).mockReturnValueOnce(pendingDeposits);
+    vi.mocked(reconciliationRows).mockReturnValueOnce(pendingReconciliations);
     renderLight(<FundsPage />, { user: "admin" });
 
     try {
@@ -331,8 +332,8 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it.each(["押金", "对账"])("%s列表加载失败时，已成功的资金总览仍可用", async (kind) => {
-    if (kind === "押金") vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
-    else vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
+    if (kind === "押金") vi.mocked(depositRows).mockRejectedValueOnce(new Error("押金加载失败"));
+    else vi.mocked(reconciliationRows).mockRejectedValueOnce(new Error("对账加载失败"));
     renderLight(<FundsPage />, { user: "admin" });
 
     await ui.click(screen.getByRole("tab", { name: kind }));
@@ -343,10 +344,10 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("账户读取失败时，无需等押金列表即可提示总览不可用", async () => {
-    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
-    const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositRows>>) => void;
+    const pendingDeposits = new Promise<Awaited<ReturnType<typeof depositRows>>>((resolve) => { finishDeposits = resolve; });
     vi.mocked(poolsApi.list).mockRejectedValueOnce(new Error("账户加载失败"));
-    vi.mocked(depositsApi.list).mockReturnValueOnce(pendingDeposits);
+    vi.mocked(depositRows).mockReturnValueOnce(pendingDeposits);
     renderLight(<FundsPage />, { user: "admin" });
 
     try {
@@ -359,10 +360,10 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("押金仍在加载时，对账列表就绪后可以查看和新增", async () => {
-    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
-    const pending = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
-    vi.mocked(depositsApi.list).mockReturnValueOnce(pending);
-    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositRows>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof depositRows>>>((resolve) => { finishDeposits = resolve; });
+    vi.mocked(depositRows).mockReturnValueOnce(pending);
+    vi.mocked(reconciliationRows).mockResolvedValueOnce([
       { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "测试对账账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "OPEN" },
     ]);
     renderLight(<FundsPage />, { user: "admin" });
@@ -378,9 +379,9 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("对账仍在加载时，已就绪的押金列表无需等待", async () => {
-    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
-    const pending = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finishReconciliations = resolve; });
-    vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pending);
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationRows>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof reconciliationRows>>>((resolve) => { finishReconciliations = resolve; });
+    vi.mocked(reconciliationRows).mockReturnValueOnce(pending);
     renderLight(<FundsPage />, { user: "admin" });
 
     try {
@@ -394,10 +395,10 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("对账失败后可独立重试，不必等待正在加载的押金", async () => {
-    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
-    const pending = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
-    vi.mocked(depositsApi.list).mockReturnValueOnce(pending);
-    vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositRows>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof depositRows>>>((resolve) => { finishDeposits = resolve; });
+    vi.mocked(depositRows).mockReturnValueOnce(pending);
+    vi.mocked(reconciliationRows).mockRejectedValueOnce(new Error("对账加载失败"));
     renderLight(<FundsPage />, { user: "admin" });
 
     try {
@@ -406,7 +407,7 @@ describe("FundsPage：资金账户卡片", () => {
       expect(screen.getByRole("button", { name: "新增对账" })).toBeDisabled();
       await ui.click(screen.getByRole("button", { name: "重新加载" }));
       await waitFor(() => expect(screen.getByRole("button", { name: "新增对账" })).toBeEnabled());
-      expect(depositsApi.list).toHaveBeenCalledTimes(1);
+      expect(depositsApi.page).toHaveBeenCalledTimes(1);
     } finally {
       await act(async () => { finishDeposits(deposits); await pending; });
     }
@@ -415,8 +416,8 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it.each(["押金", "对账"])("%s加载失败时，资金流水仍独立可用", async (kind) => {
-    if (kind === "押金") vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
-    else vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("对账加载失败"));
+    if (kind === "押金") vi.mocked(depositRows).mockRejectedValueOnce(new Error("押金加载失败"));
+    else vi.mocked(reconciliationRows).mockRejectedValueOnce(new Error("对账加载失败"));
     renderLight(<FundsPage />, { user: "admin" });
     await ui.click(screen.getByRole("tab", { name: kind }));
     expect(await screen.findByRole("alert")).toHaveTextContent(`${kind}加载失败`);
@@ -428,7 +429,7 @@ describe("FundsPage：资金账户卡片", () => {
   it.each(["对账", "资金明细"])("账户重新加载时，%s不展示上次的账户名称", async (kind) => {
     let finishPools!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
     const pending = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishPools = resolve; });
-    vi.mocked(reconciliationsApi.list).mockResolvedValue([
+    vi.mocked(reconciliationRows).mockResolvedValue([
       { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "测试对账账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "OPEN" },
     ]);
     const { rerender } = renderLight(<FundsPage active />, { user: "admin" });
@@ -450,19 +451,19 @@ describe("FundsPage：资金账户卡片", () => {
 
   it("旧一轮资金请求晚返回时，不覆盖重新进入后的账户、押金和对账", async () => {
     let finishPools!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
-    let finishDeposits!: (value: Awaited<ReturnType<typeof depositsApi.list>>) => void;
-    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
+    let finishDeposits!: (value: Awaited<ReturnType<typeof depositRows>>) => void;
+    let finishReconciliations!: (value: Awaited<ReturnType<typeof reconciliationRows>>) => void;
     const oldPools = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finishPools = resolve; });
-    const oldDeposits = new Promise<Awaited<ReturnType<typeof depositsApi.list>>>((resolve) => { finishDeposits = resolve; });
-    const oldReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finishReconciliations = resolve; });
+    const oldDeposits = new Promise<Awaited<ReturnType<typeof depositRows>>>((resolve) => { finishDeposits = resolve; });
+    const oldReconciliations = new Promise<Awaited<ReturnType<typeof reconciliationRows>>>((resolve) => { finishReconciliations = resolve; });
     const reconciliation = { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "新对账账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "OPEN" };
     vi.mocked(poolsApi.list).mockReturnValueOnce(oldPools);
     vi.mocked(poolsApi.balances).mockResolvedValueOnce(poolBalancesResponse(
       [{ ...balance, pool_id: 1, pool_code: "POOL-A" }],
       { pool_count: 1, cash_balance: "9999.00", available: "9900.00", deposit_held: "99.00" },
     ));
-    vi.mocked(depositsApi.list).mockReturnValueOnce(oldDeposits);
-    vi.mocked(reconciliationsApi.list).mockResolvedValue([reconciliation]).mockReturnValueOnce(oldReconciliations);
+    vi.mocked(depositRows).mockReturnValueOnce(oldDeposits);
+    vi.mocked(reconciliationRows).mockResolvedValue([reconciliation]).mockReturnValueOnce(oldReconciliations);
 
     const { rerender } = renderLight(<FundsPage active />, { user: "admin" });
     await waitFor(() => expect(poolsApi.list).toHaveBeenCalledTimes(1));
@@ -535,10 +536,10 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("押金失败后可独立重试，不必等待正在加载的对账", async () => {
-    let finish!: (value: Awaited<ReturnType<typeof reconciliationsApi.list>>) => void;
-    const pending = new Promise<Awaited<ReturnType<typeof reconciliationsApi.list>>>((resolve) => { finish = resolve; });
-    vi.mocked(depositsApi.list).mockRejectedValueOnce(new Error("押金加载失败"));
-    vi.mocked(reconciliationsApi.list).mockReturnValueOnce(pending);
+    let finish!: (value: Awaited<ReturnType<typeof reconciliationRows>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof reconciliationRows>>>((resolve) => { finish = resolve; });
+    vi.mocked(depositRows).mockRejectedValueOnce(new Error("押金加载失败"));
+    vi.mocked(reconciliationRows).mockReturnValueOnce(pending);
     renderLight(<FundsPage />, { user: "admin" });
 
     try {
@@ -548,7 +549,7 @@ describe("FundsPage：资金账户卡片", () => {
       await ui.click(screen.getByRole("button", { name: "重新加载" }));
       expect(await screen.findByText("#99")).toBeInTheDocument();
       await waitFor(() => expect(screen.getByRole("button", { name: "新增占用" })).toBeEnabled());
-      expect(reconciliationsApi.list).toHaveBeenCalledTimes(1);
+      expect(reconciliationsApi.page).toHaveBeenCalledTimes(1);
     } finally {
       await act(async () => { finish([]); await pending; });
     }
@@ -693,7 +694,7 @@ describe("FundsPage：资金账户卡片", () => {
   });
 
   it("FE-230：对账失败时显示明确空态并禁用新增", async () => {
-    vi.mocked(reconciliationsApi.list).mockRejectedValueOnce(new Error("reconciliations down"));
+    vi.mocked(reconciliationRows).mockRejectedValueOnce(new Error("reconciliations down"));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "对账" }));
@@ -896,7 +897,6 @@ describe("FundsPage：资金流水", () => {
       total_in: "123456.78",
       total_out: "87654.32",
     }));
-    vi.mocked(cashflowsApi.totals).mockResolvedValue(cashflowTotals({ total_in: "123456.78", total_out: "87654.32" }));
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "资金明细" }));
@@ -1026,7 +1026,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("押金释放金额超过大额剩余一分时提示并阻止提交", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_amount: "9999999999999999.98", returned_amount: "0.00", remaining_amount: "9999999999999999.98", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
+    vi.mocked(depositRows).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_amount: "9999999999999999.98", returned_amount: "0.00", remaining_amount: "9999999999999999.98", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "押金" }));
@@ -1039,7 +1039,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("未发生释放或损失的押金可编辑并回填", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
+    vi.mocked(depositRows).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
     resolveMockOnce(vi.mocked(depositsApi.update), { ...deposits[0], status: "PAID" });
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -1053,7 +1053,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("押金保留凭证，未发生释放或损失时可取消", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
+    vi.mocked(depositRows).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", paid_amount: "500.00", remaining_amount: "500.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] }] as never);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "押金" }));
@@ -1063,7 +1063,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("部分损失后的押金不能编辑或取消，仍可释放和登记损失", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", returned_amount: "0.00", lost_amount: "50.00", remaining_amount: "450.00" }] as never);
+    vi.mocked(depositRows).mockResolvedValueOnce([{ ...deposits[0], status: "PAID", returned_amount: "0.00", lost_amount: "50.00", remaining_amount: "450.00" }] as never);
     renderLight(<FundsPage />, { user: "admin" });
     await screen.findByRole("cell", { name: /经营主池/ });
     await ui.click(screen.getByRole("tab", { name: "押金" }));
@@ -1075,7 +1075,7 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("押金逐笔展示退还和损失的操作人", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{ ...deposits[0], action_history: [
+    vi.mocked(depositRows).mockResolvedValueOnce([{ ...deposits[0], action_history: [
       { flow_no: "SR00001", action: "RETURN", occurred_on: "2026-10-01", amount: "20.00", operator_user_ids: [1], operator: "admin" },
       { flow_no: "SR00002", action: "RETURN", occurred_on: "2026-10-02", amount: "30.00", operator_user_ids: [2], operator: "finance" },
       { flow_no: "ZC00003", action: "LOSS", occurred_on: "2026-10-03", amount: "10.00", operator_user_ids: [1, 2], operator: "admin" },
@@ -1119,9 +1119,9 @@ describe("FundsPage：资金写路径", () => {
   });
 
   it("押金取消：PAID 押金填原因后调用 depositsApi.cancel（全额冲正由后端写）", async () => {
-    vi.mocked(depositsApi.list).mockResolvedValue([
+    vi.mocked(depositRows).mockResolvedValue([
       { id: 12, pool_id: 1, paid_amount: "300.00", returned_amount: "0.00", lost_amount: "0.00", remaining_amount: "300.00", status: "PAID", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"] },
-    ] as unknown as Awaited<ReturnType<typeof depositsApi.list>>);
+    ] as unknown as Awaited<ReturnType<typeof depositRows>>);
     resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 12 });
     renderLight(<FundsPage />, { user: "finance" });
     await screen.findByRole("cell", { name: /经营主池/ });
@@ -1148,8 +1148,8 @@ describe("FundsPage：资金写路径", () => {
     { ...balance, pool_id: 1, pool_code: "POOL-A" },
     { ...balance, pool_id: 2, pool_code: "POOL-B" },
   ], { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" }));
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([] as never);
-    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([] as never);
+    vi.mocked(depositRows).mockResolvedValueOnce([] as never);
+    vi.mocked(reconciliationRows).mockResolvedValueOnce([] as never);
     resolveMockOnce(vi.mocked(transfersApi.create), { transfer_id: "TRF-TEST" });
     renderLight(<FundsPage />, { user: "admin" });
     const user = userEvent.setup({ pointerEventsCheck: 0 });

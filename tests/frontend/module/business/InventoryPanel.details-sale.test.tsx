@@ -682,7 +682,6 @@ it("不填写客户时仍可售出", async () => {
     amount: "350", delivery_form_extra: expect.objectContaining({ intermediary_platform: "盼之", intermediary_platform_other: null }),
   })));
   expect(customersApi.create).not.toHaveBeenCalled();
-  expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
 });
 
 it("填写客户时无需预先加载完整客户名单", async () => {
@@ -720,7 +719,6 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
     amount: "350", pool_id: 3, operator_user_ids: [1],
   })));
   expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
-  expect(vi.mocked(ordersApi.addCustomerRole)).not.toHaveBeenCalled();
   expect(vi.mocked(customersApi.create)).not.toHaveBeenCalled();
   expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
 });
@@ -775,8 +773,6 @@ describe("库存售出三表单分支", () => {
     expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
       amount: "200", pool_id: 3, sale_amount: "1000", form_extra: { sale_receipt: "全款凭据" }, customer_input: expect.objectContaining({ display_name: "买家A", role: "CONSIGNOR" }),
     }));
-    expect(vi.mocked(ordersApi.addCustomerRole)).not.toHaveBeenCalled();
-    expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
   });
 
   it("代挂售出复用买号交付信息块，交付操作人提交落库到来源单", async () => {
@@ -911,7 +907,6 @@ describe("库存售出三表单分支", () => {
     })));
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
-    expect(vi.mocked(installmentsApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(installmentsApi.pay)).not.toHaveBeenCalled();
   });
 
@@ -999,7 +994,6 @@ describe("库存售出三表单分支", () => {
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
 
     await waitFor(() => expect(screen.getByText(/客户已拉黑，不能作为售出买家/)).toBeInTheDocument());
-    expect(ordersApi.addCustomerRole).not.toHaveBeenCalled();
     expect(ordersApi.postEvent).not.toHaveBeenCalled();
   });
 });

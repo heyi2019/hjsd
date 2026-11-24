@@ -1,8 +1,7 @@
 import { beforeEach, vi } from "vitest";
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { orderCashflowsApi } from "@/shared/api/orderCashflows.api";
-import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
-import { installmentsApi } from "@/shared/api/installments.api";
+import { counterpartiesApi } from "@/shared/api/customers.api";
 import { ordersApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
@@ -53,12 +52,10 @@ export const resetInventoryPanelMocks = () => {
   resolveMock(vi.mocked(ordersApi.create), { id: 21 });
   resolveMock(vi.mocked(ordersApi.postEvent), {});
   resolveMock(vi.mocked(orderCashflowsApi.create), {});
-  resolveMock(vi.mocked(customersApi.list), [{ id: 7, display_name: "买家A", status: "ACTIVE" }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 3, code: "HJ_PROFIT", name: "利润池", status: "ACTIVE" }]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
   resolveMock(vi.mocked(rebatesApi.create), { id: 31 });
   resolveMock(vi.mocked(rebatesApi.list), []);
-  resolveMock(vi.mocked(installmentsApi.create), { id: 41 });
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },
   ]);

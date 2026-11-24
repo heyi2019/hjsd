@@ -17,8 +17,6 @@ export const poolsApi = {
   },
   create: (payload: Partial<Pool>) => api.post<Pool>("/pools", payload).then((r) => poolChanged(r.data)),
   remove: (id: number) => api.delete<void>(`/pools/${id}`).then(r => poolChanged(r.data)),
-  balance: (poolId: number) =>
-    api.get<PoolBalance>(`/pools/${poolId}/balance`, { refreshCache: true } as CacheAwareRequestConfig).then((r) => r.data),
   /** 全部可见池的余额 + 服务端汇总；替代逐池 N+1 与前端累加。 */
   balances: () =>
     api

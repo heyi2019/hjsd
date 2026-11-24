@@ -19,19 +19,6 @@ export function toCents(value: unknown): number {
   return Math.round(Number((numeric * 100).toFixed(4)));
 }
 
-/** 分 → 2 位小数字符串（只做展示格式化，不参与后续运算）。 */
-export function fromCents(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
-
-/** 多笔金额（元）求和，返回分。空值/非法值按 0 计（表单里空着就等于没填）。 */
-export function sumCents(values: Array<unknown>): number {
-  return values.reduce<number>((sum, value) => {
-    const cents = toCents(value);
-    return sum + (Number.isFinite(cents) ? cents : 0);
-  }, 0);
-}
-
 /** 多笔金额（元）求和，返回 2 位小数字符串；字符串金额不经过浮点数。 */
 export function sumMoney(values: Array<unknown>): string {
   const total = values.reduce<bigint>((sum, value) => {

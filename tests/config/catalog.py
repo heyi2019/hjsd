@@ -295,7 +295,6 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "OrdersPage.test.tsx":                 "B01",
     "helpers.test.ts":                     "B01",
     "businessReminderConfig.test.ts":      "B02",
-    "InventoryPanel-helpers.test.ts":      "B04",
     "InventoryPanel.deep.test.tsx":        "B04",
     "InventoryPanel.sale.test.tsx":        "B04",
     "InventoryPanel.write.test.tsx":       "B04",

@@ -13,12 +13,6 @@
 .inventory-rebate-details {
   gap: var(--space-2);
 }
-.inventory-rebate-details .orders-event-list,
-.inventory-rebate-details .orders-event-table {
-  margin-block-start: 0;
-  margin-top: 0;
-}
-
 .inventory-rebate-form .ant-form-item-label > label:not(.ant-form-item-required)::before {
   content: "*";
   display: inline-block;
@@ -27,28 +21,7 @@
   visibility: hidden;
 }
 
-/* 返点明细沿用资金明细的小表格规格：表头固定、行高紧凑，窄屏只横向滚动表格本身。 */
+/* 窄屏只横向滚动返点明细。 */
 .inventory-rebate-table {
   width: 100%;
-  min-width: min(100%, 56rem);
-}
-.inventory-rebate-table .orders-event-row {
-  grid-template-columns: minmax(8rem, 1.2fr) minmax(7rem, 1fr) minmax(8rem, 1fr) minmax(7rem, 1fr) minmax(8rem, 1.1fr);
-}
-.inventory-rebate-table .orders-event-row > [role="columnheader"],
-.inventory-rebate-table .orders-event-row > [role="cell"] {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.inventory-rebate-table__empty {
-  min-height: 4.5rem;
-}
-.inventory-rebate-table__empty [role="cell"] {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-tertiary);
-  white-space: normal;
 }

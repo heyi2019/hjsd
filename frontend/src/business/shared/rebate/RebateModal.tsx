@@ -1,6 +1,7 @@
 import { appMessage } from "../../../shared/ui/appFeedback";
 import { configurableLabel } from "../../../shared/lib/optionSets";
 import { Form, Input, Radio, Space, Spin, Typography } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import { useEffect, useMemo, useState } from "react";
 import { employeesApi } from "../../../shared/api/org.api";
 import { ordersApi } from "../../../shared/api/orders.api";
@@ -13,11 +14,12 @@ import { normalizeError } from "../../../shared/api/client";
 import { today } from "../../../shared/lib/format";
 import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { moneyRules } from "../../../shared/lib/validators";
-import { BusinessActionModal, BusinessRegistrationForm, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
+import { BusinessActionModal, BusinessRegistrationForm, DataTable, DateField, ErrorBanner, MoneyInput, MoneyText, PermissionButton, dateValueFromEvent, dateValueProps } from "../../../shared/ui";
 import { CfgItem, CustomFieldSections, FieldConfigContext, FieldConfigStatus, SectionLabelsContext, useOrderFormConfig, useOrderFormSectionLabels } from "../../../shared/forms/ConfigurableField";
 import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
+import { useListViewColumns } from "../../../shared/lib/listColumns";
 import { InventoryAccountSummary } from "../inventory/InventoryAccountSummary";
 import "./RebateModal.css";
 import { indexEmployeeNames } from "../employee-names";
@@ -202,6 +204,32 @@ export function InventoryRebateModal(props: {
     props.onClose();
   };
 
+  const { arrange: arrangeRebateColumns } = useListViewColumns("REBATE_DETAIL");
+  const rebateColumns: ColumnsType<Rebate> = [
+    { title: "类型", dataIndex: "rebate_type", width: 150, render: (value: string) => value === "BUY" ? "买号返点" : "卖号返点" },
+    { title: "金额", dataIndex: "amount", width: 120, render: (value: string) => <MoneyText value={value} /> },
+    { title: "返点日期", dataIndex: "collected_on", width: 130 },
+    { title: "操作人", key: "operator", width: 130, render: (_value, row) => row.operator_user_ids?.map((id) => employeeNames.get(id)).filter(Boolean).join("、") || row.operator || "-" },
+    {
+      title: "操作", key: "actions", width: 100, render: (_value, row) => (
+        <PermissionButton
+          permission="order.event.post"
+          size="small"
+          onClick={() => {
+            setEditError(null);
+            editForm.setFieldsValue({
+              amount: row.amount,
+              collected_on: row.collected_on,
+              note: row.note ?? "",
+              operator_user_ids: row.operator_user_ids ?? undefined,
+            });
+            setEditTarget(row);
+          }}
+        >编辑</PermissionButton>
+      ),
+    },
+  ];
+
   return (
     <>
     <BusinessActionModal
@@ -264,46 +292,21 @@ export function InventoryRebateModal(props: {
       {!loading ? (
         <section className="inventory-rebate-details ui-stack" aria-label="返点明细">
           <Typography.Text strong>返点明细</Typography.Text>
-          <div className="ui-form-spaced orders-event-list">
-            <div className="orders-event-table inventory-rebate-table" role="table" aria-label="返点明细表">
-              <div className="orders-event-row orders-event-row--header" role="row">
-                {(["类型", "金额", "返点日期", "操作人", "操作"] as const).map((label) => (
-                  <span key={label} role="columnheader">{label}</span>
-                ))}
-              </div>
-              {rebates.length ? rebates.map((row) => (
-                <div key={row.id} className="orders-event-row" role="row">
-                  <span role="cell">{row.rebate_type === "BUY" ? "买号返点" : "卖号返点"}</span>
-                  <span role="cell"><MoneyText value={row.amount} /></span>
-                  <span role="cell">{row.collected_on}</span>
-                  <span role="cell">{row.operator_user_ids?.map((id) => employeeNames.get(id)).filter(Boolean).join("、") || row.operator || "-"}</span>
-                  <span role="cell">
-                    <Space size={2}>
-                      <PermissionButton
-                        permission="order.event.post"
-                        size="small"
-                        onClick={() => {
-                          setEditError(null);
-                          editForm.setFieldsValue({
-                            amount: row.amount,
-                            collected_on: row.collected_on,
-                            note: row.note ?? "",
-                            operator_user_ids: row.operator_user_ids ?? undefined,
-                          });
-                          setEditTarget(row);
-                        }}
-                      >编辑</PermissionButton>
-                      {/* 2026-11-12 裁决：返点不可删除/作废；退回走资金中心录入 OUT 支出。 */}
-                    </Space>
-                  </span>
-                </div>
-              )) : (
-                <div className="orders-event-row inventory-rebate-table__empty" role="row">
-                  <span role="cell">暂无返点明细</span>
-                </div>
-              )}
-            </div>
-          </div>
+          <DataTable<Rebate>
+            ariaLabel="返点明细表"
+            className="inventory-rebate-table"
+            columns={arrangeRebateColumns(rebateColumns)}
+            rows={rebates}
+            rowKey="id"
+            size="small"
+            pagination={false}
+            scroll={{ x: "max-content" }}
+            emptyText="暂无返点明细"
+            page={1}
+            pageSize={10}
+            total={rebates.length}
+            onPageChange={() => undefined}
+          />
         </section>
       ) : null}
     </BusinessActionModal>

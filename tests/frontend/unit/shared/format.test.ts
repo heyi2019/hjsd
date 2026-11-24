@@ -7,7 +7,6 @@ import {
   INSTALLMENT_STATUS_LABEL,
   ORDER_STATUS_LABEL,
   money,
-  signedMoney,
   statusColor,
   today,
 } from "@/shared/lib/format";
@@ -59,9 +58,6 @@ describe("money：金额展示（前端不做浮点运算，只格式化）", ()
     expect(money(1234.567)).toBe("1,234.57");
   });
 
-  it("signedMoney 与 money 同口径（当前不额外加正号）", () => {
-    expect(signedMoney("12.3")).toBe(money("12.3"));
-  });
 });
 
 describe("today：本地日期字符串", () => {

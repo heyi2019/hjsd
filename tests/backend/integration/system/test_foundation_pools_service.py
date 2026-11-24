@@ -145,17 +145,6 @@ class TestPools:
 class TestDefaultPoolAndLookup:
     """Task #5 补口：默认资金账户语义（2026-11-17 路由下线后）与代码查找分支。"""
 
-    def test_require_pool_by_code_raises_resource_not_found(self, db):
-        from app.settings.field_definitions.pools import require_pool_by_code
-
-        pool = create_pool(db, code="TMPLK", name="查找池", actor="pytest")
-        db.commit()
-        assert require_pool_by_code(db, "TMPLK").id == pool.id
-
-        with pytest.raises(AppError) as exc:
-            require_pool_by_code(db, "NO_SUCH_POOL")
-        assert exc.value.code == ErrorCode.RESOURCE_NOT_FOUND
-
     def test_require_default_pool_raises_when_no_default(self, db):
         """两个活动池且无 is_default：无法确定唯一默认账户，须拒绝落账。"""
         from app.settings.field_definitions.pools import require_default_pool

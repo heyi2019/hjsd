@@ -53,11 +53,6 @@ function fetchAll(): Promise<void> {
   return inflight;
 }
 
-/** 设置页保存后调用：让所有已挂载列表按新配置重排，无需刷新页面。 */
-export function refreshListColumns(): Promise<void> {
-  return fetchAll();
-}
-
 /** 保存接口返回完整配置，可直接同步页面；较早发出的全量读取不得覆盖它。 */
 export function updateListColumnScope(scope: ListScopeConfig): void {
   scopeRevisions.set(scope.code, ++revision);
@@ -120,16 +115,6 @@ export function markMobileIdentityColumn<T extends { key?: unknown; dataIndex?: 
       return { ...cell, className: [cell.className, "ui-col-mobile-identity"].filter(Boolean).join(" ") };
     },
   } as T);
-}
-
-/** 移动端卡片字段按列表配置排列；配置未提供时保持页面定义顺序。 */
-export function orderMobileFields<T extends { key: string }>(fields: T[], configuredKeys?: string[]): T[] {
-  if (!configuredKeys?.length) return fields;
-  const order = new Map(configuredKeys.map((key, index) => [key, index]));
-  return fields
-    .filter((field) => order.has(field.key))
-    .slice()
-    .sort((a, b) => (order.get(a.key) as number) - (order.get(b.key) as number));
 }
 
 export interface ListViewColumns {

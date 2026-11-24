@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { FundsPage } from "@/pools/FundsPage";
 import { resolveMock, resolveMockOnce } from "@fixtures/mock-api";
-import { cashflowPage, cashflowTotals, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
+import { cashflowPage, poolBalancesResponse, studioExpenseSummary } from "@fixtures/api-responses";
 
 import { cashflowsApi } from "@/shared/api/cashflows.api";
 import { depositsApi } from "@/shared/api/deposits.api";
@@ -17,6 +17,8 @@ import { transfersApi } from "@/shared/api/transfers.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
 import { employeesApi } from "@/shared/api/org.api";
+const depositRows = vi.fn<() => Promise<Awaited<ReturnType<typeof depositsApi.page>>["items"]>>();
+const reconciliationRows = vi.fn<() => Promise<Awaited<ReturnType<typeof reconciliationsApi.page>>["items"]>>();
 let ui: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
@@ -66,11 +68,11 @@ const cashflows = [
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(depositsApi.page).mockImplementation(async ({ limit, offset }) => {
-    const items = await depositsApi.list();
+    const items = await depositRows();
     return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
   });
   vi.mocked(reconciliationsApi.page).mockImplementation(async ({ limit, offset }) => {
-    const items = await reconciliationsApi.list();
+    const items = await reconciliationRows();
     return { items: items.slice(offset, offset + limit), total: items.length, limit, offset };
   });
 
@@ -81,12 +83,11 @@ beforeEach(() => {
     pools.map((pool) => ({ ...balance, pool_id: pool.id, pool_code: pool.code })),
     { pool_count: 2, cash_balance: "1600.00", available: "1400.00", deposit_held: "200.00" },
   ));
-  resolveMock(vi.mocked(depositsApi.list), deposits);
+  resolveMock(vi.mocked(depositRows), deposits);
   // 合计由服务端返回，桩里同步给出，避免卡片落回 0.00。
   resolveMock(vi.mocked(cashflowsApi.list), cashflowPage(cashflows, { total_in: "800.00", total_out: "1000.00" }));
-  resolveMock(vi.mocked(cashflowsApi.totals), cashflowTotals({ total_in: "800.00", total_out: "1000.00" }));
   vi.mocked(studioExpensesApi.summary).mockResolvedValue(studioExpenseSummary([]));
-  vi.mocked(reconciliationsApi.list).mockResolvedValue([]);
+  vi.mocked(reconciliationRows).mockResolvedValue([]);
   vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "管理员", is_active: true }]);
 });
 
@@ -161,7 +162,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("编辑押金回填自定义字段并保留其他操作的历史字段", async () => {
     customReceipt("FUNDDEPOSIT");
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+    vi.mocked(depositRows).mockResolvedValueOnce([{
       ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
       form_extra: { receipt: "原始凭据", old_action: "历史信息" },
     }] as never);
@@ -187,7 +188,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       field_type: "NUMBER", required: false, is_active: true, sort_order: 1,
       locked: false, is_custom: true, section: "EXTRA",
     }] : []);
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+    vi.mocked(depositRows).mockResolvedValueOnce([{
       ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
       form_extra: { optional_number: 17, old_action: "历史信息" },
     }] as never);
@@ -211,7 +212,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
       field_type: "NUMBER", required: false, is_active: true, sort_order: 1,
       locked: false, is_custom: true, section: "EXTRA",
     }] : []);
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+    vi.mocked(depositRows).mockResolvedValueOnce([{
       ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
       form_extra: { optional_number: 17 },
     }] as never);
@@ -264,7 +265,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("取消押金提交配置的自定义字段", async () => {
     customReceipt("FUNDCANCEL");
-    vi.mocked(depositsApi.list).mockResolvedValueOnce([{
+    vi.mocked(depositRows).mockResolvedValueOnce([{
       ...deposits[0], status: "PAID", paid_on: "2026-10-17", returned_amount: "0.00", available_actions: ["EDIT", "CANCEL", "RETURN", "LOSS"],
     }] as never);
     resolveMockOnce(vi.mocked(depositsApi.cancel), { id: 11 });
@@ -300,7 +301,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
 
   it("核销对账提交配置的自定义字段", async () => {
     customReceipt("FUNDCLEAR");
-    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([{
+    vi.mocked(reconciliationRows).mockResolvedValueOnce([{
       id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户",
       system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN",
     }]);
@@ -350,7 +351,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("对账状态列显示未核销/已核销（对齐后端 ReconciliationStatus 语义）", async () => {
-    vi.mocked(reconciliationsApi.list).mockResolvedValue([
+    vi.mocked(reconciliationRows).mockResolvedValue([
       { id: 31, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
       { id: 32, pool_id: 1, reconciled_on: "2026-10-17", account_label: "经营账户", system_balance: "800.00", statement_balance: "800.00", difference: "0.00", status: "RESOLVED" },
     ]);
@@ -368,7 +369,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   it("新增对账预检：命中唯一约束（池+账户+日期）时阻断提交并提示调整", async () => {
     const warningSpy = vi.spyOn(message, "warning").mockReturnValue(undefined as never);
     // 初始加载即带入一条「同池+同日期+同账户」记录，模拟重复对账场景。
-    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([
+    vi.mocked(reconciliationRows).mockResolvedValueOnce([
       { id: 30, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN" },
     ]);
     renderLight(<FundsPage />, { user: "admin" });
@@ -397,7 +398,7 @@ describe("FundsPage：资金写路径深覆盖", () => {
   });
 
   it("对账差异核销提交调用 reconciliationsApi.resolve", async () => {
-    vi.mocked(reconciliationsApi.list).mockResolvedValueOnce([{
+    vi.mocked(reconciliationRows).mockResolvedValueOnce([{
       id: 21, pool_id: 1, reconciled_on: "2026-10-18", account_label: "经营账户", system_balance: "800.00", statement_balance: "900.00", difference: "100.00", status: "OPEN",
     }]);
     renderLight(<FundsPage />, { user: "admin" });

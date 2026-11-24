@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listColumnsApi } from "@/shared/api/orders.api";
 import type { ListColumnConfig, ListScopeConfig } from "@/shared/api/types/forms";
 import { appMessage } from "@/shared/ui/appFeedback";
-import { refreshListColumns, useListViewColumns } from "@/shared/lib/listColumns";
+import { updateListColumnScope, useListViewColumns } from "@/shared/lib/listColumns";
 
 vi.mock("@/shared/api/cashflows.api");
 vi.mock("@/shared/api/customers.api");
@@ -65,7 +65,30 @@ function ColumnPreview() {
   return <div data-testid="business-columns">{columns.map((column) => column.key).join(",")}</div>;
 }
 
+function UncachedColumnProbe() {
+  useListViewColumns("TEST_PENDING_SCOPE");
+  return null;
+}
+
 describe("ListColumnsPanel", () => {
+  it("返点列表设置展示现役明细列，保留旧导出配置但不作为页面列表", async () => {
+    vi.mocked(listColumnsApi.all).mockResolvedValue([
+      { code: "REBATE", label: "旧返点导出", columns: [{ key: "old", label: "旧导出字段", locked: false, is_visible: true, sort_order: 0 }] },
+      { code: "REBATE_DETAIL", label: "返点明细", columns: [{ key: "rebate_type", label: "返点类型", locked: false, is_visible: true, sort_order: 0 }] },
+    ]);
+    renderLight(<ListColumnsPanel />, { user: "admin" });
+    expect(await screen.findByText("返点类型")).toBeInTheDocument();
+    expect(screen.queryByText("旧导出字段")).not.toBeInTheDocument();
+  });
+
+  it("分润人员 ID 标明仅用于导出", async () => {
+    vi.mocked(listColumnsApi.all).mockResolvedValue([
+      { code: "RPT_COMMISSION", label: "分润对账", columns: [{ key: "user_id", label: "人员 ID", locked: false, is_visible: true, sort_order: 0 }] },
+    ]);
+    renderLight(<ListColumnsPanel />, { user: "admin" });
+    expect(await screen.findByText("人员 ID（仅导出）")).toBeInTheDocument();
+  });
+
   it("不再提供列宽配置，只保留显示、顺序与固定列", async () => {
     renderLight(<ListColumnsPanel />, { user: "admin" });
     await waitFor(() => expect(screen.getByText("对方 / 来源")).toBeInTheDocument());
@@ -74,6 +97,7 @@ describe("ListColumnsPanel", () => {
   });
 
   beforeEach(() => {
+    updateListColumnScope(ledger);
     vi.mocked(listColumnsApi.all).mockResolvedValue([ledger, inventory]);
     vi.mocked(listColumnsApi.reset).mockResolvedValue(ledger);
     vi.mocked(listColumnsApi.customFields).mockResolvedValue([
@@ -149,13 +173,12 @@ describe("ListColumnsPanel", () => {
 
   it("保存响应直接同步业务列表，较早的读取结果不能覆盖新配置", async () => {
     let finishOldRead!: (value: ListScopeConfig[]) => void;
-    renderLight(<><ListColumnsPanel /><ColumnPreview /></>, { user: "admin" });
+    const { rerender } = renderLight(<><ListColumnsPanel /><ColumnPreview /></>, { user: "admin" });
     await screen.findByText("对方 / 来源");
-    await act(async () => { await refreshListColumns(); });
     await waitFor(() => expect(screen.getByTestId("business-columns")).toHaveTextContent("party"));
     const calls = vi.mocked(listColumnsApi.all).mock.calls.length;
     vi.mocked(listColumnsApi.all).mockReturnValueOnce(new Promise((resolve) => { finishOldRead = resolve; }));
-    act(() => { void refreshListColumns(); });
+    rerender(<><ListColumnsPanel /><ColumnPreview /><UncachedColumnProbe /></>);
     await waitFor(() => expect(listColumnsApi.all).toHaveBeenCalledTimes(calls + 1));
     await userEvent.click(screen.getByRole("button", { name: "显示_party" }));
     await waitFor(() => expect(listColumnsApi.save).toHaveBeenCalled());

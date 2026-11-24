@@ -13,11 +13,3 @@ export interface AuditLogRow {
   after?: unknown;
   occurred_at?: string | null;
 }
-
-export interface AuditEntityStat {
-  entity_type: string;
-  /** 真实累计条数（COUNT(*)） */
-  count: number;
-  last_at?: string | null;
-  last_actor?: string | null;
-}

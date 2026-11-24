@@ -17,6 +17,20 @@ it("不为缺失的后端作用域制造本地兼容清单", () => {
   expect(buildGroupedScopeOptions([])).toEqual([]);
 });
 
+it("表单配置不展示已下线的业务入口，仍保留现役表单", () => {
+  const groups = buildGroupedScopeOptions([
+    { code: "ORDDELETE", label: "删除订单确认", group: "SYSTEM" },
+    { code: "INVDELETE", label: "删除库存确认", group: "SYSTEM" },
+    { code: "ORDERLINK", label: "订单关联", group: "ORDEROP" },
+    { code: "FUNDREJECT", label: "拒绝", group: "FUND" },
+    { code: "STUDIOREJ", label: "工作室拒绝", group: "STUDIO" },
+    { code: "REFUND", label: "资金收支", group: "ORDEROP" },
+    { code: "FUNDREPAIR", label: "划转修复", group: "FUND" },
+  ]);
+
+  expect(groups.flatMap((group) => group.options.map((option) => option.value))).toEqual(["REFUND", "FUNDREPAIR"]);
+});
+
 it("表单字段选项只接受后端规范对象", () => {
   expect(normalizeOptionItems([{ value: "A", label: "甲" }])).toEqual([{ value: "A", label: "甲" }]);
   expect(() => normalizeOptionItems(["A"] as never)).toThrow("选项必须使用 value/label 对象");

@@ -23,26 +23,6 @@ export interface OrderListParams {
 
 type OrderExportParams = Omit<OrderListParams, "limit" | "offset">;
 
-/** 订单编辑入参（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
-export interface OrderPatchPayload {
-  trade_date?: string;
-  form_extra?: Record<string, unknown>;
-  note?: string | null;
-  account_snapshot?: {
-    game_account: string;
-    game_type?: string | null;
-    game_password?: string | null;
-    camp_account?: string | null;
-    channel_region?: string | null;
-    bound_phone?: string | null;
-    has_secondary?: boolean | null;
-    wallet_realname?: string | null;
-    platform?: string | null;
-    purchase_price?: string | null;
-    note?: string | null;
-  } | null;
-}
-
 export type OrderExecutionEditPayload = {
   profile: object;
   expected_profile?: Record<string, unknown>;
@@ -222,12 +202,4 @@ export const ordersApi = {
       form_extra?: Record<string, unknown>;
     },
   ) => api.post<EventPostResult>(`/orders/${orderId}/events`, payload).then((r) => r.data),
-  /** 向已有订单追加客户角色（库存售出时把买家挂到来源单，不新建订单）。 */
-  addCustomerRole: (
-    orderId: number,
-    payload: { customer_id: number; role: string },
-  ) => api.post<Order>(`/orders/${orderId}/customer-roles`, payload).then((r) => r.data),
-  /** 订单编辑（PATCH /orders/{id}）：未传字段保持原值，显式 null 清空可空字段。 */
-  patch: (orderId: number, payload: OrderPatchPayload) =>
-    api.patch<Order>(`/orders/${orderId}`, payload).then((r) => r.data),
 };

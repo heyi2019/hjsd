@@ -21,11 +21,6 @@ def list_pools(session: Session, *, include_disabled: bool = True, user: Current
     return list(session.scalars(stmt))
 def get_pool_by_code(session: Session, code: str) -> Pool | None:
     return session.scalar(select(Pool).where(Pool.code == _normalize_pool_code(code)))
-def require_pool_by_code(session: Session, code: str) -> Pool:
-    pool = get_pool_by_code(session, code)
-    if pool is None:
-        raise NotFound("资金账户不存在", details={"pool_code": code})
-    return pool
 def get_default_pool(session: Session) -> Pool | None:
     """落账默认池：优先 `is_default` 且活动；否则回退到唯一活动池。"""
     marked = list(

@@ -15,8 +15,8 @@ import { antdRangeValues, setAntdDateRange } from "@fixtures/antdRange";
 import { appMessage } from "@/shared/ui/appFeedback";
 import { commissionResponse, dataCenterSummary, orderLedgerSummary, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 
-import { listColumnsApi, ordersApi } from "@/shared/api/orders.api";
-import { refreshListColumns } from "@/shared/lib/listColumns";
+import { ordersApi } from "@/shared/api/orders.api";
+import { updateListColumnScope } from "@/shared/lib/listColumns";
 import { employeesApi } from "@/shared/api/org.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { reportsApi } from "@/shared/api/reports.api";
@@ -242,12 +242,35 @@ describe("ReportsPage：经营中心报表", () => {
   });
 
   it("列表配置隐藏分润人员时同步隐藏分润表对应列", async () => {
-    vi.mocked(listColumnsApi.all).mockResolvedValue([{ code: "RPT_COMMISSION", columns: [{ key: "user_name", is_visible: false, sort_order: 1 }] }] as never);
     renderLight(<Commission range={{ params: {}, picker: null }} />, { user: "admin" });
-    refreshListColumns();
-    await waitFor(() => expect(listColumnsApi.all).toHaveBeenCalled());
+    act(() => updateListColumnScope({ code: "RPT_COMMISSION", label: "分润对账", columns: [{ key: "user_name", label: "分润人员", locked: false, is_visible: false, sort_order: 1 }] }));
     await waitFor(() => expect(screen.queryByRole("columnheader", { name: "分润人员" })).not.toBeInTheDocument());
     expect(screen.getByRole("columnheader", { name: "订单号" })).toBeInTheDocument();
+  });
+
+  it("分润列配置同步作用于展开的人员明细", async () => {
+    act(() => updateListColumnScope({ code: "RPT_COMMISSION", label: "分润对账", columns: [] }));
+    resolveMockOnce(vi.mocked(reportsApi.commission), commissionResponse([{
+      order_id: 10, order_no: "HS0001", inventory_date: "2026-10-02", outbound_date: "2026-10-04",
+      profit_base: "100.00", orders: [{ user_id: 1, user_name: "张三", order_id: 10, order_no: "HS0001", profit_base: "100.00", rate: "10.00" }],
+    }], { order_count: 1, profit_base: "100.00" }));
+    renderLight(<Commission range={{ params: {}, picker: null }} />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: /展开.*HS0001/ }));
+    const detail = document.querySelector(".commission-detail-table") as HTMLElement;
+    expect(within(detail).getByText("张三")).toBeInTheDocument();
+    expect(within(detail).getByText("10.00%")).toBeInTheDocument();
+
+    act(() => updateListColumnScope({
+      code: "RPT_COMMISSION", label: "分润对账", columns: [
+        { key: "user_name", label: "分润人员", locked: false, is_visible: false, sort_order: 0 },
+        { key: "profit_base", label: "分润基数", locked: false, is_visible: true, sort_order: 10 },
+        { key: "rate", label: "费率", locked: false, is_visible: false, sort_order: 20 },
+      ],
+    }));
+    expect(within(detail).queryByText("张三")).not.toBeInTheDocument();
+    expect(within(detail).queryByText("10.00%")).not.toBeInTheDocument();
+    expect(within(detail).getByText("100.00")).toBeInTheDocument();
+    act(() => updateListColumnScope({ code: "RPT_COMMISSION", label: "分润对账", columns: [] }));
   });
 
   it("从历史周期进入我的收益时首次请求就使用指定周期", async () => {

@@ -57,7 +57,7 @@ export function ListColumnsPanel() {
       dataIndex: "label",
       render: (label: string, row) => (
         <Space size={4}>
-          <span>{label}</span>
+          <span>{label}{activeScope === "RPT_COMMISSION" && row.key === "user_id" ? "（仅导出）" : ""}</span>
           {row.custom ? <StatusTag status="ACTIVE" label="自定义" /> : null}
         </Space>
       ),

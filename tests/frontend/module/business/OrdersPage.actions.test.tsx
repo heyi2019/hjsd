@@ -519,13 +519,11 @@ describe("OrdersPage：操作与筛选分支", () => {
     vi.mocked(profitAllocationApi.allocations).mockResolvedValue(profitAllocationResponse([], {
       totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "20.00" } },
     }));
-    vi.mocked(profitAllocationApi.convert).mockReset().mockResolvedValue({ value: "20.00" });
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
     expect(within(modal).getAllByLabelText("金额")[0]).toHaveValue("100.00");
     expect(within(modal).getAllByLabelText("比例")[0]).toHaveValue("20.00");
-    expect(profitAllocationApi.convert).not.toHaveBeenCalled();
   });
 
   it("分润比例和金额按后端总利润即时双向换算，不请求换算接口", async () => {
@@ -533,7 +531,6 @@ describe("OrdersPage：操作与筛选分支", () => {
       order_profit: "500.00", allocatable_profit: "300.00",
       totals_by_type: { BUY: { allocation_amount: "100.00", allocation_rate: "20.00" } },
     }));
-    vi.mocked(profitAllocationApi.convert).mockClear();
     await openLedger();
     await openRowMenu("HS-2026-0001", "分润配置");
     const modal = await modalOf(/分润 · HS-2026-0001/);
@@ -544,7 +541,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(amount).toHaveValue("125.00");
     fireEvent.change(amount, { target: { value: "100.00" } });
     expect(rate).toHaveValue("20.00");
-    expect(profitAllocationApi.convert).not.toHaveBeenCalled();
   });
 
   it("利润变化导致保存冲突时保留分润草稿", async () => {
@@ -613,7 +609,6 @@ describe("OrdersPage：操作与筛选分支", () => {
     expect(rate).toHaveValue("");
     fireEvent.change(amount, { target: { value: "200.00" } });
     expect(rate).toHaveValue("40.00");
-    expect(profitAllocationApi.convert).not.toHaveBeenCalled();
   });
 
   it("关闭分润弹窗后，新订单按自己的利润换算", async () => {

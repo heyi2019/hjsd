@@ -24,7 +24,6 @@ from app.settings.field_definitions.pools import (
     _has_cashflow,
     create_pool,
     list_pools,
-    require_pool_by_code,
     set_pool_status,
     update_pool,
 )
@@ -60,10 +59,6 @@ class TestPoolGuards:
             update_pool(seeded_db, 999999, actor="pytest", name="不存在")
         with pytest.raises(NotFound):
             set_pool_status(seeded_db, 999999, PoolStatus.ACTIVE.value, actor="pytest")
-
-    def test_pool_code_lookup_notfound(self, seeded_db):
-        with pytest.raises(NotFound):
-            require_pool_by_code(seeded_db, "NO_SUCH_POOL")
 
     def test_list_pools_excludes_disabled_when_requested(self, seeded_db):
         active = _pool(seeded_db, "TMPACT")

@@ -19,6 +19,9 @@ export const FORM_SCOPE_GROUP_LABEL: Record<string, string> = {
 
 export type FormScopeRow = { code: string; label: string; group: string };
 
+// 仅隐藏已下线的页面入口，后端作用域及历史字段继续保留。
+const RETIRED_PAGE_SCOPES = new Set(["ORDDELETE", "INVDELETE", "ORDERLINK", "FUNDREJECT", "STUDIOREJ"]);
+
 /** 从后端拉取作用域注册表；接口失败时保持空列表，不伪造本地定义。 */
 export function useFormScopes(): { scopes: FormScopeRow[]; loading: boolean } {
   const [scopes, setScopes] = useState<FormScopeRow[]>([]);
@@ -39,7 +42,7 @@ export function useFormScopes(): { scopes: FormScopeRow[]; loading: boolean } {
 export function buildGroupedScopeOptions(
   scopes: { code: string; label: string; group: string }[],
 ): { label: string; options: { value: string; label: string }[] }[] {
-  const orderedList = scopes;
+  const orderedList = scopes.filter((scope) => !RETIRED_PAGE_SCOPES.has(scope.code));
   const groups: string[] = [];
   const byGroup = new Map<string, { value: string; label: string }[]>();
   for (const scope of orderedList) {

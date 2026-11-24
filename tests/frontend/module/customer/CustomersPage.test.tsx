@@ -32,6 +32,8 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/customer-center/CustomerLeadPanel", () => ({ CustomerLeadPanel: () => <div /> }));
 
+const customerRows = vi.fn<(params?: Parameters<typeof customersApi.page>[0]) => Promise<import("@/shared/api/types/customers").Customer[]>>();
+
 const customers = [
   {
     id: 1,
@@ -75,10 +77,10 @@ const counterparties = [
 beforeEach(() => {
   vi.clearAllMocks();
   seedOptionSets();
-  vi.mocked(customersApi.list).mockResolvedValue(customers);
+  vi.mocked(customerRows).mockResolvedValue(customers);
   vi.mocked(customersApi.options).mockResolvedValue(customers);
   vi.mocked(customersApi.page).mockImplementation(async (params) => {
-    const items = await vi.mocked(customersApi.list)(params);
+    const items = await vi.mocked(customerRows)(params);
     return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
   });
   vi.mocked(customersApi.summary).mockResolvedValue(customerSummary({ month_count: 1, today_count: 1 }));
@@ -494,13 +496,13 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("后端不可达时显示错误条而不是空白页", async () => {
-    vi.mocked(customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
+    vi.mocked(customerRows).mockRejectedValueOnce({ isAxiosError: true, message: "Network Error" });
     renderLight(<CustomersPage />);
     await waitFor(() => expect(document.querySelector(".ant-alert")).toBeTruthy());
   });
 
   it("FE-242：客户接口失败时统计显示不可用并保护依赖入口", async () => {
-    vi.mocked(customersApi.list).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
+    vi.mocked(customerRows).mockRejectedValueOnce({ isAxiosError: true, message: "customers down" });
     renderLight(<CustomersPage />, { user: "admin" });
 
     expect(await screen.findByText("客户数据不可用，请点击重新加载")).toBeInTheDocument();
@@ -512,7 +514,7 @@ describe("CustomersPage：客户档案", () => {
   });
 
   it("业务错误码给出可执行的处置提示", async () => {
-    vi.mocked(customersApi.list).mockRejectedValueOnce({
+    vi.mocked(customerRows).mockRejectedValueOnce({
       isAxiosError: true,
       response: { data: { code: "PERMISSION_DENIED", message: "当前角色无此权限" } },
       message: "Request failed",
@@ -655,7 +657,7 @@ describe("CustomersPage：客户档案", () => {
 
   it("已合并（终态）客户行只保留详情，不暴露合并/拉黑/解除拉黑（L1595）", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(customersApi.list).mockResolvedValue([
+    vi.mocked(customerRows).mockResolvedValue([
       {
         id: 3,
         customer_no: "CUS-0010",
@@ -682,7 +684,7 @@ describe("CustomersPage：客户档案", () => {
 
 describe("CustomersPage：联系方式直接展示", () => {
   it("列表直接展示完整联系方式，不提供额外揭示动作", async () => {
-    vi.mocked(customersApi.list).mockResolvedValue([customers[0]]);
+    vi.mocked(customerRows).mockResolvedValue([customers[0]]);
     renderLight(<CustomersPage />, { user: "admin" });
 
     expect(await screen.findByText("13800008888")).toBeInTheDocument();
@@ -693,7 +695,7 @@ describe("CustomersPage：联系方式直接展示", () => {
 
   it("编辑保存时提交完整联系方式", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    vi.mocked(customersApi.list).mockResolvedValue([customers[0]]);
+    vi.mocked(customerRows).mockResolvedValue([customers[0]]);
     vi.mocked(customersApi.patch).mockResolvedValue(customers[0]);
     renderLight(<CustomersPage />, { user: "admin" });
     await screen.findByText("13800008888");
@@ -752,10 +754,10 @@ describe("CustomersPage：行内动作", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     seedOptionSets();
-    vi.mocked(customersApi.list).mockResolvedValue(customers as unknown as never);
+    vi.mocked(customerRows).mockResolvedValue(customers as unknown as never);
     vi.mocked(customersApi.options).mockResolvedValue(customers.filter((item) => item.status === "ACTIVE"));
     vi.mocked(customersApi.page).mockImplementation(async (params) => {
-      const items = await vi.mocked(customersApi.list)(params);
+      const items = await vi.mocked(customerRows)(params);
       return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
     });
     vi.mocked(counterpartiesApi.list).mockResolvedValue(counterparties as unknown as never);
@@ -959,7 +961,7 @@ describe("CustomersPage：行内动作", () => {
   });
 
   it("FE-194：客户 CSV 导出完成后给出成功反馈", async () => {
-    vi.mocked(customersApi.list).mockResolvedValueOnce([
+    vi.mocked(customerRows).mockResolvedValueOnce([
       { id: 1, customer_no: "CUS-0001", display_name: "测试客户", status: "ACTIVE" },
     ] as never);
     vi.mocked(customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]) as never);
@@ -1004,10 +1006,10 @@ describe("CustomersPage：权限门控与写操作", () => {
     ui = userEvent.setup({ pointerEventsCheck: 0 });
     vi.clearAllMocks();
     seedOptionSets();
-    vi.mocked(customersApi.list).mockResolvedValue(customers);
+    vi.mocked(customerRows).mockResolvedValue(customers);
   vi.mocked(customersApi.options).mockResolvedValue(customers);
     vi.mocked(customersApi.page).mockImplementation(async (params) => {
-      const items = await vi.mocked(customersApi.list)(params);
+      const items = await vi.mocked(customerRows)(params);
       return pageResponse(items, { limit: params?.limit ?? 10, offset: params?.offset ?? 0 });
     });
     vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
@@ -1062,7 +1064,7 @@ describe("CustomersPage：权限门控与写操作", () => {
   });
 
   it("合并弹窗取消后重开不残留上次选的目标客户与原因", async () => {
-    vi.mocked(customersApi.list).mockResolvedValue([
+    vi.mocked(customerRows).mockResolvedValue([
       { id: 1, customer_no: "CUS-0001", display_name: "张三", phone: "138****8888", status: "ACTIVE", extra_values: {} },
       { id: 2, customer_no: "CUS-0002", display_name: "李四", phone: "139****9999", status: "ACTIVE", extra_values: {} },
     ]);

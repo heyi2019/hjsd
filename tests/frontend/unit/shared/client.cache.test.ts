@@ -105,9 +105,7 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     expect(await poolsApi.balances()).not.toBe(first);
     const [third, fourth] = await Promise.all([poolsApi.balances(), poolsApi.balances()]);
     expect(third).toBe(fourth);
-    const single = await poolsApi.balance(1);
-    expect(await poolsApi.balance(1)).not.toBe(single);
-    expect((axios as any).__getCallCount()).toBe(5);
+    expect((axios as any).__getCallCount()).toBe(3);
   });
 
   it("重新读取经营报表和通知摘要时等待最新结果", async () => {

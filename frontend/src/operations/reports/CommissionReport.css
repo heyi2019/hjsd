@@ -11,7 +11,7 @@
   overflow-x: auto;
 }
 
-.commission-detail-table {
+.commission-detail-table table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
@@ -35,13 +35,6 @@
 
 .commission-detail-table tr:last-child td {
   border-bottom: 0;
-}
-
-.commission-detail-table th:nth-child(2),
-.commission-detail-table td:nth-child(2),
-.commission-detail-table th:nth-child(3),
-.commission-detail-table td:nth-child(3) {
-  text-align: right;
 }
 
 @media (max-width: 640px) {

@@ -22,18 +22,6 @@ export const customersApi = {
     api.get<CustomerSummary>("/customers/summary", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   /** 返回一个后端分页窗口，默认只请求当前列表页。 */
   page: (params?: CustomerListParams) => customerPage(params),
-  /** 分批读取符合条件的全部客户，limit 为每次请求数量。 */
-  list: async (params?: CustomerListParams): Promise<Customer[]> => {
-    const items: Customer[] = [];
-    const offset = params?.offset ?? 0;
-    const limit = Math.min(params?.limit ?? 500, 500);
-    while (true) {
-      const page = await customerPage({ ...params, limit, offset: offset + items.length });
-      if (!page.items.length && offset + items.length < page.total) throw new Error("客户名单读取不完整，请重试");
-      items.push(...page.items);
-      if (offset + items.length >= page.total) return items;
-    }
-  },
   create: (payload: Partial<Customer>) =>
     api.post<{ customer: Customer; duplicate_candidates: DuplicateCandidate[] }>(
       "/customers",

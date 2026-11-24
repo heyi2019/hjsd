@@ -1,7 +1,7 @@
 /** applyColumnConfig：按列表列配置过滤 + 排序的纯函数。
  *  口径：无配置原样返回；未知列视为可见并排末尾；隐藏列剔除。 */
 import { describe, expect, it } from "vitest";
-import { MOBILE_HIDE_CLASS, applyColumnConfig, columnKey, formatCustomValue, markMobileHiddenColumns, markMobileIdentityColumn, orderMobileFields, readCustomValue } from "@/shared/lib/listColumns";
+import { MOBILE_HIDE_CLASS, applyColumnConfig, columnKey, formatCustomValue, markMobileHiddenColumns, markMobileIdentityColumn, readCustomValue } from "@/shared/lib/listColumns";
 import type { ListScopeConfig } from "@/shared/api/types/forms";
 
 const config: ListScopeConfig = {
@@ -87,19 +87,6 @@ describe("markMobileIdentityColumn", () => {
 });
 
 describe("applyColumnConfig", () => {
-  it("移动端字段沿用列表配置顺序，并隐藏已配置为不可见的字段", () => {
-    const fields = [
-      { key: "order_no", label: "订单号" },
-      { key: "game_type", label: "游戏/产品类型" },
-      { key: "actions", label: "操作" },
-    ];
-
-    expect(orderMobileFields(fields, ["game_type", "order_no"])).toEqual([
-      { key: "game_type", label: "游戏/产品类型" },
-      { key: "order_no", label: "订单号" },
-    ]);
-  });
-
   it("无配置时原样返回（列表不能因为没配置而少列）", () => {
     expect(applyColumnConfig(columns, undefined)).toEqual(columns);
   });

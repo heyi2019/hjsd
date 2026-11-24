@@ -159,7 +159,7 @@ it("点击分润通知只标记当前消息并展示详情", async () => {
     expect(notificationsApi.markReadBatch).toHaveBeenCalledWith([1], "latest");
     expect(notificationsApi.markReadBatch).not.toHaveBeenCalledWith([2], "latest");
     expect(await screen.findByText("分润明细")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "比例" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "费率" })).toBeInTheDocument();
     expect(screen.getByText("60.00%")).toBeInTheDocument();
     expect(reportsApi.commission).toHaveBeenCalledWith({ notification_id: 1 });
     expect(screen.getByText("出库日期")).toBeInTheDocument();

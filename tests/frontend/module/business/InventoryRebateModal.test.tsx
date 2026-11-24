@@ -8,6 +8,7 @@ import type { Account } from "@/shared/api/types/accounts";
 import { employeesApi } from "@/shared/api/org.api";
 import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { rebatesApi } from "@/shared/api/rebates.api";
+import { updateListColumnScope } from "@/shared/lib/listColumns";
 import { resolveMock } from "@fixtures/mock-api";
 import { allFormFields, seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 
@@ -25,9 +26,30 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 
 let ui: ReturnType<typeof userEvent.setup>;
-beforeEach(() => { ui = setupInventoryWrite(); });
+beforeEach(() => {
+  ui = setupInventoryWrite();
+  updateListColumnScope({ code: "REBATE_DETAIL", label: "返点明细", columns: [] });
+});
 
 describe("InventoryRebateModal", () => {
+  it("返点明细随列表设置隐藏并调整列顺序", async () => {
+    renderLight(<InventoryRebateModal account={accounts[0]} onClose={() => undefined} onCreated={() => undefined} />, { user: "admin" });
+    const table = await screen.findByRole("table", { name: "返点明细表" });
+    await waitFor(() => expect(within(table).getByText("1,000.00")).toBeInTheDocument());
+    act(() => updateListColumnScope({
+      code: "REBATE_DETAIL", label: "返点明细", columns: [
+        { key: "operator", label: "操作人", locked: false, is_visible: true, sort_order: 0 },
+        { key: "rebate_type", label: "类型", locked: false, is_visible: true, sort_order: 10 },
+        { key: "collected_on", label: "返点日期", locked: false, is_visible: true, sort_order: 20 },
+        { key: "amount", label: "金额", locked: false, is_visible: false, sort_order: 30 },
+        { key: "actions", label: "操作", locked: false, is_visible: true, sort_order: 40 },
+      ],
+    }));
+    expect(within(table).getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["操作人", "类型", "返点日期", "操作"]);
+    expect(within(table).queryByText("1,000.00")).not.toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "编辑" })).toBeInTheDocument();
+  });
+
   it("切换返点订单后，旧订单迟到的返点明细不能覆盖当前数据", async () => {
     let finishFirst!: (value: Awaited<ReturnType<typeof rebatesApi.list>>) => void;
     const first = new Promise<Awaited<ReturnType<typeof rebatesApi.list>>>((resolve) => { finishFirst = resolve; });

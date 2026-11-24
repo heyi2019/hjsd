@@ -175,9 +175,6 @@ class CurrentUser:
     def has(self, code: str) -> bool:
         return code in self.permissions
 
-    def has_all(self, codes: Sequence[str]) -> bool:
-        return all(code in self.permissions for code in codes)
-
     def has_any(self, codes: Sequence[str]) -> bool:
         return any(code in self.permissions for code in codes)
 
@@ -186,12 +183,6 @@ class CurrentUser:
         if self.is_admin or self.owner_scope == "ALL":
             return True
         return pool_id in self.pool_ids
-
-    def can_see_owner(self, owner_id: int | None) -> bool:
-        """Fast-path check for owner-scoped records; TEAM needs a DB-aware helper."""
-        if self.is_admin or self.owner_scope == "ALL":
-            return True
-        return owner_id == self.id
 
 
 def user_from_payload(payload: dict[str, Any]) -> CurrentUser:

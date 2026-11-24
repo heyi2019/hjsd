@@ -4,7 +4,6 @@ from __future__ import annotations
 import re
 
 from _repo import REPO_ROOT
-
 from app.settings.field_definitions.catalog_seed import seed_catalog
 from app.domain.options import OptionSet
 from sqlalchemy import event, select
@@ -92,7 +91,10 @@ def test_seed_catalog_batches_lookups_and_preserves_existing_configuration(seede
     seed_catalog(seeded_db, actor="pytest")
     dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "CUSTOMER_SOURCE"))
     field = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == "LEAD", OrderFormField.field_key == "target"))
+    source_field = seeded_db.scalar(select(OrderFormField).where(OrderFormField.order_type_code == "HS", OrderFormField.field_key == "customer_source"))
     dictionary.label = "管理员名称"
+    dictionary.options = [{"value": "user_source", "label": "自定义来源"}]
+    source_field.options = [{"value": "user_source", "label": "自定义来源"}]
     field.label = "管理员目标名称"
     seeded_db.flush()
     queries = []
@@ -108,6 +110,8 @@ def test_seed_catalog_batches_lookups_and_preserves_existing_configuration(seede
         event.remove(connection, "before_cursor_execute", capture)
     assert len(queries) <= 6, f"配置种子查询次数过多: {len(queries)}"
     assert dictionary.label == "管理员名称" and field.label == "管理员目标名称"
+    assert dictionary.options == [{"value": "user_source", "label": "自定义来源"}]
+    assert source_field.options == [{"value": "user_source", "label": "自定义来源"}]
 
 
 def test_business_reminder_rejects_invalid_inventory_aging_days(client, headers):

@@ -259,6 +259,16 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}
         assert pools == set()
         assert connection.execute(text("SELECT COUNT(*) FROM game_type_options")).scalar_one() == 0
+        option_sets = dict(connection.execute(text("SELECT code, options FROM option_sets")).all())
+        for code in ("INTERMEDIARY_PLATFORM", "CUSTOMER_SOURCE", "SUPPLIER_SOURCE", "STUDIO_EXPENSE_ITEM", "STUDIO_EXPENSE_POOL",
+                     "INTERMEDIARY_TYPE", "COMPENSATION_TYPE", "REFUND_RESPONSIBILITY", "QUALITY_SEVERITY"):
+            assert option_sets[code] == [], code
+        fields = {(row[0], row[1]): row[2] for row in connection.execute(
+            text("SELECT order_type_code, field_key, options FROM order_form_fields")
+        )}
+        for key in (("CONSIGN", "platform_ids"), ("CUSTOMER", "game_category"), ("DG", "dg_customer_source"),
+                    ("HS", "customer_source"), ("TH", "supplier_source")):
+            assert fields[key] == [], key
 
         types = {row[0] for row in connection.execute(text("SELECT code FROM order_type_defs"))}
         assert types == {"HS", "TH", "DG"}

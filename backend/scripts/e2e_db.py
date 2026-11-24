@@ -236,6 +236,8 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
         # 缺失会导致 finance-write-ui 等用例下拉为空、表单无法提交。对齐真实库（dev/
         # release 首次启动即落 catalog），E2E 库 TRUNCATE 后必须重播。
         seed_catalog(db, actor="e2e")
+        from scripts.test_example_seed import seed_example_catalog
+        seed_example_catalog(db)
         _seed_default_users(db)
         _seed_real_admin(db)
         _seed_real_employee(db)

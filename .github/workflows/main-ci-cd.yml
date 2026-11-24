@@ -1,6 +1,6 @@
 name: main-ci-cd
 
-# 本地 main 直接推送云端 main：自动分级升版、生成变更摘要，三项 CI 全绿后发布。
+# GitHub 发布合并到 origin/main 后触发。三项门禁通过后构建并部署。
 on:
   push:
     branches: [main]

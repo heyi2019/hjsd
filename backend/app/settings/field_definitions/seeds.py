@@ -39,7 +39,6 @@ SEED_SEQUENCES: tuple[tuple[str, str, int], ...] = (
     # 资金流水按方向独立递增（2026-10-28 口径）：支出 ZC+五位、收入 SR+五位。
     (SequenceKey.CASHFLOW_OUT.value, "ZC", 5),
     (SequenceKey.CASHFLOW_IN.value, "SR", 5),
-    (SequenceKey.ATTACHMENT.value, "ATT", 4),
     # 库存编号（KU_ 序列，2026-10-28 口径）：KU_ + 五位流水（KU_00001…），
     # 独立于业务订单，账号创建时自动发放。
     (SequenceKey.STOCK_NO.value, "KU_", 5),

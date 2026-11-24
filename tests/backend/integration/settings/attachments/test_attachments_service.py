@@ -219,16 +219,17 @@ def test_order_detail_does_not_expose_cashflow_attachment_outside_pool_scope(see
         direction="IN", amount=to_money("10"), accounting_attribute="REBATE_INCOME", category="REBATE",
     )
     seeded_db.add(flow)
-    seeded_db.add(Attachment(attachment_no="ATT-SCOPE", entity_type="cashflow", entity_id=flow.flow_no,
+    attachment = Attachment(entity_type="cashflow", entity_id=flow.flow_no,
         file_name="x.txt", storage_key="ATT-SCOPE.txt", content_type="text/plain", size_bytes=1,
-        sha256="a" * 64, created_by="pytest", updated_by="pytest"))
+        sha256="a" * 64, created_by="pytest", updated_by="pytest")
+    seeded_db.add(attachment)
     seeded_db.flush()
     hidden = _user(uid=2, perms=(PERM_FINANCE_READ,), pool_ids=())
     visible = _user(uid=2, perms=(PERM_FINANCE_READ,), pool_ids=(1,))
     for output in (_order_detail_output(seeded_db, order, hidden), _order_details_output(seeded_db, [order], hidden)[0]):
-        assert not any(item.attachment_no == "ATT-SCOPE" for item in output.attachments)
+        assert not any(item.id == attachment.id for item in output.attachments)
     for output in (_order_detail_output(seeded_db, order, visible), _order_details_output(seeded_db, [order], visible)[0]):
-        assert any(item.attachment_no == "ATT-SCOPE" for item in output.attachments)
+        assert any(item.id == attachment.id for item in output.attachments)
 
 
 def test_assert_visible_cashflow_without_pool(seeded_db):

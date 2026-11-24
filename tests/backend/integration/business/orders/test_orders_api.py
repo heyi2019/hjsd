@@ -71,7 +71,7 @@ class TestOrdersApi:
         seeded_db.add(installment)
         seeded_db.flush()
         seeded_db.add(InstallmentSchedule(installment_id=installment.id, period_no=1, due_on=D))
-        seeded_db.add(Attachment(attachment_no="PARITY-ATTACH", entity_type="order", entity_id=second.order_no,
+        seeded_db.add(Attachment(entity_type="order", entity_id=second.order_no,
                                  file_name="a.png", storage_key="parity-test", content_type="image/png", size_bytes=1, sha256="a" * 64))
         seeded_db.flush()
         for roles in (["ADMIN"], ["EMPLOYEE"], ["VIEWER"]):

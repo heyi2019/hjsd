@@ -288,6 +288,9 @@ def accounting_attribute_options() -> list[dict[str, str]]:
 
 def _normalized_option_set(values: dict) -> dict:
     """Return the current option dictionary without retired business concepts."""
+    if values.get("code") == "SEQUENCE_KEY":
+        from app.settings.field_definitions.sequences import RETIRED_SEQUENCE_KEYS
+        return {**values, "options": [item for item in (values.get("options") or []) if item.get("value") not in RETIRED_SEQUENCE_KEYS]}
     if values.get("code") == "FUND_FLOW_ACCOUNTING_ATTRIBUTE":
         return {**values, "editable": False, "options": accounting_attribute_options()}
     if values.get("code") != "ORDER_EVENT_TYPE":
@@ -321,6 +324,11 @@ def seed_catalog(session: Session, *, actor: str = "system") -> None:
         values = _normalized_option_set(raw_values)
         existing = existing_options.get(values["code"])
         if existing:
+            if values["code"] == "SEQUENCE_KEY":
+                normalized = _normalized_option_set({"code": existing.code, "options": existing.options})["options"]
+                if existing.options != normalized:
+                    existing.options = normalized
+                    existing.updated_by = actor
             # 审计动作是只读系统字典，产品文案变更时要修正已有 dev/本地库，
             # 不能只在首次建库时写入，否则旧库会持续覆盖前端固定口径。
             if values["code"] == "AUDIT_ACTION" and existing.options != values["options"]:

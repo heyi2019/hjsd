@@ -59,7 +59,6 @@ class SequenceKey(StrEnum):
     # 资金流水按方向独立递增（用户口径 2026-10-28）：支出 ZC+五位流水、收入 SR+五位流水。
     CASHFLOW_OUT = "CASHFLOW_OUT"
     CASHFLOW_IN = "CASHFLOW_IN"
-    ATTACHMENT = "ATTACHMENT"
     # 库存编号：账号台账唯一编码，KU_ + 五位流水（KU_00001…），系统生成不可手改。
     STOCK_NO = "STOCK_NO"
 

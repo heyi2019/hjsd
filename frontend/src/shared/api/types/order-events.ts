@@ -15,7 +15,6 @@ export interface OrderAuditEntry {
 
 export interface OrderAttachment {
   id: number;
-  attachment_no: string;
   entity_type: string;
   entity_id: string;
   file_name: string;

@@ -257,7 +257,7 @@ def test_cancelled_installment_can_be_replaced_without_losing_history(seeded_cli
     assert second.id != first.id and second.inst_no != first.inst_no
     assert first.status == "CANCELLED" and second.status == "PENDING"
     for number, contract in enumerate((first, second), 1):
-        seeded_db.add(Attachment(attachment_no=f"ATT-REPEAT-{number}", entity_type="installment", entity_id=contract.inst_no, file_name=f"{number}.png", storage_key=f"repeat/{number}.png", content_type="image/png", size_bytes=1, sha256="a" * 64, created_by="pytest", updated_by="pytest"))
+        seeded_db.add(Attachment(entity_type="installment", entity_id=contract.inst_no, file_name=f"{number}.png", storage_key=f"repeat/{number}.png", content_type="image/png", size_bytes=1, sha256="a" * 64, created_by="pytest", updated_by="pytest"))
     seeded_db.flush()
     assert len(inst_queries.list_installments(seeded_db, order_id=order.id)) == 2
     with pytest.raises(Conflict):
@@ -269,7 +269,7 @@ def test_cancelled_installment_can_be_replaced_without_losing_history(seeded_cli
     detail = seeded_client.get(f"/api/orders/{order.id}", headers=headers)
     assert detail.status_code == 200, detail.text
     assert detail.json()["installment"]["id"] == second.id
-    assert {item["attachment_no"] for item in detail.json()["attachments"]} >= {"ATT-REPEAT-1", "ATT-REPEAT-2"}
+    assert {item["file_name"] for item in detail.json()["attachments"]} >= {"1.png", "2.png"}
 
 
 @pytest.mark.parametrize("order_type", ["HS", "TH"])

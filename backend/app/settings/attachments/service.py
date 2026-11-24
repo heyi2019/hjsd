@@ -30,9 +30,8 @@ from app.settings.auth.session import (
     owner_scope_filter,
 )
 from app.core.settings import get_settings
-from app.shared.numbering import allocate_number
 from app.domain.attachments import Attachment
-from app.domain.enums import AuditAction, SequenceKey
+from app.domain.enums import AuditAction
 from app.domain.trade import Cashflow, Installment, Order, OrderEvent
 from app.settings.attachments.storage import track_file
 
@@ -226,8 +225,7 @@ def create_attachment(
     session.execute(select(func.pg_advisory_xact_lock(lock_key)))
     if not allow_duplicate and _has_visible_duplicate(session, digest, user):
         raise Conflict("已存在相同内容的附件，是否继续上传？", code=ErrorCode.DUPLICATE_ATTACHMENT)
-    attachment_no = allocate_number(session, SequenceKey.ATTACHMENT)
-    with tempfile.NamedTemporaryFile(prefix=f"{attachment_no}-", dir=_storage_root(), delete=False) as output:
+    with tempfile.NamedTemporaryFile(prefix="attachment-", dir=_storage_root(), delete=False) as output:
         path = Path(output.name)
         try:
             output.write(payload)
@@ -241,7 +239,6 @@ def create_attachment(
         path.unlink(missing_ok=True)
         raise
     item = Attachment(
-        attachment_no=attachment_no,
         entity_type=target.entity_type,
         entity_id=target.entity_id,
         file_name=name,
@@ -258,11 +255,11 @@ def create_attachment(
         record_audit(
             session,
             action=AuditAction.ATTACHMENT_UPLOAD,
-            entity_type="attachment",
-            entity_id=item.attachment_no,
+            entity_type=item.entity_type,
+            entity_id=item.entity_id,
             actor=user.username,
             after={
-                "attachment_no": item.attachment_no,
+                "attachment_id": item.id,
                 "entity_type": item.entity_type,
                 "entity_id": item.entity_id,
                 "file_name": item.file_name,
@@ -292,7 +289,7 @@ def attachment_path(item: Attachment) -> Path:
     if root not in path.parents:
         raise Validation("附件存储路径无效")
     if not path.is_file():
-        raise NotFound("附件文件不存在", details={"attachment_no": item.attachment_no})
+        raise NotFound("附件文件不存在", details={"attachment_id": item.id})
     return path
 
 
@@ -308,10 +305,10 @@ def delete_attachment(
     record_audit(
         session,
         action=AuditAction.ATTACHMENT_DELETE,
-        entity_type="attachment",
-        entity_id=item.attachment_no,
+        entity_type=item.entity_type,
+        entity_id=item.entity_id,
         actor=user.username,
-        after={"deleted_at": item.deleted_at.isoformat()},
+        after={"attachment_id": item.id, "file_name": item.file_name, "deleted_at": item.deleted_at.isoformat()},
         reason="附件软删除，保留审计与文件追溯",
     )
     return item

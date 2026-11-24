@@ -21,7 +21,6 @@ class AttachmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    attachment_no: str
     entity_type: str
     entity_id: str
     file_name: str

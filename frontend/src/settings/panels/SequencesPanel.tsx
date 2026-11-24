@@ -1,139 +1,110 @@
-/** 编号序列（foundation/sequences）：各编号域的当前值与下一编号，只读。
- *  展示结构与业务字典一致：一级分组 + 二级条目；用于断号 / 跳号 / 重号排查——
- *  编号由后端统一发放，本面板不提供任何写入口。
- *  用户口径（2026-10-28）：库存编号 / 回收 / 提号 / 代挂 / 分期合约号（关联业务类型）；
- *  库存编号非序列发放域、做一级分组（组级说明），分期合约号缺少后端序列记录时展示静态口径。 */
-import { configurableLabel } from "../../shared/lib/optionSets";
-import { Card, Descriptions, Typography } from "antd";
+/** 编号序列只读面板：展示实际序列和按订单派生的编号规则。 */
+import { Descriptions, Typography } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import { useCallback } from "react";
 import { sequencesApi } from "../../shared/api/misc.api";
 import type { DocumentSequence } from "../../shared/api/types/common";
+import { configurableLabel } from "../../shared/lib/optionSets";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
-import { ErrorBanner } from "../../shared/ui";
+import { DataTable, ErrorBanner } from "../../shared/ui";
 
 const SEQUENCE_KEY_LABEL: Record<string, string> = {
+  STOCK_NO: "库存编号",
   ORDER_HS: "回收编号",
   ORDER_TH: "提号编号",
   ORDER_DG: "代挂编号",
-  INSTALLMENT: "分期合约号",
   CUSTOMER: "客户",
   COUNTERPARTY: "合作方",
   LEAD: "需求",
   NOTIFICATION: "通知",
   CASHFLOW_OUT: "支出流水",
   CASHFLOW_IN: "收入流水",
-  ATTACHMENT: "附件",
 };
 
-/** 条目说明前缀：标注分期与业务类型的关联口径。 */
-const SEQUENCE_ANNOTATION: Record<string, string> = {
-  INSTALLMENT: "关联业务类型（来源回收/提号/代挂订单）",
-};
-
-/** 无 document_sequences 行时展示的静态口径条目。 */
-const STATIC_ENTRIES: Record<string, { name: string; desc: string }> = {
-  INSTALLMENT: {
-    name: "分期合约号",
-    desc: "编号格式 业务订单编号-FQ",
-  },
-};
-
-/** 一级分组 → 二级编号域（顺序即展示顺序）。
- *  库存编号为一级分组（用户裁决 2026-10-28）：非序列发放域，仅组级说明、无二级条目。 */
-const SEQUENCE_GROUPS: Array<{ label: string; keys: string[]; desc?: string }> = [
-  { label: "库存编号", keys: [], desc: "回收/提号/代挂订单建单时自动新增，进入库存中心；不参与序列发放" },
+const SEQUENCE_GROUPS: Array<{ label: string; keys: string[] }> = [
+  { label: "库存", keys: ["STOCK_NO"] },
   { label: "业务订单", keys: ["ORDER_HS", "ORDER_TH", "ORDER_DG"] },
-  { label: "增值服务", keys: ["INSTALLMENT"] },
-  { label: "档案编号", keys: ["CUSTOMER", "COUNTERPARTY"] },
-  { label: "运营工单", keys: ["LEAD", "NOTIFICATION"] },
-  { label: "资金与系统", keys: ["CASHFLOW_OUT", "CASHFLOW_IN", "IMPORT", "ATTACHMENT"] },
+  { label: "档案", keys: ["CUSTOMER", "COUNTERPARTY"] },
+  { label: "需求与通知", keys: ["LEAD", "NOTIFICATION"] },
+  { label: "资金", keys: ["CASHFLOW_OUT", "CASHFLOW_IN"] },
 ];
 
-/** 二级条目行：一级条目占多行，每行「加粗名称 + 说明」，不用卡片。 */
-function EntryLine({ name, desc }: { name: string; desc: string }) {
-  return (
-    <div>
-      <strong>{name}</strong>：{desc}
-    </div>
-  );
-}
+// 历史库可能保留已下线序列；分期合约也不使用独立序列。
+const HIDDEN_SEQUENCE_KEYS = new Set(["IMPORT", "QUALITY_ISSUE", "INSTALLMENT", "ATTACHMENT"]);
 
-/** 静态口径条目行：名称单独一行，说明另起一行（与序列发放条目区分）。 */
-function StaticEntryLine({ name, desc }: { name: string; desc: string }) {
-  return (
-    <div>
-      <div>
-        <strong>{name}</strong>
-      </div>
-      <div>{desc}</div>
-    </div>
-  );
-}
+type SequenceRow = DocumentSequence & { group: string; label: string };
+
+const columns: ColumnsType<SequenceRow> = [
+  { title: "分组", dataIndex: "group", key: "group" },
+  { title: "编号类别", dataIndex: "label", key: "label" },
+  {
+    title: "编号格式",
+    key: "format",
+    render: (_value, row) => row.sequence_key === "NOTIFICATION"
+      ? `${row.prefix} + ${row.padding} 位（上限 NTF9999）`
+      : `${row.prefix} + 至少 ${row.padding} 位`,
+  },
+  { title: "当前序列值", dataIndex: "current_value", key: "current_value", align: "right" },
+  { title: "预计下一编号", dataIndex: "next_number", key: "next_number" },
+];
 
 export function SequencesPanel() {
   const load = useCallback(() => sequencesApi.list(), []);
   const { data: loadedRows, loading, error, reload } = useSettingsResource(load);
   const rows = loadedRows ?? [];
   const notificationSequence = rows.find((row) => row.sequence_key === "NOTIFICATION" && row.near_exhaustion && row.remaining != null);
-
   const byKey = new Map(rows.map((row) => [row.sequence_key, row]));
-  const describe = (row: DocumentSequence) => {
-    const annotation = SEQUENCE_ANNOTATION[row.sequence_key];
-    const detail = `编号格式 ${row.prefix}+${row.padding}位流水，当前值 ${row.current_value}，下一编号 ${row.next_number}`;
-    return annotation ? `${annotation}；${detail}` : detail;
-  };
-  const label = (key: string) =>
-    key === "INSTALLMENT"
-      ? SEQUENCE_KEY_LABEL.INSTALLMENT
-      : configurableLabel("SEQUENCE_KEY", key, SEQUENCE_KEY_LABEL);
-
-  const renderEntry = (key: string): JSX.Element | null => {
-    const staticEntry = STATIC_ENTRIES[key];
-    if (key === "INSTALLMENT" && staticEntry) {
-      return <StaticEntryLine key={key} name={staticEntry.name} desc={staticEntry.desc} />;
-    }
-    const row = byKey.get(key);
-    if (row) return <EntryLine key={row.sequence_key} name={label(row.sequence_key)} desc={describe(row)} />;
-    return staticEntry ? <StaticEntryLine key={key} name={staticEntry.name} desc={staticEntry.desc} /> : null;
-  };
-
-  const items = SEQUENCE_GROUPS.map((group) => {
-    const lines = group.keys.map(renderEntry).filter((line): line is JSX.Element => line !== null);
-    if (group.desc) lines.unshift(<div key={`${group.label}-desc`}>{group.desc}</div>);
-    return lines.length > 0 ? { label: group.label, lines } : null;
-  }).filter((item): item is { label: string; lines: JSX.Element[] } => item !== null);
-
-  // 兜底：静态分组未覆盖的动态编号域（如自定义业务订单 ORDER_*）不能静默丢失——
-  // 面板用于断号 / 跳号排查，任何发放中的域都必须可见。
   const coveredKeys = new Set(SEQUENCE_GROUPS.flatMap((group) => group.keys));
-  const leftover = rows.filter((row) => !coveredKeys.has(row.sequence_key));
-  if (leftover.length > 0) {
-    items.push({
-      label: "自定义编号域",
-      lines: leftover.map((row) => <EntryLine key={row.sequence_key} name={label(row.sequence_key)} desc={describe(row)} />),
-    });
-  }
+
+  const makeRow = (row: DocumentSequence, group: string): SequenceRow => ({
+    ...row,
+    group,
+    label: row.sequence_key === "STOCK_NO"
+      ? SEQUENCE_KEY_LABEL.STOCK_NO
+      : configurableLabel("SEQUENCE_KEY", row.sequence_key, SEQUENCE_KEY_LABEL),
+  });
+  const sequenceRows = SEQUENCE_GROUPS.flatMap((group) => group.keys.flatMap((key) => {
+    const row = byKey.get(key);
+    return row ? [makeRow(row, group.label)] : [];
+  }));
+  sequenceRows.push(...rows
+    .filter((row) => !coveredKeys.has(row.sequence_key) && !HIDDEN_SEQUENCE_KEYS.has(row.sequence_key))
+    .map((row) => makeRow(row, "其他／待核对")));
 
   return (
-    <Card className="glass" title="编号序列">
+    <section className="sequences-panel">
       <ErrorBanner error={error} onRetry={() => void reload()} retrying={loading} />
       {notificationSequence && <Typography.Paragraph type="warning">通知编号还剩 {notificationSequence.remaining} 个；用尽后需要生成通知的操作会失败，请联系管理员处理。</Typography.Paragraph>}
       <Typography.Paragraph type="secondary" className="ui-card-hint">
-        序列编号由后端按域独立发放，本面板只读；库存编号与分期合约号不独立发放，见条目说明。排查断号 / 跳号时对照「当前值」与业务单据最大编号：不一致说明存在发放失败或手工补号，需复查对应批次的导入与冲销记录。
+        编号由系统自动生成，页面只读。序列当前值和预计下一编号用于参考；编号可能存在间隔，如需排查，请结合历史导入和业务记录核对。预计下一编号以查询时的数据为准，实际创建时可能已被其他操作占用。
       </Typography.Paragraph>
       {error ? (
         <Typography.Paragraph type="warning">编号序列数据不可用，请点击重新加载</Typography.Paragraph>
-      ) : items.length > 0 ? (
-        <Descriptions bordered size="small" column={1} styles={{ label: { width: 96 } }}>
-          {items.map((item) => (
-            <Descriptions.Item key={item.label} label={item.label}>
-              {item.lines}
-            </Descriptions.Item>
-          ))}
-        </Descriptions>
       ) : (
-        <Typography.Paragraph type="secondary">{loading ? "加载中…" : "暂无编号序列"}</Typography.Paragraph>
+        <>
+          <DataTable<SequenceRow>
+            ariaLabel="编号序列"
+            columns={columns}
+            rows={sequenceRows}
+            rowKey="sequence_key"
+            loading={loading}
+            page={1}
+            pageSize={sequenceRows.length || 1}
+            total={sequenceRows.length}
+            onPageChange={() => undefined}
+            pagination={false}
+            emptyText="暂无编号序列"
+          />
+          <Typography.Paragraph type="secondary" className="ui-card-hint">
+            库存编号在新建库存账号时发放，例如普通建单或分期回收形成新库存时。
+          </Typography.Paragraph>
+          <Typography.Title level={5}>按订单派生的编号</Typography.Title>
+          <Descriptions column={1} size="small" bordered>
+            <Descriptions.Item label="分期合约号">首次为 HS0001-FQ；取消后重新创建可为 HS0001-FQ-02、HS0001-FQ-03。</Descriptions.Item>
+            <Descriptions.Item label="返点单号">按订单递增，例如 HS0001-RB01、HS0001-RB02。</Descriptions.Item>
+          </Descriptions>
+        </>
       )}
-    </Card>
+    </section>
   );
 }

@@ -20,7 +20,8 @@ class Attachment(Base, AuditMixin):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    attachment_no: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
+    # 仅保留历史编号供旧审计记录追溯，新附件不再发号。
+    attachment_no: Mapped[str | None] = mapped_column(String(32), nullable=True, unique=True)
     entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
     entity_id: Mapped[str] = mapped_column(String(128), nullable=False)
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)

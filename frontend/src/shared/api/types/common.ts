@@ -39,7 +39,7 @@ export interface DocumentSequence {
   near_exhaustion?: boolean;
 }
 
-export interface AttachmentItem { id: number; attachment_no: string; file_name: string; size_bytes: number; created_by: string }
+export interface AttachmentItem { id: number; file_name: string; size_bytes: number; created_by: string }
 
 
 export interface NotificationItem {

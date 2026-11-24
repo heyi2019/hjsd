@@ -73,12 +73,17 @@ describe("ConfigCenterPanel", () => {
   });
 
   it("点击编号序列后显示只读编号页面", async () => {
+    vi.mocked(sequencesApi.list).mockResolvedValue([
+      { sequence_key: "STOCK_NO", prefix: "KU_", padding: 5, current_value: 20, next_number: "KU_00021" },
+    ]);
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<ConfigCenterPanel />, { user: "admin" });
     await ui.click(screen.getByTestId("center-nav-sequences"));
 
-    expect(screen.getByText(/序列编号由后端按域独立发放/)).toBeInTheDocument();
-    expect(screen.getByText("库存编号")).toBeInTheDocument();
+    const content = screen.getByTestId("center-content");
+    expect(await within(content).findByText("KU_00021")).toBeInTheDocument();
+    expect(content.querySelectorAll(".ant-card")).toHaveLength(1);
+    expect(within(content).getAllByText("编号序列")).toHaveLength(1);
   });
 
   it("点击业务提醒后展示库存阈值和提醒开关", async () => {

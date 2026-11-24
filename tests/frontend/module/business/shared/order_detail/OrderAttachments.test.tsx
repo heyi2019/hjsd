@@ -12,7 +12,7 @@ describe("订单附件", () => {
     vi.spyOn(attachmentsApi, "list").mockResolvedValue({ items: [] });
     const create = vi.spyOn(attachmentsApi, "create").mockRejectedValueOnce({
       isAxiosError: true, response: { status: 409, data: { code: "DUPLICATE_ATTACHMENT", message: "附件内容重复" } },
-    }).mockResolvedValueOnce({ id: 1, attachment_no: "ATT0001", file_name: "凭证.txt", size_bytes: 5, created_by: "admin" } as never);
+    }).mockResolvedValueOnce({ id: 1, file_name: "凭证.txt", size_bytes: 5, created_by: "admin" } as never);
     renderLight(<OrderAttachments orderNo="HS0001" />, { user: "admin" });
     await userEvent.click(screen.getByRole("button", { name: "查看订单附件" }));
     await userEvent.upload(screen.getByLabelText("上传订单附件"), new File(["proof"], "凭证.txt", { type: "text/plain" }));

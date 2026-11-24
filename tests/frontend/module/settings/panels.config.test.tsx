@@ -1,5 +1,5 @@
 /** 配置类只读面板——编号序列与业务提醒。 */
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
 import { sequencesApi } from "@/shared/api/misc.api";
@@ -27,26 +27,23 @@ describe("SequencesPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(sequencesApi.list).mockResolvedValue([
+      { sequence_key: "STOCK_NO", prefix: "KU_", padding: 5, current_value: 20, next_number: "KU_00021" },
       { sequence_key: "ORDER_HS", prefix: "HS", padding: 4, current_value: 128, next_number: "HS0129" },
       { sequence_key: "CASHFLOW_OUT", prefix: "ZC", padding: 5, current_value: 7, next_number: "ZC00008" },
     ]);
   });
 
-  it("展示编号域的当前值与下一编号（只读，无写入口）", async () => {
+  it("库存编号显示独立序列值及预计下一编号（只读）", async () => {
     renderLight(<SequencesPanel />, { user: "admin" });
 
-    // 分组 + 条目：下一编号出现在「加粗名称：说明」行内；流水编号带 padding 位数
-    expect(await screen.findByText(/HS0129/)).toBeInTheDocument();
-    expect(screen.getByText(/ZC\+5位流水/)).toBeInTheDocument();
-    expect(screen.getByText(/ZC00008/)).toBeInTheDocument();
-    // 编号域中文标签可见；分组标签与业务字典一致
-    expect(screen.getAllByText("回收编号").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("支出流水").length).toBeGreaterThan(0);
-    // 静态口径条目：库存编号 / 分期合约号（无 document_sequences 行也展示）
-    expect(screen.getByText("库存编号")).toBeInTheDocument();
-    expect(screen.getByText("分期合约号")).toBeInTheDocument();
-    expect(screen.getByText("编号格式 业务订单编号-FQ")).toBeInTheDocument();
-    // 只读面板：不提供任何新增/编辑/重置入口
+    const stockRow = await screen.findByRole("row", { name: /库存编号/ });
+    expect(within(stockRow).getByText(/KU_.*5.*位/)).toBeInTheDocument();
+    expect(within(stockRow).getByText("20")).toBeInTheDocument();
+    expect(within(stockRow).getByText("KU_00021")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "预计下一编号" })).toBeInTheDocument();
+    expect(screen.getByText("HS0129")).toBeInTheDocument();
+    expect(screen.getByText("ZC00008")).toBeInTheDocument();
+    expect(screen.queryByText(/不参与序列发放/)).toBeNull();
     expect(screen.queryByRole("button", { name: /新建|编辑|重置|保存/ })).toBeNull();
   });
 
@@ -59,29 +56,33 @@ describe("SequencesPanel", () => {
     expect(screen.getByText(/用尽后需要生成通知的操作会失败/)).toBeInTheDocument();
   });
 
-  it("分期合约号按业务订单号派生，不展示独立流水序列", async () => {
+  it("分期合约和返点按订单派生，不展示虚构的独立序列", async () => {
     vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "INSTALLMENT", prefix: "FQ", padding: 4, current_value: 0, next_number: "FQ0001" },
     ]);
     renderLight(<SequencesPanel />, { user: "admin" });
 
-    expect(await screen.findByText("编号格式 业务订单编号-FQ")).toBeInTheDocument();
-    expect(screen.queryByText(/FQ\+4位流水/)).toBeNull();
-    expect(screen.queryByText(/当前值 0/)).toBeNull();
+    expect(await screen.findByText(/HS0001-FQ-02/)).toBeInTheDocument();
+    expect(screen.getByText(/HS0001-RB01/)).toBeInTheDocument();
     expect(screen.queryByText("FQ0001")).toBeNull();
   });
 
-  it("静态分组外的动态编号域落入「自定义编号域」兜底组（不静默丢失）", async () => {
+  it("移除已停用的编号域，同时保留其他未识别的序列", async () => {
     vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "ORDER_HS", prefix: "HS", padding: 4, current_value: 128, next_number: "HS0129" },
       { sequence_key: "ORDER_QA5B", prefix: "QA5B", padding: 4, current_value: 0, next_number: "QA5B0001" },
+      { sequence_key: "QUALITY_ISSUE", prefix: "QI", padding: 4, current_value: 0, next_number: "QI0001" },
+      { sequence_key: "IMPORT", prefix: "IMP", padding: 4, current_value: 0, next_number: "IMP0001" },
+      { sequence_key: "ATTACHMENT", prefix: "ATT", padding: 4, current_value: 0, next_number: "ATT0001" },
     ]);
     renderLight(<SequencesPanel />, { user: "admin" });
 
-    expect(await screen.findByText("自定义编号域")).toBeInTheDocument();
-    expect(screen.getByText(/QA5B0001/)).toBeInTheDocument();
-    // 分组内已覆盖的域不重复出现在兜底组
-    expect(screen.getAllByText(/HS0129/).length).toBe(1);
+    const unknownRow = await screen.findByRole("row", { name: /QA5B0001/ });
+    expect(within(unknownRow).getByText("其他／待核对")).toBeInTheDocument();
+    expect(screen.getAllByText("HS0129")).toHaveLength(1);
+    expect(screen.queryByText("QI0001")).toBeNull();
+    expect(screen.queryByText("IMP0001")).toBeNull();
+    expect(screen.queryByText("ATT0001")).toBeNull();
   });
 
   it("加载失败时展示错误横幅（不静默）", async () => {

@@ -70,7 +70,7 @@ def test_database_rejects_multiple_default_pools(seeded_db):
 
 def test_existing_database_constraint_repair_checks_data_and_is_idempotent(seeded_db):
     from app.business.orders.create import create_order
-    from app.funds.deposits.writes import create_deposit
+    from app.finance.deposits.writes import create_deposit
     from scripts.ensure_funds_constraints import ensure_funds_constraints
     from datetime import date
 

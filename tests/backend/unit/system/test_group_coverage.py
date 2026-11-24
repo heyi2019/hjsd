@@ -123,11 +123,11 @@ def _ci_scope(repo: Path, **overrides: str) -> dict[str, str]:
 
 
 @pytest.mark.parametrize(("paths", "full", "mode", "expected"), [
-    ("frontend/src/pools/FundsPage.tsx", "false", "none", ""),
+    ("frontend/src/finance/FinancePage.tsx", "false", "none", ""),
     ("tests/e2e/system/fallback.spec.ts", "false", "selected", "tests/e2e/system/fallback.spec.ts"),
     ("tests/e2e/support/api-stub.ts", "false", "all", ""),
     ("tests/e2e/system/deleted.spec.ts", "false", "all", ""),
-    ("frontend/src/pools/FundsPage.tsx", "true", "all", ""),
+    ("frontend/src/finance/FinancePage.tsx", "true", "all", ""),
 ])
 def test_ci_selects_changed_e2e_specs(paths, full, mode, expected):
     script = REPO / "scripts/ops/e2e_test_scope.py"
@@ -175,10 +175,10 @@ def test_ci_scope_includes_all_commits_and_both_sides_of_renames(tmp_path):
 
 
 @pytest.mark.parametrize(("event", "full", "paths", "expected_mode"), [
-    ("push", "false", "backend/app/funds/balances.py", "changed"),
-    ("workflow_dispatch", "false", "backend/app/funds/balances.py", "changed"),
+    ("push", "false", "backend/app/finance/balances.py", "changed"),
+    ("workflow_dispatch", "false", "backend/app/finance/balances.py", "changed"),
     ("workflow_dispatch", "false", "", "full"),
-    ("push", "true", "backend/app/funds/balances.py", "full"),
+    ("push", "true", "backend/app/finance/balances.py", "full"),
     ("push", "false", "", "full"),
     ("pull_request", "false", "", "full"),
     ("push", "false", "bad\npath", "full"),
@@ -193,9 +193,46 @@ def test_ci_scope_requires_full_suite_when_change_range_is_unknown(tmp_path, eve
         assert scope["groups"] == "ci"
 
 
-@pytest.mark.parametrize("path", [".github/workflows/main-ci-cd.yml", "scripts/ops/auto_release.sh", "tests/manifest.json"])
+@pytest.mark.parametrize("path", [".github/workflows/main-ci-cd.yml", "scripts/ops/auto_release.sh", "tests/manifest.json", "tests/backend/conftest.py"])
 def test_ci_configuration_changes_require_full_backend_regression(path):
     assert rr.is_structural_change([path])
+
+
+def test_changed_paths_includes_renamed_and_untracked_test_files(tmp_path, monkeypatch):
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=tmp_path, check=True, capture_output=True, text=True)
+
+    git("init", "-q")
+    git("config", "user.name", "Regression Test")
+    git("config", "user.email", "regression-test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    old = Path("tests/backend/integration/finance/test_moved.py")
+    new = Path("tests/backend/integration/finance/deposits/test_moved.py")
+    extra = Path("tests/backend/integration/finance/deposits/test_new.py")
+    (tmp_path / old).parent.mkdir(parents=True)
+    (tmp_path / old).write_text("def test_moved(): pass\n", encoding="utf-8")
+    (tmp_path / "backend").mkdir()
+    git("add", str(old))
+    git("commit", "-qm", "test: initial file")
+    (tmp_path / new).parent.mkdir(parents=True)
+    git("mv", str(old), str(new))
+    (tmp_path / extra).write_text("def test_new(): pass\n", encoding="utf-8")
+    monkeypatch.setattr(rr, "ROOT", tmp_path / "backend")
+
+    assert set(rr.changed_paths()) == {str(old), str(new), str(extra)}
+
+
+def test_removed_test_path_uses_full_regression_but_new_unregistered_file_still_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(rr, "REPO", tmp_path)
+    old = "tests/backend/integration/finance/test_moved.py"
+    new = "tests/backend/integration/finance/deposits/test_new_unregistered.py"
+    (tmp_path / new).parent.mkdir(parents=True)
+    (tmp_path / new).write_text("def test_new(): pass\n", encoding="utf-8")
+
+    assert rr.is_structural_change([old, new])
+    assert not rr.is_structural_change([new])
+    with pytest.raises(SystemExit, match="不在 GROUPS"):
+        rr.groups_for_changes([new])
 
 
 @pytest.mark.parametrize("path", [
@@ -210,22 +247,22 @@ def test_order_financial_changes_select_order_and_funds_regressions(path):
 
 def test_funds_regressions_include_cross_domain_import_and_installment_flows():
     assert {
-        "tests/backend/integration/business/test_order_import.py",
-        "tests/backend/integration/business/test_installments_funds_integration.py",
+        "tests/backend/integration/business/orders/test_order_import.py",
+        "tests/backend/integration/business/installments/test_installments_finance_integration.py",
     }.issubset(rr.GROUPS["finance"])
 
 
 @pytest.mark.parametrize("path", [
-    "backend/app/funds/cashflow_writes/reverse.py",
-    "backend/app/funds/deposits/writes.py",
-    "backend/app/funds/rebates.py",
+    "backend/app/finance/cashflow/writes/reverse.py",
+    "backend/app/finance/deposits/writes.py",
+    "backend/app/finance/rebates.py",
 ])
 def test_funds_writes_select_order_and_reporting_regressions(path):
     assert {"finance", "orders", "reporting"}.issubset(rr.groups_for_changes([path]))
 
 
 def test_studio_summary_changes_select_finance_and_reporting_regressions():
-    assert {"finance", "reporting"}.issubset(rr.groups_for_changes(["backend/app/funds/cashflow_reads/studio.py"]))
+    assert {"finance", "reporting"}.issubset(rr.groups_for_changes(["backend/app/finance/cashflow/reads/studio.py"]))
 
 
 def test_shared_order_amounts_are_structural_for_test_selection():

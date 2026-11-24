@@ -9,9 +9,9 @@
 #                  表单作用域清单）。依赖 L0。
 #   L2  shared     跨业务域共享原语：被 ≥2 个业务域引用、自身不属于任何
 #                  业务域、只依赖 L0+L1。依赖 L0+L1，**不依赖任何业务域**。
-#   L3  业务域     与前端 6 导航 key 一一对应：workbench（含 notifications）/ business（含
-#                  inventory、installments、profit_allocation）/ customers / funds /
-#                  operations / settings（含 field_definitions、options、lists、auth、
+#   L3  业务域     按前端 6 个业务板块组织：workbench（含 notifications）/ business（含
+#                  inventory、installments、profit_allocation）/ customers / finance /
+#                  operations / settings（含 field_definitions、options、lists、auth、users、
 #                  audit、attachments）。依赖 L0+L1+L2。
 #
 # ─────────────────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@
 #     末轮 domain 改名对齐前端导航 key：workbench→dashboard、customer_center→customers、
 #       finance→funds、reporting→operations、orders→business。
 #     契约收敛为 3 条：business↛funds 统一覆盖原 orders↛installments / stocks↛orders。
+#   2026-11-24：资金业务域由 funds 改名为 finance，依赖方向保持不变。
 #
 #   底座纯化：
 #     core/database.py 的 Base + create_all → domain/base.py（Base 是 ORM 的东西）
@@ -58,7 +59,7 @@
 # 合法依赖方向（L3 业务域之间仍允许单向依赖，但不得成环）
 #
 #   operations / workbench → 各业务域（只读聚合层）
-#   funds                  → business
+#   finance                → business
 #   business → customers / settings
 #
 # 运行：backend 目录下执行 lint-imports（CI lint-gate 同步强制）。
@@ -85,19 +86,19 @@ source_modules =
 forbidden_modules =
     app.business
     app.customers
-    app.funds
+    app.finance
     app.settings
     app.operations
     app.workbench
 
 # ── 业务域之间的既成禁止边（2026-11-18 P0-A 归位成果，保持不放松）────────
-[importlinter:contract:business-not-import-funds]
-name = business 不得依赖 funds（合法方向只有 funds -> business）
+[importlinter:contract:business-not-import-finance]
+name = business 不得依赖 finance（合法方向只有 finance -> business）
 type = forbidden
 source_modules =
     app.business
 forbidden_modules =
-    app.funds
+    app.finance
 
 # 2026-11-19 域归并后契约收敛为 3 条：子模块均随父包被既有契约覆盖，
 # 不新增禁止边（inventory/notifications/settings 六子模块均已并入对应父域）。

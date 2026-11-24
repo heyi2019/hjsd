@@ -40,7 +40,7 @@ const isFile = (p: string) => {
   }
 };
 
-/** 基线里的 file 字段以**仓库根**为基准（如 tests/frontend/module/business/OrdersPage.test.tsx）。 */
+/** 基线里的 file 字段以**仓库根**为基准（如 tests/frontend/module/business/orders/OrdersPage.test.tsx）。 */
 const rel = (abs: string) => path.relative(REPO, abs).split(path.sep).join("/");
 
 function testFiles(dir: string, acc: string[] = []): string[] {

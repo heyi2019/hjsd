@@ -167,16 +167,16 @@ GROUPS = {
         "tests/backend/unit/system/test_state_machine.py",
         "tests/backend/unit/system/test_api_contract.py",
         "tests/backend/unit/system/test_request_schema_contract.py",
-        "tests/backend/unit/business/test_cancellation_model.py",
-        "tests/backend/unit/business/test_orders_common.py",
-        "tests/backend/unit/finance/test_finance_attributes.py",
-        "tests/backend/unit/finance/test_rebate_current_contract.py",
+        "tests/backend/unit/business/shared/test_cancellation_model.py",
+        "tests/backend/unit/business/orders/test_orders_common.py",
+        "tests/backend/unit/finance/shared/test_finance_attributes.py",
+        "tests/backend/unit/finance/rebates/test_rebate_current_contract.py",
         "tests/backend/unit/settings/test_product_account_fields.py",
         "tests/backend/unit/system/test_main_contract.py",
         # 列表列「界面↔注册表」守卫：纯静态读前端源码，无 DB/HTTP，0.04s。
         # 曾长期游离在所有分组之外 —— 前端把报表视图拆成 ./reports/*.tsx 后它指错文件、
         # 7 条 RPT_* 一直红着却没人发现，证明「不在分组里的守卫等于没有守卫」。
-        "tests/backend/unit/settings/test_list_scope_ui_parity.py",
+        "tests/backend/unit/settings/lists/test_list_scope_ui_parity.py",
         # 承诺归属守卫：静态解析当前后端测试文件的 docstring，无 DB/HTTP，0.4s。
         # 它守的是「每个测试文件都能说清自己在保护哪条承诺」，以及清单证据不指向
         # 不存在的文件——没有它，新增测试就是加一个没人知道在测什么的文件。
@@ -192,30 +192,30 @@ GROUPS = {
         # 它守的是「搬目录后扫描范围仍指向旧路径」——失败表现是结果为空而非报错，
         # 用例会整批从用例库与报告里消失。纯静态，< 0.1s。
         "tests/backend/unit/system/test_manifest_parity.py",
-        "tests/backend/unit/finance/test_finance_boundaries.py",
-        "tests/backend/unit/business/test_order_detail_labels.py",
-        "tests/backend/unit/business/test_operation_operators.py",
+        "tests/backend/unit/finance/shared/test_finance_boundaries.py",
+        "tests/backend/unit/business/shared/order_detail/test_order_detail_labels.py",
+        "tests/backend/unit/business/installments/test_operation_operators.py",
     ],
     "p0": [
         "tests/backend/integration/settings/test_order_types_api.py",
-        "tests/backend/integration/business/test_orders_contract.py",
-        "tests/backend/integration/workbench/test_overview.py",
-        "tests/backend/integration/business/test_orders_create_validation.py",
-        "tests/backend/integration/business/test_orders_query_contract.py",
-        "tests/backend/integration/business/test_orders_account_effects.py",
-        "tests/backend/integration/business/test_orders_api.py",
-        "tests/backend/integration/business/test_order_import.py",
-        "tests/backend/integration/business/test_orders.py",
-        "tests/backend/integration/business/test_orders_flows.py",
-        "tests/backend/integration/business/test_orders_events.py",
-        "tests/backend/integration/business/test_orders_roles.py",
-        "tests/backend/integration/business/test_installments_contract.py",
-        "tests/backend/integration/business/test_installments_create.py",
-        "tests/backend/integration/business/test_installments_lifecycle.py",
-        "tests/backend/integration/business/test_installments_overdue.py",
-        "tests/backend/integration/business/test_installments_api_class.py",
-        "tests/backend/integration/operations/test_reporting_contract.py",
-        "tests/backend/integration/business/test_installments_funds_integration.py",
+        "tests/backend/integration/business/orders/test_orders_contract.py",
+        "tests/backend/integration/workbench/overview/test_overview.py",
+        "tests/backend/integration/business/orders/test_orders_create_validation.py",
+        "tests/backend/integration/business/orders/test_orders_query_contract.py",
+        "tests/backend/integration/business/orders/test_orders_account_effects.py",
+        "tests/backend/integration/business/orders/test_orders_api.py",
+        "tests/backend/integration/business/orders/test_order_import.py",
+        "tests/backend/integration/business/orders/test_orders.py",
+        "tests/backend/integration/business/orders/test_orders_flows.py",
+        "tests/backend/integration/business/orders/test_orders_events.py",
+        "tests/backend/integration/business/orders/test_orders_roles.py",
+        "tests/backend/integration/business/installments/test_installments_contract.py",
+        "tests/backend/integration/business/installments/test_installments_create.py",
+        "tests/backend/integration/business/installments/test_installments_lifecycle.py",
+        "tests/backend/integration/business/installments/test_installments_overdue.py",
+        "tests/backend/integration/business/installments/test_installments_api_class.py",
+        "tests/backend/integration/operations/reports/test_reporting_contract.py",
+        "tests/backend/integration/business/installments/test_installments_finance_integration.py",
     ],
     "foundation": [
         "tests/backend/integration/settings/test_foundation_contract.py",
@@ -224,141 +224,141 @@ GROUPS = {
         "tests/backend/integration/settings/test_order_types_api.py",
         "tests/backend/integration/finance/test_pools_api.py",
         "tests/backend/integration/settings/test_form_extra_scopes.py",
-        "tests/backend/integration/settings/test_order_form_fields.py",
-        "tests/backend/integration/settings/test_order_form_fields_router.py",
-        "tests/backend/integration/settings/test_order_form_fields_guards.py",
+        "tests/backend/integration/settings/field_definitions/test_order_form_fields.py",
+        "tests/backend/integration/settings/field_definitions/test_order_form_fields_router.py",
+        "tests/backend/integration/settings/field_definitions/test_order_form_fields_guards.py",
         "tests/backend/integration/system/test_numbering.py",
         "tests/backend/unit/system/test_settings.py",
-        "tests/backend/integration/settings/test_game_types.py",
-        "tests/backend/integration/settings/test_game_types_contract.py",
-        "tests/backend/integration/settings/test_option_sets_api.py",
+        "tests/backend/integration/settings/options/test_game_types.py",
+        "tests/backend/integration/settings/options/test_game_types_contract.py",
+        "tests/backend/integration/settings/options/test_option_sets_api.py",
         "tests/backend/unit/settings/test_product_account_fields.py",
     ],
     "accounts": [
-        "tests/backend/integration/business/test_accounts_contract.py",
-        "tests/backend/integration/business/test_account_stock_no.py",
-        "tests/backend/unit/business/test_account_inventory_age.py",
-        "tests/backend/integration/business/test_inventory_stats.py",
-        "tests/backend/integration/business/test_account_delete.py",
+        "tests/backend/integration/business/inventory/test_accounts_contract.py",
+        "tests/backend/integration/business/inventory/test_account_stock_no.py",
+        "tests/backend/unit/business/inventory/test_account_inventory_age.py",
+        "tests/backend/integration/business/inventory/test_inventory_stats.py",
+        "tests/backend/integration/business/inventory/test_account_delete.py",
     ],
     "orders": [
-        "tests/backend/integration/business/test_orders_contract.py",
-        "tests/backend/integration/workbench/test_overview.py",
-        "tests/backend/integration/business/test_orders_create_validation.py",
-        "tests/backend/integration/business/test_orders_query_contract.py",
-        "tests/backend/integration/business/test_orders_account_effects.py",
-        "tests/backend/integration/business/test_orders_api.py",
-        "tests/backend/integration/business/test_order_import.py",
-        "tests/backend/integration/business/test_orders.py",
-        "tests/backend/integration/business/test_orders_flows.py",
-        "tests/backend/integration/business/test_orders_events.py",
-        "tests/backend/integration/business/test_orders_roles.py",
-        "tests/backend/unit/business/test_orders_events_service.py",
+        "tests/backend/integration/business/orders/test_orders_contract.py",
+        "tests/backend/integration/workbench/overview/test_overview.py",
+        "tests/backend/integration/business/orders/test_orders_create_validation.py",
+        "tests/backend/integration/business/orders/test_orders_query_contract.py",
+        "tests/backend/integration/business/orders/test_orders_account_effects.py",
+        "tests/backend/integration/business/orders/test_orders_api.py",
+        "tests/backend/integration/business/orders/test_order_import.py",
+        "tests/backend/integration/business/orders/test_orders.py",
+        "tests/backend/integration/business/orders/test_orders_flows.py",
+        "tests/backend/integration/business/orders/test_orders_events.py",
+        "tests/backend/integration/business/orders/test_orders_roles.py",
+        "tests/backend/unit/business/orders/test_orders_events_service.py",
         "tests/backend/unit/system/test_state_machine.py",
         "tests/backend/unit/system/test_api_contract.py",
         "tests/backend/unit/system/test_request_schema_contract.py",
-        "tests/backend/unit/business/test_cancellation_model.py",
-        "tests/backend/unit/business/test_orders_common.py",
-        "tests/backend/integration/business/test_orders_guard.py",
-        "tests/backend/integration/business/test_orders_router_guard.py",
-        "tests/backend/integration/business/test_order_execution_edit.py",
-        "tests/backend/integration/business/test_order_execution_listing.py",
-        "tests/backend/integration/customer/test_order_customer_source_fixtures.py",
-        "tests/backend/integration/business/test_profit_allocation_modes.py",
-        "tests/backend/integration/business/test_flow_recycle.py",
-        "tests/backend/unit/business/test_order_status_contract.py",
-        "tests/backend/integration/business/test_flow_sale.py",
-        "tests/backend/integration/business/test_flow_config_driven.py",
-        "tests/backend/integration/business/test_stock_intake_contract.py",
-        "tests/backend/integration/business/test_cancel_inventory_release.py",
-        "tests/backend/integration/business/test_inventory_offsale_atomic.py",
-        "tests/backend/integration/business/test_inventory_offsale_concurrency.py",
-        "tests/backend/integration/business/test_order_duplicate_account.py",
-        "tests/backend/integration/business/test_order_event_cancellable_amount.py",
+        "tests/backend/unit/business/shared/test_cancellation_model.py",
+        "tests/backend/unit/business/orders/test_orders_common.py",
+        "tests/backend/integration/business/orders/test_orders_guard.py",
+        "tests/backend/integration/business/orders/test_orders_router_guard.py",
+        "tests/backend/integration/business/shared/order_detail/test_order_execution_edit.py",
+        "tests/backend/integration/business/shared/order_detail/test_order_execution_listing.py",
+        "tests/backend/integration/customers/test_order_customer_source_fixtures.py",
+        "tests/backend/integration/business/profit_allocation/test_profit_allocation_modes.py",
+        "tests/backend/integration/business/shared/test_flow_recycle.py",
+        "tests/backend/unit/business/orders/test_order_status_contract.py",
+        "tests/backend/integration/business/shared/test_flow_sale.py",
+        "tests/backend/integration/business/shared/test_flow_config_driven.py",
+        "tests/backend/integration/business/inventory/test_stock_intake_contract.py",
+        "tests/backend/integration/business/inventory/test_cancel_inventory_release.py",
+        "tests/backend/integration/business/inventory/test_inventory_offsale_atomic.py",
+        "tests/backend/integration/business/inventory/test_inventory_offsale_concurrency.py",
+        "tests/backend/integration/business/orders/test_order_duplicate_account.py",
+        "tests/backend/integration/business/orders/test_order_event_cancellable_amount.py",
         # 2026-11-12 金额链路
-        "tests/backend/integration/business/test_order_financial_date_shift.py",
-        "tests/backend/unit/business/test_order_detail_labels.py",
-        "tests/backend/unit/business/test_operation_operators.py",
+        "tests/backend/integration/business/orders/test_order_financial_date_shift.py",
+        "tests/backend/unit/business/shared/order_detail/test_order_detail_labels.py",
+        "tests/backend/unit/business/installments/test_operation_operators.py",
     ],
     "installments": [
-        "tests/backend/integration/business/test_installment_payment_concurrency.py",
-        "tests/backend/integration/business/test_installments_contract.py",
-        "tests/backend/integration/business/test_installments_create.py",
-        "tests/backend/integration/business/test_installments_lifecycle.py",
-        "tests/backend/integration/business/test_installments_overdue.py",
-        "tests/backend/integration/business/test_installments_api_class.py",
-        "tests/backend/integration/business/test_installments_funds_integration.py",
-        "tests/backend/integration/business/test_installments_service.py",
-        "tests/backend/integration/business/test_installments_service_write_paths.py",
-        "tests/backend/integration/business/test_installments_service_defensive.py",
-        "tests/backend/integration/business/test_flow_installment.py",
-        "tests/backend/integration/business/test_installment_remaining.py",
-        "tests/backend/integration/business/test_installment_totals.py",
+        "tests/backend/integration/business/installments/test_installment_payment_concurrency.py",
+        "tests/backend/integration/business/installments/test_installments_contract.py",
+        "tests/backend/integration/business/installments/test_installments_create.py",
+        "tests/backend/integration/business/installments/test_installments_lifecycle.py",
+        "tests/backend/integration/business/installments/test_installments_overdue.py",
+        "tests/backend/integration/business/installments/test_installments_api_class.py",
+        "tests/backend/integration/business/installments/test_installments_finance_integration.py",
+        "tests/backend/integration/business/installments/test_installments_service.py",
+        "tests/backend/integration/business/installments/test_installments_service_write_paths.py",
+        "tests/backend/integration/business/installments/test_installments_service_defensive.py",
+        "tests/backend/integration/business/installments/test_flow_installment.py",
+        "tests/backend/integration/business/installments/test_installment_remaining.py",
+        "tests/backend/integration/business/installments/test_installment_totals.py",
     ],
     "finance": [
-        "tests/backend/integration/business/test_installments_funds_integration.py",
-        "tests/backend/integration/business/test_order_import.py",
-        "tests/backend/integration/finance/test_finance_api.py",
-        "tests/backend/integration/finance/test_finance_deposits.py",
-        "tests/backend/integration/finance/test_finance_rebates_guards.py",
-        "tests/backend/integration/finance/test_finance_reconciliation.py",
-        "tests/backend/unit/finance/test_finance_attributes.py",
-        "tests/backend/integration/finance/test_finance_cashflows_service.py",
-        "tests/backend/integration/finance/test_finance_cashflows_deposits.py",
-        "tests/backend/integration/finance/test_finance_cashflows_guards.py",
-        "tests/backend/integration/finance/test_deposit_remaining.py",
-        "tests/backend/integration/finance/test_finance_controls_service.py",
-        "tests/backend/integration/finance/test_finance_rebates_service.py",
-        "tests/backend/integration/finance/test_finance_router_contract.py",
-        "tests/backend/unit/finance/test_rebate_rules_contract.py",
+        "tests/backend/integration/business/installments/test_installments_finance_integration.py",
+        "tests/backend/integration/business/orders/test_order_import.py",
+        "tests/backend/integration/finance/shared/test_finance_api.py",
+        "tests/backend/integration/finance/deposits/test_finance_deposits.py",
+        "tests/backend/integration/finance/rebates/test_finance_rebates_guards.py",
+        "tests/backend/integration/finance/reconciliation/test_finance_reconciliation.py",
+        "tests/backend/unit/finance/shared/test_finance_attributes.py",
+        "tests/backend/integration/finance/cashflow/test_finance_cashflows_service.py",
+        "tests/backend/integration/finance/shared/test_finance_cashflows_deposits.py",
+        "tests/backend/integration/finance/cashflow/test_finance_cashflows_guards.py",
+        "tests/backend/integration/finance/deposits/test_deposit_remaining.py",
+        "tests/backend/integration/finance/shared/test_finance_controls_service.py",
+        "tests/backend/integration/finance/rebates/test_finance_rebates_service.py",
+        "tests/backend/integration/finance/shared/test_finance_router_contract.py",
+        "tests/backend/unit/finance/rebates/test_rebate_rules_contract.py",
         "tests/backend/unit/system/test_money.py",
-        "tests/backend/integration/finance/test_finance_reconciliation_service.py",
+        "tests/backend/integration/finance/reconciliation/test_finance_reconciliation_service.py",
         "tests/backend/integration/finance/test_finance_transfers_service.py",
-        "tests/backend/unit/finance/test_rebate_current_contract.py",
-        "tests/backend/integration/finance/test_finance_reversal_service.py",
-        "tests/backend/integration/business/test_flow_distribution.py",
-        "tests/backend/integration/finance/test_cashflow_totals.py",
-        "tests/backend/integration/finance/test_cashflow_write_concurrency.py",
+        "tests/backend/unit/finance/rebates/test_rebate_current_contract.py",
+        "tests/backend/integration/finance/cashflow/test_finance_reversal_service.py",
+        "tests/backend/integration/business/shared/test_flow_distribution.py",
+        "tests/backend/integration/finance/cashflow/test_cashflow_totals.py",
+        "tests/backend/integration/finance/shared/test_cashflow_write_concurrency.py",
         "tests/backend/integration/finance/test_pool_balances_batch.py",
         "tests/backend/integration/finance/test_studio_cashflow_summary.py",
         # 2026-11-12 金额链路/裁决批次（资金两方向、金额大类口径）
-        "tests/backend/integration/finance/test_funds_direction_and_deposit.py",
-        "tests/backend/unit/finance/test_finance_boundaries.py",
+        "tests/backend/integration/finance/shared/test_finance_direction_and_deposit.py",
+        "tests/backend/unit/finance/shared/test_finance_boundaries.py",
     ],
     "parties": [
-        "tests/backend/integration/customer/test_parties.py",
-        "tests/backend/integration/customer/test_parties_contract.py",
-        "tests/backend/integration/customer/test_parties_customer_lifecycle.py",
-        "tests/backend/integration/customer/test_parties_counterparty_api.py",
-        "tests/backend/integration/customer/test_parties_fields_service.py",
-        "tests/backend/integration/customer/test_leads_contract.py",
-        "tests/backend/integration/customer/test_parties_policy_guard.py",
-        "tests/backend/unit/customer/test_parties_masking.py",
+        "tests/backend/integration/customers/test_parties.py",
+        "tests/backend/integration/customers/test_parties_contract.py",
+        "tests/backend/integration/customers/test_parties_customer_lifecycle.py",
+        "tests/backend/integration/customers/test_parties_counterparty_api.py",
+        "tests/backend/integration/customers/test_parties_fields_service.py",
+        "tests/backend/integration/customers/test_leads_contract.py",
+        "tests/backend/integration/customers/test_parties_policy_guard.py",
+        "tests/backend/unit/customers/test_parties_masking.py",
     ],
     "reporting": [
-        "tests/backend/integration/operations/test_reporting_contract.py",
-        "tests/backend/unit/operations/test_report_export_columns.py",
+        "tests/backend/integration/operations/reports/test_reporting_contract.py",
+        "tests/backend/unit/operations/reports/test_report_export_columns.py",
         "tests/backend/unit/operations/test_xlsx_sheet_capacity.py",
-        "tests/backend/integration/operations/test_reporting_service.py",
-        "tests/backend/integration/operations/test_reporting_consistency.py",
-        "tests/backend/integration/operations/test_profit_cashflow_basis.py",
-        "tests/backend/integration/operations/test_profit_monthly_accounting.py",
+        "tests/backend/integration/operations/reports/test_reporting_service.py",
+        "tests/backend/integration/operations/reports/test_reporting_consistency.py",
+        "tests/backend/integration/operations/reports/test_profit_cashflow_basis.py",
+        "tests/backend/integration/operations/reports/test_profit_monthly_accounting.py",
         "tests/backend/integration/operations/test_data_center_summary.py",
         "tests/backend/integration/operations/test_list_export_csv.py",
-        "tests/backend/unit/settings/test_list_scope_ui_parity.py",
+        "tests/backend/unit/settings/lists/test_list_scope_ui_parity.py",
     ],
     "profit-allocation": [
-        "tests/backend/integration/business/test_profit_allocation.py",
+        "tests/backend/integration/business/profit_allocation/test_profit_allocation.py",
     ],
     "governance": [
         "tests/backend/integration/system/test_attachments_contract.py",
-        "tests/backend/integration/system/test_audit_contract.py",
+        "tests/backend/integration/settings/audit/test_audit_contract.py",
         "tests/backend/integration/system/test_attachments_service.py",
         "tests/backend/integration/workbench/test_contract_message_visibility.py",
-        "tests/backend/integration/workbench/test_notifications_service.py",
-        "tests/backend/integration/workbench/test_profit_notifications.py",
-        "tests/backend/integration/workbench/test_overdue_notifications.py",
-        "tests/backend/integration/workbench/test_profit_notifications_settings.py",
+        "tests/backend/integration/workbench/notifications/test_notifications_service.py",
+        "tests/backend/integration/workbench/notifications/test_profit_notifications.py",
+        "tests/backend/integration/workbench/notifications/test_overdue_notifications.py",
+        "tests/backend/integration/workbench/notifications/test_profit_notifications_settings.py",
     ],
     "migration": [
         "tests/backend/integration/system/test_migration.py",
@@ -366,17 +366,17 @@ GROUPS = {
     # 跨域基建板块：列表列/导出、部署脚本、覆盖率与迁移基线——改动常横跨多域。
     "platform": [
         "tests/backend/unit/system/test_core_contract.py",
-        "tests/backend/integration/settings/test_list_columns.py",
+        "tests/backend/integration/settings/lists/test_list_columns.py",
         "tests/backend/integration/settings/test_list_custom_columns.py",
         "tests/backend/integration/operations/test_list_export_csv.py",
         "tests/backend/unit/system/test_deploy_script_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
-        "tests/backend/integration/business/test_inventory_ledger_export.py",
+        "tests/backend/integration/business/inventory/test_inventory_ledger_export.py",
     ],
     "auth": [
-        "tests/backend/integration/system/test_auth_contract.py",
-        "tests/backend/integration/system/test_auth_users.py",
-        "tests/backend/integration/system/test_auth_teams.py",
+        "tests/backend/integration/settings/auth/test_auth_contract.py",
+        "tests/backend/integration/settings/users/test_auth_users.py",
+        "tests/backend/integration/settings/users/test_auth_teams.py",
         "tests/backend/unit/system/test_main_contract.py",
         "tests/backend/unit/system/test_backup_scripts.py",
         "tests/backend/unit/system/test_public_release_security.py",
@@ -403,13 +403,22 @@ def all_paths() -> list[str]:
 
 def changed_paths() -> list[str]:
     result = subprocess.run(
-        ["git", "status", "--short"],
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
         cwd=ROOT.parent,
         check=True,
         capture_output=True,
         text=True,
     )
-    return [line[3:] for line in result.stdout.splitlines() if len(line) > 3]
+    entries = iter(result.stdout.split("\0"))
+    paths: list[str] = []
+    for entry in entries:
+        if len(entry) < 4:
+            continue
+        status = entry[:2]
+        paths.append(entry[3:])
+        if "R" in status or "C" in status:
+            paths.append(next(entries))
+    return paths
 
 
 def _groups_for_source_path(path: str) -> set[str]:
@@ -427,7 +436,7 @@ def _groups_for_source_path(path: str) -> set[str]:
         selected.add("orders")
     if "installment" in path:
         selected.add("installments")
-    if path.startswith("backend/app/funds/") or "finance" in path or "rebate" in path:
+    if path.startswith("backend/app/finance/") or "finance" in path or "rebate" in path:
         selected.add("finance")
     # 订单日期、事件与详情资金编辑会改同一批资金凭证；资金写入也影响订单和经营报表。
     if (path == "backend/app/business/orders/mutations.py"
@@ -435,10 +444,10 @@ def _groups_for_source_path(path: str) -> set[str]:
         or path.startswith("backend/app/business/orders/importing/")
         or path.startswith("backend/app/business/shared/order_detail/editing/")):
         selected.add("finance")
-    if (path.startswith(("backend/app/funds/cashflow_writes/", "backend/app/funds/deposits/"))
-        or path == "backend/app/funds/rebates.py"):
+    if (path.startswith(("backend/app/finance/cashflow/writes/", "backend/app/finance/deposits/"))
+        or path == "backend/app/finance/rebates.py"):
         selected.update(("orders", "reporting"))
-    if path == "backend/app/funds/cashflow_reads/studio.py":
+    if path == "backend/app/finance/cashflow/reads/studio.py":
         selected.add("reporting")
     if any(t in path for t in ("customers", "parties", "leads")):
         selected.add("parties")
@@ -474,12 +483,17 @@ def is_structural_change(paths: list[str]) -> bool:
     """看不懂的后端改动一律降级全量：核心路径直接命中，或 backend/ 下路径
     未被任何业务域 token 命中（说明规则没覆盖，不能靠猜压缩范围）。"""
     for path in paths:
-        if path.startswith("frontend/") or path.startswith("tests/backend/"):
+        if any(path.startswith(x) for x in STRUCTURAL_PREFIXES):
+            return True
+        if path.startswith("frontend/"):
+            continue
+        if path.startswith("tests/backend/"):
+            # 被删除或迁走的测试没有当前分组可供反查，无法安全判断影响范围。
+            if not (REPO / path).is_file():
+                return True
             continue
         if path in NON_STRUCTURAL_FILES:
             continue
-        if any(path.startswith(x) for x in STRUCTURAL_PREFIXES):
-            return True
         if path.startswith("backend/") and not _groups_for_source_path(path):
             return True
     return False

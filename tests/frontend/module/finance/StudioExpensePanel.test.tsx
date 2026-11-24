@@ -9,7 +9,7 @@ import { studioExpensesApi } from "@/shared/api/studioExpenses.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import { employeesApi } from "@/shared/api/org.api";
-import { StudioExpensePanel } from "@/pools/StudioExpensePanel";
+import { StudioExpensePanel } from "@/finance/StudioExpensePanel";
 import { studioExpenseSummary } from "@fixtures/api-responses";
 
 let ui: ReturnType<typeof userEvent.setup>;

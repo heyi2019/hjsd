@@ -1,6 +1,6 @@
 import { Alert, Button, Form, Input } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { OrderDetailDialog } from "../shared/order-detail/OrderDetailDialog";
+import { OrderDetailDialog } from "../shared/order_detail/OrderDetailDialog";
 import "./OrderAllocationModal.css";
 import type { FormInstance } from "antd";
 import { CustomFieldSections, FieldConfigScope } from "../../shared/forms/ConfigurableField";

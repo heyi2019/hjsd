@@ -1,0 +1,615 @@
+"""PROFIT-01 分润两种录入口径的契约测试。
+
+口径（2026-10-26 用户裁决「不止可以填比例，也可以填金额，两个都选填」）：
+
+- **按人模式**（items 不带 allocation_type）：每行一个姓名（user_id，空=公司归属），
+  比例与金额都选填、同一行只能填一个。
+  - 纯比例：合计必须 100%（沿用 BAS-06-03）。
+  - 出现金额：金额合计不得超过订单利润，比例合计不得超过 100%。
+- **按动作模式**（items 都带 allocation_type）：买号、售出、运营和公司四项。
+"""
+
+from __future__ import annotations
+
+from datetime import date
+from decimal import Decimal
+
+import pytest
+from sqlalchemy import select
+
+from app.business.inventory.profile import create_account
+from app.core.errors import Validation
+from app.domain.enums import AuditAction
+from app.domain.foundation import AuditLog
+from app.domain.trade import Order
+from app.business.orders.create import create_order
+from app.business.orders.events import post_event
+from app.business.profit_allocation import service as policy_allocations
+from app.business.profit_allocation.terms import allocation_terms, convert_action_allocation
+from app.operations.reports.commission import commission_reconciliation
+
+D = date(2026, 10, 17)
+
+
+def _order_with_profit(seeded_db, *, buy: str = "1000", sell: str = "1500") -> int:
+    """造一单有已过账 BUY/SELL 的订单，利润 = sell - buy。"""
+    account = create_account(
+        seeded_db,
+        game_account=f"alloc-{buy}-{sell}",
+        business_mode="SELF",
+        inventory_type="RECOVERY",
+        actor="pytest",
+    )
+    order = create_order(
+        seeded_db,
+        order_type="HS",
+        owner_id=1,
+        trade_date=D,
+        actor="pytest",
+        account_id=account.id,
+    )
+    post_event(
+        seeded_db, order.id, event_type="BUY", amount=Decimal(buy),
+        occurred_on=D, actor="pytest", pool_id=1,
+    )
+    post_event(
+        seeded_db, order.id, event_type="SELL", amount=Decimal(sell),
+        occurred_on=D, actor="pytest", pool_id=1,
+    )
+    return order.id
+
+
+def test_allocation_terms_use_profit_and_loss_company_rates(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+
+    profit_terms = allocation_terms(seeded_db, seeded_db.get(Order, order_id))
+    assert profit_terms == {
+        "order_profit": Decimal("500.00"),
+        "company_rate": Decimal("40.00"),
+        "allocatable_profit": Decimal("300.00"),
+    }
+
+    loss_order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+    loss_order = seeded_db.get(Order, loss_order_id)
+    assert loss_order is not None
+    loss_terms = allocation_terms(seeded_db, seeded_db.get(Order, loss_order_id))
+    assert loss_terms["company_rate"] == Decimal("50.00")
+    assert loss_terms["allocatable_profit"] == Decimal("-250.00")
+
+
+def test_convert_uses_total_profit_base_not_allocatable(seeded_db):
+    """换算比例↔金额的基数必须是对账口径的总利润，不是扣公司后的可分配利润。
+
+    回归锁：利润 500、公司 40%，BUY 20% 应为 100（总利润×20%），
+    而不是 60（可分配利润 300×20%）。两者差额正是公司那 40% 份额。
+    """
+    order_id = _order_with_profit(seeded_db)  # 利润 500
+    # 比例→金额：20% × 500 = 100（若误用可分配利润 300 会得到 60）
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="RATE_TO_AMOUNT", value=Decimal("20")
+    ) == Decimal("100.00")
+    # 金额→比例：100 / 500 = 20%（若误用可分配利润 300 会得到 33.33）
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="AMOUNT_TO_RATE", value=Decimal("100")
+    ) == Decimal("20.00")
+
+
+@pytest.mark.parametrize(("buy", "sell", "buy_share", "sell_share", "sell_rate"), [
+    ("1000", "1500", "100", "200", "40.00"),
+    ("1500", "1000", "-100", "-150", "30.00"),
+])
+def test_allocation_view_returns_grouped_rates_for_display(seeded_db, buy, sell, buy_share, sell_share, sell_rate):
+    order_id = _order_with_profit(seeded_db, buy=buy, sell=sell)
+    seeded_db.get(Order, order_id).form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": buy_share},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": sell_share},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+    ])
+    view = policy_allocations.get_allocations_view(seeded_db, order_id)
+    assert view["totals_by_type"]["BUY"]["allocation_amount"] == Decimal(buy_share)
+    assert view["totals_by_type"]["BUY"]["allocation_rate"] == Decimal("20.00")
+    assert view["totals_by_type"]["SELL"]["allocation_rate"] == Decimal(sell_rate)
+
+
+def test_allocation_form_rows_preserve_totals_and_existing_people_when_no_candidates():
+    from app.business.profit_allocation.listing import allocation_form_rows
+
+    items = [
+        {"allocation_type": "BUY", "user_id": 1, "role": "BUYER"},
+        {"allocation_type": "BUY", "user_id": 2, "role": "BUYER"},
+    ]
+    totals = {"BUY": {"allocation_rate": Decimal("20.00"), "allocation_amount": Decimal("100.00")}}
+    candidates = {"BUY": [3], "SELL": [], "OPERATION": [], "COMPANY": []}
+    rows = allocation_form_rows(items, candidates, totals, Decimal("40.00"))
+    assert rows[0] == {"allocation_type": "BUY", "employee_ids": [3], "role": "BUYER", "allocation_rate": "20.00", "allocation_amount": "100.00"}
+    assert rows[-1]["allocation_rate"] == "40.00"
+    candidates["BUY"] = []
+    assert allocation_form_rows(items, candidates, totals, Decimal("40.00"))[0]["employee_ids"] == [1, 2]
+
+
+def test_allocation_candidates_follow_order_responsibles_and_events(seeded_db, seeded_client, headers):
+    from app.core.security import CurrentUser
+    from app.domain.trade import OrderEvent
+
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    buy = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "BUY"))
+    sell = seeded_db.scalar(select(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL"))
+    buy.operator_user_ids = [2, 2]
+    sell.operator_user_ids = [2]
+    order.form_extra = {"business_responsible_ids": [1, 1], "sell_delivery_responsible_ids": [1]}
+    seeded_db.flush()
+    user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
+    candidates = policy_allocations.get_allocations_view(seeded_db, order_id, user=user)["action_candidates"]
+    assert candidates == {"BUY": [1], "SELL": [1], "OPERATION": [1], "COMPANY": []}
+    response = seeded_client.get(f"/api/orders/{order_id}/profit-allocations", headers=headers)
+    assert response.status_code == 200, response.text
+    assert response.json()["action_candidates"] == candidates
+    order.form_extra = {}
+    candidates = policy_allocations.get_allocations_view(seeded_db, order_id, user=user)["action_candidates"]
+    assert candidates == {"BUY": [2], "SELL": [2], "OPERATION": [], "COMPANY": []}
+    sell.operator_user_ids = []
+    seeded_db.flush()
+    assert policy_allocations.get_allocations_view(seeded_db, order_id, user=user)["action_candidates"]["SELL"] == [1]
+
+
+def test_grouped_allocation_derives_responsible_ids_on_server(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": "100"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": "200"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+    ], form_extra={"business_responsible_ids": [999], "sell_delivery_responsible_ids": [999]})
+    assert order.form_extra["business_responsible_ids"] == [1]
+    assert order.form_extra["sell_delivery_responsible_ids"] == [1]
+    assert order.form_extra["operation_responsible_ids"] == [1]
+
+
+@pytest.mark.parametrize(("buy", "sell", "amounts_changed", "expected_status"), [
+    ("1000", "1000", False, 200),
+    ("1000", "1000", True, 422),
+    ("1000", "1500", False, 200),
+])
+def test_allocation_form_uses_server_profit_to_choose_save_mode(
+    seeded_client, seeded_db, headers, buy, sell, amounts_changed, expected_status,
+):
+    order_id = _order_with_profit(seeded_db, buy=buy, sell=sell)
+    zero = buy == sell
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "60" if zero else "20", "allocation_amount": "0" if zero else "100"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "0" if zero else "40", "allocation_amount": "0" if zero else "200"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0", "allocation_amount": "0"},
+        {"allocation_type": "COMPANY", "employee_ids": [], "role": "OWNER", "allocation_rate": "40", "allocation_amount": None},
+    ]
+    missing = seeded_client.put(f"/api/orders/{order_id}/profit-allocations", headers=headers, json={"items": items})
+    assert missing.status_code == 422
+    response = seeded_client.put(f"/api/orders/{order_id}/profit-allocations", headers=headers, json={"items": items, "amounts_changed": amounts_changed})
+    assert response.status_code == expected_status, response.text
+    if expected_status == 200:
+        row = next(item for item in response.json()["form_rows"] if item["allocation_type"] == "BUY")
+        assert Decimal(row["allocation_rate"]) == Decimal("60" if zero else "20")
+        assert Decimal(row["allocation_amount"]) == Decimal("0" if zero else "100")
+
+
+def test_allocation_form_rejects_stale_order_profit(seeded_client, seeded_db, headers):
+    order_id = _order_with_profit(seeded_db)
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": "100"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": "200"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+        {"allocation_type": "COMPANY", "employee_ids": [], "role": "OWNER", "allocation_amount": None},
+    ]
+    url = f"/api/orders/{order_id}/profit-allocations"
+    stale = seeded_client.put(url, headers=headers, json={"items": items, "amounts_changed": True, "expected_order_profit": "400.00"})
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["code"] == "VERSION_CONFLICT"
+    current = seeded_client.put(url, headers=headers, json={"items": items, "amounts_changed": True, "expected_order_profit": "500.00"})
+    assert current.status_code == 200, current.text
+
+
+def test_rate_edited_form_preserves_rates_when_amounts_round_to_zero(seeded_client, seeded_db, headers):
+    order_id = _order_with_profit(seeded_db, buy="1000.00", sell="1000.01")
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "20", "allocation_amount": "0.00"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "20", "allocation_amount": "0.00"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "20", "allocation_amount": "0.00"},
+        {"allocation_type": "COMPANY", "employee_ids": [], "role": "OWNER", "allocation_rate": "40", "allocation_amount": None},
+    ]
+    response = seeded_client.put(f"/api/orders/{order_id}/profit-allocations", headers=headers, json={
+        "items": items, "amounts_changed": False, "rates_changed": True, "expected_order_profit": "0.01",
+    })
+    assert response.status_code == 200, response.text
+    from app.domain.trade import OrderProfitAllocation
+    saved = seeded_db.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order_id)).all()
+    assert sum((row.allocation_rate for row in saved), Decimal(0)) == Decimal("100.00")
+    assert all(row.allocation_amount == 0 for row in saved)
+
+
+def test_zero_profit_grouped_rates_survive_resaving(seeded_db):
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1000")
+    seeded_db.get(Order, order_id).form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
+    items = [
+        {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "20"},
+        {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "40"},
+        {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0"},
+        {"allocation_type": "COMPANY", "role": "OWNER", "allocation_rate": "40"},
+    ]
+    policy_allocations.set_allocations(seeded_db, order_id, items=items)
+    before = policy_allocations.get_allocations_view(seeded_db, order_id)["totals_by_type"]
+    for item in items:
+        item["allocation_rate"] = str(before[item["allocation_type"]]["allocation_rate"])
+        item["allocation_amount"] = None
+    policy_allocations.set_allocations(seeded_db, order_id, items=items)
+    assert policy_allocations.get_allocations_view(seeded_db, order_id)["totals_by_type"] == before
+
+
+def test_convert_on_loss_order_keeps_negative_direction(seeded_db):
+    """亏损单换算同样以总利润为基数，方向随利润为负。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")  # 利润 -500
+    # 亏损单 20% × -500 = -100
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="RATE_TO_AMOUNT", value=Decimal("20")
+    ) == Decimal("-100.00")
+    # 反向：-100 / -500 = 20%
+    assert convert_action_allocation(
+        seeded_db, order_id, direction="AMOUNT_TO_RATE", value=Decimal("-100")
+    ) == Decimal("20.00")
+
+
+def test_action_rows_can_omit_company_when_company_rate_is_configured(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    order.form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "30"},
+            {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "30"},
+            {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0"},
+        ],
+    )
+
+    company = next(row for row in rows if row["allocation_type"] == "COMPANY")
+    assert company["allocation_rate"] == "40.00"
+
+
+def test_action_amount_rows_keep_configured_company_share(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    order.form_extra = {"business_responsible_ids": [1], "sell_delivery_responsible_ids": [1]}
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_rate": "33.33", "allocation_amount": "100"},
+            {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_rate": "33.33", "allocation_amount": "100"},
+            {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_rate": "0", "allocation_amount": "0"},
+        ],
+    )
+
+    company = next(row for row in rows if row["allocation_type"] == "COMPANY")
+    assert company["allocation_rate"] == "0.00"
+    assert company["allocation_amount"] == "200.00"
+    for negative_amount in ("-100", "-600"):
+        with pytest.raises(Validation):
+            policy_allocations.set_allocations(seeded_db, order_id, items=[
+                {"allocation_type": "BUY", "user_id": 1, "role": "BUYER", "allocation_amount": "600"},
+                {"allocation_type": "SELL", "user_id": 1, "role": "SALES", "allocation_amount": negative_amount},
+                {"allocation_type": "OPERATION", "user_id": 1, "role": "SERVICE", "allocation_amount": "0"},
+                {"allocation_type": "COMPANY", "role": "OWNER", "allocation_rate": "100" if negative_amount == "-600" else "0"},
+            ])
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(seeded_db, order_id, items=[
+            {"allocation_type": "BUY", "employee_ids": [1], "role": "BUYER", "allocation_amount": "600"},
+            {"allocation_type": "SELL", "employee_ids": [1], "role": "SALES", "allocation_amount": "-100"},
+            {"allocation_type": "OPERATION", "employee_ids": [1], "role": "SERVICE", "allocation_amount": "0"},
+        ])
+
+
+def test_person_mode_allows_same_user_in_two_roles(seeded_db):
+    """同一人可担任多个角色（对齐 DB 唯一约束 uq_order_profit_alloc），但同角色不可重复。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"user_id": 1, "role": "SALES", "allocation_rate": "60"},
+            {"user_id": 1, "role": "SERVICE", "allocation_rate": "40"},
+        ],
+    )
+
+    assert [row["role"] for row in rows if row["user_id"] is not None] == ["SALES", "SERVICE"]
+
+    with pytest.raises(Validation, match="同一角色下不可重复分润"):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[
+                {"user_id": 1, "role": "SALES", "allocation_rate": "50"},
+                {"user_id": 1, "role": "SALES", "allocation_rate": "50"},
+            ],
+        )
+
+
+def test_person_mode_accepts_one_name_with_full_rate(seeded_db):
+    """按人模式不再强制四项：一个人拿 100% 是合法的。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
+    )
+
+    assert len(rows) == 2
+    assert rows[1]["allocation_rate"] == "40.00"
+    assert rows[0]["allocation_rate"] == "100.00"
+    assert rows[0]["allocation_amount"] == "0.00"
+    assert rows[0]["total_rate"] == "140.00"
+
+
+def test_person_mode_rate_must_total_one_hundred_without_amount(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "60"},
+                {"user_id": 2, "role": "OWNER", "allocation_rate": "30"},
+            ],
+        )
+
+
+def test_person_mode_accepts_amount_only(seeded_db):
+    """按金额分润：金额落库，比例保持 0，合计校验改为金额口径。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"user_id": 1, "role": "OWNER", "allocation_amount": "300"},
+            {"user_id": 2, "role": "OWNER", "allocation_amount": "200"},
+        ],
+    )
+
+    assert [row["allocation_amount"] for row in rows if row["user_id"] is not None] == ["300.00", "200.00"]
+    assert all(row["allocation_rate"] == "0.00" for row in rows if row["user_id"] is not None)
+    assert rows[0]["total_amount"] == "500.00"
+
+
+def test_person_mode_rejects_rate_and_amount_on_the_same_row(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "10", "allocation_amount": "100"}],
+        )
+
+
+def test_person_mode_amount_cannot_exceed_order_profit(seeded_db):
+    """利润 500，填 600 必须拒绝——金额模式不能凭空超出可分利润。"""
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "600"}],
+        )
+    for negative_amount in ("-100", "-600"):
+        with pytest.raises(Validation):
+            policy_allocations.set_allocations(seeded_db, order_id, items=[
+                {"user_id": 1, "role": "OWNER", "allocation_amount": "600"},
+                {"user_id": 2, "role": "OWNER", "allocation_amount": negative_amount},
+                {"user_id": None, "role": "OWNER", "allocation_rate": "100" if negative_amount == "-600" else "0"},
+            ])
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(seeded_db, order_id, items=[
+            {"user_id": 1, "role": "OWNER", "allocation_amount": "400"},
+            {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
+        ])
+    policy_allocations.set_allocations(seeded_db, order_id, items=[
+        {"user_id": 1, "role": "OWNER", "allocation_amount": "100"},
+        {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
+    ])
+    report = commission_reconciliation(seeded_db)
+    group = next(group for group in report["order_groups"] if group["order_id"] == order_id)
+    assert group["profit_base"] == Decimal("500.00")
+    small_order = _order_with_profit(seeded_db, buy="100", sell="100.05")
+    policy_allocations.set_allocations(seeded_db, small_order, items=[
+        {"user_id": 1, "role": "OWNER", "allocation_amount": "0.01"},
+        {"user_id": 2, "role": "OWNER", "allocation_rate": "10"},
+    ])
+    small_group = next(group for group in commission_reconciliation(seeded_db)["order_groups"] if group["order_id"] == small_order)
+    assert small_group["profit_base"] == Decimal("0.04")
+
+
+def test_person_mode_amount_requires_positive_profit(seeded_db):
+    """没有过账事件的订单没有利润，按金额分润应显式报错而不是记账 0。"""
+    order = create_order(
+        seeded_db, order_type="HS", owner_id=1, trade_date=D, actor="pytest"
+    )
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db, order.id, items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "100"}]
+        )
+
+
+def test_person_mode_rejects_duplicate_people(seeded_db):
+    order_id = _order_with_profit(seeded_db)
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
+                {"user_id": 1, "role": "OWNER", "allocation_rate": "50"},
+            ],
+        )
+
+
+def test_person_mode_company_row_has_no_user(seeded_db):
+    """姓名可为空表示公司归属，但最多一行。"""
+    order_id = _order_with_profit(seeded_db)
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[
+            {"user_id": 1, "role": "OWNER", "allocation_rate": "60"},
+            {"user_id": None, "role": "OWNER", "allocation_rate": "40"},
+        ],
+    )
+
+    assert [row["user_id"] for row in rows] == [1, None]
+
+
+def _latest_audit(seeded_db, entity_type: str, entity_id: str | int) -> AuditLog | None:
+    return seeded_db.scalars(
+        select(AuditLog)
+        .where(AuditLog.entity_type == entity_type, AuditLog.entity_id == str(entity_id))
+        .order_by(AuditLog.id.desc())
+    ).first()
+
+
+def test_person_allocation_writes_dedicated_audit_action(seeded_db):
+    """分润审计单独成动作：不再混进 EXCEPTION_APPROVE（否则审计页按异常审批筛会串味）。"""
+    order_id = _order_with_profit(seeded_db)
+
+    policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_rate": "100"}],
+    )
+
+    order = seeded_db.get(Order, order_id)
+    assert order is not None
+    entry = _latest_audit(seeded_db, "order", order.order_no)
+    assert entry is not None
+    assert entry.action == AuditAction.PROFIT_ALLOCATION_SET.value
+    assert entry.action != AuditAction.EXCEPTION_APPROVE.value
+
+
+def test_commission_report_uses_amount_as_payable_base(seeded_db):
+    """报表口径：填金额时直接取金额作为应付基数，不再乘利润比例。"""
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
+    policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "120"}],
+    )
+
+    report = commission_reconciliation(seeded_db)
+    rows = [row for group in report["order_groups"] for row in group["orders"]]
+
+    assert {row["user_id"]: row["profit_base"] for row in rows} == {1: Decimal("120.00"), None: Decimal("200.00")}
+
+    for buy, sell, expected in (("100", "100.05", Decimal("0.05")), ("100.05", "100", Decimal("-0.05"))):
+        small_order = _order_with_profit(seeded_db, buy=buy, sell=sell)
+        policy_allocations.set_allocations(seeded_db, small_order, items=[
+            {"user_id": 1, "role": "OWNER", "allocation_rate": "33.33"},
+            {"user_id": 2, "role": "OWNER", "allocation_rate": "33.33"},
+            {"user_id": 3, "role": "OWNER", "allocation_rate": "33.34"},
+        ])
+        report = commission_reconciliation(seeded_db)
+        group = next(group for group in report["order_groups"] if group["order_id"] == small_order)
+        assert group["profit_base"] == expected
+        assert sum((row["profit_base"] for row in group["orders"]), Decimal("0")) == expected
+        sign = Decimal("1") if expected > 0 else Decimal("-1")
+        assert {row["user_id"]: row["profit_base"] for row in group["orders"]} == {
+            1: sign * Decimal("0.01"), 2: sign * Decimal("0.01"), 3: sign * Decimal("0.01"), None: sign * Decimal("0.02"),
+        }
+        for detail in group["orders"]:
+            if detail["user_id"] is None:
+                continue
+            personal = commission_reconciliation(seeded_db, user_id=detail["user_id"])
+            personal_group = next(item for item in personal["order_groups"] if item["order_id"] == small_order)
+            assert personal_group["profit_base"] == detail["profit_base"]
+
+
+# ---- 亏损单分润（2026-11-05 用户裁决「亏损的时候分亏损」）----
+# 亏损单按金额分润填负数，表示该人分担的亏损额。方向必须与订单盈亏一致，
+# 且报表 base 取负值（`amount != 0` 判据；旧实现用 `> 0` 会把负数当未填而回退比例）。
+
+
+def test_person_mode_allows_negative_amount_on_loss_order(seeded_db):
+    """亏损单（利润 -500）填 -300：落库为负，报表 profit_base 也取 -300。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+
+    rows = policy_allocations.set_allocations(
+        seeded_db,
+        order_id,
+        items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],
+    )
+
+    assert [row["allocation_amount"] for row in rows if row["user_id"] is not None] == ["-300.00"]
+    assert all(row["allocation_rate"] == "0.00" for row in rows if row["user_id"] is not None)
+
+    report = commission_reconciliation(seeded_db)
+    entries = [row for group in report["order_groups"] for row in group["orders"]]
+    assert {row["user_id"]: row["profit_base"] for row in entries} == {1: Decimal("-250.00"), None: Decimal("-250.00")}
+
+
+def test_person_mode_rejects_positive_amount_on_loss_order(seeded_db):
+    """亏损单填正数等于把亏损记成收益，必须拒绝。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "300"}],
+        )
+    for positive_amount in ("100", "600"):
+        with pytest.raises(Validation):
+            policy_allocations.set_allocations(seeded_db, order_id, items=[
+                {"user_id": 1, "role": "OWNER", "allocation_amount": "-600"},
+                {"user_id": 2, "role": "OWNER", "allocation_amount": positive_amount},
+                {"user_id": None, "role": "OWNER", "allocation_rate": "100" if positive_amount == "600" else "0"},
+            ])
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(seeded_db, order_id, items=[
+            {"user_id": 1, "role": "OWNER", "allocation_amount": "-400"},
+            {"user_id": 2, "role": "OWNER", "allocation_rate": "80"},
+        ])
+
+
+def test_person_mode_rejects_over_shared_loss(seeded_db):
+    """亏损 -500，合计 -600 属于超额分担，必须拒绝（按绝对值比较）。"""
+    order_id = _order_with_profit(seeded_db, buy="1500", sell="1000")
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-600"}],
+        )
+
+
+def test_person_mode_rejects_negative_amount_on_profit_order(seeded_db):
+    """盈利单填负数同样是方向错误，必须拒绝。"""
+    order_id = _order_with_profit(seeded_db, buy="1000", sell="1500")
+
+    with pytest.raises(Validation):
+        policy_allocations.set_allocations(
+            seeded_db,
+            order_id,
+            items=[{"user_id": 1, "role": "OWNER", "allocation_amount": "-300"}],
+        )

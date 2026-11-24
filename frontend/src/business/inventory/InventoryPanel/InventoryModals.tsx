@@ -8,7 +8,7 @@ import { OrderConsignmentModal, OrderPlatformOffsaleModal, OrderProfileModal } f
 import { InventoryRebateModal } from "../../shared/rebate";
 import { CashflowModal } from "../../../finance/cashflow";
 import { ConsignmentSaleModal, PickupSaleModal, RecoverySaleModal } from "../../shared/sale";
-import { OrderDetail } from "../../shared/order-detail/OrderDetail";
+import { OrderDetail } from "../../shared/order_detail/OrderDetail";
 import type { InventoryController } from "./useInventoryController";
 import { mergeInventoryAccount } from "./types";
 

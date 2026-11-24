@@ -83,10 +83,10 @@ cd ..
 |---|---|
 | `backend/app/core` | settings / database / money / errors / security 等技术底座 |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
-| `backend/app` 领域包 | `business`、`customers`、`funds`、`operations`、`settings`、`workbench`；`shared` 为跨域共享原语 |
+| `backend/app` 领域包 | `business`、`customers`、`finance`、`operations`、`settings`、`workbench`；`shared` 为跨域共享原语 |
 | `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
 | `tests/backend` | 后端测试（pytest，按实际磁盘文件数维护） |
-| `frontend/src` | 按业务域拆分，包含 `app`、`business`、`customer-center`、`finance`、`reporting`、`settings` 等；`shared` 为 UI 与 API 基础层 |
+| `frontend/src` | 按业务域拆分，包含 `workbench`、`business`、`customers`、`finance`、`operations`、`settings`；`app` 为应用外壳，`shared` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |
 | `docs` | 当前有效文档：顶层事实源 / 工程文档 + `testing/` 测试体系；**全仓文档地图见 `docs/README.md`**；`archive/` 只保留 ux-audit 的 E2E 证据（JSON 与截图），历史文档已于 2026-11-11 全部清退 |
 | `dependencies` | 本机 Python 依赖及前端依赖入口；不进入 Git 和 Docker 构建上下文 |

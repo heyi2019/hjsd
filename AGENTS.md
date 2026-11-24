@@ -7,14 +7,15 @@
 
 - 产品：宜游轩ERP（内部代号黑金时代）。前端 HashRouter `#/xxx`，无 pages/ 目录，无 h5/。
 - 后端：FastAPI + SQLAlchemy + PostgreSQL，入口 `app/main.py`，默认 API 前缀 `/api`。
-- ORM 模型在 `app/domain/`，**不改名 models 文件**。业务域：`business` / `customers` / `funds` / `operations` / `settings` / `workbench`。
+- ORM 模型在 `app/domain/`，**不改名 models 文件**。业务域：`business` / `customers` / `finance` / `operations` / `settings` / `workbench`。
+- 前端、后端与测试按上述业务域统一目录名；功能较多的板块按职责建立子目录，跨功能测试保留共享归属。迁移测试须同步选测配置与测试元数据。
 - 全站兼容层（service.py 门面、catalog.ts/types.ts 聚合桶）**已全清**，不要重建。
 
 ## 1. 业务口径铁律（违反 = 口径错，CI 不一定拦得住）
 
 - **利润** = 单订单全部收入 − 全部支出（可正 / 负 / 0）。权威实现 `app/shared/order_amounts.py::order_cashflow_profit`。收入 = 流水 IN + 返点；支出 = 流水 OUT + 分期坏账 + 分期回收的非现金库存成本。**禁 SELL−BUY−COST 推分润**；`total` ≠ `principal + profit`。
 - **报表同源**：`operations/_shared.py::cashflow_totals_by_order` + `shared/order_amounts.py`。返点是收入的「其中项」，禁重复相加；冲销呈毛额。
-- **资金中心**：`funds/balances.py` 按收入 IN / 支出 OUT 汇总；业务名词全是「其中项」。内部划转 = 划出 OUT + 划入 IN（同 transfer_id）。`available = cash_balance`（押金占用已进 expense，不二次减）。
+- **资金中心**：`finance/balances.py` 按收入 IN / 支出 OUT 汇总；业务名词全是「其中项」。内部划转 = 划出 OUT + 划入 IN（同 transfer_id）。`available = cash_balance`（押金占用已进 expense，不二次减）。
 - **押金一套逻辑**：净额 = 收入 − 支出，+ 利润 / − 损失（**损失 = −利润，不是第二笔现金流出**）。交押金 OUT(DEPOSIT_HOLD)、退回/取消 IN；判定用 `shared/order_amounts.py::business_cashflow_filter()`。
 - **押金两类账簿**：`deposits.ledger_type` 区分 `BUSINESS`（业务押金，挂 counterparty_id，source_order_id 可选）与 `STUDIO`（工作室运营押金，**禁挂 source_order_id**）。四条派生流水 HOLD/RELEASE/LOSS/CANCEL 同账簿。两类都不进损益、不二次扣可用余额；**STUDIO 押金不进工作室收支面板**。加押金列表列须三点联动：前端 tsx + `settings/lists/scopes.py` DEPOSITS registry + parity 测试。
 - **返点无作废/删除**：登记即确认收入，退回走真实 OUT（`POST /cashflows` 或 `POST /orders/{id}/cashflows`）。金额唯一取 `rebate_records.amount`，`rate` 只留痕。

@@ -6,9 +6,9 @@ import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
 import { BusinessPeriodProvider } from "../shared/state/businessPeriod";
 import { loadOptionSets } from "../shared/lib/optionSets";
-import { WorkbenchPage } from "./WorkbenchPage";
-import { LoginPage } from "../auth/LoginPage";
-import { ChangePasswordPage } from "../auth/ChangePasswordPage";
+import { WorkbenchPage } from "../workbench/WorkbenchPage";
+import { LoginPage } from "../settings/auth/LoginPage";
+import { ChangePasswordPage } from "../settings/auth/ChangePasswordPage";
 import type { ComponentType } from "react";
 import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import type { InitialLedgerFilters } from "../business/orders/useLedgerList";
@@ -16,11 +16,11 @@ import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
 
 const OrdersPage = lazy(() => import("../business/OrdersPage").then(({ OrdersPage }) => ({ default: OrdersPage })));
-const CustomersPage = lazy(() => import("../customer-center/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
-const FundsPage = lazy(() => import("../pools/FundsPage").then(({ FundsPage }) => ({ default: FundsPage })));
+const CustomersPage = lazy(() => import("../customers/CustomersPage").then(({ CustomersPage }) => ({ default: CustomersPage })));
+const FinancePage = lazy(() => import("../finance/FinancePage").then(({ FinancePage }) => ({ default: FinancePage })));
 const ReportsPage = lazy(() => import("../operations/ReportsPage").then(({ ReportsPage }) => ({ default: ReportsPage })));
 const SettingsPage = lazy(() => import("../settings/SettingsPage").then(({ SettingsPage }) => ({ default: SettingsPage })));
-const UserCenterPage = lazy(() => import("../auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
+const UserCenterPage = lazy(() => import("../settings/auth/UserCenterPage").then(({ UserCenterPage }) => ({ default: UserCenterPage })));
 
 // 注：workbench 不入此映射——工作台是纯动作入口（无跳转需求），由下方三元单独渲染；
 // 其余页面统一收 onNavigate（ReportsPage 的数据中心入口卡跳业务中心用），无跳转需求的页面忽略该 prop。
@@ -48,7 +48,7 @@ type PageProps = {
 const PAGES: Record<string, ComponentType<PageProps>> = {
   business: OrdersPage,
   customers: CustomersPage,
-  funds: FundsPage,
+  funds: FinancePage,
   operations: ReportsPage,
   settings: SettingsPage,
 };

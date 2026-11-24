@@ -25,26 +25,26 @@ APP = BACKEND / "app"
 
 # 归位理由简表：新增模块必须在此登记，否则门禁红。
 REGISTRY: dict[str, str] = {
-    "amount_search": "金额区间检索纯函数，business(订单/库存)与 funds(资金中心)共用",
+    "amount_search": "金额区间检索纯函数，business(订单/库存)与 finance(资金中心)共用",
     "audit": "写路径审计留痕，被全部写域共用",
-    "business_numbering": "业务编号发放，business/funds 共用",
+    "business_numbering": "业务编号发放，business/finance 共用",
     "business_period": "业务期间口径，settings(期末日配置)与 workbench(看板)共用",
-    "form_field_rules": "表单字段校验规则，business/funds 共用",
+    "form_field_rules": "表单字段校验规则，business/finance 共用",
     "form_field_value": "单值校验纯函数，经 form_values/form_field_rules 间接服务多域",
-    "form_values": "form_extra 读写，business/customers/funds/operations/settings 共用",
+    "form_values": "form_extra 读写，business/customers/finance/operations/settings 共用",
     "installment_amounts": "分期应收款口径，business/customers 共用",
-    "numbering": "通用编号序列发放，business/customers/funds/settings/workbench 共用",
-    "operation_operators": "操作人归并，business/customers/funds 共用",
-    "order_access": "订单只读访问，business/funds 共用",
-    "order_amounts": "订单收入/支出/利润唯一权威，business/customers/funds/operations 共用",
+    "numbering": "通用编号序列发放，business/customers/finance/settings/workbench 共用",
+    "operation_operators": "操作人归并，business/customers/finance 共用",
+    "order_access": "订单只读访问，business/finance 共用",
+    "order_amounts": "订单收入/支出/利润唯一权威，business/customers/finance/operations 共用",
     "scope": "数据范围判定，六个业务域全量共用",
 }
 
 # 2026-11-19 域归并后与 .importlinter 的 L3 业务域对齐（对齐前端 6 导航 key）。
-# 旧名（orders/finance/installments/customer_center/...）已全部并入这六个顶层域，
+# 旧名（orders/funds/installments/customer_center/...）已全部并入这六个顶层域，
 # 若不更新此表，shared 引用会因 top 目录不匹配被误判为 0 引用（门禁假红）。
 DOMAIN_PREFIXES = (
-    "business", "customers", "funds", "operations", "settings", "workbench",
+    "business", "customers", "finance", "operations", "settings", "workbench",
 )
 
 

@@ -16,7 +16,7 @@ from app.settings.auth.router import (
     UserCreate,
     UserUpdate,
 )
-from app.funds.schemas import (
+from app.finance.schemas import (
     CashflowCreate,
     CashflowReverse,
     DepositCreate,

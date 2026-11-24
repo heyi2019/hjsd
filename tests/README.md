@@ -32,12 +32,13 @@ tests/
 └── config/                       setup.ts、mock-specifier 基线
 ```
 
-**区域目录名 = 一级导航名**：`system`（系统级兜底）/ `workbench`（工作台）/ `business`（业务中心）
-/ `customer`（客户中心）/ `finance`（资金中心）/ `operations`（经营中心）/ `settings`（设置）
+**区域目录名按业务板块统一**：`system`（系统级兜底）/ `workbench`（工作台）/ `business`（业务中心）
+/ `customers`（客户中心）/ `finance`（资金中心）/ `operations`（经营中心）/ `settings`（设置）
 / `shared`（跨区域公共层）。功能编号仍用字母前缀（A..F / SYS），映射收敛在
-`manifest.json` 的 `regionByCode`，不在代码里各写一份。
+`manifest.json` 的 `regionByCode`，不在代码里各写一份。认证和审计测试按代码放入
+`settings`，但继续保留 `SYS01` / `SYS05` 功能编号。
 
-**为什么三端都按 `<层>/<区域>/` 分两层**：区域轴用来定位失败范围（改资金中心就只跑
+**目录约定**：测试先按 `<层>/<区域>/` 归属，再按需要建立业务子模块目录，例如 `business/orders/`、`business/inventory/`、`operations/reports/` 和 `settings/lists/`；跨功能用例归入相应的 `shared/` 或区域根目录。区域轴用来定位失败范围（改资金中心就只跑
 `finance/`），分层轴用来定位执行成本（纯逻辑 vs 要 jsdom vs 要真实 PG）。两轴正交，
 任一轴写进另一轴都会让另一轴失效。
 
@@ -325,10 +326,10 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 | FE-001 ~ FE-007 | 登录态、导航、首次加载、空态、弹窗基础行为 | `workbench/`、`shared/`、`system/` | `system/smoke.spec.ts`、`system/navigation-leaves.spec.ts`、`system/fallback.spec.ts`、`system/visual.spec.ts` | 模块自动化已有；异常路径仍以手工为主 |
 | FE-008 ~ FE-024 | 回收/提号/代挂建单、字段校验、费用、图片、库存 | `business/`、`shared/` | `cross/business-write.spec.ts`、`cross/integration.spec.ts` | 建单主路径已有；下拉、图片、重复提交需补逐用例关联 |
 | FE-025 ~ FE-037 | 售出、分期、寄售、返点、取消和重复操作 | `business/`、`finance/` | `cross/business-write.spec.ts`、`cross/finance-write-ui.spec.ts`、`cross/integration.spec.ts` | 业务模块已有；终态与跨页面一致性需补专项功能用例 |
-| FE-038 ~ FE-047 | 客户、合作方、用户、团队、密码和权限 | `customer/`、`settings/`、`system/` | `cross/crud.spec.ts`、`system/auth-login.spec.ts`、`system/role-switch.spec.ts` | 主路径已有；格式校验、重复编码和异常反馈需补关联 |
+| FE-038 ~ FE-047 | 客户、合作方、用户、团队、密码和权限 | `customers/`、`settings/`、`system/` | `cross/crud.spec.ts`、`system/auth-login.spec.ts`、`system/role-switch.spec.ts` | 主路径已有；格式校验、重复编码和异常反馈需补关联 |
 | FE-048 ~ FE-056 | 资金划转、冲销、报表、导出和审计 | `finance/`、`operations/`、`system/` | `cross/finance-write-ui.spec.ts`、`finance/other-integration.spec.ts`、`cross/integration.spec.ts` | 模块自动化已有；导出反馈和报表口径需补专项场景 |
 | FE-057 ~ FE-073 | 自定义字段、列配置、游戏渠道、资金池、导入、视觉 | `settings/`、`operations/`、`workbench/` | `system/visual.spec.ts`、`cross/integration.spec.ts` | 配置与视觉已有；导入异常和下拉完整性需补逐用例关联 |
-| FE-074 ~ FE-140 | 终态动作、附件、质量、需求、资金和权限扩展场景 | `business/`、`customer/`、`operations/`、`finance/`、`settings/` | `cross/crud.spec.ts`、`cross/finance-write-ui.spec.ts`、`finance/other-integration.spec.ts` | 组件级覆盖较多；组合流程与异常恢复以手工为主 |
+| FE-074 ~ FE-140 | 终态动作、附件、质量、需求、资金和权限扩展场景 | `business/`、`customers/`、`operations/`、`finance/`、`settings/` | `cross/crud.spec.ts`、`cross/finance-write-ui.spec.ts`、`finance/other-integration.spec.ts` | 组件级覆盖较多；组合流程与异常恢复以手工为主 |
 | FE-141 ~ FE-240 | 跨页面一致性、可访问性、超时、错误态、下拉和保存保护 | 各业务区域的 `.deep.test.tsx` / `.actions.test.tsx` / `.write.test.tsx` | `system/fallback.spec.ts`、`cross/integration.spec.ts`、`cross/upgrade-integration.spec.ts`、`system/visual.spec.ts` | 主要来自手工探索发现，自动化映射与稳定复现仍不足 |
 
 ### 8.1 补映射规则
@@ -336,7 +337,7 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 新增或补齐自动化时，在手工用例表格中增加「自动化路径」字段，格式统一为：
 
 ```text
-Vitest: tests/frontend/module/business/CreateBusinessModal.test.tsx
+Vitest: tests/frontend/module/business/shared/CreateBusinessModal.test.tsx
 或
 Playwright: tests/e2e/cross/business-write.spec.ts
 ```

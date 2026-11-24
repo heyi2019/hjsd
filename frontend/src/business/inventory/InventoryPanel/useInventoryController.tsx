@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useSession } from "../../../shared/state/session";
 import { type BusinessCenterEntryTab } from "../../businessCenter";
-import { useOrderDetailEditor } from "../../shared/order-detail/editing/use-order-detail-editor";
+import { useOrderDetailEditor } from "../../shared/order_detail/editing/use-order-detail-editor";
 import { useInventoryList } from "./useInventoryList";
 import { useExecutionCache } from "./useExecutionCache";
 import { useInventoryActions } from "./useInventoryActions";

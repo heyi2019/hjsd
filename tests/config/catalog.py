@@ -139,7 +139,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_list_custom_columns.py": "F03",
     "test_list_export_csv.py": "E02",
     "test_list_scope_ui_parity.py": "F03",
-    "test_installments_funds_integration.py": "B08",
+    "test_installments_finance_integration.py": "B08",
     "test_import_lifecycle.py": "E03",
     "test_m5_policy.py": "F01",
     "test_profit_allocation.py": "B10",
@@ -208,7 +208,7 @@ BACKEND_FILE_TO_FUNC: dict[str, str] = {
     "test_studio_cashflow_summary.py": "D05",
     # 金额与财务口径功能测试归属（首字母须与所在区域目录一致）。
     "test_order_financial_date_shift.py": "B03",          # business — 冲销与成交日期联动
-    "test_funds_direction_and_deposit.py": "D05",         # finance — 收支方向与押金报表
+    "test_finance_direction_and_deposit.py": "D05",         # finance — 收支方向与押金报表
     "test_profit_monthly_accounting.py": "E01",                # reporting — 订单利润与 月度损益 归类
     "test_data_center_summary.py": "E01",                 # reporting — 数据中心汇总
     "test_inventory_ledger_export.py": "B05",             # business — 库存台账导出
@@ -319,8 +319,12 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "CustomerLeadPanel.test.tsx":          "C01",
     "CustomersPage.test.tsx":              "C01",
     "CustomersPage.write.test.tsx":        "C01",
-    "FundsPage.deep.test.tsx":             "D01",
-    "FundsPage.test.tsx":                  "D01",
+    "FinancePage.deep.test.tsx":             "D01",
+    "FinancePage.test.tsx":                  "D01",
+    "FinancePage.cashflow.test.tsx":         "D01",
+    "FinancePage.deposits.test.tsx":         "D01",
+    "FinancePage.reconciliation.test.tsx":   "D01",
+    "FinancePage.reconciliation.deep.test.tsx": "D01",
     "PoolsPanel.deep.test.tsx":            "D01",
     "RebatesPanel.deep.test.tsx":          "D04",
     "RebatesPanel.test.tsx":               "D04",
@@ -333,6 +337,7 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "SettingsPage.deep.test.tsx":          "F01",
     "SettingsPage.test.tsx":               "F01",
     "panels.config.test.tsx":              "F01",
+    "OptionsPanel.test.tsx":               "F01",
     "panels.routes.test.tsx":              "F01",
     "panels.settings.test.tsx":            "F01",
     "OrderFormFieldsPanel.test.tsx":       "F02",

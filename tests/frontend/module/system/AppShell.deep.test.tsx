@@ -60,7 +60,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-/** catalog 深兜底：让子页面（OrdersPage/FundsPage/... lazy 加载）在导航切换时不依赖后端、只验证 AppShell 自身分支。 */
+/** catalog 深兜底：让子页面（OrdersPage/FinancePage/... lazy 加载）在导航切换时不依赖后端、只验证 AppShell 自身分支。 */
 const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
   function deepStub(): unknown {
     const target = function () {} as unknown as Record<string | symbol, unknown>;
@@ -84,7 +84,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
   return { deepStub, OBJECT_SHAPED };
 });
 
-vi.mock("@/auth/UserCenterPage", () => ({
+vi.mock("@/settings/auth/UserCenterPage", () => ({
   UserCenterPage: () => <div>用户中心内容</div>,
 }));
 

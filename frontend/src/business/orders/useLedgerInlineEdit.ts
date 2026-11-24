@@ -4,7 +4,7 @@ import type { AccountExecutionDetail } from "../../shared/api/types/account-exec
 import type { Order } from "../../shared/api/types/orders";
 import { normalizeError } from "../../shared/api/client";
 import { appMessage } from "../../shared/ui/appFeedback";
-import { useOrderDetailEditor } from "../shared/order-detail/editing/use-order-detail-editor";
+import { useOrderDetailEditor } from "../shared/order_detail/editing/use-order-detail-editor";
 import { useKeyedLatestRequest, useLatestRequest } from "../../shared/hooks/useLatestRequest";
 import type { LatestRequest } from "../../shared/hooks/useLatestRequest";
 

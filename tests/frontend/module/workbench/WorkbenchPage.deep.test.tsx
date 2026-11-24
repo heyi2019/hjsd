@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
-import { WorkbenchPage } from "@/app/WorkbenchPage";
+import { WorkbenchPage } from "@/workbench/WorkbenchPage";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
 import { workbenchSummary } from "@fixtures/api-responses";

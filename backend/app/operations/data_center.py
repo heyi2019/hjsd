@@ -11,8 +11,8 @@ from app.core.money import to_money
 from app.core.security import CurrentUser
 from app.domain.enums import AccountStatus
 from app.domain.trade import Account, Order
-from app.funds.cashflow_reads.studio import studio_totals_by_date
-from app.funds.deposits.reads import deposit_held_total
+from app.finance.cashflow.reads.studio import studio_totals_by_date
+from app.finance.deposits.reads import deposit_held_total
 from app.business.orders.queries import order_status_counts
 from app.business.inventory.inventory import inventory_cost_by_entry_date
 

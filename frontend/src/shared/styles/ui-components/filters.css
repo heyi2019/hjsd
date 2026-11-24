@@ -136,48 +136,48 @@
 }
 
 /* 资金流水筛选项较多：桌面端按语义宽度收敛，避免每个字段被 flex 拉满；窄屏再自然堆叠。 */
-.funds-cashflow-filters {
+.finance-cashflow-filters {
   display: flex;
   align-items: center;
   margin-block-end: var(--space-4);
 }
-.funds-cashflow-filters > * { min-width: 0; width: 100%; }
-.funds-cashflow-filters > :first-child {
+.finance-cashflow-filters > * { min-width: 0; width: 100%; }
+.finance-cashflow-filters > :first-child {
   flex: 1 1 var(--col-w-240);
   max-width: var(--col-w-280);
 }
-.funds-cashflow-filters > :not(:first-child) {
+.finance-cashflow-filters > :not(:first-child) {
   flex: 0 1 var(--col-w-140);
   max-width: var(--col-w-140);
 }
-.funds-cashflow-filters .ant-select { width: 100%; }
-.funds-cashflow-filters > .ui-toolbar-select { flex: 0 0 auto; max-width: 100%; }
-.funds-cashflow-filters > .ant-space {
+.finance-cashflow-filters .ant-select { width: 100%; }
+.finance-cashflow-filters > .ui-toolbar-select { flex: 0 0 auto; max-width: 100%; }
+.finance-cashflow-filters > .ant-space {
   flex: 0 0 auto;
   width: auto;
   max-width: 100%;
 }
 /* 日期范围控件（与工作室经营同款）：140px 放不下两个日期输入，按 240px 档收敛。 */
-.funds-cashflow-filters .ant-picker-range {
+.finance-cashflow-filters .ant-picker-range {
   flex: 0 1 var(--col-w-240);
   max-width: var(--col-w-240);
   width: 100%;
 }
 
 @media (max-width: 960px) {
-  .funds-cashflow-filters > * {
+  .finance-cashflow-filters > * {
     flex: 1 1 100%;
     max-width: none;
   }
-  .funds-cashflow-filters .ant-picker-range {
+  .finance-cashflow-filters .ant-picker-range {
     flex-basis: 100%;
     max-width: none;
   }
 }
 @media (max-width: 640px) {
-  .funds-cashflow-filters > * { flex-basis: 100%; }
+  .finance-cashflow-filters > * { flex-basis: 100%; }
 }
-.funds-cashflow-filters > .ui-export-button {
+.finance-cashflow-filters > .ui-export-button {
   flex: 0 0 auto;
   width: auto;
   max-width: none;

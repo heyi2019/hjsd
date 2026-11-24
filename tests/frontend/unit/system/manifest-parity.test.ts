@@ -30,7 +30,7 @@ const MANIFEST = path.join(REPO, "tests", "manifest.json");
 
 const TEST_RE = /\.(test|spec)\.[cm]?[jt]sx?$/;
 const DEEP_RE = /\.deep\.test\.[cm]?[jt]sx?$/;
-const REGIONS = ["system", "workbench", "business", "customer", "finance", "operations", "settings", "shared"];
+const REGIONS = ["system", "workbench", "business", "customers", "finance", "operations", "settings", "shared"];
 
 /** 前端测试只有一个根：仓库根 tests/frontend/（包内 src/ 与 frontend/tests/ 已清空）。 */
 const ROOTS = [path.join(REPO, "tests", "frontend")];
@@ -72,6 +72,59 @@ function placementOf(abs: string): { kind: string; region: string } | null {
 const ALL = ROOTS.flatMap(walk).sort();
 
 describe("TESTING-06 前端测试文件与 manifest 一致", () => {
+  it("六个业务板块在前端、后端和测试中使用相同的目录名", () => {
+    for (const region of ["workbench", "business", "customers", "finance", "operations", "settings"]) {
+      for (const prefix of ["frontend/src", "backend/app", "tests/frontend/module", "tests/backend/integration"]) {
+        expect(existsSync(path.join(REPO, prefix, region)), `${prefix}/${region} 缺失`).toBe(true);
+      }
+    }
+  });
+
+  it("业务与设置中已拆分的功能，在前后端和测试中有对应目录", () => {
+    for (const [region, module] of [
+      ["business", "orders"], ["business", "inventory"], ["business", "installments"],
+      ["business", "profit_allocation"], ["business", "shared"],
+      ["operations", "reports"],
+      ["settings", "lists"], ["settings", "field_definitions"],
+      ["settings", "auth"], ["settings", "audit"], ["settings", "users"], ["settings", "options"],
+    ]) {
+      for (const prefix of ["frontend/src", "backend/app"]) {
+        expect(existsSync(path.join(REPO, prefix, region, module)), `${prefix}/${region}/${module} 缺失`).toBe(true);
+      }
+      for (const platform of ["frontend", "backend"]) {
+        const layers = platform === "frontend" ? ["unit", "module"] : ["unit", "integration"];
+        expect(
+          layers.some((layer) => existsSync(path.join(REPO, "tests", platform, layer, region, module))),
+          `tests/${platform}/${region}/${module} 缺失`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("资金流水与押金在前端、后端和后端测试中按功能归位", () => {
+    for (const module of ["cashflow", "deposits"]) {
+      for (const prefix of ["frontend/src/finance", "backend/app/finance", "tests/backend/integration/finance"]) {
+        expect(existsSync(path.join(REPO, prefix, module)), `${prefix}/${module} 缺失`).toBe(true);
+      }
+      expect(existsSync(path.join(REPO, "tests/frontend/module/finance", module)), `前端 ${module} 测试目录缺失`).toBe(true);
+    }
+  });
+
+  it("资金对账在前后端及测试中按功能归位", () => {
+    for (const prefix of ["frontend/src", "backend/app", "tests/frontend/module", "tests/backend/integration"]) {
+      expect(existsSync(path.join(REPO, prefix, "finance/reconciliation")), `${prefix} 对账目录缺失`).toBe(true);
+    }
+  });
+
+  it("订单详情的前后端目录使用相同名称", () => {
+    for (const prefix of ["frontend/src", "backend/app"]) {
+      expect(existsSync(path.join(REPO, prefix, "business/shared/order_detail")), `${prefix} 订单详情目录缺失`).toBe(true);
+    }
+    for (const prefix of ["tests/frontend/module", "tests/backend/integration"]) {
+      expect(existsSync(path.join(REPO, prefix, "business/shared/order_detail")), `${prefix} 订单详情测试目录缺失`).toBe(true);
+    }
+  });
+
   it("manifest 三端齐全，区域表用全名且保留编号映射", () => {
     for (const layer of ["backend", "frontend", "e2e"]) {
       expect(manifest.layers[layer], `manifest 缺 ${layer} 层`).toBeTruthy();

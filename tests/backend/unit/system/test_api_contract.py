@@ -41,6 +41,21 @@ def test_api_routes_use_unversioned_prefix(app):
         assert client.get("/api/" + "v1/pools").status_code == 404
 
 
+def test_finance_module_registers_existing_routes_from_this_project():
+    """资金域从本项目 finance 加载，避免同机其他项目的同名包被误用。"""
+    from importlib import import_module
+    from importlib.util import find_spec
+    from pathlib import Path
+    from _repo import BACKEND_DIR
+
+    spec = find_spec("app.finance")
+    assert spec is not None and spec.origin is not None
+    assert Path(spec.origin).resolve() == BACKEND_DIR / "app/finance/__init__.py"
+    router = import_module("app.finance.router").router
+    paths = {route.path for route in router.routes}
+    assert {"/pools/balances", "/cashflows", "/deposits", "/reconciliations"} <= paths
+
+
 def test_every_json_api_route_declares_response_model(app):
     public_routes = 0
     for route in app.routes:

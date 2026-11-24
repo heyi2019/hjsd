@@ -5,7 +5,7 @@
     "system": "系统级（跨区域兜底）",
     "workbench": "工作台",
     "business": "业务中心",
-    "customer": "客户中心",
+    "customers": "客户中心",
     "finance": "资金中心",
     "operations": "经营中心",
     "settings": "设置",
@@ -24,14 +24,14 @@
       "kindRule": "文件内 db 用例多于非 db 用例即 integration（多数派）；db marker 由 v1_engine 夹具依赖派生，作为执行判据双保险",
       "expected": {
         "files": 138,
-        "cases": 2165,
+        "cases": 2171,
         "kinds": {
           "unit": {
             "files": 30,
-            "cases": 397,
+            "cases": 403,
             "byArea": {
               "business": 7,
-              "customer": 1,
+              "customers": 1,
               "finance": 4,
               "operations": 2,
               "settings": 2,
@@ -43,11 +43,11 @@
             "cases": 1768,
             "byArea": {
               "business": 45,
-              "customer": 8,
+              "customers": 8,
               "finance": 20,
               "operations": 7,
-              "settings": 12,
-              "system": 10,
+              "settings": 16,
+              "system": 6,
               "workbench": 6
             }
           }
@@ -65,40 +65,41 @@
       "runner": "vitest",
       "config": "frontend/vitest.config.ts",
       "expected": {
-        "files": 100,
+        "files": 105,
         "layers": {
           "fast": 29,
           "quick": 9,
-          "react": 50,
-          "deep": 12
+          "react": 54,
+          "deep": 13
         },
         "cases": {
-          "fast": 212,
+          "fast": 219,
           "quick": 141,
           "react": 965,
           "deep": 114
         },
         "byArea": {
           "unit": {
-            "workbench": 1,
             "business": 9,
+            "finance": 1,
             "settings": 1,
-            "shared": 12,
-            "system": 7
+            "shared": 11,
+            "system": 7,
+            "workbench": 1
           },
           "module": {
-            "workbench": 4,
             "business": 23,
-            "customer": 2,
-            "finance": 4,
+            "customers": 2,
+            "finance": 8,
             "operations": 3,
-            "settings": 16,
+            "settings": 22,
             "shared": 10,
-            "system": 8
+            "system": 3,
+            "workbench": 4
           }
         },
         "_baseline_note": "前端测试文件按当前磁盘同步；tests/frontend/{unit,module}/<区域>/ 为唯一前端测试根。",
-        "root_layout": "tests/frontend/<unit|module>/<区域>/",
+        "root_layout": "tests/frontend/<unit|module>/<区域>/<子模块可选>/",
         "baseline": {
           "_doc": "2026-11-04 搬迁后实测（同机同代码）。cpu = user+sys，跨会话可比；wall 受并发会话干扰。",
           "fast": {
@@ -168,12 +169,12 @@
   "regionByCode": {
     "A": "workbench",
     "B": "business",
-    "C": "customer",
+    "C": "customers",
     "D": "finance",
     "E": "operations",
     "F": "settings",
     "SYS": "system",
     "shared": "shared"
   },
-  "_regionDoc": "目录名用区域全名（tests/backend/<kind>/<区域>/）；功能编号仍用字母前缀（A..F/SYS），映射见 regionByCode。"
+  "_regionDoc": "目录名用区域全名，按需建立功能子模块；功能编号仍是 A..F/SYS，映射见 regionByCode。"
 }

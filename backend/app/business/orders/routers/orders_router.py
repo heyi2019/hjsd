@@ -206,7 +206,7 @@ def create_order(
         from app.business.collaboration import create_cashflow
 
         # 初始成本流水由 finance 域经 collaboration 注册点提供挂账器，
-        # orders 不再反向 import finance.cashflows（backend/.importlinter 契约）。
+        # orders 不再反向 import finance.cashflow.cashflows（backend/.importlinter 契约）。
         # 初始成本核算属性：回收/提号各归其位（2026-11-18 用户裁决：
         # 「提号就是提号成本」）；DG 代挂无独立成本属性，初始成本落其他支出。
         initial_cost_attribute = {

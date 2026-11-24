@@ -137,16 +137,26 @@ sys.path.insert(0, str(REPO / "tests" / "config"))
 import catalog as tc  # noqa: E402 — 必须先调整 sys.path
 
 
-def _area_of(fname: str) -> str:
-    """功能编号首字母 → 区域目录名。
-
-    目录与 manifest 用区域全名（business/customer/…），功能编号仍是字母前缀
-    （B03、SYS12），映射表在 manifest.regionByCode，避免两套命名各写一份。
-    """
-    func = tc.BACKEND_FILE_TO_FUNC.get(fname) or GUARD_AREA.get(fname)
-    assert func, f"{fname} 既不在 BACKEND_FILE_TO_FUNC 也无守卫区域登记"
+def _area_of(path: Path) -> str:
+    """功能编号维持原样；认证与审计测试可随 settings 代码归位。"""
+    func = tc.BACKEND_FILE_TO_FUNC.get(path.name) or GUARD_AREA.get(path.name)
+    assert func, f"{path.name} 既不在 BACKEND_FILE_TO_FUNC 也无守卫区域登记"
+    area = path.relative_to(BE_TESTS).parts[1]
+    if area == "settings" and func in {"SYS01", "SYS05"}:
+        return area
     code = func[0] if func[0] in "ABCDEF" else "SYS"
     return _manifest()["regionByCode"][code]
+
+
+def test_system_feature_in_settings_keeps_its_feature_number_but_uses_directory_area(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """系统认证测试可随代码归入 settings，功能编号仍保留 SYS01。"""
+    test_file = tmp_path / "integration" / "settings" / "auth" / "test_auth_contract.py"
+    test_file.parent.mkdir(parents=True)
+    test_file.touch()
+    monkeypatch.setattr(sys.modules[__name__], "BE_TESTS", tmp_path)
+
+    assert tc.BACKEND_FILE_TO_FUNC[test_file.name] == "SYS01"
+    assert _area_of(test_file) == "settings"
 
 
 def test_manifest_has_all_three_layers() -> None:
@@ -181,7 +191,7 @@ def test_backend_area_distribution_matches_manifest() -> None:
 
     actual: dict[str, int] = {}
     for path in _test_files():
-        area = _area_of(path.name)
+        area = _area_of(path)
         actual[area] = actual.get(area, 0) + 1
 
     assert actual == expected, f"区域分布不一致：磁盘 {actual} vs manifest {expected}"
@@ -198,11 +208,28 @@ def test_kind_directories_match_manifest(kind: str) -> None:
     for area_dir in sorted(kind_dir.iterdir()):
         if not area_dir.is_dir():
             continue
-        n = len(list(area_dir.glob("test_*.py")))
+        n = len(list(area_dir.rglob("test_*.py")))
         if n:
             actual[area_dir.name] = n
 
     assert actual == expected, f"{kind}/ 区域分布 {actual} 与 manifest {expected} 不一致"
+
+
+def test_kind_directories_count_nested_module_tests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """业务模块下沉一层后，清单仍须统计其中的测试文件。"""
+    nested = tmp_path / "integration" / "finance" / "cashflow"
+    nested.mkdir(parents=True)
+    (nested / "test_cashflow.py").touch()
+    monkeypatch.setattr(sys.modules[__name__], "BE_TESTS", tmp_path)
+    monkeypatch.setattr(
+        sys.modules[__name__],
+        "_manifest",
+        lambda: {"layers": {"backend": {"expected": {"kinds": {
+            "integration": {"byArea": {"finance": 1}},
+        }}}}},
+    )
+
+    test_kind_directories_match_manifest("integration")
 
 
 def test_no_stray_backend_files() -> None:
@@ -249,7 +276,7 @@ def test_case_total_matches_manifest(request: pytest.FixtureRequest) -> None:
 
 def test_guards_declare_area() -> None:
     """三个守卫自身必须有区域归属，否则会落 SYS 兜底并悄悄改变区域分布。"""
-    on_disk = {p.name for p in BE_TESTS.rglob("test_*.py")}
+    on_disk = {p.name: p for p in BE_TESTS.rglob("test_*.py")}
     for fname in GUARD_AREA:
         assert fname in on_disk, f"守卫文件丢失：{fname}"
-        _area_of(fname)  # 无区域登记会 AssertionError
+        _area_of(on_disk[fname])  # 无区域登记会 AssertionError

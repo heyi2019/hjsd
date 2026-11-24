@@ -95,7 +95,7 @@ const { deepStub, OBJECT_SHAPED } = vi.hoisted(() => {
 
 
 
-vi.mock("@/auth/UserCenterPage", () => ({
+vi.mock("@/settings/auth/UserCenterPage", () => ({
   UserCenterPage: () => <div>用户中心内容</div>,
 }));
 
@@ -115,7 +115,7 @@ beforeEach(() => {
       }
     }
   }
-  // 资金流水接口返回分页包裹体（items/total），与 Batch 2 后 FundsPage 的消费方式对齐；
+  // 资金流水接口返回分页包裹体（items/total），与 Batch 2 后 FinancePage 的消费方式对齐；
   // 通用兜底只给 []，会导致 response.items 为 undefined 进而 .filter 崩溃。
   vi.mocked(cashflowsApi.list).mockResolvedValue(cashflowPage([]));
   // 订单台账读取接口返回分页/汇总对象，避免从工作台进入“我的当期订单”时被通用空数组桩破坏响应契约。

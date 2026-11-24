@@ -21,7 +21,7 @@ from sqlalchemy import select
 from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import OrderFormField
 from app.business.shared.form_config.form_fields import create_order_form_field
-from app.funds.cashflows import create_cashflow, reverse_cashflow
+from app.finance.cashflow.cashflows import create_cashflow, reverse_cashflow
 
 TODAY = date(2026, 10, 4)
 

@@ -26,7 +26,7 @@ from app.settings.audit.router import router as audit_router
 from app.business.profit_allocation.router import router as profit_allocation_router
 from app.workbench.notifications.router import router as notifications_router
 from app.operations.router import router as reporting_router
-from app.funds.router import router as finance_router
+from app.finance.router import router as finance_router
 from app.business.installments.router import router as installments_router
 from app.business.orders.router import router as orders_router
 from app.business.orders.export_router import export_router as order_exports_router

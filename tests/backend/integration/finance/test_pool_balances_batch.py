@@ -16,8 +16,8 @@ from decimal import Decimal
 from sqlalchemy import event
 
 from app.domain.trade import Cashflow
-from app.funds.balances import pool_balances
-from app.funds.cashflows import create_cashflow
+from app.finance.balances import pool_balances
+from app.finance.cashflow.cashflows import create_cashflow
 
 TODAY = date(2026, 10, 4)
 

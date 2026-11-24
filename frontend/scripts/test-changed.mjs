@@ -59,7 +59,9 @@ const SRC_DOMAIN_TO_REGION = {
   orders: "business",
   stocks: "business",
   installments: "business",
-  "customer-center": "customer",
+  "customer-center": "customers",
+  customers: "customers",
+  workbench: "workbench",
   pools: "finance",
   finance: ["business", "finance"],
   rebates: "finance",
@@ -167,6 +169,16 @@ for (const path of repoChanges) {
     break;
   }
   if (!rel.startsWith("src/")) continue;
+  if (rel.startsWith("src/settings/auth/")) {
+    globalReason = "src/settings/auth/（登录认证影响全站）";
+    break;
+  }
+  if (rel.startsWith("src/settings/users/")) {
+    regions.add("business");
+    regions.add("finance");
+    regions.add("settings");
+    continue;
+  }
   const domain = rel.split("/")[1];
   if (!domain) continue;
   if (GLOBAL_DOMAINS.has(domain)) {

@@ -8,7 +8,7 @@ import {
   DEFAULT_BUSINESS_REMINDER_CONFIG,
   parseBusinessReminderConfig,
   type BusinessReminderConfig,
-} from "../../app/workbench/businessReminderConfig";
+} from "../../workbench/businessReminderConfig";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { BusinessRegistrationForm, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";

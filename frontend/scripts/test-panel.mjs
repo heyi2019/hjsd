@@ -6,7 +6,7 @@
  *   ②板块测试  test:panel  = 本脚本（改哪个区域只跑 tests/frontend/<kind>/<区域>/）
  *   ③全量档   test:ci     = test-full-sharded --all（手动 full_suite / 发版收口跑）
  *
- * 板块名 = 区域目录名（system/workbench/business/customer/finance/operations/settings/shared），
+ * 板块名 = 区域目录名（system/workbench/business/customers/finance/operations/settings/shared），
  * 由磁盘自动发现，与 tests/frontend/<unit|module>/<区域>/ 单一事实源，无需手工维护清单。
  * 2026-11-04 起测试家在仓库根 tests/frontend/，本脚本以仓库根为基准（vitest 的 root）。
  *

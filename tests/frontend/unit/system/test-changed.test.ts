@@ -20,9 +20,20 @@ describe("前端变更选测", () => {
     expect(output).toContain("tests/frontend/module/finance");
   });
 
+  it("登录认证影响全站，按全量前端测试选取", () => {
+    expect(selected("frontend/src/settings/auth/LoginPage.tsx")).toContain("npm run test:full:all");
+  });
+
+  it("用户设置变更覆盖设置和使用用户信息的业务测试", () => {
+    const output = selected("frontend/src/settings/users/UsersPanel.tsx");
+    expect(output).toContain("tests/frontend/module/settings");
+    expect(output).toContain("tests/frontend/module/business");
+    expect(output).toContain("tests/frontend/module/finance");
+  });
+
   it.each([
     ["frontend/src/operations/DataCenterPanel.tsx", "tests/frontend/module/operations"],
-    ["frontend/src/settings/panels/OrderFormFieldsPanel.tsx", "tests/frontend/module/settings"],
+    ["frontend/src/settings/field_definitions/OrderFormFieldsPanel.tsx", "tests/frontend/module/settings"],
   ])("%s 选择对应业务区域", (changed, expected) => {
     expect(selected(changed)).toContain(expected);
   });

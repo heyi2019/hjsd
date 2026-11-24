@@ -12,19 +12,19 @@
 import type { ReactElement } from "react";
 import { BusinessDictionaryPanel } from "./BusinessDictionaryPanel";
 import { GameTypeSettingsPanel } from "./GameTypeSettingsPanel";
-import { IntermediaryPlatformSettingsPanel } from "./IntermediaryPlatformSettingsPanel";
+import { IntermediaryPlatformSettingsPanel } from "../options/IntermediaryPlatformSettingsPanel";
 import { OrderTypesPanel } from "./OrderTypesPanel";
-import { OrderFormFieldsPanel } from "./OrderFormFieldsPanel";
-import { ListColumnsPanel } from "./ListColumnsPanel";
-import { PartySourceSettingsPanel } from "./PartySourceSettingsPanel";
+import { OrderFormFieldsPanel } from "../field_definitions/OrderFormFieldsPanel";
+import { ListColumnsPanel } from "../lists/ListColumnsPanel";
+import { PartySourceSettingsPanel } from "../options/PartySourceSettingsPanel";
 import { PoolsAndRoutesPanel } from "./PoolsAndRoutesPanel";
 import { SequencesPanel } from "./SequencesPanel";
-import { OrganizationSettingsPanel } from "../../users/OrganizationSettingsPanel";
+import { OrganizationSettingsPanel } from "../users/OrganizationSettingsPanel";
 import { AppearancePanel } from "../../app/AppearancePanel";
 import { BusinessReminderSettingsPanel } from "./BusinessReminderSettingsPanel";
-import { BusinessPeriodSettingsPanel } from "./BusinessPeriodSettingsPanel";
+import { BusinessPeriodSettingsPanel } from "../options/BusinessPeriodSettingsPanel";
 import { CompanyProfitSettingsPanel } from "./CompanyProfitSettingsPanel";
-import { AuditPanel } from "../../audit/AuditPanel";
+import { AuditPanel } from "../audit/AuditPanel";
 import { OrderImportPanel } from "./OrderImportPanel";
 
 export type PanelRenderer = (navigate: (key: string) => void) => ReactElement;

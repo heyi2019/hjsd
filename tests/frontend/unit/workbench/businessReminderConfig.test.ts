@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBusinessReminderOptions, DEFAULT_BUSINESS_REMINDER_CONFIG, parseBusinessReminderConfig } from "@/app/workbench/businessReminderConfig";
+import { buildBusinessReminderOptions, DEFAULT_BUSINESS_REMINDER_CONFIG, parseBusinessReminderConfig } from "@/workbench/businessReminderConfig";
 
 describe("业务提醒配置", () => {
   it("未配置时使用默认规则", () => {

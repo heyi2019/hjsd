@@ -12,7 +12,7 @@ import { normalizeError } from "../../../shared/api/client";
 import { today } from "../../../shared/lib/format";
 import { formExtraOrUndefined } from "../../../shared/lib/formExtra";
 import { consignmentRecords, type ActiveConsignment } from "../../shared/operations";
-import { type OrderPartyLink } from "../../shared/order-detail/OrderDetail.shared";
+import { type OrderPartyLink } from "../../shared/order_detail/OrderDetail.shared";
 import { type OrderProfileTarget } from "../../shared/operations";
 import { type InventoryCancellationValues } from "../../shared/cancellation/InventoryCancellationDialog";
 import { type BusinessCenterEntryTab } from "../../businessCenter";

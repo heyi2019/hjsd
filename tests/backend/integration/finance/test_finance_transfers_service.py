@@ -12,8 +12,8 @@ from app.core.security import CurrentUser
 from app.domain.enums import AccountingAttribute, CashflowSourceType, Direction
 from app.domain.foundation import Pool
 from app.domain.trade import Cashflow
-from app.funds import transfers
-from app.funds.balances import pool_balance
+from app.finance import transfers
+from app.finance.balances import pool_balance
 
 
 def _pools(seeded_db):

@@ -1,0 +1,44 @@
+import type { OptionItem } from "../shared/api/types/common";
+
+export const BUSINESS_REMINDER_CONFIG_CODE = "BUSINESS_OVERVIEW_REMINDERS";
+
+export interface BusinessReminderConfig {
+  inventoryAgingDays: number;
+  profitNotificationsEnabled: boolean;
+  overdueInstallmentsEnabled: boolean;
+}
+
+export const DEFAULT_BUSINESS_REMINDER_CONFIG: BusinessReminderConfig = {
+  inventoryAgingDays: 7,
+  profitNotificationsEnabled: true,
+  overdueInstallmentsEnabled: true,
+};
+
+function positiveInteger(value: string | undefined, fallback: number): number {
+  if (!value || /[^0-9]/.test(value)) return fallback;
+  const parsed = Number(value);
+  return parsed >= 1 && parsed <= 365 ? parsed : fallback;
+}
+
+function enabled(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (value !== "0" && value !== "1") throw new Error("业务提醒开关配置无效");
+  return value === "1";
+}
+
+export function parseBusinessReminderConfig(options?: OptionItem[] | null): BusinessReminderConfig {
+  const values = new Map((options ?? []).map((item) => [item.value, item.label]));
+  return {
+    inventoryAgingDays: positiveInteger(values.get("inventory_aging_days"), DEFAULT_BUSINESS_REMINDER_CONFIG.inventoryAgingDays),
+    profitNotificationsEnabled: enabled(values.get("profit_notifications_enabled"), DEFAULT_BUSINESS_REMINDER_CONFIG.profitNotificationsEnabled),
+    overdueInstallmentsEnabled: enabled(values.get("overdue_installments_enabled"), DEFAULT_BUSINESS_REMINDER_CONFIG.overdueInstallmentsEnabled),
+  };
+}
+
+export function buildBusinessReminderOptions(config: BusinessReminderConfig): OptionItem[] {
+  return [
+    { value: "inventory_aging_days", label: String(config.inventoryAgingDays) },
+    { value: "profit_notifications_enabled", label: config.profitNotificationsEnabled ? "1" : "0" },
+    { value: "overdue_installments_enabled", label: config.overdueInstallmentsEnabled ? "1" : "0" },
+  ];
+}

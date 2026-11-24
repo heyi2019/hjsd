@@ -10,7 +10,7 @@
 
 加载链保证注册生效：
 - 生产：api import finance_router / installments_router
-  -> finance/cashflows.py、installments/create.py 被 import -> 注册执行；
+  -> finance/cashflow/cashflows.py、installments/create.py 被 import -> 注册执行；
 - 测试：tests/backend/conftest.py 模块级 import app.api.create_app，
   收集阶段即完成注册。
 """
@@ -78,7 +78,7 @@ def create_cashflow(*args: Any, **kwargs: Any) -> Any:
     """
     if _cashflow_creator is None:
         raise RuntimeError(
-            "资金流水创建器未注册：funds.cashflows 未被加载（注册点 app.business.collaboration）"
+            "资金流水创建器未注册：finance.cashflow.cashflows 未被加载（注册点 app.business.collaboration）"
         )
     return _cashflow_creator(*args, **kwargs)
 
@@ -86,7 +86,7 @@ def create_cashflow(*args: Any, **kwargs: Any) -> Any:
 def reverse_cashflow(*args: Any, **kwargs: Any) -> Any:
     """冲销业务资金流水（转发给资金域）。"""
     if _cashflow_reverser is None:
-        raise RuntimeError("资金流水冲销器未注册：funds.cashflows 未被加载（注册点 app.business.collaboration）")
+        raise RuntimeError("资金流水冲销器未注册：finance.cashflow.cashflows 未被加载（注册点 app.business.collaboration）")
     return _cashflow_reverser(*args, **kwargs)
 
 

@@ -1,76 +1,76 @@
 [
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_company_allocation_is_not_notified",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_company_allocation_is_not_notified",
     "old_id": "IT-SYS08-129",
     "new_id": "IT-A01-039"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_create_notification_rejects_blank_entity",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_create_notification_rejects_blank_entity",
     "old_id": "IT-SYS08-030",
     "new_id": "IT-A01-041"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_create_notification_rejects_blank_title_or_message",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_create_notification_rejects_blank_title_or_message",
     "old_id": "IT-SYS08-031",
     "new_id": "IT-A01-042"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_list_notifications_unread_only_filters",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_list_notifications_unread_only_filters",
     "old_id": "IT-SYS08-032",
     "new_id": "IT-A01-047"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_mark_read_not_found",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_mark_read_not_found",
     "old_id": "IT-SYS08-033",
     "new_id": "IT-A01-048"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_mark_read_sets_read_at_and_idempotent",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_mark_read_sets_read_at_and_idempotent",
     "old_id": "IT-SYS08-034",
     "new_id": "IT-A01-049"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_api_creates_notification_visible_in_seller_inbox",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_sell_api_creates_notification_visible_in_seller_inbox",
     "old_id": "IT-SYS08-130",
     "new_id": "IT-A01-054"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_completed_notifies_seller_to_allocate",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_sell_completed_notifies_seller_to_allocate",
     "old_id": "IT-SYS08-131",
     "new_id": "IT-A01-055"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_pending_notification_is_idempotent",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_sell_pending_notification_is_idempotent",
     "old_id": "IT-SYS08-132",
     "new_id": "IT-A01-056"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_sell_without_operator_ids_falls_back_to_actor",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_sell_without_operator_ids_falls_back_to_actor",
     "old_id": "IT-SYS08-133",
     "new_id": "IT-A01-057"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_set_allocations_after_completion_notifies_recipients",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_set_allocations_after_completion_notifies_recipients",
     "old_id": "IT-SYS08-134",
     "new_id": "IT-A01-058"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_notifications_service.py::test_set_allocations_repeat_is_idempotent",
+    "nodeid": "tests/backend/integration/workbench/notifications/test_notifications_service.py::test_set_allocations_repeat_is_idempotent",
     "old_id": "IT-SYS08-135",
     "new_id": "IT-A01-059"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_overview.py::test_workbench_order_cards_use_the_current_period",
+    "nodeid": "tests/backend/integration/workbench/overview/test_overview.py::test_workbench_order_cards_use_the_current_period",
     "old_id": "IT-B01-392",
     "new_id": "IT-A01-065"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_overview.py::test_workbench_personal_earnings_uses_commission_profit_base",
+    "nodeid": "tests/backend/integration/workbench/overview/test_overview.py::test_workbench_personal_earnings_uses_commission_profit_base",
     "old_id": "IT-B01-393",
     "new_id": "IT-A01-066"
   },
   {
-    "nodeid": "tests/backend/integration/workbench/test_overview.py::test_workbench_summary_exposes_one_backend_aggregate",
+    "nodeid": "tests/backend/integration/workbench/overview/test_overview.py::test_workbench_summary_exposes_one_backend_aggregate",
     "old_id": "IT-B01-394",
     "new_id": "IT-A01-067"
   },
@@ -100,7 +100,7 @@
     "new_id": "IT-F01-207"
   },
   {
-    "nodeid": "tests/frontend/module/business/OrdersPage.actions.test.tsx::详情新增动作行默认当前员工",
+    "nodeid": "tests/frontend/module/business/orders/OrdersPage.actions.test.tsx::详情新增动作行默认当前员工",
     "previous_nodeid": "tests/frontend/module/business/ResponsibleEmployeeSelect.test.tsx::详情新增动作行默认当前员工",
     "old_id": "IT-SYS12-139",
     "new_id": "IT-B01-626"
@@ -124,142 +124,142 @@
     "new_id": "UT-F04-003"
   },
   {
-    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定",
+    "nodeid": "tests/frontend/unit/business/profit_allocation/ProfitAllocation.test.ts::P1/FE-035：分润按建单、卖出和运营信息负责人自动绑定",
     "old_id": "IT-B05-020",
     "new_id": "IT-B10-049"
   },
   {
-    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::分润候选按动作预分组并保留员工原顺序和禁用状态",
+    "nodeid": "tests/frontend/unit/business/profit_allocation/ProfitAllocation.test.ts::分润候选按动作预分组并保留员工原顺序和禁用状态",
     "old_id": "IT-SYS12-200",
     "new_id": "IT-B10-050"
   },
   {
-    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::分润售出优先使用交付负责人，缺失时才回退售出事件操作人或当前人",
+    "nodeid": "tests/frontend/unit/business/profit_allocation/ProfitAllocation.test.ts::分润售出优先使用交付负责人，缺失时才回退售出事件操作人或当前人",
     "old_id": "IT-B05-032",
     "new_id": "IT-B10-051"
   },
   {
-    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账执行人与存量一致时合并为一行；台账换人后份额并入合计，候选为空时保留存量人员",
+    "nodeid": "tests/frontend/unit/business/profit_allocation/ProfitAllocation.test.ts::台账执行人与存量一致时合并为一行；台账换人后份额并入合计，候选为空时保留存量人员",
     "old_id": "IT-B01-365",
     "new_id": "IT-B10-052"
   },
   {
-    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账新增执行人后保留动作合计，均分由后端处理",
+    "nodeid": "tests/frontend/unit/business/profit_allocation/ProfitAllocation.test.ts::台账新增执行人后保留动作合计，均分由后端处理",
     "old_id": "IT-B01-408",
     "new_id": "IT-B10-053"
   },
   {
-    "nodeid": "tests/frontend/unit/business/ProfitAllocation.test.ts::台账给买号新增执行人时，已存分润联动均分（1 人 → 2 人）",
+    "nodeid": "tests/frontend/unit/business/profit_allocation/ProfitAllocation.test.ts::台账给买号新增执行人时，已存分润联动均分（1 人 → 2 人）",
     "old_id": "IT-B01-279",
     "new_id": "IT-B10-054"
   },
   {
-    "nodeid": "tests/frontend/module/business/OrdersPage.actions.test.tsx::分润：提交表单数据并由后端决定保存口径",
+    "nodeid": "tests/frontend/module/business/orders/OrdersPage.actions.test.tsx::分润：提交表单数据并由后端决定保存口径",
     "old_id": "IT-B01-560",
     "new_id": "IT-B01-640"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_action_allocations_use_order_and_sale_responsibles",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_action_allocations_use_order_and_sale_responsibles",
     "old_id": "IT-F01-177",
     "new_id": "IT-B10-059"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_cannot_choose_seller_before_sale",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_cannot_choose_seller_before_sale",
     "old_id": "IT-F01-178",
     "new_id": "IT-B10-060"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rate_cannot_exceed_one_hundred_in_database",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_rate_cannot_exceed_one_hundred_in_database",
     "old_id": "IT-F01-179",
     "new_id": "IT-B10-061"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_incomplete_and_duplicate_action_categories",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_incomplete_and_duplicate_action_categories",
     "old_id": "IT-F01-180",
     "new_id": "IT-B10-062"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_multiple_company_rows",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_multiple_company_rows",
     "old_id": "IT-F01-181",
     "new_id": "IT-B10-063"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_same_person_twice_in_one_action",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_rejects_same_person_twice_in_one_action",
     "old_id": "IT-F01-182",
     "new_id": "IT-B10-064"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_role_is_closed_in_database",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_role_is_closed_in_database",
     "old_id": "IT-F01-183",
     "new_id": "IT-B10-065"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_splits_one_action_across_multiple_executors",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_splits_one_action_across_multiple_executors",
     "old_id": "IT-F01-184",
     "new_id": "IT-B10-066"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_allocation_user_must_exist",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_allocation_user_must_exist",
     "old_id": "IT-F01-185",
     "new_id": "IT-B10-067"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_buy_sell_recipient_is_bound_to_action_actor",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_buy_sell_recipient_is_bound_to_action_actor",
     "old_id": "IT-F01-186",
     "new_id": "IT-B10-068"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_duplicate_user_role_rejected",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_duplicate_user_role_rejected",
     "old_id": "IT-F01-187",
     "new_id": "IT-B10-069"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_empty_items_rejected",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_empty_items_rejected",
     "old_id": "IT-F01-188",
     "new_id": "IT-B10-070"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_fifty_fifty",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_fifty_fifty",
     "old_id": "IT-F01-189",
     "new_id": "IT-B10-071"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_invalid_allocation_role_rejected_by_service",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_invalid_allocation_role_rejected_by_service",
     "old_id": "IT-F01-190",
     "new_id": "IT-B10-072"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_negative_rate_rejected",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_negative_rate_rejected",
     "old_id": "IT-F01-191",
     "new_id": "IT-B10-073"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_reset_replaces_old_rows",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_reset_replaces_old_rows",
     "old_id": "IT-F01-192",
     "new_id": "IT-B10-074"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_sale_completion_binds_seller_for_allocation",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_sale_completion_binds_seller_for_allocation",
     "old_id": "IT-F01-193",
     "new_id": "IT-B10-075"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_sum_99_rejected",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_sum_99_rejected",
     "old_id": "IT-F01-194",
     "new_id": "IT-B10-076"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_total_must_be_100",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_total_must_be_100",
     "old_id": "IT-F01-195",
     "new_id": "IT-B10-077"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_typed_allocation_requires_four_income_categories",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_typed_allocation_requires_four_income_categories",
     "old_id": "IT-F01-196",
     "new_id": "IT-B10-078"
   },
   {
-    "nodeid": "tests/backend/integration/business/test_profit_allocation.py::TestProfitAllocation::test_unknown_allocation_field_rejected_by_service",
+    "nodeid": "tests/backend/integration/business/profit_allocation/test_profit_allocation.py::TestProfitAllocation::test_unknown_allocation_field_rejected_by_service",
     "old_id": "IT-F01-197",
     "new_id": "IT-B10-079"
   }

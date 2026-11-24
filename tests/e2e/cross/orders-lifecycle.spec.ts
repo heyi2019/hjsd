@@ -7,7 +7,7 @@ import { navItem } from "../support/api-stub";
  *
  * 对应 C 档「以功能为纲重构测试体系 → 先建 E2E 后降级契约」的第一步：
  * 用真实业务闭环（而非逐字段断言）守护 orders 的核心能力，待本文件稳定后，
- * tests/backend/integration/business/test_orders_contract.py 中的逐字段契约断言
+ * tests/backend/integration/business/orders/test_orders_contract.py 中的逐字段契约断言
  * 可降级为状态码 + 关键业务字段的冒烟级。
  *
  * 约定与 business-write.spec.ts 一致：直连 /api，X-Dev-User 头模拟用户，

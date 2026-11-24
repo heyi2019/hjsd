@@ -80,17 +80,17 @@ const BANNED = [
 ];
 // 精确豁免只读动作；后续在同一文件新增裸按钮仍会被守卫提示。
 const READ_ONLY_BUTTONS = new Map([
-  ["src/app/workbench/notifications/ProfitNotificationModal.tsx", [
+  ["src/workbench/notifications/ProfitNotificationModal.tsx", [
     '<Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button>',
     '<Button type="primary" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button>',
   ]],
   ["src/business/profit_allocation/OrderAllocationModal.tsx", [
     '<Button htmlType="button" onClick={() => setShowOrderDetail(true)}>查看订单详情</Button>',
   ]],
-  ["src/business/shared/order-detail/OrderDetailDialog.tsx", [
+  ["src/business/shared/order_detail/OrderDetailDialog.tsx", [
     '<Button type="link" onClick={() => setAttempt((n) => n + 1)}>重试</Button>',
   ]],
-  ["src/business/shared/order-detail/OrderAttachments.tsx", [
+  ["src/business/shared/order_detail/OrderAttachments.tsx", [
     `<Button type="link" aria-expanded={open} onClick={() => { setOpen(!open); if (!open) void reload(); }}>
       {open ? "收起订单附件" : "查看订单附件"}
     </Button>`,
@@ -98,7 +98,7 @@ const READ_ONLY_BUTTONS = new Map([
     '<Button type="link" onClick={() => void download(item)}>下载</Button>',
     '<Button disabled={uploading} onClick={() => setDuplicate(null)}>取消</Button>',
   ]],
-  ["src/business/shared/order-detail/editing/ReferenceDataErrors.tsx", [
+  ["src/business/shared/order_detail/editing/ReferenceDataErrors.tsx", [
     '<Button type="link" size="small" onClick={() => { void retryEmployees().catch(() => undefined); }}>重试员工</Button>',
     '<Button type="link" size="small" onClick={() => { void retryPools().catch(() => undefined); }}>重试资金账户</Button>',
   ]],
@@ -313,7 +313,7 @@ const INLINE_STYLE_ALLOWLIST = new Map([
     { max: 1, reason: "工具栏多选框宽度按已选人员动态计算。" },
   ],
   [
-    "src/pools/StudioExpensePanel.tsx",
+    "src/finance/StudioExpensePanel.tsx",
     {
       max: 2,
       reason:
@@ -365,18 +365,18 @@ const WIRED_RE = /FieldConfigScope|useOrderFormConfig/;
 const FORM_SCOPE_WHITELIST = new Map([
   ["src/settings/panels/CompanyProfitSettingsPanel.tsx", "公司分润比例为系统策略配置，非业务表单字段；保存受 policy.manage 权限控制"],
   ["src/shared/ui/BusinessRegistrationForm.tsx", "共享表单容器，字段配置由使用它的业务表单提供"],
-  ["src/auth/LoginPage.tsx", "登录表单，非业务数据录入"],
-  ["src/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],
-  ["src/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],
-  ["src/field-definitions/panels/OrderFormFieldsPanel.tsx", "表单字段配置界面本身（即守卫所保护的设置页）"],
-  ["src/field-definitions/panels/useOrderFormFieldsPanelController.tsx", "同上：字段配置界面的编辑表单 JSX 拆分到 controller 后仍是同一界面，非业务录入"],
+  ["src/settings/auth/LoginPage.tsx", "登录表单，非业务数据录入"],
+  ["src/settings/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],
+  ["src/settings/auth/UserCenterPage.tsx", "用户中心，非业务数据录入"],
+  ["src/settings/field_definitions/OrderFormFieldsPanel.tsx", "表单字段配置界面本身（即守卫所保护的设置页）"],
+  ["src/settings/field_definitions/useOrderFormFieldsPanelController.tsx", "同上：字段配置界面的编辑表单 JSX 拆分到 controller 后仍是同一界面，非业务录入"],
   ["src/field-definitions/panels/OrderTypeRoutesPanel.tsx", "配置管理界面本身"],
   ["src/policy/PolicyResolveModal.tsx", "政策试算弹窗，非业务数据录入"],
   ["src/policy/PolicyVersionEditorModal.tsx", "政策版本编辑，配置管理"],
-  ["src/users/TeamsPanel.tsx", "团队管理，系统表单"],
-  ["src/users/UsersPanel.tsx", "用户管理，系统表单"],
-  ["src/customer-center/CustomerEditModal.tsx", "客户编辑弹窗，由 CustomerPanel.tsx 逐字拆出（原与新建弹窗共驻同一文件、搭 FieldConfigScope 顺风车）；扩展字段已通过 activeDefs（orderFormFieldsApi.list CUSTOMER）接入配置体系，基础字段维持裸 Form.Item 以直接回写已建档联系方式；FieldConfigScope/CfgItem 统一接线改造另案。类比 useOrderFormFieldsPanelController 拆分条目"],
-  ["src/customer-center/CustomerMergeModal.tsx", "客户合并确认表单：目标客户为运行时动态选择、合并原因仅记操作日志，非客户档案可配置字段，与 InventoryDeleteDialog 同属系统级确认输入"],
+  ["src/settings/users/TeamsPanel.tsx", "团队管理，系统表单"],
+  ["src/settings/users/UsersPanel.tsx", "用户管理，系统表单"],
+  ["src/customers/CustomerEditModal.tsx", "客户编辑弹窗，由 CustomerPanel.tsx 逐字拆出（原与新建弹窗共驻同一文件、搭 FieldConfigScope 顺风车）；扩展字段已通过 activeDefs（orderFormFieldsApi.list CUSTOMER）接入配置体系，基础字段维持裸 Form.Item 以直接回写已建档联系方式；FieldConfigScope/CfgItem 统一接线改造另案。类比 useOrderFormFieldsPanelController 拆分条目"],
+  ["src/customers/CustomerMergeModal.tsx", "客户合并确认表单：目标客户为运行时动态选择、合并原因仅记操作日志，非客户档案可配置字段，与 InventoryDeleteDialog 同属系统级确认输入"],
 ]);
 let wiredCount = 0;
 for (const file of ALL_FILES.filter((f) => f.endsWith(".tsx") && !f.includes(join("src", "test")) && !/\.test\.tsx$/.test(f))) {

@@ -503,7 +503,7 @@ def seed_template(v1_engine):
     Base.metadata.create_all(bind=template_engine)
     session = sessionmaker(bind=template_engine, autoflush=False, autocommit=False, future=True)()
     try:
-        seed_foundation(session, actor="pytest")
+        seed_foundation(session, actor="pytest", include_example_data=True)
         seed_default_users(session)
         session.commit()
     finally:

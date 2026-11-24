@@ -551,7 +551,7 @@ def test_concurrent_profile_edits_check_after_obtaining_locks(v1_engine, same_fi
         Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             account = create_account(session, game_account="concurrent-profile", business_mode="SELF", inventory_type="RECOVERY",
                                      account_description="原描述", note="原备注", actor="pytest")
             order = create_order(session, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

@@ -34,7 +34,7 @@ def test_simultaneous_offsale_has_one_result(v1_engine):
         Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             session.commit()
         for order_type in ("DG", "HS"):
             with factory() as session:

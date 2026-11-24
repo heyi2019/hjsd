@@ -21,9 +21,9 @@ from app.settings.field_definitions.seeds import seed_foundation
 
 class TestSeed:
     def test_seed_is_idempotent(self, db):
-        first = seed_foundation(db, actor="pytest")
+        first = seed_foundation(db, actor="pytest", include_example_data=True)
         db.commit()
-        second = seed_foundation(db, actor="pytest")
+        second = seed_foundation(db, actor="pytest", include_example_data=True)
         db.commit()
 
         assert first["pools_created"] == 2

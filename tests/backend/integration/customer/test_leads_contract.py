@@ -40,7 +40,7 @@ def concurrent_customer_factory(v1_engine):
         Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
             session.commit()
         yield factory

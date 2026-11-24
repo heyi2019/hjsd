@@ -40,7 +40,7 @@ def test_concurrent_operator_edits_record_the_serialized_previous_value(v1_engin
         Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             users = [User(username=name, display_name=name, password_hash="test", role="ADMIN",
                           owner_scope="ALL", pool_ids=[], team_ids=[], is_active=True)
                      for name in ("pytest", "first", "second")]
@@ -109,7 +109,7 @@ def test_installment_payment_and_cancellation_are_serialized(v1_engine):
         Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="pytest", password_hash="test", role="ADMIN", owner_scope="ALL", pool_ids=[], team_ids=[], is_active=True))
             session.flush()
             order = create_order(session, order_type="TH", trade_date=date(2026, 11, 1), actor="pytest")

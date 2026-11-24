@@ -55,7 +55,7 @@ def committed_finance_client(v1_engine, app):
     try:
         Base.metadata.create_all(engine)
         with Session(engine, autoflush=False) as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             session.add_all([
                 User(id=1, username="seeduser1", display_name="种子用户1", password_hash="unused"),
                 User(id=2, username="seeduser2", display_name="种子用户2", password_hash="unused"),

@@ -116,7 +116,7 @@ def test_concurrent_overdue_sync_creates_one_notification(v1_engine):
     try:
         Base.metadata.create_all(engine)
         with Session(engine) as setup:
-            seed_foundation(setup, actor="pytest")
+            seed_foundation(setup, actor="pytest", include_example_data=True)
             setup.add(User(id=1, username="seeduser1", display_name="test", password_hash="test", role="OPERATOR", owner_scope="SELF"))
             setup.flush()
             _, schedule = _schedule(setup, 1)

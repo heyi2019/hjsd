@@ -31,7 +31,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     Base.metadata.create_all(bind=bind)
     with Session(bind=bind) as session:
-        seed_foundation(session, actor="system")
+        seed_foundation(session, actor="system", include_example_data=False)
         seed_catalog(session, actor="system")
         session.commit()
 

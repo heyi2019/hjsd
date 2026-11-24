@@ -180,7 +180,7 @@ def test_sale_rolls_back_when_notification_numbers_are_exhausted(v1_engine, app)
     try:
         Base.metadata.create_all(engine)
         with Session(engine, autoflush=False) as session:
-            seed_foundation(session, actor="pytest")
+            seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(id=1, username="admin", display_name="管理员", password_hash="unused", role="ADMIN", owner_scope="ALL"))
             session.flush()
             order = _order(session, "number-limit")

@@ -257,7 +257,8 @@ def test_upgrade_creates_v1_schema_and_seeds(migration_db):
         assert "IS NOT NULL" in cashflow_clause
 
         pools = {row[0] for row in connection.execute(text("SELECT code FROM pools"))}
-        assert pools == {"HJ_INVEST", "HJ_PROFIT"}
+        assert pools == set()
+        assert connection.execute(text("SELECT COUNT(*) FROM game_type_options")).scalar_one() == 0
 
         types = {row[0] for row in connection.execute(text("SELECT code FROM order_type_defs"))}
         assert types == {"HS", "TH", "DG"}
@@ -342,7 +343,7 @@ def test_upgrade_is_repeatable(migration_db):
     with engine.connect() as connection:
         pool_count = connection.execute(text("SELECT COUNT(*) FROM pools")).scalar()
         type_count = connection.execute(text("SELECT COUNT(*) FROM order_type_defs")).scalar()
-    assert (pool_count, type_count) == (2, 3)
+    assert (pool_count, type_count) == (0, 3)
 
 
 def test_current_migration_head_is_exposed():

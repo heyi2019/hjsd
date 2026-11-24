@@ -267,7 +267,7 @@ def test_inventory_sync_and_profit_notice_do_not_deadlock(v1_engine):
     try:
         Base.metadata.create_all(engine)
         with Session(engine) as setup:
-            seed_foundation(setup, actor="pytest")
+            seed_foundation(setup, actor="pytest", include_example_data=True)
             setup.add_all([User(id=1, username="admin", display_name="admin", password_hash="test", role="ADMIN", owner_scope="ALL"),
                            User(id=10, username="pytest", display_name="pytest", password_hash="test", role="ADMIN", owner_scope="ALL")])
             setup.flush()
@@ -393,7 +393,7 @@ def test_concurrent_read_returns_position_after_previous_commit(v1_engine):
     try:
         Base.metadata.create_all(engine)
         with Session(engine, autoflush=False) as setup:
-            seed_foundation(setup, actor="pytest")
+            seed_foundation(setup, actor="pytest", include_example_data=True)
             setup.add(User(id=1, username="admin", display_name="admin", password_hash="test", role="ADMIN", owner_scope="ALL"))
             setup.flush()
             order = create_order(setup, order_type="HS", trade_date=date(2026, 10, 4), actor="pytest", owner_id=1)

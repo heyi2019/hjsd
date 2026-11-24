@@ -43,7 +43,7 @@ def check_seed() -> bool:
         with Session(bind=engine) as session:
             applied = seed_is_applied(session)
             if applied:
-                print("[v1] 基础种子已就位（HJ_INVEST / HJ_PROFIT / HS / TH / DG / 默认路由）")
+                print("[v1] 基础种子已就位（HS / TH / DG；资金账户和游戏类型由用户配置）")
             else:
                 print("[v1] 基础种子缺失，请执行 python3 scripts/v1_init_db.py", file=sys.stderr)
             return applied

@@ -230,7 +230,7 @@ def reset(reset_only: bool = False, keep: bool = False) -> str:
     Session = sessionmaker(bind=engine, autoflush=False, future=True)
     db = Session()
     try:
-        seed_foundation(db, actor="e2e")
+        seed_foundation(db, actor="e2e", include_example_data=True)
         # 选项词典 + 表单字段配置：资金流水方向（FUND_FLOW_DIRECTION）、返点类型
         # （rebate_type 等）的下拉依赖 option_sets / order_form_fields，缺一不可——
         # 缺失会导致 finance-write-ui 等用例下拉为空、表单无法提交。对齐真实库（dev/

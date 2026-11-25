@@ -780,7 +780,6 @@ def test_import_old_pool_code_still_checks_user_pool_access(seeded_db):
     from datetime import date
     from sqlalchemy import select
     from app.business.orders.importing.cashflows import import_cashflows
-    from app.business.orders.importing.parser import ImportRow, ImportTable
     from app.core.security import CurrentUser, ROLE_OPERATOR
     from app.domain.enums import AuditAction
     from app.domain.foundation import Pool

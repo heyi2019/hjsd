@@ -11,19 +11,22 @@
    `test_migration.py` 与 `test_numbering.py` 曾因此漏在快通道里，是死端口实验
    （把 DATABASE_URL 指向不可达端口后跑 `-m "not db"`，12 错误 1 失败）抓出来的。
 
-本文件只做静态核对与收集期统计校验，自身不连库。
+本文件执行静态、收集期和离线入口校验，自身不连库。
 """
 
 from __future__ import annotations
 
+import os
 import re
+import shlex
+import subprocess
 from types import SimpleNamespace
 
 import pytest
 import run_regression
 
 # 测试文件下沉后 parents[N] 的层数变了，写死层数只能撑到下一次搬家。
-from _repo import BE_TESTS
+from _repo import BE_TESTS, REPO_ROOT
 
 # db 用例数基线：只允许上升。派生机制被删除、v1_engine 被改名时，数字会塌下来。
 # 要下调这条基线，必须同时证明「确实有用例不再需要数据库」，不能图省事直接改数。
@@ -210,3 +213,100 @@ def test_ci_can_use_its_disposable_base_service_without_reusing_it():
     base = "postgresql://u:p@127.0.0.1:5432/heijin_erp_test"
     _, target = database_urls("test", {"GITHUB_ACTIONS": "true", "DATABASE_URL": base, "TEST_DATABASE_URL": base})
     assert make_url(target).database != "heijin_erp_test"
+
+
+def _offline_test_local(tmp_path, *args):
+    # 用轻量替身检查入口交给 pytest 的环境和参数，不依赖本机 Python 或再次启动 pytest。
+    root = tmp_path / "local-runner"
+    scripts = root / "scripts/ops"
+    scripts.mkdir(parents=True)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    setup_python = bin_dir / "python3"
+    setup_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    setup_python.chmod(0o755)
+    fake_pytest = bin_dir / "pytest-python"
+    fake_pytest.write_text(
+        '#!/bin/sh\nprintf "%s\\n" "$DATABASE_URL" "$TEST_DATABASE_URL" "$@"\n', encoding="utf-8"
+    )
+    fake_pytest.chmod(0o755)
+    launcher = (REPO_ROOT / "scripts/ops/test-local.sh").read_text(encoding="utf-8")
+    local_python = "/Users/aries/Applications/Python_3.13/bin/python3"
+    assert local_python in launcher
+    launcher_path = scripts / "test-local.sh"
+    launcher_path.write_text(launcher.replace(local_python, shlex.quote(str(fake_pytest))), encoding="utf-8")
+    launcher_path.chmod(0o755)
+    (scripts / "test-local-mode.sh").write_text(
+        (REPO_ROOT / "scripts/ops/test-local-mode.sh").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+    env = os.environ.copy()
+    env["DATABASE_URL"] = "postgresql+psycopg://test:test@127.0.0.1:1/heijin_erp_dev"
+    env["TEST_DATABASE_URL"] = "postgresql+psycopg://test:test@127.0.0.1:1/heijin_erp_test"
+    env["PATH"] = str(bin_dir) + os.pathsep + env.get("PATH", "")
+    env.pop("PYTEST_ADDOPTS", None)
+    for key in ("PYTEST_XDIST_WORKER", "PYTEST_XDIST_WORKER_COUNT", "PYTEST_XDIST_TESTRUNUID"):
+        env.pop(key, None)
+    return subprocess.run(
+        [str(launcher_path), *args],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True, timeout=45,
+    )
+
+
+def _offline_mode(*args, env_overrides=None):
+    env = os.environ.copy()
+    env.pop("PYTEST_ADDOPTS", None)
+    env.pop("PYTEST_XDIST_WORKER", None)
+    env.update(env_overrides or {})
+    return subprocess.run(
+        ["/bin/sh", "-c", '. "$1"; shift; heijin_is_offline "$@"',
+         "test-local-mode", str(REPO_ROOT / "scripts/ops/test-local-mode.sh"), *args],
+        cwd=REPO_ROOT, env=env, capture_output=True, text=True,
+    )
+
+
+@pytest.mark.parametrize("args,offline", [
+    (("-m", "not db"), True),
+    (("--collect-only",), True),
+    (("--co",), True),
+    (("-m", "not db or db"), False),
+    (("-m", "not db", "-m", "db"), False),
+    (("-n", "2", "-m", "not db"), False),
+    (("--collect-only", "--numprocesses=2"), False),
+    (("-m", "not db", "-o", "addopts=-n2"), False),
+    (("--collect-only", "-c", "custom.ini"), False),
+    (("-mnot db",), False),
+    (("--", "--collect-only"), False),
+    (("-q",), False),
+    (("-m",), False),
+])
+def test_offline_mode_is_conservative(args, offline):
+    """仅明确离线的选测参数跳过临时库，含糊和并行参数保留隔离。"""
+    result = _offline_mode(*args)
+    assert result.returncode == (0 if offline else 1), result.stderr
+
+
+@pytest.mark.parametrize("overrides", [
+    {"PYTEST_ADDOPTS": "-m db"},
+    {"PYTEST_XDIST_WORKER": "gw0"},
+])
+def test_offline_mode_rejects_ambient_options(overrides):
+    """附加 pytest 选项和 xdist 工作进程不使用离线通道。"""
+    assert _offline_mode("-m", "not db", env_overrides=overrides).returncode == 1
+
+
+def test_offline_channel_blocks_database_urls_and_preserves_selection(tmp_path):
+    """离线入口使用不可达数据库地址，并原样传递选测参数。"""
+    from sqlalchemy.engine import make_url
+
+    for index, args in enumerate((
+        ("-q", "tests/example.py", "-m", "not db"),
+        ("--collect-only", "-q", "tests/example.py"),
+    )):
+        result = _offline_test_local(tmp_path / str(index), *args)
+        assert result.returncode == 0, result.stdout + result.stderr
+        lines = result.stdout.splitlines()
+        for raw_url, database in zip(lines[:2], ("heijin_erp_dev", "heijin_erp_test")):
+            url = make_url(raw_url)
+            assert url.database == database
+            assert url.query.get("host") == "/dev/null"
+        assert lines[2:] == ["-m", "pytest", *args]

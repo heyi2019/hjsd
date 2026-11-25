@@ -257,8 +257,9 @@ mock 注册了却没命中被测模块，测试改用真实现照常通过，保
 
 - 后端测试只认 `TEST_DATABASE_URL`，**刻意不回落 `DATABASE_URL`**；库名必须含 `test`，
   且命中 `release`/`prod` 等黑名单或与 `DATABASE_URL` 同库时直接 abort（夹具会 TRUNCATE 全表）。
-- 本机 `scripts/ops/test-local.sh` 和 `run_regression.py` 每轮创建独立测试库，退出后回收；
-  测试库地址必须是本机 PostgreSQL，且不得与开发库相同。
+- 本机 `scripts/ops/test-local.sh` 明确指定 `-m "not db"` 或 `--collect-only`，且无并行参数、环境附加选项和自定义 pytest 配置时，
+  使用无法连接的数据库地址并跳过建库；其他运行以及 `run_regression.py` 每轮创建独立测试库，退出后回收。
+  需要数据库时，测试库地址必须是本机 PostgreSQL，且不得与开发库相同。
 - E2E 必须用 `npm run test:e2e` 启动：每轮创建独立临时库，成功后回收；失败或中断时保留，
   至少 24 小时后在下次 E2E 启动时回收无连接的过期库。不会清理未标记的库。
 

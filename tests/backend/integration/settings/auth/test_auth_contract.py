@@ -39,6 +39,36 @@ def _login(client: TestClient, username: str, password: str) -> str:
     assert response.status_code == 200, response.text
     return response.json()["access_token"]
 
+
+def test_employee_code_is_sequential_and_independent_of_login_name(client: TestClient):
+    first = _create_user(client, username="alice")
+    second = _create_user(client, username="bob")
+    assert first["employee_code"] == f"yy{first['id']:03d}"
+    assert second["employee_code"] == f"yy{second['id']:03d}"
+    assert second["id"] == first["id"] + 1
+    token = _login(client, "alice", "password123")
+    changed_password = client.post(
+        "/api/auth/change-password", headers={"Authorization": f"Bearer {token}"},
+        json={"old_password": "password123", "new_password": "newpassword1"},
+    )
+    assert changed_password.status_code == 200
+    token = changed_password.json()["access_token"]
+    current = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert current.status_code == 200
+    assert current.json()["employee_code"] == first["employee_code"]
+    assert _login(client, "alice", "newpassword1")
+
+
+def test_team_code_is_automatically_assigned_and_stable(client: TestClient):
+    headers = {"X-Dev-User": "admin"}
+    first = client.post("/api/teams", json={"name": "一组"}, headers=headers)
+    second = client.post("/api/teams", json={"name": "二组"}, headers=headers)
+    assert first.status_code == second.status_code == 201
+    assert [first.json()["code"], second.json()["code"]] == ["team_01", "team_02"]
+    renamed = client.patch(f"/api/teams/{first.json()['id']}", json={"name": "新一组"}, headers=headers)
+    assert renamed.status_code == 200
+    assert renamed.json()["code"] == "team_01"
+
 def test_user_security_scope_values_are_constrained_in_database(seeded_db):
     seeded_db.add(
         User(

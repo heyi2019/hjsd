@@ -1,0 +1,25 @@
+"""事务内分配不可重复使用的选项编码。"""
+from __future__ import annotations
+
+import hashlib
+import re
+
+from sqlalchemy import update
+from sqlalchemy.orm import Session
+
+from app.domain.foundation import DocumentSequence
+from app.shared.numbering import allocate_number, ensure_sequence
+
+
+def allocate_option_code(session: Session, namespace: str, prefix: str, existing: list[str]) -> str:
+    prefix = re.sub(r"[^a-z0-9]+", "_", prefix.lower()).strip("_")
+    if not prefix:
+        raise ValueError("选项编码前缀不能为空")
+    key = "OPTION_" + hashlib.sha256(namespace.encode("utf-8")).hexdigest()[:32]
+    ensure_sequence(session, key, "D", 2)
+    pattern = re.compile(rf"^{re.escape(prefix)}_(\d+)$")
+    highest = max((int(match.group(1)) for value in existing if (match := pattern.fullmatch(value))), default=0)
+    session.execute(update(DocumentSequence).where(
+        DocumentSequence.sequence_key == key, DocumentSequence.current_value < highest,
+    ).values(current_value=highest))
+    return f"{prefix}_{allocate_number(session, key)[1:]}"

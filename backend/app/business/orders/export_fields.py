@@ -191,9 +191,17 @@ def _money_or_none(value: object) -> Decimal | None:
 
 def _detail_value_labels(db: Session) -> dict[str, dict[str, str]]:
     """订单详情的动态字典，供导出和回流核对使用。"""
-    labels = list_columns_service.option_labels_by_code(db, ("COMPENSATION_TYPE",))
-    compensation = labels.get("COMPENSATION_TYPE")
-    return {"compensation_type": compensation} if compensation else {}
+    from app.domain.options import OptionSet
+    from app.shared.game_references import game_reference_labels
+    codes = ("COMPENSATION_TYPE", "INTERMEDIARY_PLATFORM", "INTERMEDIARY_TYPE")
+    labels = list_columns_service.option_labels_by_code(db, codes)
+    result = {code.lower(): labels[code] for code in codes if code in labels}
+    platform = db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_PLATFORM"))
+    result["intermediary_platform_behavior"] = {
+        item["value"]: item["behavior"] for item in (platform.options or []) if item.get("behavior")
+    } if platform else {}
+    _games, result["channel_region"] = game_reference_labels(db)
+    return result
 
 
 def _account_export_profiles(db: Session, orders: Sequence[Order]) -> dict[int, dict[str, object]]:
@@ -341,18 +349,22 @@ def _delivery_export_fields(
     if form_extra is None:
         form_extra = detail.get("form_extra") or {}
     compensation_labels = value_labels.get("compensation_type") or {}
+    snapshots = detail.get("option_label_snapshot") or {}
+    def label_for(group: str, value: object) -> object:
+        return value_labels.get(group, {}).get(value, value) if isinstance(value, str) else value
     def values_for(prefix: str) -> dict[str, str | None]:
         compensation = form_extra.get(f"{prefix}compensation_type")
-        platform = form_extra.get(f"{prefix}intermediary_platform")
+        platform_code = form_extra.get(f"{prefix}intermediary_platform")
+        platform = snapshots.get(f"{prefix}intermediary_platform") or label_for("intermediary_platform", platform_code)
         other_platform = form_extra.get(f"{prefix}intermediary_platform_other")
-        if platform == "其他" and isinstance(other_platform, str) and other_platform.strip():
-            platform = f"其他（{other_platform.strip()}）"
+        if isinstance(platform_code, str) and value_labels.get("intermediary_platform_behavior", {}).get(platform_code) == "OTHER" and isinstance(other_platform, str) and other_platform.strip():
+            platform = f"{platform}（{other_platform.strip()}）"
         return {
             "phone": form_extra.get(f"{prefix}bound_phone"),
             "owner": form_extra.get(f"{prefix}bound_phone_owner"),
             "platform": platform,
-            "type": form_extra.get(f"{prefix}intermediary_type"),
-            "compensation": compensation_labels.get(compensation, compensation) if isinstance(compensation, str) else compensation,
+            "type": snapshots.get(f"{prefix}intermediary_type") or label_for("intermediary_type", form_extra.get(f"{prefix}intermediary_type")),
+            "compensation": snapshots.get(f"{prefix}compensation_type") or (compensation_labels.get(compensation, compensation) if isinstance(compensation, str) else compensation),
             "responsible": detail_json(form_extra.get(f"{prefix}delivery_responsible_ids") or [], value_labels),
         }
     buy_values = values_for("")
@@ -369,19 +381,25 @@ def _order_detail_export_fields(
     account_profile: dict[str, object] | None = None,
 ) -> dict[str, str | None]:
     account = account_profile if account_profile is not None else (detail.get("account_snapshot") or {})
+    snapshot = detail.get("account_snapshot") or {}
     form_extra = _translate_responsible_ids(detail.get("form_extra") or {}, user_names)
+    history_labels = {key: dict(labels) for key, labels in value_labels.items()}
+    for key, label in (detail.get("option_label_snapshot") or {}).items():
+        value = form_extra.get(key)
+        if isinstance(value, str) and isinstance(label, str):
+            history_labels.setdefault(key, {})[value] = label
     has_secondary = account.get("has_secondary")
     image_count = account.get("account_image_count")
     if image_count is None:
         image_count = len(account.get("account_images") or [])
     return {
-        "detail_account_channel_region": account.get("channel_region"),
+        "detail_account_channel_region": (snapshot.get("channel_region_label") if snapshot.get("channel_region") == account.get("channel_region") else None) or value_labels.get("channel_region", {}).get(account.get("channel_region"), account.get("channel_region")),
         "detail_account_bound_phone": account.get("bound_phone"),
         "detail_account_secondary": None if has_secondary is None else ("有" if has_secondary else "无"),
         "detail_account_description": account.get("account_description"),
         "detail_account_images": f"{image_count}张" if image_count else "",
         "detail_order_note": detail.get("note"),
-        "detail_order_extra": detail_json(form_extra, value_labels),
+        "detail_order_extra": detail_json(form_extra, history_labels),
         **_delivery_export_fields(detail, value_labels, form_extra),
         "detail_events": detail_json(detail.get("events") or [], value_labels),
         "detail_cashflows": detail_json(detail.get("cashflows") or [], value_labels),

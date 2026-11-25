@@ -12,6 +12,8 @@ export const optionSetsApi = {
     api.get<OptionSetList>("/option-sets", { params }).then((r) => r.data),
   get: (code: string) =>
     api.get<OptionSet>(`/option-sets/${code}`).then((r) => r.data),
+  addItem: (code: string, label: string) =>
+    api.post<OptionSet>(`/option-sets/${code}/items`, { label }).then((r) => optionSetsChanged(r.data)),
   update: (code: string, payload: Partial<OptionSet>) =>
     api.put<OptionSet>(`/option-sets/${code}`, payload).then((r) => optionSetsChanged(r.data)),
 };

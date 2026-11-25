@@ -14,6 +14,7 @@ from app.domain.parties import (
 )
 from app.domain.trade import Account, Installment
 from app.domain.users import User
+from app.shared.option_snapshots import option_label_maps
 from app.business.inventory.collaboration import register_order_list_payload_builder
 from app.business.orders.output_labels import _elapsed_label, _form_responsible_label, _selected_operator_label
 from app.business.orders.amount_summaries import order_amount_summaries
@@ -55,22 +56,23 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         for item in db.scalars(select(User).where(User.id.in_(inventory_responsible_ids))).all()
     } if inventory_responsible_ids else {}
 
-    parties: dict[int, tuple[str, str, str | None, str, datetime]] = {}
+    parties: dict[int, tuple[str, str, str | None, str, datetime, str, int]] = {}
     if order_ids:
-        for order_id, role, name, source, created_by, created_at in db.execute(
+        for order_id, role, name, source, created_by, created_at, participant_id in db.execute(
             select(OrderCustomerRole.order_id, OrderCustomerRole.role, Customer.display_name,
-                   Customer.source, Customer.created_by, Customer.created_at)
+                   Customer.source, Customer.created_by, Customer.created_at, Customer.id)
             .join(Customer, Customer.id == OrderCustomerRole.customer_id)
             .where(OrderCustomerRole.order_id.in_(order_ids))
         ).all():
-            parties.setdefault(order_id, (name, role, source, created_by, created_at))
-        for order_id, role, name, source, created_by, created_at in db.execute(
+            parties.setdefault(order_id, (name, role, source, created_by, created_at, "customer", participant_id))
+        for order_id, role, name, source, created_by, created_at, participant_id in db.execute(
             select(OrderCounterpartyRole.order_id, OrderCounterpartyRole.role, Counterparty.display_name,
-                   Counterparty.source, Counterparty.created_by, Counterparty.created_at)
+                   Counterparty.source, Counterparty.created_by, Counterparty.created_at, Counterparty.id)
             .join(Counterparty, Counterparty.id == OrderCounterpartyRole.counterparty_id)
             .where(OrderCounterpartyRole.order_id.in_(order_ids))
         ).all():
-            parties.setdefault(order_id, (name, role, source, created_by, created_at))
+            parties.setdefault(order_id, (name, role, source, created_by, created_at, "counterparty", participant_id))
+    source_labels = option_label_maps(db, {"CUSTOMER_SOURCE", "SUPPLIER_SOURCE"}) if parties else {}
 
     operator_names = _operator_names(
         db,
@@ -136,13 +138,19 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             # 不把快照中的 game_password 原样带入列表响应。
             "stock_no": account.stock_no if account else None,
             "account_game_type": (account.game_type if account else None) or snapshot.get("game_type"),
+            "account_game_type_label": snapshot.get("game_type_label") if not account or not account.game_type or account.game_type == snapshot.get("game_type") else None,
             "account_game_account": (account.game_account if account else None) or snapshot.get("game_account"),
             "account_channel_region": (account.channel_region if account else None) or snapshot.get("channel_region"),
+            "account_channel_region_label": snapshot.get("channel_region_label") if not account or not account.channel_region or account.channel_region == snapshot.get("channel_region") else None,
             "account_business_mode": account.business_mode if account else None,
             "account_status": account.status if account else None,
             "party_name": party[0] if party else None,
             "party_role": party[1] if party else None,
             "party_source": party[2] if party else None,
+            "party_source_label": (
+                (order.option_label_snapshot or {}).get(f"party_source:{party[5]}:{party[6]}")
+                or source_labels.get(("CUSTOMER_SOURCE" if party[5] == "customer" else "SUPPLIER_SOURCE", party[2]), party[2])
+            ) if party and party[2] else None,
             "party_created_by": party[3] if party else None,
             "party_created_at": party[4] if party else None,
             "inventory_entry_at": inventory_entry_at,

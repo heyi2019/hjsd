@@ -31,28 +31,19 @@ from app.shared.numbering import ensure_sequence, peek_number
 
 
 def _pool(seeded_db, code: str, **kwargs):
-    return create_pool(seeded_db, code=code, name=f"池-{code}", actor="pytest", **kwargs)
+    return create_pool(seeded_db, name=f"池-{code}", actor="pytest", **kwargs)
 
 
 class TestPoolGuards:
-    def test_invalid_code_rejected(self, seeded_db):
-        with pytest.raises(Validation) as exc:
-            create_pool(seeded_db, code="!", name="坏码池", actor="pytest")
-        assert "必须为" in str(exc.value)
-
-    def test_non_string_code_is_rejected_as_business_error(self, seeded_db):
-        with pytest.raises(Validation):
-            create_pool(seeded_db, code=123, name="坏类型池", actor="pytest")
-
     def test_pool_type_cannot_be_blank(self, seeded_db):
         with pytest.raises(Validation, match="pool_type"):
             create_pool(
-                seeded_db, code="TMPPT", name="空用途池", pool_type="   ", actor="pytest"
+                seeded_db, name="空用途池", pool_type="   ", actor="pytest"
             )
 
     def test_pool_name_is_required(self, seeded_db):
         with pytest.raises(Validation):
-            create_pool(seeded_db, code="TMPNAME", name="   ", actor="pytest")
+            create_pool(seeded_db, name="   ", actor="pytest")
 
     def test_pool_notfound(self, seeded_db):
         with pytest.raises(NotFound):

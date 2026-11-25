@@ -73,7 +73,7 @@ PROMISE,,,,,,,,POLICY-01,L1,后端,订单利润分润配置与角色守卫：四
 PROMISE,,,,,,,,PARTY-01,L1,后端,客户角色按单判定，档案不设固定类型；合作方不写客户角色,角色固化后跨单业务无法表达,test_parties.py;test_parties_contract.py;test_leads_contract.py;test_parties_customer_lifecycle.py;test_parties_counterparty_api.py,已覆盖,,对应 11-02 客户角色裁决
 PROMISE,,,,,,,,FORM-01,L1,后端,参与核算的字段禁入活字段（须升格固定列）；扩展字段按声明类型校验,核算字段漂移，口径不可复算,test_parties_fields_service.py,已覆盖,,
 PROMISE,,,,,,,,REPORT-01,L1,后端,报表合计与筛选在服务端完成，不受分页影响,报表静默少算,test_data_center_summary.py;test_reporting_contract.py;test_reporting_service.py;test_reporting_consistency.py;test_profit_cashflow_basis.py;test_profit_monthly_accounting.py,已覆盖,,与 CASHFLOW-01 分工：后者管流水合计，本条目管报表域
-PROMISE,,,,,,,,MIGRATE-01,L1,后端,迁移基线可重复执行、不覆盖旧库、Up/Down 闭环,升级破坏数据且无法回滚,test_migration.py,已覆盖,,
+PROMISE,,,,,,,,MIGRATE-01,L1,后端,迁移版本可重复升级并保护旧库数据、不可逆迁移拒绝降级,升级破坏数据且无法恢复,test_migration.py,已覆盖,,
 PROMISE,,,,,,,,CONFIG-01,L1,后端,配置只来自根目录 .env，不得指向旧库,连错库，对错误的数据执行操作,test_settings.py,已覆盖,,
 PROMISE,,,,,,,,FLOW-01,L2,双端,跨模块业务流程端到端闭合（建单→库存→资金→报表）,单点都正确但串联断裂，业务实际走不通,test_flow_recycle.py;test_flow_sale.py;test_flow_distribution.py;test_flow_installment.py;test_flow_config_driven.py,已覆盖,,
 PROMISE,,,,,,,,PROFIT-01,L1,后端,分润四项（BUY/SELL/OPERATION/COMPANY）合计恒为 100%,分润金额不平，账目无法闭合,test_profit_allocation_modes.py,已覆盖,,

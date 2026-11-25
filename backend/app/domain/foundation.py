@@ -115,6 +115,10 @@ class GameTypeOption(Base, AuditMixin):
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     channel_regions: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
+    @property
+    def value(self) -> str:
+        return f"game_{self.id:02d}"
+
 class DocumentSequence(Base, TimestampMixin):
     """编号序列表：事务内递增，位数不足时自动扩展。"""
 

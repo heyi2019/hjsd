@@ -11,6 +11,7 @@ import type { InventoryOrderRow } from "./types";
 import { type Dispatch, type SetStateAction } from "react";
 import { useSession } from "../../../shared/state/session";
 import { authorizedOrderOperationItems } from "../../shared/operations";
+import { useGameReferences } from "../../../shared/hooks/useGameReferences";
 
 export function useInventoryColumns(params: {
   editingAccount: Account | null;
@@ -30,6 +31,7 @@ export function useInventoryColumns(params: {
     openCashflow, openPlatformOffsale, openEditor, handleInventoryAction,
   } = params;
   const { can } = useSession();
+  const { gameLabel } = useGameReferences();
   const canSell = can("order.create") && (can("order.event.post") || can("finance.order.event.post"));
   const { arrange: arrangeColumns } = useListViewColumns("INVENTORY");
   const columns: ColumnsType<InventoryOrderRow> = [
@@ -44,7 +46,7 @@ export function useInventoryColumns(params: {
       align: "right",
       render: (v: string) => <MoneyText value={v} />,
     },
-    { title: "游戏/产品类型", key: "account_game_type", width: 80, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_type) },
+    { title: "游戏/产品类型", key: "account_game_type", width: 80, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_type ? gameLabel(row.account_game_type) : null) },
     { title: "游戏账号/产品", key: "account_game_account", width: 120, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_account) },
     { title: "业务", key: "business_mode", width: 56, ellipsis: true, render: (_v, row) => row.account_business_mode ? BUSINESS_MODE_LABEL[row.account_business_mode] ?? row.account_business_mode : inventoryCellValue(null)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },

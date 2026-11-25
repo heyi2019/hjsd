@@ -1,9 +1,9 @@
 """options.schemas：选项词典的请求/响应模型。"""
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 
 class OptionItem(BaseModel):
@@ -13,6 +13,22 @@ class OptionItem(BaseModel):
 
     value: str
     label: str
+    behavior: Literal["OTHER", "COMPENSATION"] | None = None
+
+    @model_serializer(mode="wrap")
+    def omit_empty_behavior(self, handler):
+        result = handler(self)
+        if result.get("behavior") is None:
+            result.pop("behavior", None)
+        return result
+
+
+class OptionItemCreate(BaseModel):
+    """新增字典项时只提交名称，稳定编码由服务端分配。"""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    label: str = Field(min_length=1, max_length=128)
 
 
 class OptionSetOut(BaseModel):
@@ -62,6 +78,7 @@ class OptionSetUpdate(BaseModel):
 
 __all__ = [
     "OptionItem",
+    "OptionItemCreate",
     "OptionSetOut",
     "OptionSetListOut",
     "OptionSetCreate",

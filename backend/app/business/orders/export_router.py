@@ -128,11 +128,12 @@ def export_orders_csv(
     details = _order_details_output(db, orders, _user)
     account_profiles = _account_export_profiles(db, orders)
     for row, order, detail_output in zip(rows, orders, details, strict=True):
+        row["account_game_type"] = row.get("account_game_type_label") or row.get("account_game_type")
         detail = detail_output.model_dump(mode="json")
         row.update(_order_detail_export_fields(detail, value_labels, names, account_profiles.get(order.account_id)))
         # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
         row["party"] = " · ".join(
-            part for part in (row.get("party_name"), row.get("party_source")) if part
+            part for part in (row.get("party_name"), row.get("party_source_label") or row.get("party_source")) if part
         )
         # 注册表的 `business_mode` / `inventory_type` 列，前端由账号字段/订单类型
         # 渲染函数合成；行数据只有 account_business_mode，导出前补齐同名派生列，
@@ -212,8 +213,9 @@ def export_orders_xlsx(
     names = user_name_map(db)
     # 注册表的 `party` 列是前端由 party_name/party_source 合成的派生列，导出前补齐
     for row, order in zip(rows, orders, strict=True):
+        row["account_game_type"] = row.get("account_game_type_label") or row.get("account_game_type")
         row["party"] = " · ".join(
-            part for part in (row.get("party_name"), row.get("party_source")) if part
+            part for part in (row.get("party_name"), row.get("party_source_label") or row.get("party_source")) if part
         )
         # `business_mode` / `inventory_type` 派生列：口径同 CSV 导出
         row["business_mode"] = row.get("account_business_mode")

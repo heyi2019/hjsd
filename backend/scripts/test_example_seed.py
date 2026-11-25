@@ -7,14 +7,14 @@ from app.settings.field_definitions.pools import create_pool, get_default_pool, 
 
 
 def seed_example_data(session: Session, *, actor: str, stats: dict[str, int]) -> None:
-    for code, name, pool_type in (("HJ_INVEST", "投资款荷包", "INVEST"), ("HJ_PROFIT", "利润荷包", "PROFIT")):
+    for code, name, pool_type in (("pool_01", "投资款荷包", "INVEST"), ("pool_02", "利润荷包", "PROFIT")):
         if get_pool_by_code(session, code) is not None:
             stats["pools_skipped"] += 1
             continue
-        create_pool(session, code=code, name=name, actor=actor, pool_type=pool_type, note="测试示例")
+        create_pool(session, name=name, actor=actor, pool_type=pool_type, note="测试示例")
         stats["pools_created"] += 1
     if get_default_pool(session) is None:
-        invest = get_pool_by_code(session, "HJ_INVEST")
+        invest = get_pool_by_code(session, "pool_01")
         if invest is not None:
             invest.is_default = True
             session.flush()
@@ -27,34 +27,35 @@ def seed_example_data(session: Session, *, actor: str, stats: dict[str, int]) ->
         stats["game_types_created"] += 1
 
 
-_EXAMPLE_OPTION_SETS = {'CUSTOMER_SOURCE': [{'value': '自营', 'label': '自营'},
-                     {'value': '微博', 'label': '微博'},
-                     {'value': '小红书', 'label': '小红书'},
-                     {'value': '闲鱼', 'label': '闲鱼'},
-                     {'value': '同行推荐', 'label': '同行推荐'},
-                     {'value': '其他', 'label': '其他'}],
- 'INTERMEDIARY_PLATFORM': [{'value': '千寻', 'label': '千寻'},
-                           {'value': '盼之', 'label': '盼之'},
-                           {'value': '白情', 'label': '白情'},
-                           {'value': '螃蟹', 'label': '螃蟹'},
-                           {'value': '私下', 'label': '私下'},
-                           {'value': '其他', 'label': '其他'}],
- 'STUDIO_EXPENSE_ITEM': [{'value': '房租', 'label': '房租'},
-                         {'value': '日用', 'label': '日用'},
-                         {'value': '水电', 'label': '水电'},
-                         {'value': '物业', 'label': '物业'},
-                         {'value': '其他', 'label': '其他'}],
+_EXAMPLE_OPTION_SETS = {'CUSTOMER_SOURCE': [{'value': 'customer_source_01', 'label': '自营'},
+                     {'value': 'customer_source_02', 'label': '微博'},
+                     {'value': 'customer_source_03', 'label': '小红书'},
+                     {'value': 'customer_source_04', 'label': '闲鱼'},
+                     {'value': 'customer_source_05', 'label': '同行推荐'},
+                     {'value': 'customer_source_06', 'label': '其他', 'behavior': 'OTHER'}],
+ 'INTERMEDIARY_PLATFORM': [{'value': 'intermediary_platform_01', 'label': '千寻'},
+                           {'value': 'intermediary_platform_02', 'label': '盼之'},
+                           {'value': 'intermediary_platform_03', 'label': '白情'},
+                           {'value': 'intermediary_platform_04', 'label': '螃蟹'},
+                           {'value': 'intermediary_platform_05', 'label': '私下'},
+                           {'value': 'intermediary_platform_06', 'label': '其他', 'behavior': 'OTHER'}],
+ 'STUDIO_EXPENSE_ITEM': [{'value': 'studio_expense_item_01', 'label': '房租'},
+                         {'value': 'studio_expense_item_02', 'label': '日用'},
+                         {'value': 'studio_expense_item_03', 'label': '水电'},
+                         {'value': 'studio_expense_item_04', 'label': '物业'},
+                         {'value': 'studio_expense_item_05', 'label': '其他'}],
  'STUDIO_EXPENSE_POOL': [{'value': 'HJ_RUN', 'label': '经营资金池'}],
- 'SUPPLIER_SOURCE': [{'value': '自营', 'label': '自营'},
-                     {'value': '微博', 'label': '微博'},
-                     {'value': '小红书', 'label': '小红书'},
-                     {'value': '闲鱼', 'label': '闲鱼'},
-                     {'value': '同行推荐', 'label': '同行推荐'},
-                     {'value': '其他', 'label': '其他'}],
- 'COMPENSATION_TYPE': [{'value': 'shoubao', 'label': '首保'},
-                       {'value': 'xubao', 'label': '续保'},
-                       {'value': 'zhuanxu', 'label': '转续'}],
- 'INTERMEDIARY_TYPE': [{'value': '普中', 'label': '普中'}, {'value': '包赔', 'label': '包赔'}],
+ 'SUPPLIER_SOURCE': [{'value': 'supplier_source_01', 'label': '自营'},
+                     {'value': 'supplier_source_02', 'label': '微博'},
+                     {'value': 'supplier_source_03', 'label': '小红书'},
+                     {'value': 'supplier_source_04', 'label': '闲鱼'},
+                     {'value': 'supplier_source_05', 'label': '同行推荐'},
+                     {'value': 'supplier_source_06', 'label': '其他', 'behavior': 'OTHER'}],
+ 'COMPENSATION_TYPE': [{'value': 'compensation_type_01', 'label': '首保'},
+                       {'value': 'compensation_type_02', 'label': '续保'},
+                       {'value': 'compensation_type_03', 'label': '转续'}],
+ 'INTERMEDIARY_TYPE': [{'value': 'intermediary_type_01', 'label': '普中'},
+                       {'value': 'intermediary_type_02', 'label': '包赔', 'behavior': 'COMPENSATION'}],
  'QUALITY_SEVERITY': [{'value': 'LOW', 'label': '低'},
                       {'value': 'MEDIUM', 'label': '中'},
                       {'value': 'HIGH', 'label': '高'},
@@ -66,29 +67,29 @@ _EXAMPLE_OPTION_SETS = {'CUSTOMER_SOURCE': [{'value': '自营', 'label': '自营
                            {'value': 'OTHER', 'label': '其他'}]}
 
 _EXAMPLE_FORM_FIELDS = {('CONSIGN', 'platform_ids'): [{'value': 'panzhi', 'label': '盼之'}, {'value': 'pangxie', 'label': '螃蟹'}],
- ('CUSTOMER', 'game_category'): [{'value': '王者荣耀', 'label': '王者荣耀'},
-                                 {'value': '和平精英', 'label': '和平精英'},
-                                 {'value': '原神', 'label': '原神'},
-                                 {'value': '英雄联盟', 'label': '英雄联盟'},
-                                 {'value': '其他', 'label': '其他'}],
- ('DG', 'dg_customer_source'): [{'value': '自营', 'label': '自营'},
-                                {'value': '微博', 'label': '微博'},
-                                {'value': '小红书', 'label': '小红书'},
-                                {'value': '闲鱼', 'label': '闲鱼'},
-                                {'value': '同行推荐', 'label': '同行推荐'},
-                                {'value': '其他', 'label': '其他'}],
- ('HS', 'customer_source'): [{'value': '自营', 'label': '自营'},
-                             {'value': '微博', 'label': '微博'},
-                             {'value': '小红书', 'label': '小红书'},
-                             {'value': '闲鱼', 'label': '闲鱼'},
-                             {'value': '同行推荐', 'label': '同行推荐'},
-                             {'value': '其他', 'label': '其他'}],
- ('TH', 'supplier_source'): [{'value': '自营', 'label': '自营'},
-                             {'value': '微博', 'label': '微博'},
-                             {'value': '小红书', 'label': '小红书'},
-                             {'value': '闲鱼', 'label': '闲鱼'},
-                             {'value': '同行推荐', 'label': '同行推荐'},
-                             {'value': '其他', 'label': '其他'}]}
+ ('CUSTOMER', 'game_category'): [{'value': 'game_category_01', 'label': '王者荣耀'},
+                                 {'value': 'game_category_02', 'label': '和平精英'},
+                                 {'value': 'game_category_03', 'label': '原神'},
+                                 {'value': 'game_category_04', 'label': '英雄联盟'},
+                                 {'value': 'game_category_05', 'label': '其他'}],
+ ('DG', 'dg_customer_source'): [{'value': 'customer_source_01', 'label': '自营'},
+                                {'value': 'customer_source_02', 'label': '微博'},
+                                {'value': 'customer_source_03', 'label': '小红书'},
+                                {'value': 'customer_source_04', 'label': '闲鱼'},
+                                {'value': 'customer_source_05', 'label': '同行推荐'},
+                                {'value': 'customer_source_06', 'label': '其他'}],
+ ('HS', 'customer_source'): [{'value': 'customer_source_01', 'label': '自营'},
+                             {'value': 'customer_source_02', 'label': '微博'},
+                             {'value': 'customer_source_03', 'label': '小红书'},
+                             {'value': 'customer_source_04', 'label': '闲鱼'},
+                             {'value': 'customer_source_05', 'label': '同行推荐'},
+                             {'value': 'customer_source_06', 'label': '其他'}],
+ ('TH', 'supplier_source'): [{'value': 'supplier_source_01', 'label': '自营'},
+                             {'value': 'supplier_source_02', 'label': '微博'},
+                             {'value': 'supplier_source_03', 'label': '小红书'},
+                             {'value': 'supplier_source_04', 'label': '闲鱼'},
+                             {'value': 'supplier_source_05', 'label': '同行推荐'},
+                             {'value': 'supplier_source_06', 'label': '其他'}]}
 
 
 def seed_example_catalog(session: Session) -> None:

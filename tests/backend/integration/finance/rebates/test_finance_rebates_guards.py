@@ -111,7 +111,7 @@ class TestRebateGuards:
 
 class TestCashflowLifecycle:
     def test_manual_cashflow_counts_into_balance_immediately(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         before = pool_balance(seeded_db, invest.id)
 
         flow = create_cashflow(
@@ -130,7 +130,7 @@ class TestCashflowLifecycle:
         assert after["cash_balance"] == before["cash_balance"] - Decimal("120.00")
 
     def test_manual_cashflow_can_be_reversed_once(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         flow = create_cashflow(
             seeded_db,
             pool_id=invest.id,

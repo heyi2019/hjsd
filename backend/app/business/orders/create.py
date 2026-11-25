@@ -12,6 +12,8 @@ import re
 from typing import Any
 
 from app.shared.audit import record_audit
+from app.shared.game_references import game_reference_labels
+from app.shared.option_snapshots import option_label_maps, update_option_label_snapshot
 from app.core.security import CurrentUser
 from app.domain.users import User
 from app.settings.field_definitions.order_types import get_order_type_by_code
@@ -87,6 +89,13 @@ def create_order(
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
     if account_snapshot is not None:
         account_snapshot = _normalize_account_snapshot(account_snapshot)
+        game_labels, channel_labels = game_reference_labels(session)
+        game_value = account_snapshot.get("game_type")
+        channel_value = account_snapshot.get("channel_region")
+        if game_value in game_labels:
+            account_snapshot["game_type_label"] = game_labels[game_value]
+        if channel_value in channel_labels:
+            account_snapshot["channel_region_label"] = channel_labels[channel_value]
         validate_account_profile_scope(
             {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}[definition.code],
             account_snapshot.get("account_description"), None,
@@ -104,8 +113,8 @@ def create_order(
         context={
             **(account_snapshot or {}),
             "has_secondary": (
-                "有" if (account_snapshot or {}).get("has_secondary") is True
-                else "无" if (account_snapshot or {}).get("has_secondary") is False
+                "Y" if (account_snapshot or {}).get("has_secondary") is True
+                else "N" if (account_snapshot or {}).get("has_secondary") is False
                 else None
             ),
             "game_account_note": (account_snapshot or {}).get("note"),
@@ -258,6 +267,20 @@ def create_order(
 
     # 二次图片是账号私有资料（data URL 体积大），只入库存账号，不复制进订单快照。
     order_account_snapshot = account_snapshot
+    if order_account_snapshot is None and account_id is not None:
+        linked_account = session.get(Account, account_id)
+        if linked_account is not None:
+            games, channels = game_reference_labels(session)
+            snapshot = {}
+            for key, value, labels in (
+                ("game_type", linked_account.game_type, games),
+                ("channel_region", linked_account.channel_region, channels),
+            ):
+                if value:
+                    snapshot[key] = value
+                    if value in labels:
+                        snapshot[f"{key}_label"] = labels[value]
+            order_account_snapshot = snapshot or None
     if account_snapshot is not None and (
         "secondary_images" in account_snapshot or "wallet_realname_images" in account_snapshot
     ):
@@ -266,6 +289,18 @@ def create_order(
             for key, value in account_snapshot.items()
             if key not in {"secondary_images", "wallet_realname_images"}
         }
+    option_snapshots = update_option_label_snapshot(session, None, None, form_extra)
+    if customer_participants or counterparty_participants:
+        source_labels = option_label_maps(session, {"CUSTOMER_SOURCE", "SUPPLIER_SOURCE"})
+        for kind, group, participants in (
+            ("customer", "CUSTOMER_SOURCE", customer_participants),
+            ("counterparty", "SUPPLIER_SOURCE", counterparty_participants),
+        ):
+            for participant_id, _role, participant in participants:
+                if participant.source:
+                    option_snapshots[f"party_source:{kind}:{participant_id}"] = source_labels.get(
+                        (group, participant.source), participant.source,
+                    )
     order = Order(
         order_no=imported_order_no or next_order_no(session, definition),
         order_type=definition.code,
@@ -276,6 +311,7 @@ def create_order(
         owner_id=owner_id,
         note=note,
         form_extra=dict(form_extra) if form_extra else None,
+        option_label_snapshot=option_snapshots or None,
         created_by=actor,
         updated_by=actor,
     )

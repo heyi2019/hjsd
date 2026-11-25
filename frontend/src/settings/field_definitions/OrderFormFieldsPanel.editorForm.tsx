@@ -78,17 +78,15 @@ export function renderOrderFormFieldEditorForm(params: {
           </CfgItem>
         ) : null}
         {needsOptions && !managedOptionField && (
-          <CfgGroup name="options" label="选项（值 / 展示名）">
+          <CfgGroup name="options" label="选项名称">
             <Form.List name="options">
               {(fields, { add, remove }) => (
                 <Space direction="vertical" className="ui-control-full">
                   {fields.map(({ key, name, ...restField }) => (
                     <Space key={key} align="baseline">
-                      <Form.Item {...restField} name={[name, "value"]} rules={[{ required: true, message: "值必填" }]} noStyle>
-                        <Input placeholder="枚举值（后端编码）" className="ui-control-width-200" />
-                      </Form.Item>
-                      <Form.Item {...restField} name={[name, "label"]} noStyle>
-                        <Input placeholder="展示名（可空，默认同值）" className="ui-control-width-200" />
+                      <Form.Item {...restField} name={[name, "value"]} hidden><Input /></Form.Item>
+                      <Form.Item {...restField} name={[name, "label"]} noStyle rules={[{ required: true, whitespace: true, message: "请输入选项名称" }]}>
+                        <Input placeholder="选项名称" className="ui-control-width-200" />
                       </Form.Item>
                       <PermissionButton permission="field-definition.manage" danger size="small" onClick={() => remove(name)}>
                         删

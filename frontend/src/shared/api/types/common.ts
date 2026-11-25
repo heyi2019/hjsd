@@ -12,6 +12,8 @@ export interface PageResponse<T> {
 export interface OptionItem {
   value: string;
   label: string;
+  behavior?: "OTHER" | "COMPENSATION";
+  disabled?: boolean;
 }
 
 export interface OptionSet {

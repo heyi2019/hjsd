@@ -86,11 +86,11 @@ describe("基础资料变更后的选项", () => {
   it("打开建单时更新其他设备修改的资金账户和游戏类型", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "旧账户", code: "OLD", pool_type: "OPERATING", status: "ACTIVE" }]);
-    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, name: "旧游戏", sort_order: 1, is_active: true, is_default: false }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, value: "game_01", name: "旧游戏", sort_order: 1, is_active: true, is_default: false }]);
     renderLight(<EmployeeSelectors />, { user: "admin" });
     await waitFor(() => expect(screen.getByTestId("建单账户")).toHaveTextContent("旧账户"));
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, name: "新增账户", code: "NEW", pool_type: "OPERATING", status: "ACTIVE" }]);
-    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 4, name: "新增游戏", sort_order: 1, is_active: true, is_default: false }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 4, value: "game_04", name: "新增游戏", sort_order: 1, is_active: true, is_default: false }]);
 
     await user.click(screen.getByRole("button", { name: "打开建单" }));
     await waitFor(() => expect(screen.getByTestId("建单账户")).toHaveTextContent("新增账户"));
@@ -107,7 +107,7 @@ describe("基础资料变更后的选项", () => {
     await user.click(screen.getByRole("button", { name: "编辑订单" }));
     await waitFor(() => expect(screen.getByTestId("详情账户")).toHaveTextContent("旧账户"));
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 3, name: "新增账户", code: "NEW", pool_type: "OPERATING", status: "ACTIVE" }]);
-    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 4, name: "新增游戏", sort_order: 1, is_active: true, is_default: false }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 4, value: "game_04", name: "新增游戏", sort_order: 1, is_active: true, is_default: false }]);
 
     await act(async () => { await poolsApi.create({ name: "新增账户" }); });
     await waitFor(() => expect(screen.getByTestId("建单账户")).toHaveTextContent("新增账户"));
@@ -130,7 +130,7 @@ describe("基础资料变更后的选项", () => {
     renderLight(<UsersPanel />, { user: "admin" });
     await waitFor(() => expect(teamList).toHaveBeenCalledTimes(1));
 
-    await act(async () => { await teamsApi.create({ code: "T2", name: "新团队" }); });
+    await act(async () => { await teamsApi.create({ name: "新团队" }); });
     await waitFor(() => expect(userList).toHaveBeenCalledTimes(2));
     await act(async () => { resolveOld([]); });
     await user.click(screen.getByRole("combobox", { name: "所属团队" }));

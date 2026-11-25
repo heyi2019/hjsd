@@ -18,14 +18,8 @@ export function TeamsPanel() {
   useReferenceRefresh("teams", reload, true);
   const rows = loadedRows ?? [];
   const submit = async (values: Record<string, string>) => {
-    const code = String(values.code ?? "").trim();
-    const duplicated = rows.some((team) => team.code.trim().toUpperCase() === code.toUpperCase());
-    if (duplicated) {
-      appMessage.error("团队编码已存在");
-      return;
-    }
     try {
-      await teamsApi.create({ ...values, code });
+      await teamsApi.create(values);
       appMessage.success("团队已创建");
       form.resetFields();
       await reload();
@@ -61,7 +55,6 @@ export function TeamsPanel() {
       ]}
     />
     <BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
-      <Form.Item name="code" rules={[{ required: true, min: 2 }]}><Input placeholder="团队编码" /></Form.Item>
       <Form.Item name="name" rules={[{ required: true }]}><Input placeholder="团队名称" /></Form.Item>
       <Form.Item name="description"><Input placeholder="说明（可选）" /></Form.Item>
       <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={loading || Boolean(error)}>新增团队</PermissionButton>

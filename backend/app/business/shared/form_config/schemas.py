@@ -10,7 +10,7 @@ FlowDirection = Literal["BASE", "IN", "OUT"]
 
 
 class FieldOption(BaseModel):
-    value: str
+    value: str = ""
     label: str
 
 

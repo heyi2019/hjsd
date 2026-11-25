@@ -3,7 +3,7 @@
  * 选项词典（D 类筛选器 / 业务字典）被库存、资金等页面的筛选器广泛使用，
  * 一次性拉全量后在内存缓存，组件按 code 取用，避免每个筛选器各自请求。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { optionSetsApi } from "../api/options.api";
 import type { OptionItem } from "../api/types/common";
 import { subscribeReferenceDataChanged } from "../state/referenceDataEvents";
@@ -95,6 +95,29 @@ export function useOptionSet(code: string): OptionItem[] | null {
   return useOptionSetResource(code).options;
 }
 
+/** 历史单据需要展示已删除选项，编辑时这些选项不可重新选择。 */
+export function useOptionSetWithHistory(code: string): OptionItem[] | null {
+  const { map } = useOptionSets(true);
+  return useMemo(() => {
+    if (!map) return null;
+    const current = map[code] ?? [];
+    const existing = new Set(current.map((item) => item.value));
+    const prefix = `${code}:`;
+    const old = (map.OPTION_ITEM_ARCHIVE ?? [])
+      .filter((item) => item.value.startsWith(prefix) && !existing.has(item.value.slice(prefix.length)))
+      .map((item) => ({ ...item, value: item.value.slice(prefix.length), disabled: true }));
+    return [...current, ...old];
+  }, [map, code]);
+}
+
+export function hasOptionBehavior(options: OptionItem[] | null | undefined, value: unknown, behavior: NonNullable<OptionItem["behavior"]>): boolean {
+  return typeof value === "string" && Boolean(options?.some((item) => item.value === value && item.behavior === behavior));
+}
+
+export function optionHasBehavior(code: string, value: unknown, behavior: NonNullable<OptionItem["behavior"]>): boolean {
+  return hasOptionBehavior(cache?.[code], value, behavior);
+}
+
 /**
  * 同步查询：从已缓存的词典里取某个值的展示文案。
  * 未加载完成或未命中返回 null，调用方回落原硬编码映射（保证零行为变化）。
@@ -102,7 +125,8 @@ export function useOptionSet(code: string): OptionItem[] | null {
  */
 function optionLabelSync(code: string, value: string | null | undefined): string | null {
   if (!value || !cache) return null;
-  const found = (cache[code] ?? []).find((item) => item.value === value);
+  const found = (cache[code] ?? []).find((item) => item.value === value)
+    ?? (cache.OPTION_ITEM_ARCHIVE ?? []).find((item) => item.value === `${code}:${value}`);
   return found?.label ?? null;
 }
 

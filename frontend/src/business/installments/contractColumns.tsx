@@ -17,6 +17,7 @@ const can = (row: { available_actions: string[] }, key: string) =>
   row.available_actions.includes(key);
 
 export type ContractColumnsDeps = {
+  gameLabel: (value: string) => string;
   payForm: FormInstance;
   recoverForm: FormInstance;
   cancelForm: FormInstance;
@@ -40,6 +41,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
   scheduleColumns: ColumnsType<Schedule>;
 } {
   const {
+    gameLabel,
     payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
     setWaiveTarget, setExtendTarget, openDeliver, settlePermission,
@@ -68,7 +70,7 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
       title: "产品",
       key: "product",
       render: (_v, row) => {
-        return [row.order.account_game_type, row.order.account_game_account].filter(Boolean).join(" / ") || "-";
+        return [row.order.account_game_type ? gameLabel(row.order.account_game_type) : null, row.order.account_game_account].filter(Boolean).join(" / ") || "-";
       },
     },
     {

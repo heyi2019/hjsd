@@ -412,6 +412,72 @@ def test_partial_schema_rebuilds_from_active_migration_chain(tmp_path):
     assert "半初始化数据库" in result.stdout
 
 
+@pytest.mark.parametrize("configured_dictionary_removed", [False, True])
+def test_deploy_accepts_internal_archive_but_detects_lost_dictionary(tmp_path, configured_dictionary_removed):
+    """历史渠道归档允许新增，用户配置词典减少仍须阻止发布。"""
+    script, fake_bin = _release_tree(tmp_path)
+    docker = fake_bin / "docker"
+    contents = docker.read_text(encoding="utf-8")
+    original = '  *"from option_sets"*) printf "41|NONE|63|13|220|1|0001\\n"; exit 0 ;;\n'
+    assert original in contents
+    after = "62" if configured_dictionary_removed else "63"
+    replacement = (
+        '  *"from option_sets"*) '
+        'if [ -f "$FAKE_MIGRATED" ]; then '
+        f'case "$args" in *"GAME_REFERENCE_ARCHIVE"*) count={after} ;; *) count=$(({after} + 1)) ;; esac; '
+        'else count=63; fi; printf "41|NONE|%s|13|220|1|0001\\n" "$count"; exit 0 ;;\n'
+        '  *"alembic upgrade head"*) touch "$FAKE_MIGRATED"; exit 0 ;;\n'
+    )
+    docker.write_text(contents.replace(original, replacement), encoding="utf-8")
+    result = _run(script, fake_bin, extra_env={"FAKE_MIGRATED": str(tmp_path / "migrated")})
+    if configured_dictionary_removed:
+        assert result.returncode != 0
+        assert "option_sets" in result.stdout + result.stderr
+    else:
+        assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_deploy_quiesces_backend_before_backup_and_migration(tmp_path):
+    """版本化数据迁移前先停旧后端，避免备份之后产生旧编码写入。"""
+    script, fake_bin = _release_tree(tmp_path)
+    arguments = tmp_path / "docker-arguments"
+    result = _run(script, fake_bin, extra_env={"FAKE_DOCKER_ARGUMENTS": str(arguments)})
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = arguments.read_text(encoding="utf-8").splitlines()
+    stop = calls.index("stop")
+    backup = next(index for index, value in enumerate(calls) if value.startswith("pg_dump "))
+    migrate = calls.index("alembic")
+    assert calls[stop + 1] == "backend"
+    assert stop < backup < migrate
+
+
+def test_backup_failure_restarts_previously_running_backend(tmp_path):
+    """迁移尚未开始且备份失败时，恢复原有后端服务。"""
+    script, fake_bin = _release_tree(tmp_path, dump_exit=1)
+    arguments = tmp_path / "docker-arguments"
+    result = _run(script, fake_bin, extra_env={"FAKE_DOCKER_ARGUMENTS": str(arguments)})
+    assert result.returncode != 0
+    calls = arguments.read_text(encoding="utf-8").splitlines()
+    assert calls.index("stop") < calls.index("start")
+    assert calls[calls.index("start") + 1] == "backend"
+    assert "alembic" not in calls
+
+
+def test_failed_migration_does_not_restart_old_backend(tmp_path):
+    """迁移结果未确认时不得自动启动可能不兼容的旧后端。"""
+    script, fake_bin = _release_tree(tmp_path)
+    docker = fake_bin / "docker"
+    contents = docker.read_text(encoding="utf-8").replace(
+        'case "$args" in\n', 'case "$args" in\n  *"alembic upgrade head"*) exit 73 ;;\n', 1,
+    )
+    docker.write_text(contents, encoding="utf-8")
+    arguments = tmp_path / "docker-arguments"
+    result = _run(script, fake_bin, extra_env={"FAKE_DOCKER_ARGUMENTS": str(arguments)})
+    calls = arguments.read_text(encoding="utf-8").splitlines()
+    assert result.returncode != 0
+    assert "stop" in calls and "start" not in calls
+
+
 def test_deploy_aborts_when_pre_migration_backup_fails(tmp_path):
     """备份失败必须中止发布：没有可信快照就改结构是最高危的操作。"""
     script, fake_bin = _release_tree(tmp_path, dump_exit=1)
@@ -753,7 +819,7 @@ def test_offline_deploy_refuses_missing_rate_limit_image(tmp_path):
 
 
 def test_local_release_provisions_only_restored_drill_before_schema_check(monkeypatch):
-    """仅在本地临时库补表；仍执行完整结构对比和线上前后校验。"""
+    """线上副本先走完整版本迁移，再补表、对照结构并核验线上未变化。"""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("local_release_provision_drill", PROJECT_ROOT / "scripts/ops/local_release.py")
@@ -763,12 +829,19 @@ def test_local_release_provisions_only_restored_drill_before_schema_check(monkey
     name = "heijin_erp_drill_" + "a" * 20
     monkeypatch.setattr(module.secrets, "token_hex", lambda _: "a" * 20)
     calls = []
+    call_options = []
     digests = []
     def fake_call(args, **kwargs):
         calls.append(args)
-        return "127.0.0.1:5433" if args[:2] == ["docker", "port"] else ""
+        call_options.append(kwargs)
+        if args[:2] == ["docker", "port"]:
+            return "127.0.0.1:5433"
+        if len(args) > 2 and "render_as_string" in args[2]:
+            return f"postgresql+psycopg://erp_app:test@127.0.0.1:5433/{name}"
+        return ""
     def fake_run(args, **kwargs):
         calls.append(args)
+        call_options.append(kwargs)
     def digest():
         digests.append(True)
         return "same"
@@ -778,8 +851,10 @@ def test_local_release_provisions_only_restored_drill_before_schema_check(monkey
     assert module.check_production_schema({}) == "same"
     provision = next(i for i, command in enumerate(calls) if "scripts.ensure_idempotency_records" in command)
     restore = next(i for i, command in enumerate(calls) if "--single-transaction" in command)
+    upgrade = next(i for i, command in enumerate(calls) if command[-4:] == ["-m", "alembic", "upgrade", "head"])
     diff = next(i for i, command in enumerate(calls) if any(str(x).endswith("schema_diff.py") for x in command))
-    assert restore < provision < diff
+    assert restore < upgrade < provision < diff
+    assert call_options[upgrade]["env"]["DATABASE_URL"].endswith("/" + name)
     assert calls[provision][-2:] == ["--drill-db", name]
     assert calls[diff][-1] == name
     assert len(digests) == 2

@@ -8,6 +8,7 @@ import { buildFormExtraDisplay, formatExtraDisplayValue, useOrderFormConfig } fr
 import { configurableLabel } from "../../shared/lib/optionSets";
 import { money } from "../../shared/lib/format";
 import { DataTable, ErrorBanner } from "../../shared/ui";
+import { useGameReferences } from "../../shared/hooks/useGameReferences";
 
 /** 历史订单不自动绑定库存，但订单自身的事实仍须可查询。 */
 export function UnboundOrderDetail({ orderId }: { orderId: number }) {
@@ -15,6 +16,7 @@ export function UnboundOrderDetail({ orderId }: { orderId: number }) {
   const [error, setError] = useState<NormalizedError | null>(null);
   const [attempt, setAttempt] = useState(0);
   const fields = useOrderFormConfig(order?.order_type);
+  const { gameLabel, channelLabel } = useGameReferences();
   useEffect(() => {
     let active = true;
     setOrder(null);
@@ -43,8 +45,8 @@ export function UnboundOrderDetail({ orderId }: { orderId: number }) {
     <Descriptions size="small" column={2}>
       <Descriptions.Item label="业务日期">{order.trade_date}</Descriptions.Item>
       <Descriptions.Item label="游戏账号/产品">{snapshot?.game_account || "-"}</Descriptions.Item>
-      <Descriptions.Item label="游戏/产品类型">{snapshot?.game_type || "-"}</Descriptions.Item>
-      <Descriptions.Item label="渠道 / 区服">{snapshot?.channel_region || "-"}</Descriptions.Item>
+      <Descriptions.Item label="游戏/产品类型">{snapshot?.game_type_label || (snapshot?.game_type ? gameLabel(snapshot.game_type) : "-")}</Descriptions.Item>
+      <Descriptions.Item label="渠道 / 区服">{snapshot?.channel_region_label || (snapshot?.channel_region ? channelLabel(snapshot.channel_region) : "-")}</Descriptions.Item>
       <Descriptions.Item label="绑定手机号">{snapshot?.bound_phone || "-"}</Descriptions.Item>
       <Descriptions.Item label="有无二次">{snapshot?.has_secondary == null ? "-" : snapshot.has_secondary ? "有" : "无"}</Descriptions.Item>
       <Descriptions.Item label="账号描述" span={2}>{snapshot?.account_description || "-"}</Descriptions.Item>

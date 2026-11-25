@@ -34,9 +34,9 @@ def _make_flow(session, *, direction,
 
 
 def _seed_recon(session):
-    """在 HJ_INVEST 池上造两笔已审核流水，建立系统余额基线 50+20=70。"""
-    pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-    assert pool is not None, "种子池 HJ_INVEST 缺失"
+    """在 pool_01 池上造两笔已审核流水，建立系统余额基线 50+20=70。"""
+    pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
+    assert pool is not None, "种子池 pool_01 缺失"
     for amount in (Decimal("50"), Decimal("20")):
         create_cashflow(
             session, pool_id=pool.id, occurred_on=TODAY, direction="IN",

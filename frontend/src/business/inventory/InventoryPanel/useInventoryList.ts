@@ -9,6 +9,7 @@ import { today } from "../../../shared/lib/format";
 import { useOptionSet } from "../../../shared/lib/optionSets";
 import { inventoryTypeOfOrder, mergeInventoryAccount, type InventoryOrderRow } from "./types";
 import { useLatestRequest } from "../../../shared/hooks/useLatestRequest";
+import { useGameReferences } from "../../../shared/hooks/useGameReferences";
 
 function toInventoryOrderRow(account: InventoryOrderRow["account"], order: InventoryOrderRow): InventoryOrderRow {
   return mergeInventoryAccount({
@@ -46,7 +47,8 @@ export function useInventoryList({ active = true, refreshKey = 0, initialAgeGtDa
   const loadSequence = useLatestRequest();
   const businessOptions = useOptionSet("INVENTORY_BUSINESS");
   const inventoryTypeOptions = useOptionSet("INVENTORY_TYPE");
-  const gameTypeOptions = useMemo(() => serverGameTypes.map((value) => ({ value, label: value })), [serverGameTypes]);
+  const { gameLabel } = useGameReferences();
+  const gameTypeOptions = useMemo(() => serverGameTypes.map((value) => ({ value, label: gameLabel(value) })), [serverGameTypes, gameLabel]);
 
   const filters = useMemo(() => ({
     business_mode: businessMode,

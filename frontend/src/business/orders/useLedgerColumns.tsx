@@ -10,6 +10,7 @@ import { inventoryTypeOfOrder } from "../inventory/InventoryPanel/types";
 import { BUSINESS_MODE_LABEL, INVENTORY_TYPE_LABEL } from "../shared/inventory/inventory-logic";
 import { formatOrderAmount } from "./helpers";
 import { useSession } from "../../shared/state/session";
+import { useGameReferences } from "../../shared/hooks/useGameReferences";
 
 /**
  * 订单台账列定义域：库存共享字段与订单字段的渲染配置 + 配置中心列排序 + 移动端隐藏编排。
@@ -42,6 +43,7 @@ export function useLedgerColumns(params: {
     openOrderOffsale,
   } = params;
   const { can } = useSession();
+  const { gameLabel } = useGameReferences();
   const canSell = can("order.create") && (can("order.event.post") || can("finance.order.event.post"));
   const { arrange: arrangeLedgerColumns } = useListViewColumns("LEDGER");
   const ledgerColumns: ColumnsType<Order> = [
@@ -50,7 +52,7 @@ export function useLedgerColumns(params: {
     { title: "入库时间", dataIndex: "inventory_entry_at", width: 132, ellipsis: true, render: (v: string | null) => formatDateTimeMinute(v) },
     { title: "入库操作人", dataIndex: "inventory_operator", width: "var(--col-w-100)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "成本", dataIndex: "cost_amount", width: "var(--col-w-90)", ellipsis: true, render: (_v: string | null, order) => order.cost_amount != null ? `¥${money(order.cost_amount)}` : "-" },
-    { title: "游戏/产品类型", dataIndex: "account_game_type", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null) => v || "-" },
+    { title: "游戏/产品类型", dataIndex: "account_game_type", width: "var(--col-w-80)", ellipsis: true, render: (v: string | null, row) => row.account_game_type_label || (v ? gameLabel(v) : "-") },
     { title: "游戏账号/产品", dataIndex: "account_game_account", width: "var(--col-w-120)", ellipsis: true, render: (v: string | null) => v || "-" },
     { title: "业务", key: "business_mode", width: "var(--col-w-60)", ellipsis: true, render: (_v, order) => order.account_business_mode ? BUSINESS_MODE_LABEL[order.account_business_mode] ?? order.account_business_mode : "-" },
     { title: "业务类型", key: "inventory_type", width: "var(--col-w-70)", ellipsis: true, render: (_v, order) => {

@@ -662,7 +662,7 @@ def test_order_detail_cannot_move_deposit_flow_to_another_pool(seeded_client, se
     day = date(2026, 10, 1)
     account = create_account(seeded_db, game_account="edit-deposit-pool", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     target = seeded_db.scalar(select(Pool).where(Pool.id != pool.id, Pool.status == "ACTIVE").order_by(Pool.id))
     deposit = create_deposit(seeded_db, pool_id=pool.id, source_order_id=order.id, amount="100", paid_on=day, actor="admin")
     flow = seeded_db.scalar(select(Cashflow).where(Cashflow.source_type == "DEPOSIT", Cashflow.source_id == str(deposit.id)))
@@ -684,7 +684,7 @@ def test_order_detail_manual_cashflow_edit_keeps_reconciliation_snapshot(seeded_
     day = date(2026, 10, 1)
     account = create_account(seeded_db, game_account=f"edit-manual-flow-{reconciled}", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
     order = create_order(seeded_db, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     flow = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=day, direction="IN", category="OTHER", amount="100", order_id=order.id, actor="pytest")
     recon = None
     if reconciled:

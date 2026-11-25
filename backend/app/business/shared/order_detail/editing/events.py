@@ -14,10 +14,34 @@ from app.domain.trade import Account, Cashflow, Installment, OrderEvent, RebateR
 from app.domain.enums import CashflowSourceType
 from app.domain.users import User
 from app.shared.order_access import get_order
+from app.shared.option_snapshots import option_label_maps
 from app.business.orders.events import post_event
 from app.business.shared.listing_state import active_listings, validate_unique_platforms
 
 from .schemas import ExecutionEditItem, ExecutionEditRequest, ExecutionOperationCreateItem
+
+
+def _with_consignment_labels(db: Session, old_extra: dict, new_extra: dict) -> dict:
+    """平台未变时保留历史名称，改选平台时记录新名称。"""
+    result = dict(new_extra)
+    result.pop("consignment_platform_labels", None)
+    platforms = new_extra.get("consignment_platforms")
+    if not isinstance(platforms, list):
+        return result
+    previous = old_extra.get("consignment_platform_labels")
+    previous = previous if isinstance(previous, dict) else {}
+    old_platforms = old_extra.get("consignment_platforms")
+    old_platforms = old_platforms if isinstance(old_platforms, list) else []
+    snapshots = {value: previous[value] for value in platforms
+                 if isinstance(value, str) and value in old_platforms and previous.get(value)}
+    missing = [value for value in platforms if isinstance(value, str) and value not in snapshots]
+    if missing:
+        labels = option_label_maps(db, {"INTERMEDIARY_PLATFORM"})
+        snapshots.update({value: labels[("INTERMEDIARY_PLATFORM", value)] for value in missing
+                          if ("INTERMEDIARY_PLATFORM", value) in labels})
+    if snapshots:
+        result["consignment_platform_labels"] = snapshots
+    return result
 
 
 def _linked_unlistings(db: Session, listing: OrderEvent) -> list[OrderEvent]:
@@ -252,12 +276,15 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                     new_platform = new_platforms[0].strip() if isinstance(new_platforms[0], str) else new_platforms[0]
                     if any((value.strip() if isinstance(value, str) else value) == old_platform for value in platforms):
                         before_extra = jsonable_encoder(linked_extra)
-                        linked.form_extra = {**linked_extra, "consignment_platforms": [new_platform if (value.strip() if isinstance(value, str) else value) == old_platform else value for value in platforms]}
+                        changed_extra = {**linked_extra, "consignment_platforms": [new_platform if (value.strip() if isinstance(value, str) else value) == old_platform else value for value in platforms]}
+                        linked.form_extra = _with_consignment_labels(db, linked_extra, changed_extra)
                         linked.updated_by = actor
                         record_audit(db, action="ORDER_UPDATE", entity_type="inventory_event_edit", entity_id=linked.id,
                             actor=actor, before={"form_extra": before_extra}, after={"form_extra": jsonable_encoder(linked.form_extra)})
             # 前端提交的是该事件当前完整草稿；使用替换才能真正删除已清空的平台、价格等字段。
-            event.form_extra = item.form_extra
+            event.form_extra = (_with_consignment_labels(db, old_extra, item.form_extra)
+                                if event.event_type == "OPERATE" and old_extra.get("operation_type") in {"CONSIGNMENT", "UNLIST"}
+                                else item.form_extra)
             # 同时修改平台与时间时，时间字段仍以时间控件为准，避免完整草稿里的旧值覆盖新时间。
             if item.occurred_at is not None:
                 operation_type = (event.form_extra or {}).get("operation_type")

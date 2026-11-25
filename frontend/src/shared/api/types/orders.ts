@@ -28,13 +28,16 @@ export interface Order {
   status: string;
   note?: string | null;
   account_game_type?: string | null;
+  account_game_type_label?: string | null;
   account_game_account?: string | null;
   account_channel_region?: string | null;
+  account_channel_region_label?: string | null;
   account_business_mode?: string | null;
   account_status?: string | null;
   party_name?: string | null;
   party_role?: string | null;
   party_source?: string | null;
+  party_source_label?: string | null;
   party_created_by?: string | null;
   party_created_at?: string | null;
   inventory_entry_at?: string | null;
@@ -66,9 +69,11 @@ export interface Order {
   account_snapshot?: {
     game_account: string;
     game_type?: string | null;
+    game_type_label?: string | null;
     game_password?: string | null;
     camp_account?: string | null;
     channel_region?: string | null;
+    channel_region_label?: string | null;
     bound_phone?: string | null;
     bound_phone_owner?: string | null;
     has_secondary?: boolean | null;

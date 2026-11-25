@@ -18,7 +18,7 @@ TODAY = date(2026, 10, 6)
 
 
 def _pool(seeded_db) -> Pool:
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     assert pool is not None
     return pool
 

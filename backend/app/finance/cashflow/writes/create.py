@@ -23,6 +23,7 @@ from app.domain.trade import Cashflow, OrderEvent
 from app.finance.attributes import (
     accounting_attribute_for_manual_cashflow,
     assert_order_cost_attribute,
+    normalize_cashflow_category,
 )
 from app.settings.field_definitions.pools import assert_pool_usable
 from app.shared.order_access import get_order
@@ -67,9 +68,10 @@ def create_cashflow(
         category,
         field="category",
         message="category 不能为空",
-        uppercase=True,
+        uppercase=False,
         type_message="category 必须为文本",
     )
+    label = normalize_cashflow_category(label)
     default_accounting_attribute = accounting_attribute_for_manual_cashflow(
         category=label, direction=direction,
         order_attached=order_id is not None,

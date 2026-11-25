@@ -369,8 +369,8 @@ def test_list_orders_filters_by_owner(seeded_db):
 
 def test_list_orders_filters_by_pool(seeded_db):
     """pool_id 必须落到 order_events 存在性子查询：只有在该资金账户发生过事件的单才命中。"""
-    invest = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+    invest = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
+    profit = seeded_db.scalar(select(Pool).where(Pool.code == "pool_02"))
     if invest is None or profit is None:
         pytest.fail("种子资金账户缺失")
 

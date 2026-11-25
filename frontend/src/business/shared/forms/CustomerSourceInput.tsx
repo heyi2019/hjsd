@@ -1,6 +1,6 @@
 import { Form, Input } from "antd";
 import { ErrorBanner, Select } from "../../../shared/ui";
-import { useOptionSetResource } from "../../../shared/lib/optionSets";
+import { hasOptionBehavior, useOptionSetResource } from "../../../shared/lib/optionSets";
 import { CfgItem } from "../../../shared/forms/ConfigurableField";
 
 /** 客户来源只允许选择预设值；「其他」时再收集具体渠道，避免自由输入导致来源口径分散。 */
@@ -8,8 +8,9 @@ export function CustomerSourceFields(props: { name: string; otherName: string })
   const source = Form.useWatch(props.name);
   const form = Form.useFormInstance();
   const sourceOptions = useOptionSetResource("CUSTOMER_SOURCE");
+  const isOtherSource = hasOptionBehavior(sourceOptions.options, source, "OTHER");
   const onChange = (value: string) => {
-    if (value !== "其他") form.setFieldValue(props.otherName, undefined);
+    if (!hasOptionBehavior(sourceOptions.options, value, "OTHER")) form.setFieldValue(props.otherName, undefined);
   };
 
   return (
@@ -22,9 +23,9 @@ export function CustomerSourceFields(props: { name: string; otherName: string })
         className="customer-source-other"
         name={props.otherName}
         label="其他来源"
-        rules={source === "其他" ? [{ required: true, whitespace: true, message: "请输入其他来源" }] : []}
+        rules={isOtherSource ? [{ required: true, whitespace: true, message: "请输入其他来源" }] : []}
       >
-        <Input disabled={source !== "其他"} placeholder={source === "其他" ? "请输入来源名称" : "选择其他后可填写"} />
+        <Input disabled={!isOtherSource} placeholder={isOtherSource ? "请输入来源名称" : "选择其他后可填写"} />
       </CfgItem>
     </>
   );

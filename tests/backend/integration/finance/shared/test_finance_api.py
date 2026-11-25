@@ -88,7 +88,7 @@ def test_reconciliation_and_snapshots_require_finance_read_even_with_pool_access
 
 @pytest.mark.parametrize("kind", ["deposit", "reconciliation"])
 def test_finance_lists_batch_operation_operators(seeded_client, seeded_db, headers, kind):
-    pool = _pool(seeded_db, "HJ_INVEST")
+    pool = _pool(seeded_db, "pool_01")
     records = []
     for i in range(3):
         if kind == "deposit":
@@ -204,9 +204,9 @@ class TestFinanceApi:
     def test_finance_conditional_custom_fields_follow_form_values(
         self, seeded_client, seeded_db, headers, action, scope, dependency,
     ):
-        pool = _pool(seeded_db, "HJ_INVEST")
+        pool = _pool(seeded_db, "pool_01")
         if action == "transfer":
-            target = _pool(seeded_db, "HJ_PROFIT")
+            target = _pool(seeded_db, "pool_02")
             create_cashflow(seeded_db, pool_id=pool.id, occurred_on=TODAY, direction="IN",
                             category="OTHER", amount=Decimal("200"), actor="pytest")
             url = "/api/transfers"
@@ -276,7 +276,7 @@ class TestFinanceApi:
             assert saved.json()["form_extra"]["receipt"] == "凭据A"
 
     def test_deposit_edit_preserves_existing_fields_and_validates_clear(self, seeded_client, seeded_db, headers):
-        pool = _pool(seeded_db, "HJ_INVEST")
+        pool = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=pool.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest",
             form_extra={"receipt": "原始凭据", "past_action": "历史信息"},
@@ -303,8 +303,8 @@ class TestFinanceApi:
         assert "条件凭据" in cleared.text
 
     def test_deposit_condition_is_optional_when_account_does_not_match(self, seeded_client, seeded_db, headers):
-        pool = _pool(seeded_db, "HJ_INVEST")
-        other = _pool(seeded_db, "HJ_PROFIT")
+        pool = _pool(seeded_db, "pool_01")
+        other = _pool(seeded_db, "pool_02")
         core_field = create_order_form_field(seeded_db, order_type_code="FUNDDEPOSIT", field_key="pool_id",
                                              label="资金账户", actor="pytest")
         core_field.is_custom = False
@@ -320,7 +320,7 @@ class TestFinanceApi:
         assert response.status_code == 201, response.text
 
     def test_deposit_edit_can_clear_optional_number(self, seeded_client, seeded_db, headers):
-        pool = _pool(seeded_db, "HJ_INVEST")
+        pool = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=pool.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest",
             form_extra={"optional_number": 17},
@@ -338,7 +338,7 @@ class TestFinanceApi:
         ("return", "FUNDRELEASE"), ("cancel", "FUNDCANCEL"), ("resolve", "FUNDCLEAR"),
     ])
     def test_finance_action_requires_its_custom_fields(self, seeded_client, seeded_db, headers, action, scope):
-        pool = _pool(seeded_db, "HJ_INVEST")
+        pool = _pool(seeded_db, "pool_01")
         if action == "resolve":
             created = seeded_client.post("/api/reconciliations", headers=headers, json={
                 "pool_id": pool.id, "reconciled_on": TODAY.isoformat(), "statement_balance": "0", "account_label": "账户",
@@ -368,7 +368,7 @@ class TestFinanceApi:
     def test_reconciliation_endpoints_snapshot_and_resolve(
         self, seeded_client, seeded_db, headers
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         flow = Cashflow(
             flow_no="CF-RECON-API-1",
             pool_id=invest.id,
@@ -420,7 +420,7 @@ class TestFinanceApi:
 
     def test_balance_snapshot_endpoint(self, seeded_client, seeded_db, headers):
         """FIN-01-05：对账后可从只读端点查到当日固化余额。"""
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         seeded_db.add(
             Cashflow(
                 flow_no="CF-SNAPSHOT-API-1",
@@ -523,7 +523,7 @@ class TestFinanceApi:
             )
         seeded_db.commit()
         payload = {
-            "pool_id": _pool(seeded_db, "HJ_INVEST").id,
+            "pool_id": _pool(seeded_db, "pool_01").id,
             "occurred_on": TODAY.isoformat(), "direction": "OUT",
             "category": "OTHER", "amount": "25.00",
         }
@@ -927,8 +927,8 @@ class TestFinanceApi:
     def test_create_transfer_posts_symmetric_internal_cashflows(
         self, seeded_client, seeded_db, headers
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "pool_01")
+        profit = _pool(seeded_db, "pool_02")
         create_cashflow(
             seeded_db,
             pool_id=invest.id,
@@ -996,8 +996,8 @@ class TestFinanceApi:
     def test_repair_unpaired_transfer_creates_only_missing_side(
         self, seeded_db
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "pool_01")
+        profit = _pool(seeded_db, "pool_02")
         seeded_db.add(
             Cashflow(
                 flow_no="TR-REPAIR-OUT",
@@ -1044,8 +1044,8 @@ class TestFinanceApi:
             )
 
     def test_repair_transfer_endpoint(self, seeded_client, seeded_db, headers):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "pool_01")
+        profit = _pool(seeded_db, "pool_02")
         seeded_db.add(
             Cashflow(
                 flow_no="TR-REPAIR-API-OUT",
@@ -1075,7 +1075,7 @@ class TestFinanceApi:
 
 
     def test_list_deposits_endpoint(self, seeded_client, seeded_db, headers):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         order_id = _active_order(seeded_db)
         create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
@@ -1095,7 +1095,7 @@ class TestFinanceApi:
     def test_deposit_loss_endpoint_returns_operating_cashflow(
         self, seeded_client, seeded_db, headers
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )

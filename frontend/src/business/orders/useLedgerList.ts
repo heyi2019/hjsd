@@ -11,6 +11,7 @@ import { useOptionSet } from "../../shared/lib/optionSets";
 import { useSession } from "../../shared/state/session";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { useLatestRequest } from "../../shared/hooks/useLatestRequest";
+import { useGameReferences } from "../../shared/hooks/useGameReferences";
 import type { BusinessFilterKey, BusinessModeFilterKey } from "./helpers";
 
 type Opt = { value: string; label: string };
@@ -28,6 +29,7 @@ export interface InitialLedgerFilters {
 export function useLedgerList(params: { active: boolean; initialMine: boolean; initialFilters?: InitialLedgerFilters }) {
   const { active, initialMine, initialFilters } = params;
   const { username } = useSession();
+  const { gameLabel } = useGameReferences();
   const initialStatus = initialFilters?.status;
   const initialKeyword = initialFilters?.keyword;
   const initialTradeDateFrom = initialFilters?.tradeDateFrom;
@@ -95,8 +97,8 @@ export function useLedgerList(params: { active: boolean; initialMine: boolean; i
     ...(["WAITING", "SOLD", "VOID"] as const).map((value) => ({ value, label: ACCOUNT_STATUS_LABEL[value] })),
   ];
   const gameTypeOptions = useMemo(
-    () => [{ value: "all", label: "全部游戏类型" }, ...gameTypes.map((value) => ({ value, label: value }))],
-    [gameTypes],
+    () => [{ value: "all", label: "全部游戏类型" }, ...gameTypes.map((value) => ({ value, label: gameLabel(value) }))],
+    [gameTypes, gameLabel],
   );
   const [keyword, setKeyword] = useState(initialKeyword ?? "");
   const [searchRevision, setSearchRevision] = useState(0);

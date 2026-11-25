@@ -107,35 +107,32 @@ export function RecoveryAccountSection(props: {
   const selectedGameType = Form.useWatch(fieldNames.gameType, form);
   const selectedSecondary = Form.useWatch(fieldNames.hasSecondary, form);
   const selectedWalletRealname = Form.useWatch(fieldNames.walletRealname, form);
-  // 「有无二次」选「有」/true 时才要求留证：其余情况不渲染上传区，提交侧同样不传图片。
-  const showSecondaryImages = selectedSecondary === "有" || selectedSecondary === true;
+  // 「有无二次」选 Y/true 时才展示佐证图。
+  const showSecondaryImages = selectedSecondary === "Y" || selectedSecondary === true;
   // 钱包实名选「已注销」时才留注销佐证图。
-  const showWalletRealnameImages = selectedWalletRealname === "已注销";
-  const channelRegions = props.gameTypes?.find((item) => item.name === selectedGameType)?.channel_regions ?? [];
+  const showWalletRealnameImages = selectedWalletRealname === "Y";
+  const channelRegions = props.gameTypes?.find((item) => item.value === selectedGameType)?.channel_regions ?? [];
   const selectedChannelRegion = Form.useWatch(fieldNames.channelRegion, form);
   const filterLibraryOption = (input: string, option?: { label?: ReactNode }) =>
     String(option?.label ?? "").toLocaleLowerCase().includes(input.trim().toLocaleLowerCase());
   useEffect(() => {
-    if (channelRegions.length && selectedChannelRegion && !channelRegions.includes(String(selectedChannelRegion))) {
+    if (selectedChannelRegion && !channelRegions.some((item) => item.value === selectedChannelRegion)) {
       form.setFieldValue(fieldNames.channelRegion, undefined);
     }
   }, [channelRegions, fieldNames.channelRegion, form, selectedChannelRegion]);
   return (
     <BusinessRegistrationSection className="account-section" title={accountTitle}>
       <CfgItem name={fieldNames.gameType} label="游戏类型" rules={[{ required: true, message: "游戏类型必填" }]}>
-        {props.gameTypes?.length ? (
-          <Select
-            showSearch
-            optionFilterProp="label"
-            filterOption={filterLibraryOption}
-            defaultActiveFirstOption
-            options={props.gameTypes.map((item) => ({ value: item.name, label: item.name }))}
-            placeholder="请选择或搜索游戏类型"
-            notFoundContent="没有匹配的库内选项"
-          />
-        ) : (
-          <Input placeholder="例如：王者荣耀" />
-        )}
+        <Select
+          showSearch
+          optionFilterProp="label"
+          filterOption={filterLibraryOption}
+          defaultActiveFirstOption
+          options={(props.gameTypes ?? []).map((item) => ({ value: item.value, label: item.name }))}
+          disabled={!props.gameTypes?.length}
+          placeholder={props.gameTypes?.length ? "请选择或搜索游戏类型" : "请先配置游戏类型"}
+          notFoundContent="没有匹配的库内选项"
+        />
       </CfgItem>
       <CfgItem name={fieldNames.gameAccount} label="游戏账号" rules={[{ required: true, message: "游戏账号必填" }]}>
         <Input placeholder="请输入游戏账号" />
@@ -147,19 +144,16 @@ export function RecoveryAccountSection(props: {
         <Input placeholder="可选填，如绑定营地的账号" autoComplete="off" />
       </CfgItem>
       <CfgItem name={fieldNames.channelRegion} label="渠道／区服" rules={[{ required: true, message: "渠道／区服必填" }]}>
-        {channelRegions.length ? (
-          <Select
-            showSearch
-            optionFilterProp="label"
-            filterOption={filterLibraryOption}
-            defaultActiveFirstOption
-            options={channelRegions.map((item) => ({ value: item, label: item }))}
-            placeholder="请选择或搜索渠道／区服"
-            notFoundContent="没有匹配的库内选项"
-          />
-        ) : (
-          <Input placeholder="例如：安卓一区／微信" />
-        )}
+        <Select
+          showSearch
+          optionFilterProp="label"
+          filterOption={filterLibraryOption}
+          defaultActiveFirstOption
+          options={channelRegions}
+          disabled={!channelRegions.length}
+          placeholder={channelRegions.length ? "请选择或搜索渠道／区服" : "请先配置渠道／区服"}
+          notFoundContent="没有匹配的库内选项"
+        />
       </CfgItem>
       <CfgItem name={fieldNames.hasSecondary} label="有无二次">
         <Select />
@@ -174,8 +168,8 @@ export function RecoveryAccountSection(props: {
           allowClear
           placeholder="请选择"
           options={[
-            { value: "未注销", label: "未注销" },
-            { value: "已注销", label: "已注销" },
+            { value: "N", label: "未注销" },
+            { value: "Y", label: "已注销" },
           ]}
         />
       </CfgItem>

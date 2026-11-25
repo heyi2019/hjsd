@@ -5,6 +5,8 @@ import { renderLight } from "@fixtures/render";
 import * as client from "@/shared/api/client";
 import { CreateBusinessModal } from "@/business/shared/order-create/CreateBusinessModal";
 import { DgOrderSection } from "@/business/shared/order-create/dg/DgOrderSection";
+import { RecoveryAccountSection } from "@/business/shared/order-create/recovery/RecoveryAccountSection";
+import { DeliveryInfoSection } from "@/business/shared/forms/DeliveryInfoSection";
 import { FieldConfigContext } from "@/shared/forms/ConfigurableField";
 import { Form } from "antd";
 import { gameTypesApi } from "@/shared/api/misc.api";
@@ -18,6 +20,41 @@ import { clearOptionSetsCache, loadOptionSets } from "@/shared/lib/optionSets";
 
 let ui: ReturnType<typeof userEvent.setup>;
 
+function GameSelectionValues() {
+  const form = Form.useFormInstance();
+  const game = Form.useWatch("game_type", form);
+  const channel = Form.useWatch("channel_region", form);
+  return <span data-testid="game-selection-values">{game}|{channel}</span>;
+}
+
+it("建单选择中文游戏和渠道时保存对应编码", async () => {
+  const user = userEvent.setup({ pointerEventsCheck: 0 });
+  renderLight(<Form initialValues={{ game_type: "game_01" }}>
+    <RecoveryAccountSection gameTypes={[{
+      id: 1, value: "game_01", name: "王者荣耀", sort_order: 0, is_active: true, is_default: true,
+      channel_regions: [{ value: "channel_01", label: "安卓区" }],
+    }]} />
+    <GameSelectionValues />
+  </Form>, { user: "admin" });
+  const selector = screen.getByLabelText("渠道／区服").closest(".ant-select");
+  expect(selector).not.toBeNull();
+  await user.click(selector!.querySelector(".ant-select-selector")!);
+  await user.click(await screen.findByText("安卓区", { selector: ".ant-select-item-option-content" }));
+  expect(screen.getByTestId("game-selection-values")).toHaveTextContent("game_01|channel_01");
+});
+
+it("包赔选项改名后仍启用包赔类型", async () => {
+  resolveMock(vi.mocked(optionSetsApi.list), { items: [
+    { code: "INTERMEDIARY_TYPE", options: [{ value: "intermediary_type_01", label: "保障交易", behavior: "COMPENSATION" }] },
+    { code: "COMPENSATION_TYPE", options: [{ value: "compensation_type_01", label: "首保" }] },
+    { code: "INTERMEDIARY_PLATFORM", options: [] },
+  ] });
+  renderLight(<Form initialValues={{ intermediary_type: "intermediary_type_01" }}>
+    <DeliveryInfoSection showIntermediary />
+  </Form>, { user: "admin" });
+  await waitFor(() => expect(screen.getByLabelText("包赔类型")).toBeEnabled());
+});
+
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
 });
@@ -27,6 +64,18 @@ async function pickMainPool() {
   const placeholder = screen.getByText("请选择资金账户", { exact: true });
   await ui.click(placeholder.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
   await ui.click(await screen.findByText("主账户", { selector: ".ant-select-item-option-content" }));
+}
+
+async function pickGame(name = "王者荣耀") {
+  const field = await screen.findByLabelText("游戏类型");
+  await ui.click(field.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+  await ui.click(await screen.findByText(name, { selector: ".ant-select-item-option-content" }));
+}
+
+async function pickChannel() {
+  const field = screen.getByLabelText("渠道／区服");
+  await ui.click(field.closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
+  await ui.click(await screen.findByText("安卓一区", { selector: ".ant-select-item-option-content" }));
 }
 // 自动 mock：所有导出（含嵌套 ordersApi / orderTypesApi / ...）均为 vi.fn()，
 // 跨文件在 isolate:false 下复用同一份 mock 实例，配合 setup.ts 的 resetAllMocks
@@ -60,8 +109,8 @@ beforeEach(() => {
     { id: 2, username: "operator", display_name: "业务员", is_active: true },
   ]);
   vi.mocked(gameTypesApi.list).mockResolvedValue([
-    { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
-    { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
+    { id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true, channel_regions: [{ value: "channel_01", label: "安卓一区" }] },
+    { id: 2, value: "game_02", name: "原神", sort_order: 20, is_active: true, is_default: false, channel_regions: [{ value: "channel_02", label: "安卓一区" }] },
   ]);
   resolveMock(vi.mocked(ordersApi.postEvent), { event: { id: 1 }, cashflow_no: "FLOW-0001" });
 });
@@ -261,7 +310,7 @@ it("代挂必填客户昵称不能仅由空格组成", async () => {
   await openTypedModal("DG");
   await ui.type(screen.getByLabelText("游戏账号"), "account-test");
   await ui.type(screen.getByLabelText("账号密码"), "secret");
-  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await pickChannel();
   await ui.type(screen.getByLabelText("客户昵称"), "   ");
   await ui.click(screen.getByRole("button", { name: /创建订单/ }));
   expect(await screen.findByText("客户昵称必填")).toBeInTheDocument();
@@ -279,7 +328,7 @@ it.each(["必填", "条件必填"])("提号供货方昵称配置为%s时不能�
   await openTypedModal("TH");
   await ui.type(screen.getByLabelText("游戏账号"), "account-test");
   await ui.type(screen.getByLabelText("账号密码"), "secret");
-  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await pickChannel();
   await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
   await pickMainPool();
   if (mode === "条件必填") fireEvent.change(document.getElementById("supplier_phone")!, { target: { value: "13800008888" } });
@@ -319,10 +368,10 @@ it.each([
       options: null, required: false, is_active: true, sort_order: 1, locked: false, is_custom: false, note: null },
   ]);
   await openTypedModal(orderType);
-  await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+  await pickGame();
   await ui.type(screen.getByLabelText("游戏账号"), "account-test");
   await ui.type(screen.getByLabelText("账号密码"), "secret");
-  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await pickChannel();
   await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
   await pickMainPool();
   fireEvent.change(document.getElementById(phoneId)!, { target: { value: "13800008888" } });
@@ -347,10 +396,10 @@ it("建单失败时错误落到弹窗内 ErrorBanner（不静默）", async () =
     });
     const { container } = await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await pickMainPool();
@@ -372,10 +421,10 @@ it("FE-023：未售出的相同游戏账号由后端拒绝并保留表单", asyn
     });
     await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await pickMainPool();
@@ -408,10 +457,10 @@ it("FE-023：已售出的相同游戏账号按复购确认后允许回流建单"
       .mockResolvedValueOnce({ id: 1 } as never);
     await openTypedModal("TH");
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
     await pickMainPool();
@@ -435,7 +484,7 @@ it("复购确认后提交失败，再换游戏类型时不能沿用旧确认", a
   await openTypedModal("TH");
   await ui.type(screen.getByLabelText("游戏账号"), "same-account");
   await ui.type(screen.getByLabelText("账号密码"), "secret");
-  await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+  await pickChannel();
   await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
   await pickMainPool();
   await ui.click(screen.getByRole("button", { name: /创建订单/ }));
@@ -443,11 +492,12 @@ it("复购确认后提交失败，再换游戏类型时不能沿用旧确认", a
   expect(await screen.findByText("提交失败")).toBeInTheDocument();
   await ui.click(screen.getByLabelText("游戏类型").closest(".ant-select")!.querySelector(".ant-select-selector") as Element);
   await ui.click(await screen.findByText("原神", { selector: ".ant-select-item-option-content" }));
+  await pickChannel();
   await ui.click(screen.getByRole("button", { name: /创建订单/ }));
   await waitFor(() => expect(ordersApi.create).toHaveBeenCalledTimes(3));
   expect(ordersApi.create).toHaveBeenLastCalledWith(expect.objectContaining({
     confirm_repurchase: false,
-    account_snapshot: expect.objectContaining({ game_type: "原神" }),
+    account_snapshot: expect.objectContaining({ game_type: "game_02" }),
   }));
 });
 
@@ -456,10 +506,10 @@ it.each(["HS", "TH", "DG"])("%s 建单等待时显示进度且重复提交只发
     const pending = new Promise<never>((resolve) => { finish = resolve; });
     vi.mocked(ordersApi.create).mockReturnValueOnce(pending);
     const { container } = await openTypedModal(orderType);
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), `account-${orderType}`);
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     if (orderType === "TH") await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     if (orderType !== "TH") await ui.type(screen.getByLabelText("客户昵称"), "客户甲");
     if (orderType !== "DG") {
@@ -486,10 +536,10 @@ it("订单已创建后不等待列表刷新，提交按钮立即结束 loading",
       { user: "admin" },
     );
     await screen.findByLabelText("供货方昵称");
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), "pickup-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     const amounts = screen.getAllByPlaceholderText("请输入金额");
     await ui.type(amounts[0], "1000");
@@ -508,10 +558,10 @@ it("上一张建单完成后不关闭或清空新表单", async () => {
     const onClose = vi.fn();
     const onCreated = vi.fn();
     const { rerender } = renderLight(<CreateBusinessModal open onClose={onClose} onCreated={onCreated} initialOrderType="TH" />, { user: "admin" });
-    await ui.type(await screen.findByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), "first-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     await ui.type(screen.getByLabelText("供货方昵称"), "同行甲");
     await ui.type(screen.getAllByPlaceholderText("请输入金额")[0], "1000");
     await pickMainPool();
@@ -552,9 +602,9 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     clearOptionSetsCache();
     vi.mocked(optionSetsApi.list).mockResolvedValueOnce({
       items: [
-        { code: "INTERMEDIARY_PLATFORM", options: [{ value: "盼之", label: "盼之" }, { value: "其他", label: "其他" }] },
-        { code: "INTERMEDIARY_TYPE", options: [{ value: "包赔", label: "包赔" }] },
-        { code: "COMPENSATION_TYPE", options: [{ value: "shoubao", label: "首保" }] },
+        { code: "INTERMEDIARY_PLATFORM", options: [{ value: "intermediary_platform_01", label: "盼之" }, { value: "intermediary_platform_02", label: "其他", behavior: "OTHER" }] },
+        { code: "INTERMEDIARY_TYPE", options: [{ value: "intermediary_type_01", label: "包赔", behavior: "COMPENSATION" }] },
+        { code: "COMPENSATION_TYPE", options: [{ value: "compensation_type_01", label: "首保" }] },
       ],
     } as never);
     await loadOptionSets();
@@ -562,10 +612,10 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
     const onClose = vi.fn();
     await openTypedModal("HS", "admin");
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await pickGame();
     await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await pickChannel();
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
     await ui.type(await screen.findByLabelText("自定义凭据"), "凭据A");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
@@ -583,10 +633,10 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     await waitFor(() => expect(vi.mocked(ordersApi.create)).toHaveBeenCalled());
     const payload = vi.mocked(ordersApi.create).mock.calls[0][0] as Record<string, unknown>;
     const formExtra = (payload.form_extra ?? {}) as Record<string, unknown>;
-    expect(formExtra.intermediary_platform).toBe("其他");
+    expect(formExtra.intermediary_platform).toBe("intermediary_platform_02");
     expect(formExtra.intermediary_platform_other).toBe("星河平台");
-    expect(formExtra.intermediary_type).toBe("包赔");
-    expect(formExtra.compensation_type).toBe("shoubao");
+    expect(formExtra.intermediary_type).toBe("intermediary_type_01");
+    expect(formExtra.compensation_type).toBe("compensation_type_01");
     expect(formExtra.bound_phone_owner).toBe("张三");
     expect(formExtra.extra_receipt).toBe("凭据A");
   });
@@ -617,7 +667,7 @@ it("P1-剩①：回收建单把交付字段随订单写入 form_extra", async ()
     renderLight(<CreateBusinessModal open onClose={onClose} onCreated={() => undefined} initialOrderType="HS" />, { user: "admin" });
     await screen.findByText("新建回收订单");
     await ui.type(screen.getByLabelText("客户昵称"), "未保存的客户");
-    await act(async () => resolveGames([{ id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]));
+    await act(async () => resolveGames([{ id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]));
     await waitFor(() => expect(screen.getByLabelText("游戏类型").closest(".ant-select")).toHaveTextContent("王者荣耀"));
     await ui.click(document.querySelector(".ant-modal-close") as Element);
     expect(await screen.findByText("放弃未保存的建单内容？")).toBeInTheDocument();

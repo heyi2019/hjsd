@@ -4,14 +4,15 @@
 
 export interface GameTypeOption {
   id: number;
+  value: string;
   name: string;
   sort_order: number;
   is_active: boolean;
   is_default: boolean;
-  channel_regions?: string[];
+  channel_regions?: Array<{ value: string; label: string }>;
 }
 
-export interface EmployeeOption { id: number; username: string; display_name: string; is_active: boolean }
+export interface EmployeeOption { id: number; username: string; employee_code?: string | null; display_name: string; is_active: boolean }
 
 export interface ManagedUser extends EmployeeOption {
   role: string;

@@ -8,6 +8,7 @@ import type { Pool } from "../../../shared/api/types/finance";
 import { formatDateTimeMinute } from "../../../shared/lib/format";
 import { currentDevUser } from "../../../shared/api/client";
 import { useOptionSetResource } from "../../../shared/lib/optionSets";
+import { useGameReferences } from "../../../shared/hooks/useGameReferences";
 import { ErrorBanner } from "../../../shared/ui";
 import {
   INVENTORY_STATUS_LABEL,
@@ -125,6 +126,7 @@ export function OrderDetail({
   saving?: boolean;
 }) {
   const optionSets = useOptionSetResource("INTERMEDIARY_PLATFORM", Boolean(editing));
+  const { gameLabel, channelLabel } = useGameReferences();
   // 展开详情是订单级：即便调用方误传了账号聚合快照，这里也再次按订单主键收口，
   // 防止同一账号的寄售/回收/提号订单串入当前订单的资金、分润和操作明细。
   const scopedDetail = useMemo(
@@ -202,7 +204,7 @@ export function OrderDetail({
     inventoryNo: row.stock_no ?? "-",
     status: row.status,
     statusLabel: INVENTORY_STATUS_LABEL[row.status] ?? row.status,
-    gameType: accountSnapshot.game_type ?? null,
+    gameType: contextOrder?.game_type_label || (accountSnapshot.game_type ? gameLabel(accountSnapshot.game_type) : null),
     gameAccount: accountSnapshot.game_account ?? null,
     campAccount: accountSnapshot.camp_account ?? null,
     cost: accountSnapshot.cost_amount ?? null,
@@ -229,10 +231,10 @@ export function OrderDetail({
     imagesAt: formatDateTimeMinute(operationRow("images")?.occurred_at),
     imagesOperator: operationRow("images")?.operator ?? "-",
     password: accountSnapshot.game_password || "-",
-    channelRegion: accountSnapshot.channel_region || "-",
+    channelRegion: contextOrder?.channel_region_label || (accountSnapshot.channel_region ? channelLabel(accountSnapshot.channel_region) : "-"),
     boundPhone: accountSnapshot.bound_phone || "-",
     secondary: accountSnapshot.has_secondary == null ? "-" : accountSnapshot.has_secondary ? "有" : "无",
-    walletRealname: accountSnapshot.wallet_realname || "-",
+    walletRealname: accountSnapshot.wallet_realname === "Y" ? "已注销" : accountSnapshot.wallet_realname === "N" ? "未注销" : accountSnapshot.wallet_realname || "-",
     walletRealnameImages: accountSnapshot.wallet_realname_images ?? [],
     accountDescription: accountSnapshot.account_description || "-",
     accountImages: accountSnapshot.account_images ?? [],
@@ -241,7 +243,7 @@ export function OrderDetail({
     orderNotes: detailView?.order_notes ?? "-",
     orderParties: renderOrderParties((detailView?.parties ?? []).map((party) => ({ ...party, entityType: party.entity_type === "customer" ? "customer" as const : "counterparty" as const })), onPartyClick),
     orderExtras: detailView?.extras ?? [],
-  }), [accountSnapshot, row.stock_no, row.status, row.source_order_no, scopedDetail, detailView, contextOrder, sourceOrderNo, onPartyClick, operationRows]);
+  }), [accountSnapshot, row.stock_no, row.status, row.source_order_no, scopedDetail, detailView, contextOrder, sourceOrderNo, onPartyClick, operationRows, gameLabel, channelLabel]);
 
   if (loading && !detail) return <Spin size="small" />;
 

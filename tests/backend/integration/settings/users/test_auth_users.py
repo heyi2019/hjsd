@@ -99,7 +99,7 @@ def test_create_user_with_unknown_pool_ids(client: TestClient):
 def test_create_user_with_existing_team_ids(client: TestClient):
     team = client.post(
         "/api/teams",
-        json={"code": "t1", "name": "一组"},
+        json={"name": "一组"},
         headers={"X-Dev-User": "admin"},
     )
     assert team.status_code == 201, team.text

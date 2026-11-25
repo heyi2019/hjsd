@@ -174,8 +174,8 @@ export const STUDIO_EXPENSE_ITEM_SET = "STUDIO_EXPENSE_ITEM";
 /** 工作室收入科目（固定两项）：与支出科目词典分开维护。
  *  「退款」已随订单售后退款专用链路下线（退款统一并入普通支出）：收入科目不再保留退款。 */
 export const STUDIO_INCOME_ITEMS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "货款", label: "货款" },
-  { value: "其他", label: "其他" },
+  { value: "studio_income_item_01", label: "货款" },
+  { value: "studio_income_item_02", label: "其他" },
 ];
 
 /** 审计动作中文名：与 backend/app/domain/enums.py AuditAction 对齐（随枚举增补）。

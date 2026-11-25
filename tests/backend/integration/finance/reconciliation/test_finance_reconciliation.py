@@ -54,7 +54,7 @@ class TestReconciliation:
     def test_reconciliation_rejects_invalid_unmatched_flow_ids(
         self, seeded_db, raw_ids
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
 
         with pytest.raises(Validation, match="正整数"):
             create_reconciliation(
@@ -68,7 +68,7 @@ class TestReconciliation:
             )
 
     def test_reconciliation_snapshots_difference_and_unmatched_flows(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         flow = Cashflow(
             flow_no="CF-RECON-1",
             pool_id=invest.id,
@@ -111,7 +111,7 @@ class TestReconciliation:
             )
 
     def test_reconciliation_requires_reason_for_difference(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         with pytest.raises(Validation, match="差异原因"):
             create_reconciliation(
                 seeded_db,
@@ -123,7 +123,7 @@ class TestReconciliation:
             )
 
     def test_reconciliation_actions_persist_action_operators(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         item = create_reconciliation(
             seeded_db,
             pool_id=invest.id,

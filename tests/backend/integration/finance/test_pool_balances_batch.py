@@ -66,7 +66,7 @@ def _flow(seeded_db, pool_id: int, *, direction: str, amount: str, note: str):
 def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
     seeded_client, seeded_db, headers
 ):
-    profit_pool = get_pool_by_code(seeded_db, "HJ_PROFIT")
+    profit_pool = get_pool_by_code(seeded_db, "pool_02")
     assert profit_pool is not None
     _flow(seeded_db, profit_pool.id, direction="IN", amount="1200.10", note="批量入")
     _flow(seeded_db, profit_pool.id, direction="OUT", amount="200.05", note="批量出")
@@ -77,8 +77,8 @@ def test_batch_items_match_single_pool_and_totals_are_decimal_sums(
     body = batch.json()
 
     items_by_code = {item["pool_code"]: item for item in body["items"]}
-    assert items_by_code["HJ_INVEST"]["cash_balance"] == "0.00"
-    assert items_by_code["HJ_PROFIT"]["cash_balance"] == "1000.05"
+    assert items_by_code["pool_01"]["cash_balance"] == "0.00"
+    assert items_by_code["pool_02"]["cash_balance"] == "1000.05"
     for item in body["items"]:
         single = seeded_client.get(
             f"/api/pools/{item['pool_id']}/balance", headers=headers

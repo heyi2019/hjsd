@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import pytest
 from concurrent.futures import ThreadPoolExecutor
+from importlib.util import module_from_spec, spec_from_file_location
 from threading import Event
 from uuid import uuid4
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.orm import Session
+import _repo
 
 from app.core.errors import Validation
 from app.domain.foundation import AuditLog, GameTypeOption
@@ -19,6 +21,15 @@ from app.settings.field_definitions.game_types import (
     set_game_type_default,
     update_game_type,
 )
+
+
+def _dictionary_migration():
+    path = _repo.BACKEND_DIR / "alembic" / "squashed_versions" / "0002_dictionary_codes.py"
+    spec = spec_from_file_location("dictionary_migration_0002", path)
+    assert spec and spec.loader
+    module = module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_seeded_game_types_include_one_default(seeded_db):
@@ -59,16 +70,17 @@ def test_delete_default_game_type_is_rejected(seeded_db):
 
 
 def test_update_game_type_writes_channel_regions(seeded_db):
-    """渠道地区入库前要去空、去重，且顺序按首次出现。"""
+    """渠道名称去空格，保存自动分配的稳定编码并记审计。"""
     item = list_game_types(seeded_db)[1]
 
     updated = update_game_type(
-        seeded_db, item.id, actor="pytest", channel_regions=["安卓", "iOS", "  ", "安卓"]
+        seeded_db, item.id, actor="pytest", channel_regions=[{"label": " 安卓 "}, {"label": "iOS"}]
     )
 
-    assert updated.channel_regions == ["安卓", "iOS"]
+    expected = [{"value": "channel_01", "label": "安卓"}, {"value": "channel_02", "label": "iOS"}]
+    assert updated.channel_regions == expected
     audit = seeded_db.scalar(select(AuditLog).where(AuditLog.action == "GAME_TYPE_UPDATE", AuditLog.entity_id == str(item.id)).order_by(AuditLog.id.desc()))
-    assert audit.after_json["channel_regions"] == ["安卓", "iOS"]
+    assert audit.after_json["channel_regions"] == expected
 
 
 def test_game_type_delete_is_an_enumerated_audited_action(seeded_db):
@@ -84,6 +96,148 @@ def test_game_type_delete_is_an_enumerated_audited_action(seeded_db):
     seed_catalog(seeded_db)
     options = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "AUDIT_ACTION"))
     assert any(option["value"] == "GAME_TYPE_DELETE" and option["label"] == "删除游戏类型" for option in options.options)
+
+
+def test_removed_game_and_channel_keep_historical_labels(seeded_db):
+    from app.shared.game_references import game_reference_labels
+    game = create_game_type(seeded_db, name="历史游戏", actor="pytest", channel_regions=[{"label": "历史渠道"}])
+    game_value = game.value
+    channel_value = game.channel_regions[0]["value"]
+    delete_game_type(seeded_db, game.id, actor="pytest")
+    seeded_db.flush()
+    games, channels = game_reference_labels(seeded_db)
+    assert games[game_value] == "历史游戏"
+    assert channels[channel_value] == "历史渠道"
+
+
+def test_one_step_encoding_migration_preserves_existing_orders(seeded_db):
+    from datetime import date
+    from app.domain.options import OptionSet
+    from app.business.inventory.profile import create_account
+    from app.business.orders.create import create_order
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    migration = _dictionary_migration()
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    game = list_game_types(seeded_db)[0]
+    account = create_account(seeded_db, game_account="legacy-migration", game_type=game.name,
+                             channel_region="安卓QQ", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest",
+                         account_id=account.id, form_extra={"business_responsible_ids": [1], "intermediary_type": "包赔"})
+    account.wallet_realname = "未注销"
+    order.account_snapshot = {"game_account": account.game_account, "game_type": game.name,
+                              "channel_region": "安卓QQ", "wallet_realname": "未注销"}
+    game.channel_regions = ["安卓QQ"]
+    dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_TYPE"))
+    dictionary.options = [{"value": "普中", "label": "普中"}, {"value": "包赔", "label": "包赔"}]
+    seeded_db.flush()
+
+    migration.migrate_codes(seeded_db, actor="pytest")
+    assert account.game_type == game.value
+    assert account.channel_region == "channel_01"
+    assert account.wallet_realname == "N"
+    assert order.account_snapshot["game_type_label"] == "王者荣耀"
+    assert order.account_snapshot["channel_region_label"] == "安卓QQ"
+    assert order.form_extra["intermediary_type"] == "intermediary_type_02"
+    assert order.option_label_snapshot["intermediary_type"] == "包赔"
+
+
+def test_encoding_migration_rolls_back_if_game_cannot_be_matched(seeded_db):
+    from app.business.inventory.profile import create_account
+    migration = _dictionary_migration()
+    account = create_account(seeded_db, game_account="ambiguous-migration", game_type="未配置的游戏",
+                             business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    game = list_game_types(seeded_db)[0]
+    game.channel_regions = ["安卓QQ"]
+    seeded_db.flush()
+    with pytest.raises(Validation, match="游戏类型"):
+        migration.migrate_codes(seeded_db, actor="pytest")
+    seeded_db.refresh(account)
+    seeded_db.refresh(game)
+    assert account.game_type == "未配置的游戏"
+    assert game.channel_regions == ["安卓QQ"]
+
+
+def test_encoding_migration_archives_unconfigured_channel_and_preserves_financial_ids(seeded_db):
+    from datetime import date
+    from app.business.inventory.profile import create_account
+    from app.business.orders.create import create_order
+    from app.domain.foundation import Pool
+    from app.domain.users import Team
+    from app.finance.cashflow.cashflows import create_cashflow
+    from app.shared.game_references import game_reference_labels
+    migrate_codes = _dictionary_migration().migrate_codes
+
+    game = list_game_types(seeded_db)[0]
+    account = create_account(seeded_db, game_account="legacy-unlisted-channel", game_type=game.name,
+                             channel_region="旧渠道", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest", account_id=account.id)
+    order.account_snapshot = {"game_type": game.name, "channel_region": "旧渠道"}
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
+    pool_id = pool.id
+    pool.code = "HJ_INVEST"
+    team = Team(code="OLD_TEAM", name="老团队", is_active=True)
+    seeded_db.add(team)
+    flow = create_cashflow(seeded_db, pool_id=pool_id, occurred_on=date(2026, 1, 1), direction="IN",
+                           category="OTHER", amount="123.45", actor="pytest")
+    flow_id, team_id = flow.id, team.id
+    game.channel_regions = ["安卓QQ"]
+    seeded_db.flush()
+    seeded_db.execute(text("ALTER TABLE orders DROP COLUMN option_label_snapshot"))
+
+    migrate_codes(seeded_db, actor="pytest")
+    seeded_db.refresh(account)
+    seeded_db.refresh(order)
+    seeded_db.refresh(flow)
+    seeded_db.refresh(pool)
+    seeded_db.refresh(team)
+    _, channels = game_reference_labels(seeded_db)
+    assert channels[account.channel_region] == "旧渠道"
+    assert all(item["label"] != "旧渠道" for item in game.channel_regions)
+    assert order.account_snapshot["channel_region_label"] == "旧渠道"
+    assert flow.id == flow_id and flow.pool_id == pool_id and str(flow.amount) == "123.45"
+    assert pool.id == pool_id and pool.code == "pool_01"
+    assert team.id == team_id and team.code == "team_01"
+
+
+def test_encoding_migration_preserves_consignment_listing_state(seeded_db):
+    from datetime import date
+    from app.business.orders.create import create_order
+    from app.business.shared.listing_state import active_listings
+    from app.domain.options import OptionSet
+    from app.domain.trade import OrderEvent
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+    migrate_codes = _dictionary_migration().migrate_codes
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    platforms = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_PLATFORM"))
+    platforms.options = [{"value": "千寻", "label": "千寻"}, {"value": "盼之", "label": "盼之"}, {"value": "螃蟹", "label": "螃蟹"}]
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 1), actor="pytest",
+                         form_extra={"business_responsible_ids": [1]})
+    listing = OrderEvent(order_id=order.id, event_no="TEST-LIST", event_type="OPERATE", amount=0,
+                         occurred_on=date(2026, 1, 1), is_posted=True, created_by="pytest", updated_by="pytest",
+                         form_extra={"operation_type": "CONSIGNMENT", "consignment_platforms": ["千寻", "盼之"]})
+    seeded_db.add(listing)
+    seeded_db.flush()
+    unlisting = OrderEvent(order_id=order.id, event_no="TEST-UNLIST", event_type="OPERATE", amount=0,
+                           occurred_on=date(2026, 1, 2), is_posted=True, created_by="pytest", updated_by="pytest",
+                           form_extra={"operation_type": "UNLIST", "consignment_event_id": listing.id,
+                                       "platform_unlist_scope": "PLATFORM", "consignment_platforms": ["千寻"]})
+    seeded_db.add(unlisting)
+    seeded_db.flush()
+    assert active_listings(seeded_db, order.id) == {(listing.id, "盼之")}
+
+    migrate_codes(seeded_db, actor="pytest")
+    seeded_db.refresh(listing)
+    seeded_db.refresh(unlisting)
+    assert listing.form_extra["consignment_platforms"] == ["intermediary_platform_01", "intermediary_platform_02"]
+    assert unlisting.form_extra["consignment_platforms"] == ["intermediary_platform_01"]
+    assert listing.form_extra["consignment_platform_labels"]["intermediary_platform_02"] == "盼之"
+    assert active_listings(seeded_db, order.id) == {(listing.id, "intermediary_platform_02")}
 
 
 @pytest.fixture

@@ -84,7 +84,7 @@ def test_order_custom_field_condition_uses_account_snapshot(seeded_db):
     )
 
 
-@pytest.mark.parametrize(("has_secondary", "trigger"), [(True, "有"), (False, "无")])
+@pytest.mark.parametrize(("has_secondary", "trigger"), [(True, "Y"), (False, "N")])
 def test_order_condition_matches_secondary_display_value(seeded_db, has_secondary, trigger):
     secondary = create_order_form_field(
         seeded_db, order_type_code="HS", field_key="has_secondary", label="有无二次", actor="pytest",

@@ -42,6 +42,7 @@ from app.finance.cashflow.cashflows import (
 )
 from app.settings.lists.export import build_list_csv
 from app.settings.lists.file_response import CSV_MEDIA_TYPE
+from app.finance.attributes import normalize_cashflow_category
 from ..router_output import _actor, _cashflow_out, _cashflow_outputs
 
 router = APIRouter(tags=["资金流水"])
@@ -56,9 +57,11 @@ def _cashflow_filters(values: dict, *, pool_ids: list[int] | None = None) -> dic
     keys = ("pool_id", "order_id", "direction", "occurred_from", "occurred_to",
             "ledger_type", "accounting_attribute", "category", "created_by", "keyword", "user")
     filters = {key: values[key] for key in keys}
-    for key in ("ledger_type", "accounting_attribute", "category"):
+    for key in ("ledger_type", "accounting_attribute"):
         value = filters[key]
         filters[key] = value.strip().upper() if value else None
+    if filters["category"]:
+        filters["category"] = normalize_cashflow_category(filters["category"])
     filters["pool_ids"] = pool_ids
     return filters
 
@@ -97,7 +100,7 @@ def studio_summary(
         pool_ids=parsed,
         occurred_from=occurred_from,
         occurred_to=occurred_to,
-        category=category.strip().upper() if category else None,
+        category=normalize_cashflow_category(category) if category else None,
         sort_desc=sort_desc,
         limit=limit,
         offset=offset,

@@ -501,3 +501,26 @@ def test_deactivate_is_idempotent_when_already_inactive(seeded_db):
     seeded_db.commit()
     updated = ff.set_order_form_field_active(seeded_db, dep.id, False, actor="admin")
     assert updated.is_active is False
+def test_custom_field_options_generate_codes_and_preserve_them_on_rename(seeded_client, headers):
+    created = seeded_client.post("/api/order-form-fields", headers=headers, json={
+        "order_type_code": "CUSTOMER", "field_key": "service_kind", "label": "服务类型",
+        "field_type": "SELECT", "options": [{"label": "普通服务"}, {"label": "有"}, {"label": "无"}],
+    })
+    assert created.status_code == 201, created.text
+    field = created.json()
+    assert field["options"] == [
+        {"value": "service_kind_01", "label": "普通服务"},
+        {"value": "Y", "label": "有"}, {"value": "N", "label": "无"},
+    ]
+    changed = seeded_client.patch(f"/api/order-form-fields/{field['id']}", headers=headers, json={
+        "options": [{"value": "service_kind_01", "label": "标准服务"}, {"label": "高级服务"}],
+    })
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["options"] == [
+        {"value": "service_kind_01", "label": "标准服务"},
+        {"value": "service_kind_02", "label": "高级服务"},
+    ]
+    tampered = seeded_client.patch(f"/api/order-form-fields/{field['id']}", headers=headers, json={
+        "options": [{"value": "service_kind_99", "label": "标准服务"}],
+    })
+    assert tampered.status_code == 422

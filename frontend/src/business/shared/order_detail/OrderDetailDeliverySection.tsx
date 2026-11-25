@@ -16,7 +16,7 @@ import {
   useOrderFormConfig,
   FieldConfigStatus,
 } from "../../../shared/forms/ConfigurableField";
-import { useOptionSet } from "../../../shared/lib/optionSets";
+import { hasOptionBehavior, useOptionSetWithHistory } from "../../../shared/lib/optionSets";
 import { OrderDetailCustomFieldInput } from "./OrderDetailCustomFieldInput";
 import {
   OrderSectionHeading,
@@ -87,9 +87,9 @@ function DeliverySubSection({
   onSaleEventExtraChange?: (key: string, value: unknown) => void;
 }) {
   const { config, ready, error, retry } = useOrderFormConfig(orderType ?? undefined);
-  const platformOptions = useOptionSet("INTERMEDIARY_PLATFORM");
-  const intermediaryTypeOptions = useOptionSet("INTERMEDIARY_TYPE");
-  const compensationTypeOptions = useOptionSet("COMPENSATION_TYPE");
+  const platformOptions = useOptionSetWithHistory("INTERMEDIARY_PLATFORM");
+  const intermediaryTypeOptions = useOptionSetWithHistory("INTERMEDIARY_TYPE");
+  const compensationTypeOptions = useOptionSetWithHistory("COMPENSATION_TYPE");
   const optionsByField: Record<string, Array<{ value: string; label: string }>> = {
     intermediary_platform: platformOptions ?? config.intermediary_platform?.options ?? [],
     intermediary_type: intermediaryTypeOptions ?? config.intermediary_type?.options ?? [],
@@ -129,11 +129,14 @@ function DeliverySubSection({
       } else if (key === "delivery_responsible_ids" && Array.isArray(raw)) {
         value = raw.length ? "操作人信息加载中" : "-";
       } else {
-        value = formatExtraDisplayValue(raw);
+        const snapshotKey = direction === "SELL" ? `sell_${key}` : key;
+        const snapshot = order?.option_label_snapshot?.[snapshotKey];
+        value = snapshot && (!editing || order?.extra_values?.[snapshotKey] === raw)
+          ? snapshot : formatExtraDisplayValue(raw, optionsByField[key]);
       }
     }
     return { key, fallback, value };
-  }), [account, direction, editableValues, employees, employeeNames, hasSale]);
+  }), [account, direction, editableValues, employees, employeeNames, hasSale, platformOptions, intermediaryTypeOptions, compensationTypeOptions, config, order, editing]);
   const deliveryItems = useMemo(() => {
     const existing = buildFormExtraDisplay(customValues, Object.values(config)).filter(
       (item) => item.key !== "intermediary_platform_other" && config[item.key]?.is_custom && config[item.key]?.section === "DELIVER",
@@ -151,7 +154,7 @@ function DeliverySubSection({
       <Descriptions className="order-detail__meta-table" size="small" bordered column={3}>
         {mainFields
           .filter((field) => isFieldActive(config, field.key))
-          .filter((field) => field.key !== "intermediary_platform_other" || editableValues.intermediary_platform === "其他")
+          .filter((field) => field.key !== "intermediary_platform_other" || hasOptionBehavior(platformOptions, editableValues.intermediary_platform, "OTHER"))
           .map((field) => (
             <Descriptions.Item key={field.key} label={fieldLabel(config, field.key, field.fallback)}>
               {editing && field.key === "delivery_responsible_ids" ? (
@@ -185,7 +188,7 @@ function DeliverySubSection({
                   options={selectOptions(optionsByField[field.key] ?? [], editableValues[field.key])}
                   onChange={(value: string | undefined) => {
                     onExtraChange?.(field.key, value ?? null);
-                    if (field.key === "intermediary_platform" && value !== "其他" && editableValues.intermediary_platform_other) {
+                    if (field.key === "intermediary_platform" && !hasOptionBehavior(platformOptions, value, "OTHER") && editableValues.intermediary_platform_other) {
                       onExtraChange?.("intermediary_platform_other", null);
                     }
                   }}

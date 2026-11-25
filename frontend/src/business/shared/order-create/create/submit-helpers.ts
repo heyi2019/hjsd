@@ -1,5 +1,6 @@
 import { today } from "../../../../shared/lib/format";
 import type { FieldConfigMap } from "../../../../shared/forms/ConfigurableField";
+import { configurableLabel, optionHasBehavior } from "../../../../shared/lib/optionSets";
 
 /** 建单表单值。字段由后端表单配置驱动，故保持 Record 形态。 */
 type Values = Record<string, unknown>;
@@ -35,7 +36,7 @@ export function splitFormExtra(values: Values, config: FieldConfigMap) {
     const v = values[key];
     if (v !== undefined && v !== null && v !== "") orderFormExtra[key] = v;
   }
-  if (values.intermediary_platform === "其他" && hasValue(values.intermediary_platform_other)) {
+  if (optionHasBehavior("INTERMEDIARY_PLATFORM", values.intermediary_platform, "OTHER") && hasValue(values.intermediary_platform_other)) {
     orderFormExtra.intermediary_platform_other = values.intermediary_platform_other;
   } else {
     delete orderFormExtra.intermediary_platform_other;
@@ -48,7 +49,7 @@ export function resolveCustomerSource(values: Values, isDg: boolean): string | u
   const customerSourceField = isDg ? "dg_customer_source" : "customer_source";
   const customerSourceOtherField = isDg ? "dg_customer_source_other" : "customer_source_other";
   const selected = values[customerSourceField] as string | undefined;
-  if (selected !== "其他") return selected;
+  if (!optionHasBehavior("CUSTOMER_SOURCE", selected, "OTHER")) return selected;
   return String(values[customerSourceOtherField] ?? "").trim() || selected;
 }
 
@@ -60,7 +61,7 @@ export function buildOrderNote(
 ): string | undefined {
   if ((kind.isRecovery || kind.isDg) && resolvedCustomerSource) {
     const tail = values[kind.isDg ? "dg_note" : "note"];
-    return `客户来源：${String(resolvedCustomerSource)}${tail ? `｜${String(tail)}` : ""}`;
+    return `客户来源：${configurableLabel("CUSTOMER_SOURCE", resolvedCustomerSource)}${tail ? `｜${String(tail)}` : ""}`;
   }
   if (kind.isTh) {
     return [
@@ -139,14 +140,14 @@ export function buildAccountSnapshot(values: Values, accountExtraValues: Record<
     channel_region: values.channel_region as string | undefined,
     bound_phone: values.bound_phone as string | undefined,
     bound_phone_owner: values.bound_phone_owner as string | undefined,
-    has_secondary: values.has_secondary === "有" ? true : values.has_secondary === "无" ? false : undefined,
+    has_secondary: values.has_secondary === "Y" ? true : values.has_secondary === "N" ? false : undefined,
     // 二次图片只在「有二次」时随号入库；无二次时表单残留不提交。
-    secondary_images: values.has_secondary === "有"
+    secondary_images: values.has_secondary === "Y"
       ? ((values.secondary_images as string[] | undefined)?.length ? values.secondary_images as string[] : undefined)
       : undefined,
     wallet_realname: values.wallet_realname as string | undefined,
     // 钱包实名注销佐证图：仅「已注销」时随号入库。
-    wallet_realname_images: values.wallet_realname === "已注销"
+    wallet_realname_images: values.wallet_realname === "Y"
       ? ((values.wallet_realname_images as string[] | undefined)?.length ? values.wallet_realname_images as string[] : undefined)
       : undefined,
     camp_account: values.camp_account as string | undefined,

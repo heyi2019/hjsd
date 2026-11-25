@@ -25,7 +25,7 @@ TODAY = date(2026, 10, 4)
 
 
 def _order_with_buy(seeded_db, *, amount: str):
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     assert pool is not None
     order = create_order(
         seeded_db,

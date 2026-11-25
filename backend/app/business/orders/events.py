@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.option_snapshots import option_label_maps
 from app.shared.business_numbering import event_no as next_event_no
 from app.core.errors import Validation
 from app.shared.numbering import allocate_flow_no
@@ -245,6 +246,13 @@ def post_event(
         form_extra_context=field_context,
         actor=actor,
     )
+    platforms = (event_form_extra or {}).get("consignment_platforms")
+    if event_type == EventType.OPERATE.value and isinstance(platforms, list) and platforms:
+        labels = option_label_maps(session, {"INTERMEDIARY_PLATFORM"})
+        snapshots = {value: labels[("INTERMEDIARY_PLATFORM", value)] for value in platforms
+                     if isinstance(value, str) and ("INTERMEDIARY_PLATFORM", value) in labels}
+        if snapshots:
+            event_form_extra = {**event_form_extra, "consignment_platform_labels": snapshots}
 
     event = OrderEvent(
         event_no=next_event_no(

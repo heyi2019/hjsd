@@ -25,6 +25,7 @@ type SystemConsignment = {
   orderId: "SYSTEM";
   orderNo: "ERP";
   platform: "本系统";
+  platformLabel?: string;
   price: null;
   listedAt: string;
 };
@@ -116,7 +117,7 @@ export function OrderPlatformOffsaleModal(props: {
           occurred_on: unlistedAt.format("YYYY-MM-DD"),
           reason: values.reason.trim(),
           operator_user_ids: values.operator_user_ids,
-          note: `寄售下架：${selected.platform}`,
+          note: `寄售下架：${selected.platformLabel ?? selected.platform}`,
           form_extra_scope: "INVOID",
           form_extra: {
             ...formExtraOrUndefined(values.form_extra),
@@ -126,7 +127,7 @@ export function OrderPlatformOffsaleModal(props: {
             platform_unlist_scope: "PLATFORM",
           },
         }, draft.key);
-        appMessage.success(`${selected.platform} 已下架，账号仍保留在 ERP 库存`);
+        appMessage.success(`${selected.platformLabel ?? selected.platform} 已下架，账号仍保留在 ERP 库存`);
         if (session.isCurrent(submittedSession)) {
           form.resetFields();
           close();
@@ -174,7 +175,7 @@ export function OrderPlatformOffsaleModal(props: {
               aria-label="下架平台"
               placeholder="请选择要下架的平台"
               onChange={(value) => setSelectedMode(value === "SYSTEM" ? "SYSTEM" : "PLATFORM")}
-              options={displayRecords.map((record) => ({ value: record.id, label: `${record.platform}（上架于 ${record.listedAt}）` }))}
+              options={displayRecords.map((record) => ({ value: record.id, label: `${record.platformLabel ?? record.platform}（上架于 ${record.listedAt}）` }))}
             />
           </CfgItem>
           <CfgItem name="unlisted_at" label="下架时间" rules={[{ required: true, message: "请选择下架时间" }]}>
@@ -197,7 +198,7 @@ export function OrderPlatformOffsaleModal(props: {
         total={displayRecords.length}
         onPageChange={() => undefined}
         emptyText="暂无可下架的平台"
-        columns={[{ title: "上架平台", dataIndex: "platform" }, { title: "上架时间", dataIndex: "listedAt" }]}
+        columns={[{ title: "上架平台", dataIndex: "platform", render: (value: string, row: DisplayConsignment) => row.platformLabel ?? value }, { title: "上架时间", dataIndex: "listedAt" }]}
       />
     </BusinessActionModal>
   );

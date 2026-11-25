@@ -1,4 +1,4 @@
-import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
+import { CfgGroup, CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Checkbox, Form, Input, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
@@ -8,7 +8,7 @@ import type { GameTypeOption } from "../../shared/api/types/org";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { useReferenceRefresh } from "../../shared/hooks/useReferenceRefresh";
-import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, Select, StatusTag } from "../../shared/ui";
+import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate, StatusTag } from "../../shared/ui";
 import "./SettingsSubpanel.css";
 import "./GameTypeSettingsPanel.css";
 
@@ -23,10 +23,10 @@ export function GameTypeSettingsPanel() {
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
 
-  const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) => {
+  const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean; channel_regions?: Array<{ value?: string; label: string }> }) => {
     try {
       const previous = rows.find((row) => row.id === editingId);
-      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? previous?.sort_order ?? 0), channel_regions: (values.channel_regions ?? previous?.channel_regions ?? []).map((item) => item.trim()).filter(Boolean) };
+      const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? previous?.sort_order ?? 0), channel_regions: (values.channel_regions ?? previous?.channel_regions ?? []).map((item) => ({ ...(item.value ? { value: item.value } : {}), label: item.label.trim() })).filter((item) => item.label) };
       if (editingId === null) {
         // 后端 create 支持 is_default（自动清其他默认项）；update 不支持，编辑态不传。
         await gameTypesApi.create(values.is_default ? { ...payload, is_default: true } : payload);
@@ -66,7 +66,7 @@ export function GameTypeSettingsPanel() {
 
   const columns: ColumnsType<GameTypeOption> = [
     { title: "游戏类型", dataIndex: "name" },
-    { title: "渠道／区服", render: (_value, row) => row.channel_regions?.length ? row.channel_regions.join("、") : "未配置" },
+    { title: "渠道／区服", render: (_value, row) => row.channel_regions?.length ? row.channel_regions.map((item) => item.label).join("、") : "未配置" },
     { title: "排序", dataIndex: "sort_order" },
     {
       title: "默认",
@@ -162,16 +162,20 @@ export function GameTypeSettingsPanel() {
             <CfgItem name="sort_order" label="排序">
               <InputNumber min={0} />
             </CfgItem>
-            <CfgItem name="channel_regions" label="渠道／区服">
-              <Select
-                mode="tags"
-                showSearch
-                tokenSeparators={[",", "，", "/", "／"]}
-                placeholder="输入后回车新增，例如：安卓QQ"
-                notFoundContent="回车即可新增"
-                className="ui-control-width-260"
-              />
-            </CfgItem>
+            <CfgGroup name="channel_regions" label="渠道／区服">
+              <Form.List name="channel_regions">
+                {(fields, { add, remove }) => <Space direction="vertical">
+                  {fields.map(({ key, name, ...restField }, index) => <Space key={key}>
+                    <Form.Item {...restField} name={[name, "value"]} hidden><Input /></Form.Item>
+                    <Form.Item {...restField} name={[name, "label"]} noStyle rules={[{ required: true, whitespace: true, message: "请输入渠道名称" }]}>
+                      <Input aria-label={`渠道名称 ${index + 1}`} placeholder="例如：安卓QQ" className="ui-control-width-200" />
+                    </Form.Item>
+                    <PermissionButton permission="order-type.manage" size="small" onClick={() => remove(name)}>删除渠道</PermissionButton>
+                  </Space>)}
+                  <PermissionButton permission="order-type.manage" size="small" onClick={() => add({ label: "" })}>添加渠道</PermissionButton>
+                </Space>}
+              </Form.List>
+            </CfgGroup>
             {editingId === null ? (
               <CfgItem name="is_default" valuePropName="checked" label="默认类型">
                 <Checkbox>新建表单自动带出（保存后其他类型取消默认）</Checkbox>

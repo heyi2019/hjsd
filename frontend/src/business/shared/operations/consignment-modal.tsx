@@ -21,7 +21,7 @@ import { activeConsignmentListings, availableConsignmentPlatforms } from "./cons
 import "./consignment-modal.css";
 import "../../../shared/ui/AdaptiveFormGrid/MoneyInput.css";
 
-type ListedPlatform = { key: number; platform: string; price: number | string | null; listedAt: string };
+type ListedPlatform = { key: number; platform: string; platformLabel?: string; price: number | string | null; listedAt: string };
 
 export function OrderConsignmentModal(props: {
   account: Account | null;
@@ -61,6 +61,7 @@ export function OrderConsignmentModal(props: {
     const current = detail.account.status === "VOID" || !sourceOrder ? [] : activeConsignmentListings(sourceOrder).map((item) => ({
       key: item.eventId ?? item.orderId,
       platform: item.platform,
+      platformLabel: item.platformLabel,
       price: item.price,
       listedAt: item.listedAt,
     }));
@@ -117,12 +118,13 @@ export function OrderConsignmentModal(props: {
       try {
         const draft = idempotency.get(submittedSession);
         const listedAt = values.listed_at ?? dayjs(draft.startedAt);
+        const platformLabel = platforms.find((item) => item.value === values.platform_ids)?.label ?? values.platform_ids;
         await ordersApi.postEvent(orderId, {
           event_type: "OPERATE",
           operation_type: "CONSIGNMENT",
           occurred_on: listedAt.format("YYYY-MM-DD"),
           operator_user_ids: values.operator_user_ids,
-          note: `寄售上架：${values.platform_ids}`,
+          note: `寄售上架：${platformLabel}`,
           form_extra_scope: "CONSIGN",
           form_extra: {
             ...formExtraOrUndefined(values.form_extra),
@@ -131,7 +133,7 @@ export function OrderConsignmentModal(props: {
             listed_at: listedAt.format("YYYY-MM-DDTHH:mm"),
           },
         }, draft.key);
-        appMessage.success(`${values.platform_ids} 已上架，账号仍保持在库`);
+        appMessage.success(`${platformLabel} 已上架，账号仍保持在库`);
         if (session.isCurrent(submittedSession)) {
           form.setFieldsValue({ platform_ids: undefined, consignment_price: null, listed_at: dayjs().second(0).millisecond(0) });
           setListingReady(false);
@@ -233,7 +235,7 @@ export function OrderConsignmentModal(props: {
               scroll={listed.length > 5 ? { x: "max-content", y: 180 } : { x: "max-content" }}
               emptyText="暂无上架记录"
               columns={[
-                { title: "上架平台", dataIndex: "platform" },
+                { title: "上架平台", dataIndex: "platform", render: (value: string, row: ListedPlatform) => row.platformLabel ?? value },
                 { title: "寄售价格", dataIndex: "price", width: 120, align: "right", render: (value: number | string | null) => value == null ? "-" : <MoneyText value={value} tone="plain" /> },
                 { title: "上架时间", dataIndex: "listedAt", width: 180 },
               ]}

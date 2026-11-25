@@ -39,7 +39,6 @@ export function PoolsPanel() {
   const submit = async (values: Record<string, unknown>) => {
     try {
       await poolsApi.create({
-        code: (values.code as string).toUpperCase(),
         name: values.name as string,
         pool_type: (values.pool_type as string) ?? "OTHER",
         is_default: Boolean(values.is_default),
@@ -134,9 +133,6 @@ export function PoolsPanel() {
         fallback={<Typography.Paragraph type="secondary">当前角色无主数据维护权限。</Typography.Paragraph>}
       >
         <FieldConfigScope scope="SYSPOOL" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
-          <CfgItem name="code" rules={[{ required: true }]}>
-            <Input placeholder="请输入资金账户编码" />
-          </CfgItem>
           <CfgItem name="name" rules={[{ required: true }]}>
             <Input placeholder="显示名" />
           </CfgItem>

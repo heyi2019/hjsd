@@ -44,7 +44,7 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     seedOrderFormFields();
     vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", is_active: true }]);
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }] as never);
-    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]);
     vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "系统管理员", is_active: true }] as never);
     vi.mocked(ordersApi.create).mockResolvedValue({ id: 31, order_no: "HS0031", status: "ACTIVE" } as never);
     vi.mocked(workbenchApi.summary)

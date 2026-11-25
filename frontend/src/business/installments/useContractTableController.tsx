@@ -9,6 +9,7 @@ import type { Permission } from "../../shared/state/session";
 import { useContractActions } from "./useContractActions";
 import { useContractModalState } from "./useContractModalState";
 import { buildContractColumns } from "./contractColumns";
+import { useGameReferences } from "../../shared/hooks/useGameReferences";
 
 export function useContractTableController(params: { contractType: string; reloadKey: number; active?: boolean; dateRange?: [string, string] | null; status?: string }) {
   const { contractType, reloadKey, active = true, dateRange, status } = params;
@@ -24,6 +25,7 @@ export function useContractTableController(params: { contractType: string; reloa
   const [pageTotal, setPageTotal] = useState(0);
   const { activeEmployees: employees, error: employeeError, settled: employeesSettled, reloadFresh: reloadEmployees } = useEmployeeOptions();
   const { can } = useSession();
+  const { gameLabel } = useGameReferences();
   // 提前结清：后端接受 order.event.post 或 finance.order.event.post 任一，取当前用户实际持有的码做门控。
   const settlePermission: Permission = can("order.event.post") ? "order.event.post" : "finance.order.event.post";
   const modal = useContractModalState(active);
@@ -131,6 +133,7 @@ export function useContractTableController(params: { contractType: string; reloa
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
   const { columns, scheduleColumns } = buildContractColumns({
+    gameLabel,
     payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
     setWaiveTarget, setExtendTarget, openDeliver, settlePermission,

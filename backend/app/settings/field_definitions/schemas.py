@@ -16,7 +16,6 @@ from app.domain.enums import PoolStatus, PoolType
 class PoolCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    code: str = Field(min_length=2, max_length=64, description="池代码，创建后不可修改")
     name: str = Field(min_length=1, max_length=128)
     # pool_type 是可扩展注册值，不锁死在首批枚举。
     pool_type: str = Field(default=PoolType.OTHER.value, min_length=1, max_length=32)
@@ -95,13 +94,25 @@ class OrderTypeOut(BaseModel):
     updated_at: datetime
 
 
+class GameChannelInput(RequestModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    value: str | None = None
+    label: str = Field(min_length=1, max_length=128)
+
+
+class GameChannelOut(BaseModel):
+    value: str
+    label: str
+
+
 class GameTypeCreate(RequestModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     name: str = Field(min_length=1, max_length=64)
     sort_order: int = Field(default=0, ge=0)
     is_default: bool = False
-    channel_regions: list[str] = Field(default_factory=list)
+    channel_regions: list[GameChannelInput] = Field(default_factory=list)
 
 
 class GameTypeUpdate(RequestModel):
@@ -109,22 +120,23 @@ class GameTypeUpdate(RequestModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=64)
     sort_order: int | None = Field(default=None, ge=0)
-    channel_regions: list[str] | None = None
+    channel_regions: list[GameChannelInput] | None = None
 
 
 class GameTypeOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    value: str
     name: str
     sort_order: int
     is_active: bool
     is_default: bool
-    channel_regions: list[str] = Field(default_factory=list)
+    channel_regions: list[GameChannelOut] = Field(default_factory=list)
 
     @field_validator("channel_regions", mode="before")
     @classmethod
-    def normalize_channel_regions(cls, value: object) -> list[str]:
+    def normalize_channel_regions(cls, value: object) -> list:
         """兼容迁移前或旧数据里的 NULL，前端统一收到空数组。"""
         return value if isinstance(value, list) else []
     created_at: datetime

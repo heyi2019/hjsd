@@ -238,8 +238,8 @@ class InventoryAgeLevel(StrEnum):
 class WalletRealName(StrEnum):
     """库存账号的钱包实名状态：交付前需确认实名是否已解绑。"""
 
-    NOT_CANCELLED = "未注销"
-    CANCELLED = "已注销"
+    NOT_CANCELLED = "N"
+    CANCELLED = "Y"
 
 
 class BusinessMode(StrEnum):

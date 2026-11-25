@@ -58,6 +58,10 @@ class User(Base, TimestampMixin):
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    @property
+    def employee_code(self) -> str:
+        return f"yy{self.id:03d}"
+
 
 class RevokedToken(Base):
     __tablename__ = "revoked_tokens"

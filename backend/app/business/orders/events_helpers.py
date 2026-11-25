@@ -31,6 +31,7 @@ from app.settings.field_definitions.order_types import get_order_type_by_code
 from app.settings.field_definitions.pools import require_default_pool
 from app.shared.operation_operators import validate_optional_operator_ids
 from app.shared.form_field_rules import validate_form_extra
+from app.shared.option_snapshots import update_option_label_snapshot
 
 from ..shared.validation import _required_bool
 from ..shared.cancellation_model import (
@@ -335,7 +336,9 @@ def _build_event_form_extra(
         sale_delivery = {f"sell_{key}": (form_extra_context or {}).get(key) for key in DELIVERY_FIELDS}
         sale_delivery["sell_bound_phone"] = normalized_bound_phone
         sale_delivery["sell_bound_phone_owner"] = normalized_bound_phone_owner
+        previous_extra = dict(order_extra)
         order_extra.update(sale_delivery)
+        order.option_label_snapshot = update_option_label_snapshot(session, order.option_label_snapshot, previous_extra, order_extra) or None
         order.form_extra = order_extra
     if event_type == EventType.SELL.value and (normalized_bound_phone is not None or normalized_bound_phone_owner is not None):
         if normalized_bound_phone is not None:

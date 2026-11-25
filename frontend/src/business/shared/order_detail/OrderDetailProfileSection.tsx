@@ -3,6 +3,8 @@ import { Descriptions, Input, Tooltip } from "antd";
 import { useMemo } from "react";
 import type { AccountExecutionDetail } from "../../../shared/api/types/account-execution";
 import type { Account } from "../../../shared/api/types/accounts";
+import type { GameTypeOption } from "../../../shared/api/types/org";
+import { useGameReferences } from "../../../shared/hooks/useGameReferences";
 import type { OrderDraft } from "./editing/editor-types";
 import {
   OrderSectionHeading,
@@ -117,7 +119,7 @@ const ACCOUNT_PROFILE_FIELD_DEFINITIONS: AccountProfileFieldDefinition[] = [
     fallback: "有无二次",
     getValue: ({ account }) => account.has_secondary == null ? "-" : account.has_secondary ? "有" : "无",
   },
-  { key: "walletRealname", cfgKey: "wallet_realname", fallback: "钱包实名", getValue: ({ account }) => fallbackValue(account.wallet_realname) },
+  { key: "walletRealname", cfgKey: "wallet_realname", fallback: "钱包实名", getValue: ({ account }) => account.wallet_realname === "Y" ? "已注销" : account.wallet_realname === "N" ? "未注销" : fallbackValue(account.wallet_realname) },
   { key: "note", cfgKey: "game_account_note", fallback: "账号备注", getValue: ({ account }) => fallbackValue(account.note) },
 ];
 
@@ -166,6 +168,7 @@ export function OrderDetailProfileSection({
     : creationOrder?.operator || "-";
   const { config: creationConfig, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(creationOrderType);
   const { labels: sectionLabels } = useOrderFormSectionLabels(creationOrderType);
+  const { data: gameTypes, gameLabel, channelLabel } = useGameReferences();
   // 编辑态必须以本地草稿 account 为唯一受控源；详情快照只用于只读展示。
   // 否则每次输入都会被 detail.account 的旧值覆盖，表现为输入框无法编辑。
   const profileAccount = account;
@@ -175,7 +178,11 @@ export function OrderDetailProfileSection({
     () => ({ ...inventoryFields.config, ...creationConfig }),
     [creationConfig, inventoryFields.config],
   );
-  const profileSource = useMemo(() => profileAccount ? ({ account: profileAccount }) : null, [profileAccount]);
+  const profileSource = useMemo(() => profileAccount ? ({ account: {
+    ...profileAccount,
+    game_type: creationOrder?.game_type_label || (profileAccount.game_type ? gameLabel(profileAccount.game_type) : profileAccount.game_type),
+    channel_region: creationOrder?.channel_region_label || (profileAccount.channel_region ? channelLabel(profileAccount.channel_region) : profileAccount.channel_region),
+  } }) : null, [profileAccount, creationOrder, gameLabel, channelLabel]);
   const accountProfileFields = useMemo(
     () => profileSource ? buildAccountProfileFields(profileSource) : [],
     [profileSource],
@@ -216,7 +223,7 @@ export function OrderDetailProfileSection({
             {visibleAccountProfileFields.map((field) => (
                 <Descriptions.Item key={field.key} label={fieldLabel(creationConfig, field.cfgKey, field.fallback)}>
                   {editing ? (
-                    <EditableProfileField field={field} account={profileAccount} onChange={onProfileChange} />
+                    <EditableProfileField field={field} account={profileAccount} gameTypes={gameTypes} onChange={onProfileChange} />
                   ) : COPYABLE_PROFILE_KEYS.has(field.key) ? (
                     <CopyableProfileValue label={field.fallback} value={field.value} />
                   ) : field.value}
@@ -269,20 +276,22 @@ export function OrderDetailProfileSection({
 function EditableProfileField({
   field,
   account,
+  gameTypes,
   onChange,
 }: {
   field: AccountProfileField;
   account?: Account | null;
+  gameTypes: GameTypeOption[];
   onChange?: (changes: Partial<Account>) => void;
 }) {
   if (field.key === "secondary") {
     return (
       <Select
         aria-label="编辑有无二次"
-        value={account?.has_secondary == null ? undefined : account.has_secondary ? "true" : "false"}
+        value={account?.has_secondary == null ? undefined : account.has_secondary ? "Y" : "N"}
         placeholder="请选择"
-        options={[{ value: "true", label: "有" }, { value: "false", label: "无" }]}
-        onChange={(value: string) => onChange?.({ has_secondary: value === "true" })}
+        options={[{ value: "Y", label: "有" }, { value: "N", label: "无" }]}
+        onChange={(value: string) => onChange?.({ has_secondary: value === "Y" })}
       />
     );
   }
@@ -293,28 +302,37 @@ function EditableProfileField({
         allowClear
         value={account?.wallet_realname ?? undefined}
         placeholder="请选择"
-        options={[{ value: "未注销", label: "未注销" }, { value: "已注销", label: "已注销" }]}
+        options={[{ value: "N", label: "未注销" }, { value: "Y", label: "已注销" }]}
         onChange={(value: string | undefined) => onChange?.({ wallet_realname: value ?? null })}
       />
     );
   }
   if (field.key === "channelRegion") {
+    const channels = gameTypes.find((item) => item.value === account?.game_type)?.channel_regions ?? [];
+    const options = account?.channel_region && !channels.some((item) => item.value === account.channel_region)
+      ? [...channels, { value: account.channel_region, label: field.value, disabled: true }]
+      : channels;
     return (
-      <Input aria-label="编辑渠道区服" value={account?.channel_region ?? ""} placeholder="渠道 / 区服" onChange={(event) => onChange?.({ channel_region: event.target.value })} />
+      <Select aria-label="编辑渠道区服" value={account?.channel_region ?? undefined} options={options} placeholder="请选择渠道 / 区服" onChange={(value: string) => onChange?.({ channel_region: value })} />
     );
   }
-  const value = field.key === "gameType"
-      ? account?.game_type ?? ""
-      : field.key === "gameAccount"
+  if (field.key === "gameType") {
+    const games = gameTypes.filter((item) => item.is_active || item.value === account?.game_type).map((item) => ({ value: item.value, label: item.name }));
+    const options = account?.game_type && !games.some((item) => item.value === account.game_type)
+      ? [...games, { value: account.game_type, label: field.value, disabled: true }]
+      : games;
+    return <Select aria-label="编辑游戏 / 产品类型" value={account?.game_type ?? undefined}
+      options={options}
+      placeholder="请选择游戏类型" onChange={(value: string) => onChange?.({ game_type: value, channel_region: null })} />;
+  }
+  const value = field.key === "gameAccount"
         ? account?.game_account ?? ""
         : field.key === "campAccount"
           ? account?.camp_account ?? ""
           : field.key === "password"
             ? account?.game_password ?? ""
             : account?.note ?? "";
-  const key = field.key === "gameType"
-      ? "game_type"
-      : field.key === "gameAccount"
+  const key = field.key === "gameAccount"
         ? "game_account"
         : field.key === "campAccount"
           ? "camp_account"

@@ -165,11 +165,11 @@ describe("OrderDetail", () => {
   });
   it("保存中暂停编辑，避免保存完成后丢失后续输入", async () => {
     const { rerender } = renderLight(<OrderDetail row={account} loading={false} editing={account} saving />);
-    const channel = await screen.findByLabelText("编辑渠道区服");
+    const channel = await screen.findByRole("combobox", { name: "编辑渠道区服" });
     expect(channel).toBeDisabled();
     expect(screen.getByRole("button", { name: "取消" })).toBeDisabled();
     rerender(<OrderDetail row={account} loading={false} editing={account} saving={false} />);
-    expect(screen.getByLabelText("编辑渠道区服")).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "编辑渠道区服" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
   });
 
@@ -1197,10 +1197,19 @@ describe("OrderDetail", () => {
     expect(within(profile).getByLabelText("编辑游戏账号 / 产品")).toHaveValue("acc-1");
   });
 
+  it("编辑旧订单时已归档渠道仍显示原名称", async () => {
+    const oldAccount = { ...account, source_order_no: "HS0001", game_type: "game_01", channel_region: "channel_13" } as Account;
+    const detail = { orders: [{ order_id: 1, order_no: "HS0001", order_type: "HS", game_type_label: "王者荣耀", channel_region_label: "旧渠道", events: [] }] } as unknown as AccountExecutionDetail;
+    renderApp(<OrderDetail row={oldAccount} detail={detail} loading={false} editing={oldAccount} employees={[]} />);
+    await settleFieldConfig();
+    const selector = await screen.findByRole("combobox", { name: "编辑渠道区服" });
+    expect(selector.closest(".ant-select")).toHaveTextContent("旧渠道");
+  });
+
   it("编辑态钱包实名可以下拉选择实名状态", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     const onProfileChange = vi.fn();
-    const accountWithWalletRealname = { ...account, wallet_realname: "未注销" } as unknown as Account;
+    const accountWithWalletRealname = { ...account, wallet_realname: "N" } as unknown as Account;
 
     renderApp(
       <OrderDetail
@@ -1219,7 +1228,7 @@ describe("OrderDetail", () => {
     await user.click(walletRealname);
     await user.click(await screen.findByText("已注销", { selector: ".ant-select-item-option-content" }));
 
-    expect(onProfileChange).toHaveBeenCalledWith({ wallet_realname: "已注销" });
+    expect(onProfileChange).toHaveBeenCalledWith({ wallet_realname: "Y" });
   });
 
   it("FE-269：返点进入收入笔数，总收入取服务端 finance_summary", () => {

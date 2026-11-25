@@ -1,7 +1,7 @@
 import { Form, Input } from "antd";
 import { AdaptiveFormGrid, BusinessRegistrationGroup, ErrorBanner, Select } from "../../../shared/ui";
 import { CfgItem, sectionLabel } from "../../../shared/forms/ConfigurableField";
-import { useOptionSet, useOptionSetResource } from "../../../shared/lib/optionSets";
+import { hasOptionBehavior, useOptionSet, useOptionSetResource } from "../../../shared/lib/optionSets";
 import type { EmployeeOption } from "../../../shared/api/types/org";
 import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import "./DeliveryInfoSection.css";
@@ -16,16 +16,17 @@ export function DeliveryInfoSection(props: {
   const deliveryTitle = sectionLabel("DELIVER", "交付信息");
   const intermediaryType = Form.useWatch("intermediary_type", form);
   const platform = Form.useWatch("intermediary_platform", form);
-  const compensationEnabled = intermediaryType === "包赔";
   const platformResource = useOptionSetResource("INTERMEDIARY_PLATFORM", Boolean(props.showIntermediary));
   const platformOptions = platformResource.options ?? [];
   const intermediaryTypeOptions = useOptionSet("INTERMEDIARY_TYPE") ?? [];
   const compensationTypeOptions = useOptionSet("COMPENSATION_TYPE") ?? [];
+  const compensationEnabled = hasOptionBehavior(intermediaryTypeOptions, intermediaryType, "COMPENSATION");
+  const isOtherPlatform = hasOptionBehavior(platformOptions, platform, "OTHER");
 
   // L254：交易平台选「其他」时显示「其他平台」输入框（与客户来源「其他」联动保持一致）；
   // 切换离开「其他」时清空自定义值，避免脏数据残留。
   const onPlatformChange = (value: string) => {
-    if (value !== "其他") form.setFieldValue("intermediary_platform_other", undefined);
+    if (!hasOptionBehavior(platformOptions, value, "OTHER")) form.setFieldValue("intermediary_platform_other", undefined);
   };
 
   return (
@@ -38,7 +39,7 @@ export function DeliveryInfoSection(props: {
           <CfgItem name="intermediary_platform" label="交易平台" fixedLabel="交易平台">
             <Select options={platformOptions} placeholder="可选填" onChange={onPlatformChange} />
           </CfgItem>
-          {platform === "其他" ? (
+          {isOtherPlatform ? (
             <CfgItem
               className="delivery-info-section__platform-other"
               name="intermediary_platform_other"

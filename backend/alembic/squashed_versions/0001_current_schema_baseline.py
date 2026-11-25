@@ -1,4 +1,4 @@
-"""当前 v1 ORM schema 的唯一活动基线（2026-11-02 压平后的唯一活动迁移）。
+"""当前 v1 ORM schema 的活动基线（2026-11-02 压平）。
 
 压平口径：
 - **基线 schema 随 ORM 走**：直接 `Base.metadata.create_all()` 建立压平时的 schema；后续需要保留数据的结构变化使用版本化 DDL 迁移；

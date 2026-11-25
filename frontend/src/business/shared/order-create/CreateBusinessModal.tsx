@@ -26,6 +26,7 @@ import {
 import { useCreateBusinessLookups } from "./create/useCreateBusinessLookups";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useRequestSession } from "../../../shared/hooks/useLatestRequest";
+import { optionHasBehavior } from "../../../shared/lib/optionSets";
 
 export type BusinessOrderType = "HS" | "TH" | "DG";
 
@@ -92,7 +93,7 @@ export function CreateBusinessModal(props: {
       defaults.customer_role = "SELLER";
       defaults.counterparty_role = "PEER";
     }
-    const defaultGameType = gameTypes.find((item) => item.is_default)?.name;
+    const defaultGameType = gameTypes.find((item) => item.is_default)?.value;
     const gameTypeField = "game_type";
     if (defaultGameType && form.getFieldValue(gameTypeField) == null) {
       defaults[gameTypeField] = defaultGameType;
@@ -238,7 +239,7 @@ export function CreateBusinessModal(props: {
             setLoadError(null);
           }
           const clear: Record<string, undefined> = {};
-          if ("intermediary_type" in changed && changed.intermediary_type !== "包赔") {
+          if ("intermediary_type" in changed && !optionHasBehavior("INTERMEDIARY_TYPE", changed.intermediary_type, "COMPENSATION")) {
             clear.compensation_type = undefined;
           }
           if (Object.keys(clear).length) form.setFieldsValue(clear);

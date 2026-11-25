@@ -81,7 +81,7 @@ def test_execution_edit_does_not_limit_batch_record_count(field, item, count):
             {"username": "alice", "display_name": "Alice", "password": "password123"},
         ),
         (UserUpdate, {}),
-        (TeamCreate, {"code": "TEAM1", "name": "一组"}),
+        (TeamCreate, {"name": "一组"}),
         (TeamUpdate, {}),
         (ScheduleCreate, {"period_no": 1, "due_on": date(2026, 10, 1)}),
         (
@@ -130,7 +130,7 @@ def test_execution_edit_does_not_limit_batch_record_count(field, item, count):
         (TransferRepair, {"counterpart_pool_id": 2, "reason": "补齐"}),
         (RebateCreate, {"source_order_id": 1, "amount": "1.00", "collected_on": date(2026, 10, 1)}),
         (AccountProfileUpdate, {}),
-        (PoolCreate, {"code": "POOL1", "name": "资金账户"}),
+        (PoolCreate, {"name": "资金账户"}),
         (PoolUpdate, {}),
         (PoolStatusUpdate, {"status": "ACTIVE"}),
         (OrderTypeCreate, {"code": "TB", "name": "测试业务"}),

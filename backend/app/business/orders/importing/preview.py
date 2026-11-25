@@ -21,6 +21,7 @@ from .custom_columns import configured_order_columns, read_custom_order_values
 from .events import _EVENT, _operators
 from .ledger_reference import ledger_reference_values, reference_errors, reference_labels
 from .parser import ImportTable, detail_records
+from .reference_codes import resolve_new_account_references
 
 _ORDER_NO = re.compile(r"^(HS|TH|DG)(?!0000)\d{4}$")
 _TYPE_LABELS = {"HS": "回收", "TH": "提号", "DG": "代挂"}
@@ -180,14 +181,26 @@ def preview_order_import(
         else:
             detail_errors.append({"sheet": label, "message": f"文件缺少所选的{label}"})
     actions = {row["order_no"]: row["action"] for row in results}
+    detail_values = {}
     if "details" in sections and not any(error["sheet"] == _SECTION_LABELS["details"] for error in detail_errors):
         try:
-            read_details(session, tables, records, actions, user)
+            detail_values = read_details(session, tables, records, actions, user)
         except Validation as exc:
             columns = exc.details.get("columns") or []
             detail_errors.append({"sheet": exc.details.get("sheet", _SECTION_LABELS["details"]),
                                   "row": exc.details.get("row"),
                                   "message": exc.message + (f"：{'、'.join(columns)}" if columns else "")})
+    for result, record in zip(results, records, strict=True):
+        if result["action"] != "create":
+            continue
+        game_type = record.get("游戏/产品类型", "").strip()
+        channel = detail_values.get(result["order_no"], {}).get("channel_region")
+        if game_type or channel:
+            try:
+                resolve_new_account_references(session, game_type, channel)
+            except Validation as exc:
+                result["errors"].append(exc.message)
+                result["action"] = "error"
     for name in ("events", "cashflows", "rebates"):
         if name not in sections or any(error["sheet"] == _SECTION_LABELS[name] for error in detail_errors):
             continue

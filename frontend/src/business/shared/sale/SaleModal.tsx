@@ -22,6 +22,7 @@ import { SaleFinanceCard } from "./SaleFinanceCard";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useRequestSession } from "../../../shared/hooks/useLatestRequest";
 import { compareMoney } from "../../../shared/lib/money";
+import { optionHasBehavior } from "../../../shared/lib/optionSets";
 import "./SaleModal.css";
 
 type SaleInventoryType = "RECOVERY" | "PICKUP" | "CONSIGNMENT" | (string & {});
@@ -207,7 +208,7 @@ function InventorySaleModalBase(props: InventorySaleModalProps) {
           phone: values.customer_phone as string | undefined,
           wechat: values.customer_wechat as string | undefined,
           qq: values.customer_qq as string | undefined,
-          source: (values.customer_source === "其他" ? values.customer_source_other : values.customer_source) as string | undefined,
+          source: (optionHasBehavior("CUSTOMER_SOURCE", values.customer_source, "OTHER") ? values.customer_source_other : values.customer_source) as string | undefined,
           note: values.note as string | undefined,
         } : undefined;
         const deliveryFormExtra: Record<string, unknown> = {};
@@ -216,7 +217,7 @@ function InventorySaleModalBase(props: InventorySaleModalProps) {
           if (value !== undefined && value !== null && value !== "") deliveryFormExtra[key] = value;
         }
         if (values.intermediary_platform !== undefined && values.intermediary_platform !== null && values.intermediary_platform !== "") {
-          deliveryFormExtra.intermediary_platform_other = values.intermediary_platform === "其他"
+          deliveryFormExtra.intermediary_platform_other = optionHasBehavior("INTERMEDIARY_PLATFORM", values.intermediary_platform, "OTHER")
             ? values.intermediary_platform_other || null : null;
         }
         const deliveryResponsibleIds = Array.isArray(values.delivery_responsible_ids)

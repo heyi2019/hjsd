@@ -84,6 +84,7 @@ class Order(Base, AuditMixin):
     # 建单表单「自定义字段」值存放处（与统一表单字段配置解耦，不违反治理约束）。
     # key 为 OrderFormField.field_key，value 为按 field_type 归一化后的值。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    option_label_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class OrderEvent(Base, AuditMixin):

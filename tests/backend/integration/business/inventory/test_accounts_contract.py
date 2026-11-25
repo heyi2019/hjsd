@@ -42,7 +42,7 @@ def _account(seeded_db, game_account: str, **kwargs):
     )
 
 def _invest_pool(seeded_db) -> Pool:
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     assert pool is not None
     return pool
 
@@ -229,7 +229,9 @@ class TestCreateAccountGuards:
         assert result["total"] == 1
         assert result["facet_total"] == 3
         assert result["type_counts"] == {"RECOVERY": 2}
-        assert len(statements) == 5
+        assert len(statements) == 7
+        assert sum(" from option_sets " in f" {' '.join(sql.lower().split())} " for sql in statements) == 1
+        assert sum(" from game_type_options " in f" {' '.join(sql.lower().split())} " for sql in statements) == 1
         date_filtered = inventory_ledger(seeded_db, date_from=date.today() + timedelta(days=1))
         assert date_filtered["total"] == 0
         assert date_filtered["facet_total"] == 3
@@ -449,6 +451,14 @@ class TestCreateAccountGuards:
         seeded_db.commit()
         seeded_db.refresh(account)
         assert account.has_secondary is None
+
+    def test_wallet_realname_stores_yes_no_codes(self, seeded_db):
+        account = _account(seeded_db, "wallet-code", wallet_realname="N")
+        assert account.wallet_realname == "N"
+        updated = update_account_profile(seeded_db, account.id, actor="pytest", wallet_realname="Y")
+        assert updated.wallet_realname == "Y"
+        with pytest.raises(Validation, match="钱包实名取值无效"):
+            update_account_profile(seeded_db, account.id, actor="pytest", wallet_realname="已注销")
 
     def test_risk_level_is_not_part_of_account_domain(self, seeded_db):
         account = _account(seeded_db, "no-risk-field")

@@ -13,9 +13,9 @@ export const gameTypesApi = {
     const config: CacheAwareRequestConfig = { params, ...(options?.fresh ? { refreshCache: true } : {}) };
     return api.get<GameTypeOption[]>("/game-types", config).then((r) => r.data);
   },
-  create: (payload: { name: string; sort_order?: number; is_default?: boolean; channel_regions?: string[] }) =>
+  create: (payload: { name: string; sort_order?: number; is_default?: boolean; channel_regions?: Array<{ value?: string; label: string }> }) =>
     api.post<GameTypeOption>("/game-types", payload).then((r) => gameTypesChanged(r.data)),
-  update: (id: number, payload: { name?: string; sort_order?: number; channel_regions?: string[] }) =>
+  update: (id: number, payload: { name?: string; sort_order?: number; channel_regions?: Array<{ value?: string; label: string }> }) =>
     api.patch<GameTypeOption>(`/game-types/${id}`, payload).then((r) => gameTypesChanged(r.data)),
   setActive: (id: number, active: boolean) =>
     api.patch<GameTypeOption>(`/game-types/${id}/active?active=${active}`).then((r) => gameTypesChanged(r.data)),

@@ -171,8 +171,8 @@ class TestA01HsStock:
         assert account.cost_amount == Decimal("1000.00")
         assert account.status == AccountStatus.SOLD.value
 
-        # 现金流：BUY 出、SELL 入，删除路由后统一落默认池（HJ_INVEST，is_default）
-        invest = _pool(seeded_db, "HJ_INVEST")
+        # 现金流：BUY 出、SELL 入，删除路由后统一落默认池（pool_01，is_default）
+        invest = _pool(seeded_db, "pool_01")
         flows = _flows(seeded_db, invest.id)
         assert [str(flow.amount) for flow in flows] == ["1000.00", "1400.00"]
         assert flows[0].direction == Direction.OUT.value
@@ -270,7 +270,7 @@ class TestA03DgZeroCapital:
         )
         seeded_db.commit()
         # 删除路由后 DG 服务收入落默认池（不再分利润池）
-        default_pool = _pool(seeded_db, "HJ_INVEST")
+        default_pool = _pool(seeded_db, "pool_01")
         flows = _flows(seeded_db, default_pool.id)
         assert len(flows) == 1
         assert str(flows[0].amount) == "200.00"

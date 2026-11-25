@@ -45,7 +45,7 @@ def create_game_type(
         name=payload.name,
         sort_order=payload.sort_order,
         is_default=payload.is_default,
-        channel_regions=payload.channel_regions,
+        channel_regions=[item.model_dump(exclude_none=True) for item in payload.channel_regions],
         actor=_actor(user),
     )
     return schemas.GameTypeOut.model_validate(item)

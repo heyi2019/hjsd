@@ -235,7 +235,7 @@ export function useOrderFormFieldsPanelController({
         : null;
       // 必填与条件必填互斥：配置了条件即按条件必填处理（基础态为选填）。
       const required = condField ? false : Boolean(values.required);
-      const rawOptions = needsOptions ? normalizeOptionItems(values.options) : [];
+      const rawOptions = needsOptions ? normalizeOptionItems(values.options, true) : [];
       // 动态字典字段（游戏类型/资金账户/客户等）库内 options 为空，编辑改名时
       // 空选项数组按「未变更」处理（不传），否则后端会以「选择型字段至少需要一个选项」拒绝更新。
       const options = needsOptions && rawOptions.length ? rawOptions : undefined;

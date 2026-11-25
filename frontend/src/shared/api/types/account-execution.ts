@@ -72,6 +72,9 @@ export interface AccountExecutionOrder {
   order_id: number;
   order_no: string;
   order_type: string;
+  game_type_label?: string | null;
+  channel_region_label?: string | null;
+  option_label_snapshot?: Record<string, string> | null;
   trade_date: string;
   created_at?: string | null;
   occurred_at?: string | null;
@@ -87,7 +90,7 @@ export interface AccountExecutionOrder {
   /** 最近售出事件由后端按业务登记顺序确定。 */
   latest_sale_event_id?: number | null;
   /** 已保存的上架状态由服务端统一计算。 */
-  active_consignments?: Array<{ event_id: number; platform: string; price: string | number | null; listed_at: string }>;
+  active_consignments?: Array<{ event_id: number; platform: string; platform_label?: string | null; price: string | number | null; listed_at: string }>;
   operator: string;
   operator_user_ids?: number[] | null;
 }

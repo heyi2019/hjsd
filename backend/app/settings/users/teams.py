@@ -7,9 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
-from app.core.errors import Conflict, Validation
+from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.users import Team
+from app.shared.option_codes import allocate_option_code
 from app.settings.users._validation import (
     _TEAM_MUTABLE_FIELDS,
     _required_bool,
@@ -21,15 +22,12 @@ from app.settings.users._validation import (
 def create_team(
     session: Session,
     *,
-    code: str,
     name: str,
     description: str | None,
     actor: str,
 ) -> Team:
-    normalized_code = _required_text(code, message="团队编码不能为空").upper()
     normalized_name = _required_text(name, message="团队名称不能为空")
-    if session.scalar(select(Team).where(Team.code == normalized_code)):
-        raise Conflict("团队编码已存在")
+    normalized_code = allocate_option_code(session, "team", "team", list(session.scalars(select(Team.code))))
     team = Team(code=normalized_code, name=normalized_name, description=description)
     session.add(team)
     session.flush()

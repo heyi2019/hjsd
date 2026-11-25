@@ -10,6 +10,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import AuditAction, PoolStatus, PoolType
 from app.domain.foundation import Pool
 from app.shared.form_values import set_extra_values
+from app.shared.option_codes import allocate_option_code
 from ._common import _UNSET, _get_pool_or_404, _normalize_pool_code, _required_name, _required_pool_type, _snapshot
 # --------------------------------------------------------------------- 资金账户
 def list_pools(session: Session, *, include_disabled: bool = True, user: CurrentUser | None = None) -> list[Pool]:
@@ -69,7 +70,6 @@ def _switch_default_pool(session: Session, pool: Pool) -> None:
 def create_pool(
     session: Session,
     *,
-    code: str,
     name: str,
     actor: str,
     pool_type: str = PoolType.OTHER.value,
@@ -78,14 +78,8 @@ def create_pool(
     extra_values: Mapping[str, Any] | None = None,
 ) -> Pool:
     """新增资金账户：新增池无需改代码（PRD §1.2）。"""
-    normalized = _normalize_pool_code(code)
     normalized_name = _required_name(name, field="name")
-    if session.scalar(select(Pool).where(Pool.code == normalized)) is not None:
-        raise Validation(
-            f"资金账户代码 {normalized} 已存在",
-            code=ErrorCode.DUPLICATE_CODE,
-            details={"code": normalized},
-        )
+    normalized = allocate_option_code(session, "fund-pool", "pool", list(session.scalars(select(Pool.code))))
     pool = Pool(
         code=normalized,
         name=normalized_name,

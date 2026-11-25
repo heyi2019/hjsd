@@ -59,7 +59,7 @@ def _active_order(seeded_db) -> int:
 
 class TestDepositQueries:
     def test_deposit_returned_and_lost_amount_cannot_exceed_paid_amount(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
             actor="pytest",
@@ -70,7 +70,7 @@ class TestDepositQueries:
         seeded_db.rollback()
 
     def test_transfer_cashflow_requires_source_id(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         seeded_db.add(
             Cashflow(
                 flow_no="CF-TRANSFER-WITHOUT-SOURCE-ID",
@@ -89,7 +89,7 @@ class TestDepositQueries:
         seeded_db.rollback()
 
     def test_reconciliation_difference_matches_two_balances_in_database(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         seeded_db.add(
             Reconciliation(
                 pool_id=invest.id,
@@ -109,7 +109,7 @@ class TestDepositQueries:
         seeded_db.rollback()
 
     def test_deposit_source_order_must_exist(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
 
         with pytest.raises(NotFound, match="来源订单"):
             create_deposit(
@@ -122,7 +122,7 @@ class TestDepositQueries:
             )
 
     def test_cashflow_list_filters_accounting_dimensions(self, seeded_client, seeded_db, headers):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         first = create_cashflow(
             seeded_db,
             pool_id=invest.id,
@@ -156,7 +156,7 @@ class TestDepositQueries:
         assert second.id not in [item["id"] for item in response.json()["items"]]
 
     def test_positive_amounts_are_business_errors_in_service(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         with pytest.raises(Validation, match="必须大于 0"):
             create_deposit(
                 seeded_db,
@@ -167,7 +167,7 @@ class TestDepositQueries:
             )
 
     def test_text_inputs_are_business_errors_in_service(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         with pytest.raises(Validation, match="category 必须为文本"):
             create_cashflow(
                 seeded_db,
@@ -205,7 +205,7 @@ class TestDepositQueries:
             )
 
     def test_deposit_counterparty_must_exist(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         with pytest.raises(NotFound, match="合作方"):
             create_deposit(
                 seeded_db,
@@ -217,7 +217,7 @@ class TestDepositQueries:
             )
 
     def test_deposit_rejects_disabled_counterparty(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         counterparty = create_counterparty(
             seeded_db,
             display_name="已停用押金合作方",
@@ -245,8 +245,8 @@ class TestDepositQueries:
             )
 
     def test_list_deposits_filters_by_pool(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "pool_01")
+        profit = _pool(seeded_db, "pool_02")
         create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
             actor="pytest",
@@ -260,8 +260,8 @@ class TestDepositQueries:
         assert len(list_deposits(seeded_db)) == 2
 
     def test_deposit_held_total_by_pool_and_overall(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
-        profit = _pool(seeded_db, "HJ_PROFIT")
+        invest = _pool(seeded_db, "pool_01")
+        profit = _pool(seeded_db, "pool_02")
         first = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY,
             actor="pytest",
@@ -286,7 +286,7 @@ class TestDepositQueries:
     def test_deposit_loss_reclassifies_holding_without_new_operating_expense(
         self, seeded_db
     ):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db,
             pool_id=invest.id,
@@ -332,7 +332,7 @@ class TestDepositQueries:
         assert pnl["total"]["operating_expense"] == Decimal("0.00")
 
     def test_deposit_loss_cannot_exceed_unreleased_balance(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
@@ -364,7 +364,7 @@ class TestDepositLedgerType:
         )
 
     def test_business_deposit_defaults_to_business_ledger(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
@@ -373,7 +373,7 @@ class TestDepositLedgerType:
         assert len(holds) == 1 and holds[0].ledger_type == "BUSINESS"
 
     def test_studio_deposit_lands_in_studio_ledger(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("200"), paid_on=TODAY,
             actor="pytest", ledger_type="STUDIO",
@@ -383,7 +383,7 @@ class TestDepositLedgerType:
         assert len(holds) == 1 and holds[0].ledger_type == "STUDIO"
 
     def test_studio_deposit_rejects_source_order(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         order_id = _active_order(seeded_db)
         with pytest.raises(Validation, match="不能挂来源订单"):
             create_deposit(
@@ -401,7 +401,7 @@ class TestDepositLedgerType:
                 seeded_db.flush()
 
     def test_invalid_ledger_type_rejected(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         with pytest.raises(Validation, match="押金账簿"):
             create_deposit(
                 seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY,
@@ -409,7 +409,7 @@ class TestDepositLedgerType:
             )
 
     def test_studio_deposit_release_and_loss_flows_inherit_ledger(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("300"), paid_on=TODAY,
             actor="pytest", ledger_type="STUDIO",
@@ -428,7 +428,7 @@ class TestDepositLedgerType:
 
     def test_update_ledger_type_syncs_hold_flow(self, seeded_db):
         from app.finance.deposits.writes import update_deposit
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )
@@ -443,7 +443,7 @@ class TestDepositLedgerType:
 
     # ---- 取消结清后的台账勾稽与重复入账防线（回归）----
     def test_cancel_syncs_held_to_zero_and_keeps_balance(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         before_balance = pool_balance(seeded_db, invest.id)["cash_balance"]
         before_held = deposit_held_total(seeded_db, pool_id=invest.id)
         deposit = create_deposit(
@@ -462,7 +462,7 @@ class TestDepositLedgerType:
         assert after_create == before_balance - Decimal("1000.00")
 
     def test_cancel_blocks_further_return(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
         )
@@ -478,7 +478,7 @@ class TestDepositLedgerType:
         assert len(self._flows(seeded_db, deposit.id, "DEPOSIT_RELEASE")) == 0
 
     def test_cancel_blocks_further_loss(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
         )
@@ -493,7 +493,7 @@ class TestDepositLedgerType:
         assert len(self._flows(seeded_db, deposit.id, "OPERATING_COST")) == 0
 
     def test_returned_and_lost_are_terminal_for_return(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("100"), paid_on=TODAY, actor="pytest"
         )

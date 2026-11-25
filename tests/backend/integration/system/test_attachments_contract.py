@@ -179,7 +179,14 @@ def test_legacy_attachment_remains_available_without_exposing_its_old_number(see
 
 
 def test_existing_attachment_number_constraint_can_be_relaxed_without_losing_history(seeded_db):
-    from scripts.relax_attachment_number import relax_attachment_number
+    from importlib.util import module_from_spec, spec_from_file_location
+    import _repo
+
+    path = _repo.BACKEND_DIR / "alembic" / "squashed_versions" / "0002_dictionary_codes.py"
+    spec = spec_from_file_location("attachment_migration_0002", path)
+    assert spec and spec.loader
+    migration = module_from_spec(spec)
+    spec.loader.exec_module(migration)
 
     old = Attachment(attachment_no="ATT0001", entity_type="order", entity_id="HS0001",
         file_name="old.txt", storage_key="old", content_type="text/plain", size_bytes=1,
@@ -188,8 +195,8 @@ def test_existing_attachment_number_constraint_can_be_relaxed_without_losing_his
     seeded_db.flush()
     seeded_db.execute(text("ALTER TABLE public.attachments ALTER COLUMN attachment_no SET NOT NULL"))
 
-    assert relax_attachment_number(seeded_db.connection()) is True
-    assert relax_attachment_number(seeded_db.connection()) is False
+    assert migration.relax_attachment_number(seeded_db.connection()) is True
+    assert migration.relax_attachment_number(seeded_db.connection()) is False
     new = Attachment(entity_type="order", entity_id="HS0001", file_name="new.txt",
         storage_key="new", content_type="text/plain", size_bytes=1, sha256="b" * 64,
         created_by="pytest", updated_by="pytest")

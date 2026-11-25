@@ -12,6 +12,81 @@ from app.domain.trade import OrderFormField
 OPTION_SETS = "/api/option-sets"
 
 
+def test_dictionary_item_codes_increase_and_are_not_reused_after_deletion(client, headers):
+    created = client.post(OPTION_SETS, json={"code": "TEST_SOURCE", "label": "来源"}, headers=headers)
+    assert created.status_code == 201
+    url = f"{OPTION_SETS}/TEST_SOURCE"
+    first = client.post(f"{url}/items", json={"label": "微博"}, headers=headers)
+    assert first.status_code == 201, first.text
+    assert first.json()["options"] == [{"value": "test_source_01", "label": "微博"}]
+
+    assert client.put(url, json={"options": []}, headers=headers).status_code == 200
+    second = client.post(f"{url}/items", json={"label": "闲鱼"}, headers=headers)
+    assert second.status_code == 201, second.text
+    assert second.json()["options"] == [{"value": "test_source_02", "label": "闲鱼"}]
+
+
+def test_removed_dictionary_item_keeps_its_historical_label(client, headers, db):
+    from app.settings.lists.services.labels import option_labels_by_code
+    assert client.post(OPTION_SETS, json={"code": "TEST_ARCHIVE", "label": "来源"}, headers=headers).status_code == 201
+    url = f"{OPTION_SETS}/TEST_ARCHIVE"
+    assert client.post(f"{url}/items", json={"label": "微博"}, headers=headers).status_code == 201
+    assert client.put(url, json={"options": []}, headers=headers).status_code == 200
+    assert option_labels_by_code(db, ["TEST_ARCHIVE"])["TEST_ARCHIVE"]["test_archive_01"] == "微博"
+
+
+def test_boolean_dictionary_labels_use_yes_no_values(client, headers):
+    assert client.post(OPTION_SETS, json={"code": "TEST_YES_NO", "label": "是否"}, headers=headers).status_code == 201
+    url = f"{OPTION_SETS}/TEST_YES_NO/items"
+    assert client.post(url, json={"label": "是"}, headers=headers).json()["options"] == [{"value": "Y", "label": "是"}]
+    assert client.post(url, json={"label": "否"}, headers=headers).json()["options"][-1] == {"value": "N", "label": "否"}
+    assert client.post(url, json={"label": "有"}, headers=headers).status_code == 422
+
+
+def test_special_option_keeps_its_business_meaning_when_label_changes(client, headers):
+    assert client.post(OPTION_SETS, json={"code": "INTERMEDIARY_TYPE", "label": "中介类型"}, headers=headers).status_code == 201
+    url = f"{OPTION_SETS}/INTERMEDIARY_TYPE"
+    created = client.post(f"{url}/items", json={"label": "包赔"}, headers=headers)
+    assert created.status_code == 201, created.text
+    option = created.json()["options"][0]
+    assert option["value"] == "intermediary_type_01"
+    assert option["behavior"] == "COMPENSATION"
+    option["label"] = "保障交易"
+    saved = client.put(url, json={"options": [option]}, headers=headers)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["options"][0]["behavior"] == "COMPENSATION"
+    changed_code = {**option, "value": "intermediary_type_99"}
+    assert client.put(url, json={"options": [changed_code]}, headers=headers).status_code == 422
+    missing_behavior = {"value": option["value"], "label": option["label"]}
+    assert client.put(url, json={"options": [missing_behavior]}, headers=headers).status_code == 422
+
+
+def test_seeded_customer_and_yes_no_options_use_codes(seeded_db):
+    seed_catalog(seeded_db, actor="pytest")
+    fields = list(seeded_db.scalars(select(OrderFormField).where(
+        OrderFormField.order_type_code.in_(["CUSTOMER", "HS"]),
+        OrderFormField.field_key.in_(["credit_level", "recovery_record", "has_secondary", "wallet_realname"]),
+    )))
+    by_key = {field.field_key: field.options for field in fields}
+    assert by_key["credit_level"][0] == {"value": "credit_level_01", "label": "优质"}
+    assert by_key["recovery_record"][0] == {"value": "N", "label": "无"}
+    assert by_key["has_secondary"] == [{"value": "Y", "label": "有"}, {"value": "N", "label": "无"}]
+    assert by_key["wallet_realname"] == [{"value": "N", "label": "未注销"}, {"value": "Y", "label": "已注销"}]
+
+
+def test_example_dictionary_seed_has_codes_and_special_behavior(seeded_db):
+    from scripts.test_example_seed import seed_example_catalog
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    source = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "CUSTOMER_SOURCE"))
+    platform = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_PLATFORM"))
+    intermediary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_TYPE"))
+    assert source.options[0] == {"value": "customer_source_01", "label": "自营"}
+    assert source.options[-1] == {"value": "customer_source_06", "label": "其他", "behavior": "OTHER"}
+    assert platform.options[-1]["behavior"] == "OTHER"
+    assert intermediary.options[1] == {"value": "intermediary_type_02", "label": "包赔", "behavior": "COMPENSATION"}
+
+
 def test_duplicate_option_code_returns_business_error(client, headers):
     payload = {"code": "CUSTOM_DUPLICATE", "label": "重复测试"}
     assert client.post(OPTION_SETS, json=payload, headers=headers).status_code == 201

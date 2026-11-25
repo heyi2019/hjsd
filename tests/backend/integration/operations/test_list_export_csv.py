@@ -22,7 +22,116 @@ from app.domain.foundation import AuditLog
 from app.domain.trade import Order, OrderFormField, RebateRecord
 from app.domain.users import User
 from app.settings.lists.export import build_list_csv
-from app.business.orders.export_fields import _event_platform, _order_detail_export_fields
+from app.business.orders.export_fields import _delivery_export_fields, _event_platform, _order_detail_export_fields
+
+
+def test_delivery_export_translates_stable_dictionary_codes():
+    labels = {
+        "intermediary_platform": {"intermediary_platform_01": "其他"},
+        "intermediary_platform_behavior": {"intermediary_platform_01": "OTHER"},
+        "intermediary_type": {"intermediary_type_01": "包赔"},
+        "compensation_type": {"compensation_type_01": "首保"},
+    }
+    fields = _delivery_export_fields({}, labels, {
+        "intermediary_platform": "intermediary_platform_01", "intermediary_platform_other": "某平台",
+        "intermediary_type": "intermediary_type_01", "compensation_type": "compensation_type_01",
+    })
+    assert fields["detail_buy_delivery_platform"] == "其他（某平台）"
+    assert fields["detail_buy_delivery_type"] == "包赔"
+    assert fields["detail_buy_delivery_compensation"] == "首保"
+
+
+def test_order_keeps_original_game_and_channel_labels_after_rename(seeded_client, headers, seeded_db):
+    from app.business.orders.create import create_order
+    from app.settings.field_definitions.game_types import create_game_type, update_game_type
+
+    game = create_game_type(seeded_db, name="历史游戏", actor="pytest", channel_regions=[{"label": "历史渠道"}])
+    channel = game.channel_regions[0]["value"]
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest",
+                         account_snapshot={"game_account": "history-label-test", "game_type": game.value,
+                                           "channel_region": channel})
+    assert order.account_snapshot.get("game_type_label") == "历史游戏"
+    assert order.account_snapshot.get("channel_region_label") == "历史渠道"
+    update_game_type(seeded_db, game.id, actor="pytest", name="新游戏名称",
+                     channel_regions=[{"value": channel, "label": "新渠道名称"}])
+    seeded_db.commit()
+    response = seeded_client.get("/api/orders", headers=headers)
+    assert response.status_code == 200, response.text
+    row = next(item for item in response.json()["items"] if item["id"] == order.id)
+    assert row.get("account_game_type_label") == "历史游戏"
+    exported = seeded_client.get("/api/orders/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "历史游戏" in exported.text
+    assert "历史渠道" in exported.text
+
+
+def test_order_linked_to_existing_inventory_keeps_original_names(seeded_client, headers, seeded_db):
+    from app.business.inventory.profile import create_account
+    from app.business.orders.create import create_order
+    from app.settings.field_definitions.game_types import create_game_type, update_game_type
+
+    game = create_game_type(seeded_db, name="原游戏名", actor="pytest", channel_regions=[{"label": "原渠道名"}])
+    channel = game.channel_regions[0]["value"]
+    account = create_account(seeded_db, game_account="linked-history-test", game_type=game.value,
+                             channel_region=channel, business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest", account_id=account.id)
+    assert order.account_snapshot["game_type_label"] == "原游戏名"
+    assert order.account_snapshot["channel_region_label"] == "原渠道名"
+    update_game_type(seeded_db, game.id, actor="pytest", name="新游戏名",
+                     channel_regions=[{"value": channel, "label": "新渠道名"}])
+    seeded_db.commit()
+    exported = seeded_client.get("/api/orders/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "原游戏名" in exported.text
+    assert "原渠道名" in exported.text
+
+
+def test_order_keeps_original_delivery_option_labels_after_rename(seeded_client, headers, seeded_db):
+    from app.business.orders.create import create_order
+    from app.domain.options import OptionSet
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest",
+                         account_snapshot={"game_account": "history-delivery-test"},
+                         form_extra={"intermediary_type": "intermediary_type_02", "business_responsible_ids": [1]})
+    assert getattr(order, "option_label_snapshot", None) == {"intermediary_type": "包赔"}
+    dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_TYPE"))
+    dictionary.options = [{**item, "label": "保障交易"} if item["value"] == "intermediary_type_02" else item
+                          for item in dictionary.options]
+    seeded_db.commit()
+    exported = seeded_client.get("/api/orders/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "包赔" in exported.text
+    assert "保障交易" not in exported.text
+
+
+def test_order_party_source_keeps_original_option_label(seeded_client, headers, seeded_db):
+    from app.business.orders.create import create_order
+    from app.customers.customer_ops.writes import create_customer
+    from app.domain.options import OptionSet
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    customer = create_customer(seeded_db, display_name="老客户", source="customer_source_02", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest",
+                         account_snapshot={"game_account": "history-source-test"},
+                         form_extra={"business_responsible_ids": [1]},
+                         customer_roles=[(customer.id, "SELLER")])
+    dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "CUSTOMER_SOURCE"))
+    dictionary.options = [{**item, "label": "新微博"} if item["value"] == "customer_source_02" else item
+                          for item in dictionary.options]
+    seeded_db.commit()
+    listing = seeded_client.get("/api/orders", headers=headers)
+    assert listing.status_code == 200, listing.text
+    row = next(item for item in listing.json()["items"] if item["id"] == order.id)
+    assert row["party_source"] == "customer_source_02"
+    assert row["party_source_label"] == "微博"
+    assert order.option_label_snapshot[f"party_source:customer:{customer.id}"] == "微博"
 
 
 def _seed_select_field(db, *, field_key: str = "trade_role") -> OrderFormField:
@@ -324,16 +433,21 @@ def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
 
 def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_client, headers, seeded_db):
     """同一订单的买号和卖号交付分别导出，只有卖号资料的订单买号列留空。"""
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
     _seed_order(
         seeded_db,
         order_no="HS9806",
-        form_extra={"bound_phone": "13800000001", "intermediary_platform": "其他", "intermediary_platform_other": "星河平台", "delivery_responsible_ids": [1], "sell_bound_phone": "13900000003", "sell_intermediary_platform": "盼之", "sell_delivery_responsible_ids": [2]},
+        form_extra={"bound_phone": "13800000001", "intermediary_platform": "intermediary_platform_06", "intermediary_platform_other": "星河平台", "delivery_responsible_ids": [1], "sell_bound_phone": "13900000003", "sell_intermediary_platform": "intermediary_platform_02", "sell_delivery_responsible_ids": [2]},
     )
     _seed_order(
         seeded_db,
         order_no="DG9801",
         order_type="DG",
-        form_extra={"sell_bound_phone": "13800000002", "sell_intermediary_platform": "其他", "sell_intermediary_platform_other": "分期平台"},
+        form_extra={"sell_bound_phone": "13800000002", "sell_intermediary_platform": "intermediary_platform_06", "sell_intermediary_platform_other": "分期平台"},
     )
 
     response = seeded_client.get("/api/orders/export.xlsx", headers=headers)

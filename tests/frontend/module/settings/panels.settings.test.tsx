@@ -12,6 +12,7 @@ import { gameTypesApi } from "@/shared/api/misc.api";
 import { poolsApi } from "@/shared/api/pools.api";
 import { PoolsPanel } from "@/settings/panels/PoolsPanel";
 import { GameTypeSettingsPanel } from "@/settings/panels/GameTypeSettingsPanel";
+import { InventoryAccountSummary } from "@/business/shared/inventory/InventoryAccountSummary";
 import { listResponse } from "@fixtures/api-responses";
 
 vi.mock("@/shared/api/cashflows.api");
@@ -38,8 +39,8 @@ beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(poolsApi).list.mockResolvedValue(pools);
   vi.mocked(gameTypesApi).list.mockResolvedValue([
-    { id: 1, name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
-    { id: 2, name: "原神", sort_order: 20, is_active: true, is_default: false },
+    { id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
+    { id: 2, value: "game_02", name: "原神", sort_order: 20, is_active: true, is_default: false },
   ]);
 });
 
@@ -110,6 +111,33 @@ describe("PoolsPanel：失败态与空态", () => {
 });
 
 describe("设置面板：游戏类型", () => {
+  it("库存账号摘要将游戏编码展示为中文名称", async () => {
+    vi.mocked(gameTypesApi).list.mockResolvedValue([{
+      id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true,
+      is_default: true, channel_regions: [],
+    }]);
+    renderLight(<InventoryAccountSummary account={{ game_type: "game_01" } as never} />, { user: "admin" });
+    expect(await screen.findByText("王者荣耀")).toBeInTheDocument();
+  });
+
+  it("修改渠道名称时保留原渠道编码", async () => {
+    vi.mocked(gameTypesApi).list.mockResolvedValue([{
+      id: 1, value: "game_01", name: "王者荣耀", sort_order: 10,
+      is_active: true, is_default: true,
+      channel_regions: [{ value: "channel_01", label: "安卓区" }],
+    }] as never);
+    renderLight(<GameTypeSettingsPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "编辑王者荣耀" }));
+    const channel = screen.getByLabelText("渠道名称 1");
+    await ui.clear(channel);
+    await ui.type(channel, "安卓新版");
+    await ui.click(screen.getByRole("button", { name: /保存游戏类型/ }));
+    await waitFor(() => expect(vi.mocked(gameTypesApi).update).toHaveBeenCalledWith(1, {
+      name: "王者荣耀", sort_order: 10,
+      channel_regions: [{ value: "channel_01", label: "安卓新版" }],
+    }));
+  });
+
   it("展示游戏类型并可勾选默认游戏类型", async () => {
     renderLight(<GameTypeSettingsPanel />, { user: "admin" });
 
@@ -160,7 +188,7 @@ describe("GameTypeSettingsPanel：表单细节", () => {
   });
 
   it("新建时勾选默认类型 → payload 带 is_default（后端 create 支持，edit 不传）", async () => {
-    vi.mocked(gameTypesApi).create.mockResolvedValue({ id: 3, name: "蛋仔派对", sort_order: 0, is_active: true, is_default: true });
+    vi.mocked(gameTypesApi).create.mockResolvedValue({ id: 3, value: "game_03", name: "蛋仔派对", sort_order: 0, is_active: true, is_default: true });
     renderLight(<GameTypeSettingsPanel />, { user: "admin" });
 
     await ui.type(await screen.findByPlaceholderText("如：王者荣耀"), "蛋仔派对");

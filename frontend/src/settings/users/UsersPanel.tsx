@@ -105,6 +105,7 @@ export function UsersPanel() {
       onPageChange={() => undefined}
       emptyText={loadError ? "用户数据不可用，请点击重新加载" : "暂无用户"}
       columns={[
+        { title: "员工代码", dataIndex: "employee_code", render: (value?: string) => value || "-" },
         { title: "用户名", dataIndex: "username" },
         { title: "姓名", dataIndex: "display_name" },
         { title: "手机号", dataIndex: "phone", render: (v?: string) => v || "-" },

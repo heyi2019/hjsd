@@ -62,7 +62,7 @@ describe("组织 API：统一通过领域客户端访问", () => {
     vi.mocked(api.patch).mockResolvedValueOnce({ data: { id: 1 } });
     await teamsApi.list();
     await teamsApi.list({ fresh: true });
-    await teamsApi.create({ code: "T1", name: "一队" });
+    await teamsApi.create({ name: "一队" });
     await teamsApi.update(1, { is_active: false });
     expect(api.get).toHaveBeenNthCalledWith(1, "/teams");
     expect(api.get).toHaveBeenNthCalledWith(2, "/teams", { refreshCache: true });

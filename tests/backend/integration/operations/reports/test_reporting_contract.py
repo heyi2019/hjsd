@@ -83,7 +83,7 @@ def _commission_details(data: dict) -> list[dict]:
 
 
 def _direct_cost(seeded_db, order_id: int, amount: str, occurred_on: date) -> None:
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     assert pool is not None
     create_cashflow(
         seeded_db,
@@ -132,7 +132,7 @@ class TestMonthlyPnl:
         order = _order(seeded_db)
         post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=D, actor="pytest")
         post_event(seeded_db, order.id, event_type="SELL", amount="160", occurred_on=D, actor="pytest")
-        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
         income = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=D, direction="IN", ledger_type="STUDIO",
             accounting_attribute="SELF_REVENUE", category="OTHER", amount="20", actor="pytest")
         expense = create_cashflow(seeded_db, pool_id=pool.id, occurred_on=D, direction="OUT", ledger_type="STUDIO",
@@ -164,7 +164,7 @@ class TestMonthlyPnl:
 
     @pytest.mark.parametrize("ledger_type", ["BUSINESS", "STUDIO"])
     def test_deposit_loss_does_not_increase_operating_expense(self, seeded_db, ledger_type):
-        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
         assert pool is not None
         deposit = create_deposit(
             seeded_db, pool_id=pool.id, amount=Decimal("100"), paid_on=D,
@@ -722,7 +722,7 @@ class TestReports:
             occurred_on=date(2026, 10, 4),
             actor="pytest",
         )
-        pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+        pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
         create_cashflow(
             seeded_db,
             pool_id=pool.id,

@@ -32,9 +32,9 @@ def _restricted_user() -> CurrentUser:
 
 
 def _seed_recon(seeded_db):
-    """在 HJ_INVEST 账户登记两笔收入，建立 50+20=70 的余额基线。"""
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-    assert pool is not None, "种子池 HJ_INVEST 缺失"
+    """在 pool_01 账户登记两笔收入，建立 50+20=70 的余额基线。"""
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
+    assert pool is not None, "种子池 pool_01 缺失"
     for amount in (Decimal("50"), Decimal("20")):
         create_cashflow(
             seeded_db,
@@ -114,7 +114,7 @@ def test_create_reconciliation_rejects_missing_flow(seeded_db):
 
 def test_create_reconciliation_rejects_flow_outside_pool(seeded_db):
     pool = _seed_recon(seeded_db)
-    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+    profit = seeded_db.scalar(select(Pool).where(Pool.code == "pool_02"))
     flow2 = create_cashflow(
         seeded_db,
         pool_id=profit.id,
@@ -328,7 +328,7 @@ def test_create_reconciliation_allows_same_label_distinct_date(seeded_db):
 
 def test_reconciliation_system_balance_excludes_deposit_loss(seeded_db):
     """押金损失重分类流水不被重复扣减：对账系统余额 == 总览现金余额。"""
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     create_cashflow(
         seeded_db, pool_id=pool.id, occurred_on=date(2026, 10, 17),
         direction="IN", accounting_attribute="OTHER_INCOME", category="OTHER",
@@ -391,7 +391,7 @@ def test_balance_snapshot_idempotent_same_pool_date(seeded_db):
 
 def test_balance_snapshot_excludes_deposit_loss(seeded_db):
     """快照余额排除押金损失重分类流水，与对账口径一致。"""
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     create_cashflow(
         seeded_db, pool_id=pool.id, occurred_on=date(2026, 10, 17),
         direction="IN", accounting_attribute="OTHER_INCOME", category="OTHER",

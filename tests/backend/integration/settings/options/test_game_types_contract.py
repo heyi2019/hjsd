@@ -66,6 +66,33 @@ class TestGameTypeService:
 
 
 class TestGameTypeApi:
+    def test_game_and_channel_codes_stay_stable_when_labels_change(self, seeded_client, headers):
+        created = seeded_client.post(
+            "/api/game-types",
+            json={"name": "新游戏", "channel_regions": [{"label": "安卓区"}]},
+            headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        body = created.json()
+        assert body["value"] == f"game_{body['id']:02d}"
+        assert body["channel_regions"] == [{"value": "channel_01", "label": "安卓区"}]
+
+        edited = seeded_client.patch(
+            f"/api/game-types/{body['id']}",
+            json={"name": "新游戏改名", "channel_regions": [{"value": "channel_01", "label": "安卓新版"}]},
+            headers=headers,
+        )
+        assert edited.status_code == 200, edited.text
+        assert edited.json()["value"] == body["value"]
+        assert edited.json()["channel_regions"] == [{"value": "channel_01", "label": "安卓新版"}]
+
+        added = seeded_client.patch(
+            f"/api/game-types/{body['id']}",
+            json={"channel_regions": [{"label": "iOS"}]}, headers=headers,
+        )
+        assert added.status_code == 200, added.text
+        assert added.json()["channel_regions"] == [{"value": "channel_02", "label": "iOS"}]
+
     @staticmethod
     def _non_default_id(client, headers: dict) -> int:
         resp = client.get("/api/game-types", headers=headers)

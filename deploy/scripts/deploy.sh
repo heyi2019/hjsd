@@ -116,13 +116,38 @@ if [ "$db_ready" -ne 1 ]; then
   exit 1
 fi
 
+# 旧版本不能在字典编码转换前后继续写入；先停后端，再取完整备份。
+backend_was_running=0
+migration_attempted=0
+running_services="$(docker compose ps --status running --services)"
+if printf '%s\n' "$running_services" | grep -qx backend; then
+  echo "==> 暂停旧后端，防止迁移期间继续写入"
+  docker compose stop backend
+  backend_was_running=1
+fi
+
+resume_backend_before_migration_on_error() {
+  local status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ] && [ "$backend_was_running" = "1" ]; then
+    if [ "$migration_attempted" = "0" ]; then
+      echo "==> 迁移尚未开始，恢复原后端"
+      docker compose start backend || echo "✗ 原后端恢复失败，请检查服务状态" >&2
+    else
+      echo "✗ 已尝试迁移，请核对数据库和服务状态后再恢复后端" >&2
+    fi
+  fi
+  exit "$status"
+}
+trap resume_backend_before_migration_on_error EXIT
+
 echo "==> 迁移前备份 PostgreSQL 正式库"
 if ! bash scripts/backup_daily.sh; then
   echo "✗ 迁移前备份失败，已中止发布（不在没有备份的情况下改结构）" >&2
   exit 1
 fi
 
-# 全新数据库没有任何业务表，先用当前唯一活动迁移 0001 建结构；
+# 全新数据库没有任何业务表，先运行活动迁移链建结构；
 # 若只残留 alembic_version 等元表、业务表完全不存在，清掉残留迁移标记再初始化。
 # 已有业务表仍走下面的正常迁移流程，不自动覆盖业务数据。
 schema_probe="$(docker compose exec -T db psql \
@@ -140,20 +165,22 @@ schema_users="$(printf '%s' "$schema_users" | tr -d '[:space:]')"
 schema_policies="$(printf '%s' "$schema_policies" | tr -d '[:space:]')"
 if [ "$schema_tables" = "0" ]; then
   echo "==> 检测到全新数据库，初始化活动迁移链"
+  migration_attempted=1
   docker compose run --rm backend alembic upgrade head
 elif [ "$schema_users" = "NONE" ] && [ "$schema_policies" = "NONE" ]; then
   echo "==> 检测到仅有迁移元表的半初始化数据库，重置迁移标记并初始化活动迁移链"
   docker compose exec -T db psql \
     -U "${POSTGRES_USER:-erp_app}" -d "${POSTGRES_DB:-heijin_erp}" \
     -v ON_ERROR_STOP=1 -c "drop table if exists alembic_version"
+  migration_attempted=1
   docker compose run --rm backend alembic upgrade head
 elif [ "$schema_alembic" = "NONE" ]; then
   echo "✗ 数据库已有表但缺少 alembic_version，拒绝无版本迁移" >&2
   exit 1
 fi
 
-# 发布不变量基线：只采集，不写业务数据。版本化迁移允许调整结构与 Alembic 版本，
-# 但发布通道不能改写用户、配置和历史业务记录。
+# 发布不变量基线：只采集。版本化迁移可按既定规则转换数据，
+# 用户配置词典数量不得改变；用于保留历史名称的内部归档不计入配置数量。
 # 用户与库名与 compose 的 db 服务同源；宿主未 export 时按 compose 默认值回落。
 db_snapshot() {
   local policy_table policies state tables dbversion options sale fields users alembic
@@ -172,7 +199,7 @@ db_snapshot() {
     "select
        (select count(*) from information_schema.tables where table_schema=current_schema()),
        coalesce((select to_regclass('public.db_version')::text), 'NONE'),
-       (select count(*) from option_sets),
+       (select count(*) from option_sets where code not in ('GAME_REFERENCE_ARCHIVE', 'OPTION_ITEM_ARCHIVE')),
        (select count(*) from order_form_fields where order_type_code='SALE'),
        (select count(*) from order_form_fields),
        (select count(*) from users),
@@ -202,12 +229,13 @@ echo "  ${pre_state}"
 
 echo "==> 执行数据库迁移"
 # 已有数据库只应用当前活动迁移链，不覆盖业务数据。
+migration_attempted=1
 docker compose run --rm backend alembic upgrade head
 if [ "${ERP_ROLLBACK:-0}" != "1" ]; then
   docker compose run --rm -T backend python -m scripts.ensure_idempotency_records --apply </dev/null
 fi
 
-echo "==> 迁移完成（发布通道不写入业务数据）"
+echo "==> 迁移完成（数据转换由版本化迁移管理）"
 
 echo "==> 启动服务"
 if ! docker compose up -d; then

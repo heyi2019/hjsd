@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from datetime import date, datetime, timedelta
 from typing import Any
 from app.shared.audit import record_audit
+from app.shared.option_snapshots import update_option_label_snapshot
 from app.core.security import CurrentUser
 from app.shared.form_field_rules import validate_form_extra
 from app.shared.form_values import set_extra_values
@@ -208,7 +209,9 @@ def update_order(
             validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra)
             if form_extra_scope else dict(form_extra)
         )
-        order.form_extra = {**(order.form_extra or {}), **checked}
+        previous_extra = dict(order.form_extra or {})
+        order.form_extra = {**previous_extra, **checked}
+        order.option_label_snapshot = update_option_label_snapshot(session, order.option_label_snapshot, previous_extra, order.form_extra) or None
     record_audit(
         session,
         action=AuditAction.ORDER_UPDATE,

@@ -27,7 +27,7 @@ TODAY = date(2026, 10, 4)
 
 
 def _pool(seeded_db) -> Pool:
-    pool = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+    pool = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
     assert pool is not None
     return pool
 
@@ -185,6 +185,30 @@ def test_studio_create_and_edit_use_studio_custom_field_rules(seeded_client, see
     saved = seeded_client.put(f"/api/cashflows/{flow_id}", headers=headers, json={**payload, "form_extra": {"studio_note": "凭据3"}})
     assert saved.status_code == 200, saved.text
     assert saved.json()["form_extra"] == {"studio_note": "凭据3"}
+
+
+def test_studio_dictionary_codes_survive_create_edit_and_filter(seeded_client, seeded_db, headers):
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    seeded_db.commit()
+    payload = {
+        "pool_id": _pool(seeded_db).id, "occurred_on": TODAY.isoformat(),
+        "direction": "OUT", "ledger_type": "STUDIO", "accounting_attribute": "OPERATING_EXPENSE",
+        "category": "studio_expense_item_01", "amount": "120.00",
+    }
+    created = seeded_client.post("/api/cashflows", headers=headers, json=payload)
+    assert created.status_code == 201, created.text
+    assert created.json()["category"] == "studio_expense_item_01"
+    saved = seeded_client.put(f"/api/cashflows/{created.json()['id']}", headers=headers,
+                              json={**payload, "amount": "150.00"})
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["category"] == "studio_expense_item_01"
+    summary = _summary(seeded_client, headers, category="studio_expense_item_01")
+    assert summary["count"] == 1
+    assert Decimal(summary["expense"]) == Decimal("150.00")
 
 
 def test_studio_custom_fields_round_trip_through_list_and_edit(seeded_client, seeded_db, headers):

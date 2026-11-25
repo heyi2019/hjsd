@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from collections.abc import Collection
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.options import OptionSet
+from app.shared.game_references import game_reference_labels
+from app.shared.option_snapshots import option_label_maps
 from app.settings.lists.scopes import get_scope
 from app.settings.lists.services._shared import _custom_rows_for_scope
 
@@ -20,15 +20,8 @@ def option_labels_by_code(
     不因字典缺失而失败。主列表列值翻译与订单台账明细 sheet 共用这一入口。
     """
     labels: dict[str, dict[str, str]] = {}
-    for row in session.scalars(select(OptionSet).where(OptionSet.code.in_(codes))).all():
-        options = row.options if isinstance(row.options, list) else []
-        labels[row.code] = {
-            str(item["value"]): str(item["label"])
-            for item in options
-            if isinstance(item, dict)
-            and item.get("value") is not None
-            and item.get("label") is not None
-        }
+    for (group, value), label in option_label_maps(session, set(codes)).items():
+        labels.setdefault(group, {})[value] = label
     return labels
 
 
@@ -50,6 +43,15 @@ def get_value_labels(session: Session, scope_code: str) -> dict[str, dict[str, s
         for column in scope.columns
         if column.value_set and by_code.get(column.value_set)
     }
+    if scope_code in {"LEDGER", "INVENTORY"}:
+        games, _channels = game_reference_labels(session)
+        result["account_game_type"] = games
+    if scope_code == "CASHFLOW":
+        result["category"] = {
+            **option_labels_by_code(session, {"STUDIO_EXPENSE_ITEM"}).get("STUDIO_EXPENSE_ITEM", {}),
+            "studio_income_item_01": "货款",
+            "studio_income_item_02": "其他",
+        }
     for column_key, definition in _custom_rows_for_scope(session, scope_code).items():
         if definition.value_labels:
             result[column_key] = dict(definition.value_labels)

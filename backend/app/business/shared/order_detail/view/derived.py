@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 INVENTORY_ORDER_TYPES = frozenset({"HS", "TH", "DG"})
 INTERNAL_EXTRA_KEYS = frozenset({
     "consignment_platforms",
+    "consignment_platform_labels",
     "listed_at",
     "platform_unlisted_at",
     "platform_unlist_scope",
@@ -46,7 +47,9 @@ def _platforms(value: Any) -> list[str]:
 
 
 def _platform_text(extra: dict[str, Any]) -> str:
-    return "、".join(_platforms(extra.get("consignment_platforms")))
+    labels = extra.get("consignment_platform_labels")
+    labels = labels if isinstance(labels, dict) else {}
+    return "、".join(labels.get(value, value) for value in _platforms(extra.get("consignment_platforms")))
 
 
 def _operator(event: Any) -> str:

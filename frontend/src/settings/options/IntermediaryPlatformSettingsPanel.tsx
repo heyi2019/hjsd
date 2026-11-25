@@ -29,12 +29,12 @@ export function OptionDictionarySection({ code, title, description }: { code: st
     setMutationError(null);
     await reload();
   }, [reload]);
-  const updateOptions = async (options: OptionItem[], onSuccess?: () => void) => {
+  const runMutation = async (mutate: () => Promise<unknown>, onSuccess?: () => void) => {
     if (!canEdit || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     try {
-      await optionSetsApi.update(code, { options });
+      await mutate();
       onSuccess?.();
       setMutationError(null);
       await reload();
@@ -45,16 +45,22 @@ export function OptionDictionarySection({ code, title, description }: { code: st
       setSaving(false);
     }
   };
+  const updateOptions = (options: OptionItem[], onSuccess?: () => void) =>
+    runMutation(() => optionSetsApi.update(code, { options }), onSuccess);
   const save = async ({ option }: { option: string }) => {
     if (!canEdit) return;
-    const value = option.trim(); if (!value) return;
-    const next = editingValue ? rows.map((item) => item.value === editingValue ? { value, label: value } : item) : [...rows, { value, label: value }];
-    if (next.some((item, index) => next.findIndex((candidate) => candidate.value === item.value) !== index)) { form.setFields([{ name: "option", errors: [`${title}不能重复`] }]); return; }
-    await updateOptions(next, () => {
+    const label = option.trim(); if (!label) return;
+    if (rows.some((item) => item.value !== editingValue && item.label === label)) { form.setFields([{ name: "option", errors: [`${title}不能重复`] }]); return; }
+    const onSuccess = () => {
       appMessage.success(editingValue ? `${title}已更新` : `${title}已新增`);
       setEditingValue(null);
       form.resetFields();
-    });
+    };
+    if (editingValue !== null) {
+      await updateOptions(rows.map((item) => item.value === editingValue ? { ...item, label } : item), onSuccess);
+    } else {
+      await runMutation(() => optionSetsApi.addItem(code, label), onSuccess);
+    }
   };
   const move = async (value: string, offset: -1 | 1) => {
     if (!canEdit) return;

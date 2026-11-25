@@ -73,30 +73,27 @@ def test_list_teams(client: TestClient):
     assert response.status_code == 200
     assert response.json() == []
 
-def test_create_team_success_normalizes_code(client: TestClient):
+def test_create_team_assigns_code(client: TestClient):
     response = client.post(
         "/api/teams",
-        json={"code": " t1 ", "name": " 一组 ", "description": " desc "},
+        json={"name": " 一组 ", "description": " desc "},
         headers={"X-Dev-User": "admin"},
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert body["code"] == "T1"
+    assert body["code"] == "team_01"
     assert body["name"] == "一组"
     assert body["is_active"] is True
 
-def test_create_team_duplicate_code(client: TestClient):
+def test_create_team_rejects_manual_code(client: TestClient):
     headers = {"X-Dev-User": "admin"}
-    assert client.post("/api/teams", json={"code": "T1", "name": "一组"}, headers=headers).status_code == 201
-    # 大小写归一化后仍判重
-    response = client.post("/api/teams", json={"code": "t1", "name": "重名"}, headers=headers)
-    assert response.status_code == 409
-    assert response.json()["message"] == "团队编码已存在"
+    response = client.post("/api/teams", json={"code": "team_99", "name": "一组"}, headers=headers)
+    assert response.status_code == 422
 
 def test_create_team_blank_name_rejected(client: TestClient):
     response = client.post(
         "/api/teams",
-        json={"code": "blank-name", "name": "   "},
+        json={"name": "   "},
         headers={"X-Dev-User": "admin"},
     )
     assert response.status_code == 422
@@ -105,7 +102,7 @@ def test_create_team_blank_name_rejected(client: TestClient):
 def test_create_team_non_admin_forbidden(client: TestClient):
     response = client.post(
         "/api/teams",
-        json={"code": "t9", "name": "九组"},
+        json={"name": "九组"},
         headers={"X-Dev-User": "viewer"},
     )
     assert response.status_code == 403
@@ -122,7 +119,7 @@ def test_update_team_not_found(client: TestClient):
 def test_update_team_success(client: TestClient):
     created = client.post(
         "/api/teams",
-        json={"code": "t2", "name": "二组"},
+        json={"name": "二组"},
         headers={"X-Dev-User": "admin"},
     )
     assert created.status_code == 201
@@ -139,7 +136,7 @@ def test_update_team_success(client: TestClient):
 def test_update_team_explicit_blank_name_rejected(client: TestClient):
     created = client.post(
         "/api/teams",
-        json={"code": "t3", "name": "三组"},
+        json={"name": "三组"},
         headers={"X-Dev-User": "admin"},
     )
     assert created.status_code == 201
@@ -153,7 +150,7 @@ def test_update_team_explicit_blank_name_rejected(client: TestClient):
 
 def test_team_service_rejects_unknown_fields(seeded_db):
     team = service.create_team(
-        seeded_db, code="T-SERVICE", name="服务团队", description=None, actor="pytest"
+        seeded_db, name="服务团队", description=None, actor="pytest"
     )
     with pytest.raises(Validation):
         service.update_team(
@@ -162,7 +159,7 @@ def test_team_service_rejects_unknown_fields(seeded_db):
 
 def test_team_service_rejects_non_boolean_active_state(seeded_db):
     team = service.create_team(
-        seeded_db, code="T-SERVICE-BOOL", name="服务团队", description=None, actor="pytest"
+        seeded_db, name="服务团队", description=None, actor="pytest"
     )
 
     with pytest.raises(Validation, match="启用状态必须为布尔值"):
@@ -190,7 +187,7 @@ def test_admin_mutations_write_audit(client: TestClient, db: Session):
     assert reset.status_code == 200, reset.text
     team = client.post(
         "/api/teams",
-        json={"code": "t1", "name": "一组"},
+        json={"name": "一组"},
         headers={"X-Dev-User": "admin"},
     )
     assert team.status_code == 201, team.text

@@ -5,6 +5,7 @@ orders / installments 双方引用 domain 不再有反向依赖）；本文件�
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.core.errors import Validation
@@ -61,6 +62,12 @@ MANUAL_EXCLUDED_CATEGORIES: tuple[str, ...] = (
 # 两者是不同的归类，所以不能用一个属性过滤同时拿到两个方向。
 STUDIO_EXPENSE_ATTRIBUTE = AccountingAttribute.OPERATING_EXPENSE.value
 STUDIO_INCOME_ATTRIBUTE = AccountingAttribute.SELF_REVENUE.value
+
+
+def normalize_cashflow_category(value: str) -> str:
+    """字典编码保留小写；系统科目继续使用大写编码。"""
+    value = value.strip()
+    return value if re.fullmatch(r"[a-z][a-z0-9_]*_\d{2,}", value) else value.upper()
 
 
 def accounting_attribute_for_manual_cashflow(

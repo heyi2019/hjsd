@@ -76,6 +76,7 @@ class ExecutionRebateOut(BaseModel):
 class ActiveConsignmentOut(BaseModel):
     event_id: int
     platform: str
+    platform_label: str | None = None
     price: object | None = None
     listed_at: datetime
 
@@ -84,11 +85,14 @@ class AccountExecutionOrderOut(BaseModel):
     order_id: int
     order_no: str
     order_type: str
+    game_type_label: str | None = None
+    channel_region_label: str | None = None
     trade_date: date
     created_at: datetime
     occurred_at: datetime | None = None
     status: str
     note: str | None = None
+    option_label_snapshot: dict[str, str] | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
     extra_fields: list[dict[str, object]] = Field(default_factory=list)
     cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)

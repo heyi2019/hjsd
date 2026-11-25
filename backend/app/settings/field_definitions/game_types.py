@@ -5,6 +5,8 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.numbering import allocate_number, ensure_sequence
+from app.shared.game_references import archive_game_references
 from app.core.errors import ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import GameTypeOption
@@ -30,13 +32,35 @@ def _get_game_type_or_404(session: Session, game_type_id: int, *, refresh: bool 
     return item
 
 
+def _channel_regions(session: Session, regions: list[dict[str, str]], existing: list | None = None) -> list[dict[str, str]]:
+    previous = {item["value"]: item for item in (existing or []) if isinstance(item, dict) and "value" in item}
+    result: list[dict[str, str]] = []
+    labels: set[str] = set()
+    values: set[str] = set()
+    for region in regions:
+        label = _required_name(region.get("label"), field="channel_regions.label")
+        if label in labels:
+            raise Validation("渠道／区服名称不能重复")
+        labels.add(label)
+        value = region.get("value")
+        if value:
+            if value not in previous or value in values:
+                raise Validation("渠道／区服编码无效或重复", details={"value": value})
+        else:
+            ensure_sequence(session, "GAME_CHANNEL", "channel_", 2)
+            value = allocate_number(session, "GAME_CHANNEL")
+        values.add(value)
+        result.append({"value": value, "label": label})
+    return result
+
+
 def create_game_type(
-    session: Session, *, name: str, actor: str, sort_order: int = 0, is_default: bool = False, channel_regions: list[str] | None = None
+    session: Session, *, name: str, actor: str, sort_order: int = 0, is_default: bool = False, channel_regions: list[dict[str, str]] | None = None
 ) -> GameTypeOption:
     normalized_name = _required_name(name, field="name")
     sort_order = _non_negative_int(sort_order, field="sort_order")
-    regions = list(dict.fromkeys(str(item).strip() for item in (channel_regions or []) if str(item).strip()))
     _lock_game_types(session)
+    regions = _channel_regions(session, channel_regions or [])
     if session.scalar(select(GameTypeOption).where(GameTypeOption.name == normalized_name)) is not None:
         raise Validation(
             f"游戏类型已存在：{normalized_name}",
@@ -62,7 +86,7 @@ def create_game_type(
         entity_type="GameTypeOption",
         entity_id=item.id,
         actor=actor,
-        after=_snapshot(item, ("name", "sort_order", "is_active", "is_default")),
+        after=_snapshot(item, ("name", "sort_order", "is_active", "is_default", "channel_regions")),
     )
     return item
 
@@ -74,7 +98,7 @@ def update_game_type(
     actor: str,
     name: str | None = None,
     sort_order: int | None = None,
-    channel_regions: list[str] | None = None,
+    channel_regions: list[dict[str, str]] | None = None,
 ) -> GameTypeOption:
     _lock_game_types(session)
     item = _get_game_type_or_404(session, game_type_id, refresh=True)
@@ -85,7 +109,10 @@ def update_game_type(
             raise Validation(f"游戏类型已存在：{normalized_name}", code=ErrorCode.DUPLICATE_CODE)
     if sort_order is not None:
         sort_order = _non_negative_int(sort_order, field="sort_order")
-    regions = None if channel_regions is None else list(dict.fromkeys(str(item).strip() for item in channel_regions if str(item).strip()))
+    regions = None if channel_regions is None else _channel_regions(session, channel_regions, item.channel_regions)
+    if regions is not None:
+        active_values = {region["value"] for region in regions}
+        archive_game_references(session, [region for region in item.channel_regions or [] if region["value"] not in active_values], actor=actor)
     before = _snapshot(item, ("name", "sort_order", "channel_regions"))
     if normalized_name is not None:
         item.name = normalized_name
@@ -158,12 +185,13 @@ def delete_game_type(session: Session, game_type_id: int, *, actor: str) -> None
     item = _get_game_type_or_404(session, game_type_id, refresh=True)
     if item.is_default:
         raise Validation("默认游戏类型不能删除")
+    archive_game_references(session, [{"value": item.value, "label": item.name}, *(item.channel_regions or [])], actor=actor)
     record_audit(
         session,
         action=AuditAction.GAME_TYPE_DELETE,
         entity_type="GameTypeOption",
         entity_id=item.id,
         actor=actor,
-        before=_snapshot(item, ("name", "sort_order", "is_active", "is_default")),
+        before=_snapshot(item, ("name", "sort_order", "is_active", "is_default", "channel_regions")),
     )
     session.delete(item)

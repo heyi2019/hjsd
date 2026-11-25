@@ -46,7 +46,6 @@ def create_pool(
 ) -> schemas.PoolOut:
     pool = foundation_create_pool(
         db,
-        code=payload.code,
         name=payload.name,
         actor=_actor(user),
         pool_type=payload.pool_type,

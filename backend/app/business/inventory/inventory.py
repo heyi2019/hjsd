@@ -16,6 +16,7 @@ from app.core.security import CurrentUser
 from app.domain.trade import Account, Order, OrderEvent
 from app.shared.form_values import get_extra_values_bulk
 from app.shared.amount_search import amount_keyword
+from app.shared.game_references import matching_game_references
 from ._common import (
     AGE_WARNING_MAX_DAYS,
     INVENTORY_STATUSES,
@@ -112,6 +113,10 @@ def inventory_ledger(
         Date,
     )
     base_scope = _inventory_ledger_scope(session, user)
+    search_keyword = keyword.strip() if keyword else ""
+    matching_games, matching_channels = (
+        matching_game_references(session, search_keyword) if search_keyword else ([], [])
+    )
 
     def stmt(*, include_type: bool = True, include_search_date: bool = True):
         query = base_scope
@@ -129,13 +134,17 @@ def inventory_ledger(
         if age_gt_days is not None:
             query = query.where(entry_day < date.today() - timedelta(days=age_gt_days))
         if include_search_date:
-            if keyword and keyword.strip():
-                pattern, escape = like_contains(keyword.strip())
-                amount = amount_keyword(keyword)
+            if search_keyword:
+                pattern, escape = like_contains(search_keyword)
+                amount = amount_keyword(search_keyword)
                 conditions = [
                     func.coalesce(Account.game_account, Order.account_snapshot["game_account"].as_string()).ilike(pattern, escape=escape),
                     game_type_expr.ilike(pattern, escape=escape),
                     func.coalesce(Account.channel_region, Order.account_snapshot["channel_region"].as_string()).ilike(pattern, escape=escape),
+                    Order.account_snapshot["game_type_label"].as_string().ilike(pattern, escape=escape),
+                    Order.account_snapshot["channel_region_label"].as_string().ilike(pattern, escape=escape),
+                    game_type_expr.in_(matching_games),
+                    func.coalesce(Account.channel_region, Order.account_snapshot["channel_region"].as_string()).in_(matching_channels),
                 ]
                 if amount is not None:
                     conditions.append(Account.cost_amount == amount)

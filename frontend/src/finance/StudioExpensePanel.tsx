@@ -292,7 +292,7 @@ export function StudioExpensePanel({ pools, ctrl, periodState: suppliedPeriod }:
       width: 70,
       render: (v: string) => (v === "IN" ? "收入" : "支出"),
     },
-    { title: "科目", dataIndex: "category" },
+    { title: "科目", dataIndex: "category", render: (value: string) => [...expenseItems, ...INCOME_ITEMS].find((item) => item.value === value)?.label ?? value },
     {
       title: "金额",
       dataIndex: "amount",

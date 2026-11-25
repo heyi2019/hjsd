@@ -23,7 +23,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
 }));
 
 const users = [
-  { id: 7, username: "operator01", display_name: "业务同事", role: "OPERATOR", owner_scope: "SELF", team_ids: [], pool_ids: [], is_active: true, must_change_password: false },
+  { id: 7, username: "operator01", employee_code: "yy007", display_name: "业务同事", role: "OPERATOR", owner_scope: "SELF", team_ids: [], pool_ids: [], is_active: true, must_change_password: false },
   { id: 8, username: "viewer01", display_name: "查看人甲", role: "VIEWER", owner_scope: "ALL", team_ids: [1], pool_ids: [1], is_active: false, must_change_password: false },
 ];
 const teams = [{ id: 1, code: "T1", name: "一队", is_active: true }];
@@ -47,6 +47,7 @@ describe("UsersPanel.deep：写路径与失败分支", () => {
     const ui = userEvent.setup({ pointerEventsCheck: 0 });
     renderLight(<UsersPanel />, { user: "admin" });
     await screen.findByText("operator01");
+    expect(screen.getByText("yy007")).toBeInTheDocument();
     expect(screen.getByText("用户名", { selector: "label" })).toBeVisible();
     await ui.type(screen.getByPlaceholderText("用户名"), "newuser");
     await ui.type(screen.getByPlaceholderText("姓名"), "新同事");

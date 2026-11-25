@@ -18,8 +18,8 @@ from app.finance.balances import pool_balance
 
 def _pools(seeded_db):
     """按 code 取 system 池（等价于原 pool_accounts.get_pool）。"""
-    invest = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-    profit = seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+    invest = seeded_db.scalar(select(Pool).where(Pool.code == "pool_01"))
+    profit = seeded_db.scalar(select(Pool).where(Pool.code == "pool_02"))
     assert invest is not None and profit is not None, "种子池缺失"
     return invest, profit
 

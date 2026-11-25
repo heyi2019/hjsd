@@ -90,7 +90,7 @@ cd ..
 | `backend/app/core` | settings / database / money / errors / security 等技术底座 |
 | `backend/app/domain` | 当前 ORM 模型与领域对象 |
 | `backend/app` 领域包 | `business`、`customers`、`finance`、`operations`、`settings`、`workbench`；`shared` 为跨域共享原语 |
-| `backend/alembic/squashed_versions` | **活动迁移链**：只有 `0001_current_schema_baseline`，head = `0001`（`alembic.ini` 的 `version_locations` 只指向此目录；改 ORM 即改基线，不再加增量迁移） |
+| `backend/alembic/squashed_versions` | **活动迁移链**：`0001_current_schema_baseline` 和 `0002_dictionary_codes`，head = `0002`；新库与既有库均通过 `alembic upgrade head` 按版本升级 |
 | `tests/backend` | 后端测试（pytest，按实际磁盘文件数维护） |
 | `frontend/src` | 按业务域拆分，包含 `workbench`、`business`、`customers`、`finance`、`operations`、`settings`；`app` 为应用外壳，`shared` 为 UI 与 API 基础层 |
 | `frontend/scripts/ui_guards.mjs` | UI 守卫 |

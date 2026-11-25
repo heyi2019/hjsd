@@ -225,6 +225,26 @@ def test_export_accepts_keyword_instead_of_leaking_query_object(committed_financ
         seeded_client.app.dependency_overrides.pop(read_access.dependency, None)
 
 
+def test_cashflow_export_translates_studio_dictionary_code(committed_finance_client, headers):
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    client, engine = committed_finance_client
+    with Session(engine) as session:
+        seed_catalog(session, actor="pytest")
+        seed_example_catalog(session)
+        session.commit()
+    response = client.post("/api/cashflows", headers=headers, json={
+        "pool_id": 1, "occurred_on": TODAY.isoformat(), "direction": "OUT", "ledger_type": "STUDIO",
+        "accounting_attribute": "OPERATING_EXPENSE", "category": "studio_expense_item_01", "amount": "120",
+    })
+    assert response.status_code == 201, response.text
+    exported = client.get("/api/cashflows/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "房租" in exported.text
+    assert "studio_expense_item_01" not in exported.text
+
+
 def test_cashflow_export_includes_fund_account_name(committed_finance_client, headers):
     seeded_client, engine = committed_finance_client
     created = _create(seeded_client, headers, direction="OUT", amount="20", note="资金账户导出")

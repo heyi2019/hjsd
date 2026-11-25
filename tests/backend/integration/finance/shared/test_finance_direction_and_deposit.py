@@ -61,7 +61,7 @@ def _flow(
 # ------------------------------- #10 押金占用进支出 / 释放进收入（资金中心呈现层）
 def test_deposit_hold_in_expense_release_in_income(seeded_db):
     """押金占用=支出、释放=收入；现金头寸 / 押金占用 / 可用余额口径不变。"""
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     deposit = create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("2000"), paid_on=TODAY, actor="pytest"
@@ -100,7 +100,7 @@ def test_deposit_linked_to_order_in_r2_direct_cost_same_source_as_profit(seeded_
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
 
     def october_monthly_totals():
         data = monthly_pnl_report(seeded_db)
@@ -168,7 +168,7 @@ def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     base = monthly_pnl_report(seeded_db)
     oct_before = next((r for r in base["items"] if r["month"] == "2026-10"), None)
     before_cost = oct_before["cost"] if oct_before else Decimal("0.00")
@@ -183,7 +183,7 @@ def test_order_linked_normal_expense_still_in_r2_direct_cost(seeded_db):
 # ----------------------------------------------- #5 外部注入进入收入
 def test_external_in_updates_income(seeded_db):
     """外部注入进入资金账户收入，余额与收入同源。"""
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="IN",
           amount="5000")
@@ -199,7 +199,7 @@ def test_sale_and_rebate_are_income_subtypes_not_separate_columns(seeded_db):
     返点流水源头见 finance/rebates.py（IN/category=REBATE）；
     售出见 orders/events.py（IN/"SELL"）。
     """
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="IN", amount="8000", category="SELL")
     _flow(seeded_db, pool_id=invest.id, direction="IN", amount="500", category="REBATE")
@@ -214,7 +214,7 @@ def test_buy_amounts_are_expense_subtypes_not_separate_columns(seeded_db):
 
     BUY 源头见 orders/events.py（OUT/"BUY"）。
     """
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="3000", category="BUY")
     _flow(seeded_db, pool_id=invest.id, direction="OUT", amount="2000", category="BUY")
@@ -226,8 +226,8 @@ def test_buy_amounts_are_expense_subtypes_not_separate_columns(seeded_db):
 # ------------ 内部划转：划出账户记支出、划入账户记收入，不单列第三方向（2026-11-12 裁决）
 def test_internal_transfer_is_expense_of_source_income_of_target(seeded_db):
     """同一笔划转：划出池 expense +、划入池 income +；资金日报无独立划转方向列。"""
-    invest = _pool(seeded_db, "HJ_INVEST")
-    profit = _pool(seeded_db, "HJ_PROFIT")
+    invest = _pool(seeded_db, "pool_01")
+    profit = _pool(seeded_db, "pool_02")
     before_src = pool_balance(seeded_db, invest.id)
     before_tgt = pool_balance(seeded_db, profit.id)
     tid = "TRF-TEST-001"
@@ -256,7 +256,7 @@ def test_deposit_loss_not_double_counted_in_funds_and_profit(seeded_db):
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     profit0 = order_cashflow_profit_by_order(seeded_db, order_ids=[order.id]).get(order.id, Decimal("0"))
 
@@ -316,7 +316,7 @@ def test_deposit_hold_available_not_deducted_twice(seeded_db):
     deposit_held 仅作「其中：押金占用」信息列，不再从 available 二次扣减
     （缴 1000：cash −1000、available −1000，合计只影响一次）。
     """
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     create_deposit(
         seeded_db, pool_id=invest.id, amount=Decimal("1000"),
@@ -338,7 +338,7 @@ def test_deposit_loss_null_attribute_other_flows_not_dropped(seeded_db):
     order = create_order(
         seeded_db, order_type="TH", owner_id=1, trade_date=TODAY, actor="pytest"
     )
-    invest = _pool(seeded_db, "HJ_INVEST")
+    invest = _pool(seeded_db, "pool_01")
     before = pool_balance(seeded_db, invest.id)
     # 无属性的挂单支出（普通经营流水）：accounting_attribute=NULL
     # SQL 中 NULL != 'DEPOSIT' 为假，若过滤写成 != 会误删本行——正向条件须放行 NULL。

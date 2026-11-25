@@ -347,7 +347,7 @@ def test_concurrent_reconciliation_creation_keeps_one_snapshot(v1_engine, same_a
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
-            pool_id = session.scalar(select(Pool.id).where(Pool.code == "HJ_INVEST"))
+            pool_id = session.scalar(select(Pool.id).where(Pool.code == "pool_01"))
             session.commit()
         reached, proceed = Event(), Event()
         day = date(2026, 11, 1)
@@ -409,7 +409,7 @@ def test_deposit_and_reconciliation_competing_actions_are_serialized(v1_engine, 
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             pool_id = pool.id
             if action == "resolve":
                 row = create_reconciliation(session, pool_id=pool_id, reconciled_on=day,
@@ -506,8 +506,8 @@ def test_concurrent_transfer_repairs_only_create_one_counterpart(v1_engine):
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
-            source = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-            target = session.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+            source = session.scalar(select(Pool).where(Pool.code == "pool_01"))
+            target = session.scalar(select(Pool).where(Pool.code == "pool_02"))
             target_id = target.id
             session.add(Cashflow(flow_no="TEST-REPAIR-OUT", pool_id=source.id,
                                  occurred_on=date(2026, 11, 1), direction="OUT", amount=100,
@@ -576,7 +576,7 @@ def test_concurrent_actions_cannot_change_reversed_flow(v1_engine, action):
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             flow = create_cashflow(session, pool_id=pool.id, occurred_on=date(2026, 11, 1),
                                    ledger_type="STUDIO", direction="OUT", category="房租", amount="100", actor="pytest")
             flow_id, flow_no, pool_id = flow.id, flow.flow_no, pool.id
@@ -649,8 +649,8 @@ def test_concurrent_transfers_remain_paired_with_negative_balance(v1_engine):
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
-            source = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
-            target = session.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
+            source = session.scalar(select(Pool).where(Pool.code == "pool_01"))
+            target = session.scalar(select(Pool).where(Pool.code == "pool_02"))
             source_id, target_id = source.id, target.id
             session.add(Cashflow(flow_no="TEST-CONCURRENT-IN", pool_id=source_id,
                                  occurred_on=date(2026, 11, 1), direction=Direction.IN.value,
@@ -715,8 +715,8 @@ def test_concurrent_default_pool_switches_keep_one_default(v1_engine):
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
-            second = session.scalar(select(Pool).where(Pool.code == "HJ_PROFIT"))
-            third = create_pool(session, code="HJ_THIRD", name="第三账户", actor="pytest")
+            second = session.scalar(select(Pool).where(Pool.code == "pool_02"))
+            third = create_pool(session, name="第三账户", actor="pytest")
             second_id, third_id = second.id, third.id
             session.commit()
         reached, proceed = Event(), Event()
@@ -778,7 +778,7 @@ def test_pool_disable_serializes_with_new_cashflows(v1_engine, kind, first_actio
             account = create_account(session, game_account="disable-race", business_mode="SELF",
                                      inventory_type="RECOVERY", actor="pytest")
             order = create_order(session, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             pool_id, order_id = pool.id, order.id
             session.commit()
         reached, proceed = Event(), Event()
@@ -859,7 +859,7 @@ def test_pool_disable_and_order_cashflow_edit_do_not_deadlock(v1_engine):
             account = create_account(session, game_account="pool-edit-race", business_mode="SELF",
                                      inventory_type="RECOVERY", actor="pytest")
             order = create_order(session, order_type="HS", trade_date=day, actor="pytest", account_id=account.id)
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             flow = create_cashflow(session, pool_id=pool.id, occurred_on=day, direction="OUT", category="OTHER",
                                    amount="10", order_id=order.id, actor="pytest")
             pool_id, order_id, flow_no = pool.id, order.id, flow.flow_no
@@ -933,7 +933,7 @@ def test_order_date_shift_and_new_deposit_keep_matching_dates(v1_engine):
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
             order = create_order(session, order_type="HS", trade_date=old_day, actor="pytest")
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             order_id, pool_id = order.id, pool.id
             session.commit()
 
@@ -1003,7 +1003,7 @@ def test_order_date_shift_and_deposit_return_do_not_deadlock(v1_engine):
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
             order = create_order(session, order_type="HS", trade_date=old_day, actor="pytest")
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             deposit = create_deposit(session, pool_id=pool.id, amount="50", paid_on=old_day,
                                      source_order_id=order.id, actor="pytest")
             order_id, deposit_id = order.id, deposit.id
@@ -1129,7 +1129,7 @@ def test_order_date_shift_and_cashflow_reversal_do_not_deadlock(v1_engine):
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
             order = create_order(session, order_type="HS", trade_date=old_day, actor="pytest")
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             flow = create_cashflow(session, pool_id=pool.id, order_id=order.id, amount="50", occurred_on=old_day,
                                    direction="OUT", category="OTHER", actor="pytest")
             order_id, flow_id, flow_no = order.id, flow.id, flow.flow_no
@@ -1203,7 +1203,7 @@ def test_order_write_and_pool_disable_keep_consistent_lock_order(v1_engine, kind
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
             order = create_order(session, order_type="HS", trade_date=day, actor="pytest")
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             order_id, pool_id = order.id, pool.id
             session.commit()
 
@@ -1302,7 +1302,7 @@ def test_reconciliation_sees_one_committed_order_date_shift(v1_engine):
             seed_foundation(session, actor="pytest", include_example_data=True)
             session.add(User(username="pytest", display_name="测试", password_hash="unused"))
             order = create_order(session, order_type="HS", trade_date=day, actor="pytest")
-            pool = session.scalar(select(Pool).where(Pool.code == "HJ_INVEST"))
+            pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
             for direction, amount in (("OUT", "100"), ("IN", "50")):
                 create_cashflow(session, pool_id=pool.id, order_id=order.id, amount=amount, occurred_on=day,
                                 direction=direction, category="OTHER", actor="pytest")

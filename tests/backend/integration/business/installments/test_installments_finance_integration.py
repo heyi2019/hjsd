@@ -187,7 +187,7 @@ class TestHsStockSale:
         seeded_db.commit()
         assert seeded_db.get(type(account), account.id).status == AccountStatus.WAITING.value
 
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         contract = inst_create.create_installment(
             seeded_db,
             order_id=order.id,
@@ -304,7 +304,7 @@ class TestHsStockSale:
 
 class TestDeposit:
     def test_deposit_holds_available_balance_without_profit_impact(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         before = pool_balance(seeded_db, invest.id)
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("2000"), paid_on=TODAY, actor="pytest"
@@ -330,7 +330,7 @@ class TestDeposit:
         assert balance["deposit_held"] == Decimal("800.00")
 
     def test_return_cannot_exceed_outstanding(self, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = create_deposit(
             seeded_db, pool_id=invest.id, amount=Decimal("1000"), paid_on=TODAY, actor="pytest"
         )
@@ -415,7 +415,7 @@ class TestBusinessFinanceIntegrationApi:
         assert len(schedules) == 3  # 首付 + 2 期
 
     def test_deposit_and_rebate_endpoints(self, seeded_client, headers, seeded_db):
-        invest = _pool(seeded_db, "HJ_INVEST")
+        invest = _pool(seeded_db, "pool_01")
         deposit = seeded_client.post(
             "/api/deposits",
             json={"pool_id": invest.id, "amount": "2000.00", "paid_on": TODAY.isoformat()},

@@ -493,6 +493,70 @@ def test_exported_ledger_updates_existing_order_without_rewriting_derived_column
 
 
 @pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_exported_dictionary_labels_can_round_trip_into_existing_order(seeded_client, seeded_db, headers, extension):
+    from datetime import date
+    from app.business.orders.create import create_order
+    from app.settings.field_definitions.game_types import create_game_type, update_game_type
+
+    game = create_game_type(seeded_db, name="原游戏", channel_regions=[{"label": "原渠道"}], actor="pytest")
+    channel = game.channel_regions[0]["value"]
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest",
+                         account_snapshot={"game_account": "编码回流", "game_type": game.value, "channel_region": channel})
+    update_game_type(seeded_db, game.id, name="现游戏", channel_regions=[{"value": channel, "label": "现渠道"}], actor="pytest")
+    seeded_db.commit()
+    exported = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+    assert exported.status_code == 200, exported.text
+    mime = "text/csv" if extension == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    data = {"existing": "update", "sections": "details"}
+    files = {"file": (f"订单.{extension}", exported.content, mime)}
+    preview = seeded_client.post("/api/order-imports/preview", headers=headers, data=data, files=files)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["detail_errors"] == []
+    assert preview.json()["rows"][0]["action"] == "update"
+    result = seeded_client.post("/api/order-imports/execute", headers=headers, data=data, files=files)
+    assert result.status_code == 200, result.text
+    seeded_db.refresh(order)
+    assert order.account_snapshot["game_type"] == game.value
+    assert order.account_snapshot["channel_region"] == channel
+    assert order.account_snapshot["game_type_label"] == "原游戏"
+
+
+def test_new_order_import_resolves_game_and_channel_labels_to_codes(seeded_client, seeded_db, headers):
+    from sqlalchemy import select
+    from app.domain.trade import Order
+    from app.settings.field_definitions.game_types import create_game_type
+
+    game = create_game_type(seeded_db, name="导入游戏", channel_regions=[{"label": "安卓一区"}], actor="pytest")
+    content = ("订单号,业务日期,业务类型,游戏账号/产品,游戏/产品类型,渠道 / 区服\n"
+               "DG0955,2026-10-17,代挂,导入账号,导入游戏,安卓一区\n").encode()
+    result = seeded_client.post("/api/order-imports/execute", headers=headers,
+                                data={"existing": "skip", "sections": "details"},
+                                files={"file": ("订单.csv", content, "text/csv")})
+    assert result.status_code == 200, result.text
+    order = seeded_db.scalar(select(Order).where(Order.order_no == "DG0955"))
+    assert order.account_snapshot["game_type"] == game.value
+    assert order.account_snapshot["channel_region"] == game.channel_regions[0]["value"]
+    assert order.account_snapshot["game_type_label"] == "导入游戏"
+    assert order.account_snapshot["channel_region_label"] == "安卓一区"
+
+
+def test_new_order_import_preview_rejects_unconfigured_game(seeded_client, seeded_db, headers):
+    from sqlalchemy import select
+    from app.domain.trade import Order
+
+    content = ("订单号,业务日期,业务类型,游戏账号/产品,游戏/产品类型\n"
+               "DG0956,2026-10-17,代挂,导入账号,未配置游戏\n").encode()
+    files = {"file": ("订单.csv", content, "text/csv")}
+    preview = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "skip"}, files=files)
+    assert preview.status_code == 200, preview.text
+    assert preview.json()["rows"][0]["action"] == "error"
+    assert any("游戏类型" in error for error in preview.json()["rows"][0]["errors"])
+    result = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "skip"}, files=files)
+    assert result.status_code == 422
+    assert seeded_db.scalar(select(Order.id).where(Order.order_no == "DG0956")) is None
+
+
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
 def test_order_export_uses_current_linked_account_details(seeded_client, seeded_db, headers, extension):
     from datetime import date
     from app.business.inventory.profile import update_account_profile
@@ -533,7 +597,9 @@ def test_execute_creates_unbound_orders_reserves_numbers_and_is_idempotent_on_sk
     from sqlalchemy import select
     from app.business.orders.create import create_order
     from app.domain.trade import Account, Order
+    from app.settings.field_definitions.game_types import create_game_type
 
+    game = create_game_type(seeded_db, name="手游", actor="pytest")
     content = ("订单号,业务日期,业务类型,游戏账号/产品,游戏/产品类型,订单备注\n"
                "HS0998,2026-10-17,回收,导入账号,手游,历史备注\n").encode()
     def submit(choice):
@@ -545,6 +611,7 @@ def test_execute_creates_unbound_orders_reserves_numbers_and_is_idempotent_on_sk
     order = seeded_db.scalar(select(Order).where(Order.order_no == "HS0998"))
     assert order is not None and order.account_id is None
     assert order.account_snapshot["game_account"] == "导入账号"
+    assert order.account_snapshot["game_type"] == game.value
     assert order.trade_date == date(2026, 10, 17) and order.note == "历史备注"
     assert seeded_db.scalar(select(Account.id).where(Account.game_account == "导入账号")) is None
     repeated = submit("skip")
@@ -718,6 +785,8 @@ def test_operational_events_import_with_stable_unlisting_reference(seeded_client
 def test_selected_order_details_imports_snapshot_and_note_without_binding_stock(seeded_client, seeded_db, headers):
     from sqlalchemy import select
     from app.domain.trade import Account, Order
+    from app.settings.field_definitions.game_types import create_game_type
+    game = create_game_type(seeded_db, name="手游", channel_regions=[{"label": "一区"}], actor="pytest")
     book = Workbook()
     main = book.active
     main.title = "主订单信息"
@@ -735,7 +804,7 @@ def test_selected_order_details_imports_snapshot_and_note_without_binding_stock(
     assert response.status_code == 200, response.text
     order = seeded_db.scalar(select(Order).where(Order.order_no == "DG0960"))
     assert order.account_id is None and order.note == "历史订单备注"
-    assert order.account_snapshot["channel_region"] == "一区"
+    assert order.account_snapshot["channel_region"] == game.channel_regions[0]["value"]
     assert order.account_snapshot["bound_phone"] == "12345" and order.account_snapshot["has_secondary"] is True
     assert order.account_snapshot["account_description"] == "历史账号描述"
     assert seeded_db.scalar(select(Account.id).where(Account.game_account == "历史账号")) is None

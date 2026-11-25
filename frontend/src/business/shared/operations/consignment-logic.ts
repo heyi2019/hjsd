@@ -9,6 +9,7 @@ export type ConsignmentListing = {
   orderNo: string;
   eventId?: number;
   platform: string;
+  platformLabel?: string;
   price: number | string | null;
   listedAt: string;
 };
@@ -26,6 +27,7 @@ export function activeConsignmentListings(order: AccountExecutionOrder): Consign
     orderNo: order.order_no,
     eventId: item.event_id,
     platform: item.platform,
+    ...(item.platform_label ? { platformLabel: item.platform_label } : {}),
     price: item.price,
     listedAt: formatDateTimeMinute(item.listed_at),
   }));

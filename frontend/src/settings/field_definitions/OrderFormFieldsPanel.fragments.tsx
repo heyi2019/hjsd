@@ -56,7 +56,7 @@ export const describeCondition = (fieldLabel: string, cond: { op: string; values
 };
 
 /** 校验后端规范化的 options 字段。 */
-export const normalizeOptionItems = (raw: unknown): Array<{ value: string; label: string }> => {
+export const normalizeOptionItems = (raw: unknown, allowEmptyValue = false): Array<{ value: string; label: string }> => {
   if (!Array.isArray(raw)) return [];
   return raw.map((item) => {
     if (!item || typeof item !== "object") {
@@ -68,8 +68,8 @@ export const normalizeOptionItems = (raw: unknown): Array<{ value: string; label
     }
     const value = option.value.trim();
     const label = option.label.trim();
-    if (!value || !label) {
-      throw new Error("选项 value/label 不能为空");
+    if ((!value && !allowEmptyValue) || !label) {
+      throw new Error("选项名称不能为空");
     }
     return { value, label };
   });

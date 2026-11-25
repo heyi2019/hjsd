@@ -122,8 +122,8 @@ def _migration_template() -> str:
         admin.dispose()
 
 
-def _provision_probe_db(template: str) -> tuple[str, dict[str, str]]:
-    """从模板库拷贝出一个全新的临时库（已处于 head 结构）。"""
+def _provision_probe_db(template: str | None) -> tuple[str, dict[str, str]]:
+    """从模板拷贝或创建空的隔离临时库。"""
     from app.core.settings import get_settings
 
     base = get_settings().alembic_url
@@ -132,7 +132,8 @@ def _provision_probe_db(template: str) -> tuple[str, dict[str, str]]:
     admin = _admin_engine()
     try:
         with admin.connect() as conn:
-            conn.exec_driver_sql(f'CREATE DATABASE "{db_name}" TEMPLATE "{template}"')
+            suffix = f' TEMPLATE "{template}"' if template else ""
+            conn.exec_driver_sql(f'CREATE DATABASE "{db_name}"{suffix}')
     finally:
         admin.dispose()
 
@@ -162,6 +163,20 @@ def migration_db(_migration_template: str):
     engine = create_engine(target)
     try:
         yield engine, target, env
+    finally:
+        engine.dispose()
+        _drop_probe_db(target)
+
+
+@pytest.fixture()
+def migration_0001_db():
+    """独立空库真实执行 0001，供测试真实的 0001→0002 升级。"""
+    target, env = _provision_probe_db(None)
+    engine = create_engine(target)
+    try:
+        result = _alembic(env, "upgrade", "0001")
+        assert result.returncode == 0, result.stdout + result.stderr
+        yield engine, env
     finally:
         engine.dispose()
         _drop_probe_db(target)
@@ -379,25 +394,140 @@ def test_adds_idempotency_storage_to_existing_database_without_reseeding(migrati
 
 
 def test_active_migration_chain_is_single_current_baseline():
-    """新环境只允许从当前 ORM 基线 0001 初始化，不加载旧库兼容迁移。"""
+    """活动链为 0001 基线和 0002 字典编码迁移。"""
     result = _alembic({}, "heads")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert result.stdout.strip() == "0001 (head)"
+    assert result.stdout.strip() == "0002 (head)"
 
     active_dir = BACKEND_DIR / "alembic" / "squashed_versions"
     active_files = sorted(path.name for path in active_dir.glob("*.py"))
-    assert active_files == ["0001_current_schema_baseline.py"]
+    assert active_files == ["0001_current_schema_baseline.py", "0002_dictionary_codes.py"]
 
 
-def test_downgrade_and_upgrade_roundtrip(migration_db):
-    engine, target, env = migration_db
-    assert _alembic(env, "downgrade", "base").returncode == 0
+def test_upgrade_0002_migrates_existing_data_without_changing_financial_links(migration_0001_db):
+    from collections import defaultdict
+    from datetime import date
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from app.business.inventory.profile import create_account
+    from app.business.orders.create import create_order
+    from app.domain.foundation import GameTypeOption, Pool
+    from app.domain.options import OptionSet
+    from app.domain.trade import OrderEvent
+    from app.domain.users import User
+    from app.finance.cashflow.cashflows import create_cashflow
+    from scripts.test_example_seed import seed_example_catalog, seed_example_data
 
+    engine, env = migration_0001_db
+    with Session(engine) as session:
+        seed_example_data(session, actor="pytest", stats=defaultdict(int))
+        seed_example_catalog(session)
+        operator = User(username="migration-test", display_name="测试员工", password_hash="test",
+                        role="OPERATOR", owner_scope="ALL", is_active=True)
+        session.add(operator)
+        session.flush()
+        game = session.scalar(select(GameTypeOption).where(GameTypeOption.name == "王者荣耀"))
+        platform = session.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_PLATFORM"))
+        platform.options = [{"value": "千寻", "label": "千寻"}, {"value": "盼之", "label": "盼之"},
+                            {"value": "螃蟹", "label": "螃蟹"}]
+        account = create_account(session, game_account="legacy-migration-test", game_type=game.name,
+                                 channel_region="安卓QQ", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+        account.wallet_realname = "未注销"
+        order = create_order(session, order_type="HS", trade_date=date(2026, 1, 1), actor="pytest", account_id=account.id,
+                             form_extra={"business_responsible_ids": [operator.id]})
+        order.account_snapshot = {"game_type": "王者荣耀", "channel_region": "安卓QQ", "wallet_realname": "未注销"}
+        session.add(OrderEvent(order_id=order.id, event_no="MIGRATION-LIST", event_type="OPERATE", amount=0,
+                               occurred_on=date(2026, 1, 1), is_posted=True, created_by="pytest", updated_by="pytest",
+                               form_extra={"operation_type": "CONSIGNMENT", "consignment_platforms": ["盼之"]}))
+        pool = session.scalar(select(Pool).where(Pool.code == "pool_01"))
+        flow = create_cashflow(session, pool_id=pool.id, occurred_on=date(2026, 1, 1), direction="IN",
+                               category="OTHER", amount="123.45", actor="pytest")
+        pool.code = "HJ_INVEST"
+        game.channel_regions = ["安卓QQ"]
+        session.flush()
+        account_id, order_id, flow_id, pool_id = account.id, order.id, flow.id, pool.id
+        session.commit()
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE orders DROP COLUMN option_label_snapshot"))
+        connection.execute(text("ALTER TABLE attachments ALTER COLUMN attachment_no SET NOT NULL"))
+
+    first = _alembic(env, "upgrade", "head")
+    assert first.returncode == 0, first.stdout + first.stderr
     with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+        assert next(column for column in inspect(connection).get_columns("attachments") if column["name"] == "attachment_no")["nullable"] is True
+        stock = connection.execute(text("SELECT game_type, channel_region, wallet_realname FROM stocks WHERE id=:id"), {"id": account_id}).one()
+        assert tuple(stock) == ("game_01", "channel_01", "N")
+        snapshot = connection.scalar(text("SELECT account_snapshot FROM orders WHERE id=:id"), {"id": order_id})
+        assert snapshot["game_type_label"] == "王者荣耀" and snapshot["channel_region_label"] == "安卓QQ"
+        event = connection.scalar(text("SELECT form_extra FROM order_events WHERE event_no='MIGRATION-LIST'"))
+        assert event["consignment_platforms"] == ["intermediary_platform_02"]
+        assert event["consignment_platform_labels"] == {"intermediary_platform_02": "盼之"}
+        flow = connection.execute(text("SELECT pool_id, amount FROM cashflow WHERE id=:id"), {"id": flow_id}).one()
+        assert flow.pool_id == pool_id and str(flow.amount) == "123.45"
+        assert connection.scalar(text("SELECT code FROM pools WHERE id=:id"), {"id": pool_id}) == "pool_03"
+        assert connection.scalar(text("SELECT COUNT(*) FROM audit_logs WHERE entity_type='dictionary_migration' AND entity_id='0002'")) == 1
+    again = _alembic(env, "upgrade", "head")
+    assert again.returncode == 0, again.stdout + again.stderr
+
+
+def test_upgrade_0002_recognizes_previously_migrated_local_data(migration_0001_db):
+    from sqlalchemy.orm import Session
+    from app.domain.options import OptionSet
+
+    engine, env = migration_0001_db
+    with Session(engine) as session:
+        session.add_all([OptionSet(code=code, label="已执行", group="SYSTEM", editable=False, options=[],
+                                   created_by="pytest", updated_by="pytest") for code in
+                         ("DICTIONARY_CODE_MIGRATION_V1", "CONSIGNMENT_CODE_MIGRATION_V1")])
+        session.commit()
+    with engine.connect() as connection:
+        before = connection.scalar(text("SELECT COUNT(*) FROM audit_logs"))
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+        assert connection.scalar(text("SELECT COUNT(*) FROM audit_logs")) == before
+        assert connection.scalar(text("SELECT COUNT(*) FROM option_sets WHERE code IN ('DICTIONARY_CODE_MIGRATION_V1', 'CONSIGNMENT_CODE_MIGRATION_V1')")) == 0
+
+
+def test_upgrade_0002_rolls_back_when_legacy_reference_is_invalid(migration_0001_db):
+    from sqlalchemy.orm import Session
+    from app.business.inventory.profile import create_account
+
+    engine, env = migration_0001_db
+    with Session(engine) as session:
+        account = create_account(session, game_account="unmapped-migration-test", game_type="不存在的游戏",
+                                 business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+        session.commit()
+        account_id = account.id
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE orders DROP COLUMN option_label_snapshot"))
+        connection.execute(text("ALTER TABLE attachments ALTER COLUMN attachment_no SET NOT NULL"))
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode != 0
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0001"
+        assert connection.scalar(text("SELECT game_type FROM stocks WHERE id=:id"), {"id": account_id}) == "不存在的游戏"
+        assert "option_label_snapshot" not in _column_names(engine, "orders")
+        assert next(column for column in inspect(connection).get_columns("attachments") if column["name"] == "attachment_no")["nullable"] is False
+
+
+def test_downgrade_and_upgrade_roundtrip(migration_db, migration_0001_db):
+    engine, target, env = migration_db
+    blocked = _alembic(env, "downgrade", "0001")
+    assert blocked.returncode != 0 and "不能自动降级" in blocked.stderr
+    with engine.connect() as connection:
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "0002"
+
+    baseline_engine, baseline_env = migration_0001_db
+    assert _alembic(baseline_env, "downgrade", "base").returncode == 0
+
+    with baseline_engine.connect() as connection:
         remaining = set(inspect(connection).get_table_names())
         assert remaining == {"alembic_version"}
 
-    upgraded = _alembic(env, "upgrade", "head")
+    upgraded = _alembic(baseline_env, "upgrade", "head")
     assert upgraded.returncode == 0, upgraded.stdout + upgraded.stderr
 
 

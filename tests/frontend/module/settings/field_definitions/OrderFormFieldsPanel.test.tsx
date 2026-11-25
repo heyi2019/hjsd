@@ -69,6 +69,25 @@ beforeEach(() => {
 });
 
 describe("OrderFormFieldsPanel", () => {
+  it("编辑自定义选项时只维护名称，原编码保留并由后台生成新编码", async () => {
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([makeField({
+      id: 88, field_key: "service_kind", label: "服务类型", field_type: "SELECT", is_custom: true,
+      options: [{ value: "service_kind_01", label: "普通服务" }],
+    })]);
+    vi.mocked(orderFormFieldsApi.update).mockResolvedValue(undefined as never);
+    renderLight(<OrderFormFieldsPanel />, { user: "admin" });
+    await ui.click(await screen.findByRole("button", { name: "编辑服务类型" }));
+    const existing = screen.getByPlaceholderText("选项名称");
+    await ui.clear(existing);
+    await ui.type(existing, "标准服务");
+    await ui.click(screen.getByRole("button", { name: "添加选项" }));
+    await ui.type(screen.getAllByPlaceholderText("选项名称")[1], "高级服务");
+    await ui.click(screen.getByRole("button", { name: "保存字段" }));
+    await waitFor(() => expect(orderFormFieldsApi.update).toHaveBeenCalledWith(88, expect.objectContaining({
+      options: [{ value: "service_kind_01", label: "标准服务" }, { value: "", label: "高级服务" }],
+    })));
+  });
+
   it("业务必填字段在设置中不能停用或改为选填", async () => {
     vi.mocked(orderFormFieldsApi.list).mockResolvedValue([
       makeField({ id: 62, field_key: "target", label: "需求目标", required: true, required_locked: true, locked: true, is_custom: false }),
@@ -286,8 +305,8 @@ describe("OrderFormFieldsPanel", () => {
       makeField({ field_key: "game_type", label: "游戏类型", field_type: "SELECT", locked: true, is_custom: false }),
     ]);
     vi.mocked(gameTypesApi.list).mockResolvedValue([
-      { id: 1, name: "王者荣耀", sort_order: 1, is_active: true, is_default: false },
-      { id: 2, name: "原神", sort_order: 2, is_active: true, is_default: false },
+      { id: 1, value: "game_01", name: "王者荣耀", sort_order: 1, is_active: true, is_default: false },
+      { id: 2, value: "game_02", name: "原神", sort_order: 2, is_active: true, is_default: false },
     ]);
     renderLight(<OrderFormFieldsPanel onConfigureGameTypes={onConfigureGameTypes} />, { user: "admin" });
     expect(await screen.findByText("游戏类型主数据 · 王者荣耀、原神等 2 项")).toBeInTheDocument();

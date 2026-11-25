@@ -190,7 +190,7 @@ def test_list_cashflows_transfer_source(seeded_db):
         actor="pytest",
     )
     transfers.create_transfer(
-        seeded_db, source_pool_id=1, target_pool_id=seeded_db.scalar(select(Pool).where(Pool.code == "HJ_PROFIT")).id,
+        seeded_db, source_pool_id=1, target_pool_id=seeded_db.scalar(select(Pool).where(Pool.code == "pool_02")).id,
         amount=Decimal("10"), occurred_on=TODAY, actor="pytest",
     )
     rows, total = list_cashflows(seeded_db)

@@ -9,6 +9,7 @@ from typing import Any
 
 from app.core.security import CurrentUser
 from app.core.report_csv import spreadsheet_csv_cell
+from app.shared.game_references import game_reference_labels
 from app.business.inventory.collaboration import load_order_execution, load_order_execution_batch
 from app.business.inventory.schemas import AccountOut
 from app.settings.lists import service as list_columns_service
@@ -86,12 +87,19 @@ def _detail_text(detail: Any, source_order_id: int | None) -> dict[str, Any]:
     }
 
 
-def _row(account: AccountOut, detail_text: dict[str, Any]) -> list[Any]:
+def _historical_label(order: Any, key: str, value: str | None, labels: dict[str, str]) -> str:
+    snapshot = order.account_snapshot or {}
+    if value and snapshot.get(key) == value and snapshot.get(f"{key}_label"):
+        return snapshot[f"{key}_label"]
+    return labels.get(value, value or "")
+
+
+def _row(account: AccountOut, detail_text: dict[str, Any], game_labels: dict[str, str], channel_labels: dict[str, str], order: Any) -> list[Any]:
     return [
         detail_text["order_no"] or account.source_order_no or "",
         BUSINESS_MODE_LABEL.get(account.business_mode or "", account.business_mode or ""),
         INVENTORY_TYPE_LABEL.get(account.inventory_type or "", account.inventory_type or ""),
-        account.game_type or "",
+        _historical_label(order, "game_type", account.game_type, game_labels),
         account.camp_account or "",
         account.stock_no or "",
         account.cost_amount,
@@ -103,7 +111,7 @@ def _row(account: AccountOut, detail_text: dict[str, Any]) -> list[Any]:
         detail_text["removed_at"],
         detail_text["consignment_at"],
         detail_text["consignment_platforms"],
-        account.channel_region or "",
+        _historical_label(order, "channel_region", account.channel_region, channel_labels),
         account.bound_phone or "",
         "" if account.has_secondary is None else ("有" if account.has_secondary else "无"),
         account.account_description or "",
@@ -130,6 +138,7 @@ def build_inventory_ledger_csv(
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow(INVENTORY_EXPORT_HEADERS)
+    game_labels, channel_labels = game_reference_labels(db)
     failed_details = 0
     for start in range(0, len(pairs), 500):
         batch = pairs[start:start + 500]
@@ -150,7 +159,7 @@ def build_inventory_ledger_csv(
         for (_, order), account_out, detail in zip(batch, accounts[start:start + 500], details, strict=True):
             if detail is None:
                 failed_details += 1
-            writer.writerow([spreadsheet_csv_cell(value) for value in _row(account_out, _detail_text(detail, order.id))])
+            writer.writerow([spreadsheet_csv_cell(value) for value in _row(account_out, _detail_text(detail, order.id), game_labels, channel_labels, order)])
         del details, detail
     return f"\ufeff{output.getvalue()}", failed_details
 
@@ -162,6 +171,7 @@ def build_inventory_visible_csv(pairs: Sequence[tuple[Any, Any]], accounts: Sequ
     config = list_columns_service.get_config(db, "INVENTORY")
     columns = [column for column in config["columns"] if column["is_visible"] and column["key"] != "actions"]
     labels = list_columns_service.get_value_labels(db, "INVENTORY")
+    game_labels, _channel_labels = game_reference_labels(db)
     output = io.StringIO()
     writer = csv.writer(output, lineterminator="\r\n")
     writer.writerow([spreadsheet_csv_cell(column["label"]) for column in columns])
@@ -175,7 +185,7 @@ def build_inventory_visible_csv(pairs: Sequence[tuple[Any, Any]], accounts: Sequ
             "inventory_entry_at": _minute(account.inventory_entry_at),
             "inventory_operator": account.inventory_operator or "-",
             "cost_amount": account.cost_amount,
-            "account_game_type": account.game_type or "-",
+            "account_game_type": _historical_label(order, "game_type", account.game_type, game_labels) or "-",
             "account_game_account": account.game_account or "-",
             "business_mode": BUSINESS_MODE_LABEL.get(account.business_mode or "", account.business_mode or "-"),
             "inventory_type": INVENTORY_TYPE_LABEL.get(inventory_type, inventory_type or "-"),

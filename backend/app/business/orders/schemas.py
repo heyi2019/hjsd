@@ -190,6 +190,7 @@ class OrderOut(BaseModel):
     value_added_service: str | None = None
     trade_date: date
     account_snapshot: dict | None = None
+    option_label_snapshot: dict[str, str] | None = None
     account_id: int | None = None
     status: str
     owner_id: int | None = None
@@ -202,15 +203,18 @@ class OrderListOut(OrderOut):
     """工作台列表摘要：主订单之外只带列表需要的可读业务信息。"""
 
     account_game_type: str | None = None
+    account_game_type_label: str | None = None
     stock_no: str | None = None
     account_game_account: str | None = None
     account_channel_region: str | None = None
+    account_channel_region_label: str | None = None
     account_business_mode: str | None = None
     account_platform: str | None = None
     account_status: str | None = None
     party_name: str | None = None
     party_role: str | None = None
     party_source: str | None = None
+    party_source_label: str | None = None
     party_created_by: str | None = None
     party_created_at: datetime | None = None
     inventory_entry_at: datetime | None = None

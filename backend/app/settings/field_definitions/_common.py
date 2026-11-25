@@ -9,8 +9,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 from app.core.errors import NotFound, Validation
 from app.domain.foundation import OrderTypeDef, Pool
-# 池代码允许下划线（HJ_INVEST / HJ_PROFIT）；业务代码为紧凑大写字母数字（HS / TB2）
-POOL_CODE_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]{1,63}$")
+# 业务代码为紧凑大写字母数字（HS / TB2）。
 ORDER_TYPE_CODE_PATTERN = re.compile(r"^[A-Z0-9]{2,10}$")
 SEQUENCE_PREFIX_PATTERN = re.compile(r"^[A-Z][A-Z0-9]{0,15}$")
 _UNSET = object()
@@ -32,11 +31,10 @@ def _normalize_code(
         )
     return code
 def _normalize_pool_code(value: str) -> str:
-    return _normalize_code(
-        value,
-        pattern=POOL_CODE_PATTERN,
-        hint="大写字母开头，可含数字与下划线（如 HJ_INVEST）",
-    )
+    code = value.strip() if isinstance(value, str) else ""
+    if not re.fullmatch(r"pool_\d{2,}", code):
+        raise Validation("资金账户代码格式无效", details={"field": "code", "value": value})
+    return code
 def _required_name(value: str, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise Validation("名称不能为空", details={"field": field})

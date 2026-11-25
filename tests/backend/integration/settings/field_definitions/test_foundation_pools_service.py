@@ -35,8 +35,8 @@ class TestSeed:
         assert second["order_types_skipped"] == 3
 
     def test_seeded_pools_and_order_types(self, seeded_db):
-        invest = get_pool_by_code(seeded_db, "HJ_INVEST")
-        profit = get_pool_by_code(seeded_db, "HJ_PROFIT")
+        invest = get_pool_by_code(seeded_db, "pool_01")
+        profit = get_pool_by_code(seeded_db, "pool_02")
         assert invest is not None and profit is not None
         assert invest.pool_type == "INVEST"
         assert profit.pool_type == "PROFIT"
@@ -55,27 +55,21 @@ class TestSeed:
 
 
 class TestPools:
-    def test_create_pool_and_duplicate_code(self, db):
-        pool = create_pool(
-            db, code="hj_custody", name="代客保管池", actor="pytest"
-        )
+    def test_create_pool_allocates_code(self, db):
+        pool = create_pool(db, name="代客保管池", actor="pytest")
         db.commit()
-        assert pool.code == "HJ_CUSTODY"
+        assert pool.code == "pool_01"
         assert pool.status == PoolStatus.ACTIVE.value
 
-        with pytest.raises(AppError) as exc:
-            create_pool(db, code="HJ_CUSTODY", name="重复", actor="pytest")
-        assert exc.value.code == ErrorCode.DUPLICATE_CODE
-
     def test_pool_code_is_immutable(self, db):
-        pool = create_pool(db, code="TMP1", name="临时池", actor="pytest")
+        pool = create_pool(db, name="临时池", actor="pytest")
         db.commit()
         updated = update_pool(db, pool.id, actor="pytest", name="临时池改名")
-        assert updated.code == "TMP1"
+        assert updated.code == "pool_01"
         assert updated.name == "临时池改名"
 
     def test_delete_blocked_when_pool_has_cashflow(self, db, monkeypatch):
-        pool = create_pool(db, code="TMP3", name="带流水池", actor="pytest")
+        pool = create_pool(db, name="带流水池", actor="pytest")
         db.commit()
         monkeypatch.setattr(pools_service, "_has_cashflow", lambda session, pool_id: True)
         with pytest.raises(AppError) as exc:
@@ -83,14 +77,14 @@ class TestPools:
         assert exc.value.code == ErrorCode.POOL_HAS_TRANSACTIONS
 
     def test_delete_allowed_when_empty(self, db):
-        pool = create_pool(db, code="TMP4", name="空池", actor="pytest")
+        pool = create_pool(db, name="空池", actor="pytest")
         db.commit()
         delete_pool(db, pool.id, actor="pytest")
         db.commit()
-        assert get_pool_by_code(db, "TMP4") is None
+        assert get_pool_by_code(db, "pool_01") is None
 
     def test_disable_pool_blocks_new_usage(self, db):
-        pool = create_pool(db, code="TMP5", name="将停用", actor="pytest")
+        pool = create_pool(db, name="将停用", actor="pytest")
         db.commit()
         set_pool_status(db, pool.id, PoolStatus.DISABLED.value, actor="pytest")
         db.commit()
@@ -99,7 +93,7 @@ class TestPools:
         assert exc.value.code == ErrorCode.POOL_DISABLED
 
     def test_pool_update_writes_audit(self, db):
-        pool = create_pool(db, code="TMP6", name="审计池", actor="pytest")
+        pool = create_pool(db, name="审计池", actor="pytest")
         db.commit()
         update_pool(db, pool.id, actor="pytest", note="改备注")
         db.commit()
@@ -114,7 +108,7 @@ class TestPools:
 
     def test_update_pool_applies_extra_values(self, db, monkeypatch):
         """覆盖 update_pool 的 extra_values 分支（pools.py:114）。"""
-        pool = create_pool(db, code="TMPEV", name="活字段池", actor="pytest")
+        pool = create_pool(db, name="活字段池", actor="pytest")
         db.commit()
         captured: dict = {}
 
@@ -135,7 +129,7 @@ class TestPools:
 
     def test_assert_pool_usable_returns_active_pool(self, db):
         """覆盖 assert_pool_usable 的成功返回路径（pools.py:189）。"""
-        pool = create_pool(db, code="TMPAU", name="可用池", actor="pytest")
+        pool = create_pool(db, name="可用池", actor="pytest")
         db.commit()
         result = assert_pool_usable(db, pool.id)
         assert result.id == pool.id
@@ -149,8 +143,8 @@ class TestDefaultPoolAndLookup:
         """两个活动池且无 is_default：无法确定唯一默认账户，须拒绝落账。"""
         from app.settings.field_definitions.pools import require_default_pool
 
-        create_pool(db, code="TMPD1", name="甲池", actor="pytest")
-        create_pool(db, code="TMPD2", name="乙池", actor="pytest")
+        create_pool(db, name="甲池", actor="pytest")
+        create_pool(db, name="乙池", actor="pytest")
         db.commit()
         with pytest.raises(AppError) as exc:
             require_default_pool(db)
@@ -159,14 +153,14 @@ class TestDefaultPoolAndLookup:
 
     def test_switch_default_moves_exclusive_flag(self, seeded_db):
         """切换默认账户：旧默认被清、新默认唯一；再显式取消后无默认。"""
-        invest = get_pool_by_code(seeded_db, "HJ_INVEST")
-        profit = get_pool_by_code(seeded_db, "HJ_PROFIT")
+        invest = get_pool_by_code(seeded_db, "pool_01")
+        profit = get_pool_by_code(seeded_db, "pool_02")
         assert invest.is_default is True
         assert profit.is_default is False
 
         update_pool(seeded_db, profit.id, actor="pytest", is_default=True)
         assert profit.is_default is True
-        assert get_pool_by_code(seeded_db, "HJ_INVEST").is_default is False
+        assert get_pool_by_code(seeded_db, "pool_01").is_default is False
 
         update_pool(seeded_db, profit.id, actor="pytest", is_default=False)
         assert profit.is_default is False

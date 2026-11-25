@@ -55,6 +55,79 @@ def test_active_platforms_are_server_derived_and_legacy_whitespace_is_consistent
     assert relisted.status_code == 201, relisted.text
 
 
+def test_consignment_platform_code_keeps_original_name_after_rename(seeded_db, seeded_client, headers):
+    from app.domain.options import OptionSet
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest",
+                         account_snapshot={"game_account": "platform-snapshot"},
+                         form_extra={"business_responsible_ids": [1]})
+    listing, _ = register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+                                      form_extra={"consignment_platforms": ["intermediary_platform_02"]})
+    assert listing.form_extra["consignment_platform_labels"] == {"intermediary_platform_02": "盼之"}
+    dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_PLATFORM"))
+    dictionary.options = [{**item, "label": "平台新名"} if item["value"] == "intermediary_platform_02" else item
+                          for item in dictionary.options]
+    seeded_db.commit()
+    response = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
+    assert response.status_code == 200, response.text
+    detail = response.json()
+    active = detail["orders"][0]["active_consignments"][0]
+    assert active["platform"] == "intermediary_platform_02"
+    assert active["platform_label"] == "盼之"
+    assert any("盼之" in row["content"] for row in detail["detail_view"]["operation_rows"])
+    exported = seeded_client.get("/api/stocks/inventory/ledger/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "盼之" in exported.text
+    assert "平台新名" not in exported.text
+
+
+def test_editing_consignment_keeps_platform_name_snapshots_in_sync(seeded_db, seeded_client, headers):
+    from app.domain.options import OptionSet
+    from app.settings.field_definitions.catalog_seed import seed_catalog
+    from scripts.test_example_seed import seed_example_catalog
+
+    seed_catalog(seeded_db, actor="pytest")
+    seed_example_catalog(seeded_db)
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest",
+                         account_snapshot={"game_account": "platform-edit-snapshot"},
+                         form_extra={"business_responsible_ids": [1]})
+    listing, _ = register_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 1), actor="pytest",
+                                      form_extra={"consignment_platforms": ["intermediary_platform_02"]})
+    unlisting, _ = platform_unlist_consignment(seeded_db, order.id, occurred_on=date(2026, 11, 2), actor="pytest",
+                                               form_extra={"consignment_event_id": listing.id,
+                                                           "consignment_platforms": ["intermediary_platform_02"]})
+    dictionary = seeded_db.scalar(select(OptionSet).where(OptionSet.code == "INTERMEDIARY_PLATFORM"))
+    dictionary.options = [{**item, "label": "更名后的盼之"} if item["value"] == "intermediary_platform_02" else item
+                          for item in dictionary.options]
+    seeded_db.commit()
+    url = f"/api/orders/{order.id}/execution-edit"
+
+    def edit(platform):
+        return seeded_client.patch(url, headers=headers, json={"events": [{
+            "id": listing.id, "expected_amount": "0", "amount": "0",
+            "form_extra": {"operation_type": "CONSIGNMENT", "consignment_platforms": [platform]},
+        }]})
+
+    unchanged = edit("intermediary_platform_02")
+    assert unchanged.status_code == 200, unchanged.text
+    seeded_db.expire_all()
+    assert listing.form_extra["consignment_platform_labels"] == {"intermediary_platform_02": "盼之"}
+
+    changed = edit("intermediary_platform_01")
+    assert changed.status_code == 200, changed.text
+    seeded_db.expire_all()
+    assert listing.form_extra["consignment_platform_labels"] == {"intermediary_platform_01": "千寻"}
+    assert unlisting.form_extra["consignment_platforms"] == ["intermediary_platform_01"]
+    assert unlisting.form_extra["consignment_platform_labels"] == {"intermediary_platform_01": "千寻"}
+    detail = seeded_client.get(f"/api/orders/{order.id}/execution-detail", headers=headers)
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["orders"][0]["active_consignments"] == []
+
+
 @pytest.mark.parametrize("dependency", ["platform_ids", "operator_user_ids"])
 def test_consignment_conditions_use_selected_platform_and_operators(seeded_db, seeded_client, headers, dependency):
     order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 11, 1),

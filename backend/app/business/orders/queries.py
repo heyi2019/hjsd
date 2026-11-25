@@ -9,6 +9,7 @@ from app.core.like_pattern import like_contains
 from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
 from app.shared.scope import owner_scope_filter
+from app.shared.game_references import matching_game_references
 from sqlalchemy import (
     case,
     cast,
@@ -345,6 +346,7 @@ def _order_list_stmt(
     if keyword and keyword.strip():
         pattern, escape = like_contains(keyword)
         amount = amount_keyword(keyword)
+        matching_games, matching_channels = matching_game_references(session, keyword)
         stmt = stmt.where(
             or_(
                 Order.order_no.ilike(pattern, escape=escape),
@@ -352,7 +354,11 @@ def _order_list_stmt(
                 Order.account_snapshot["game_account"].as_string().ilike(pattern, escape=escape),
                 Account.game_account.ilike(pattern, escape=escape),
                 Order.account_snapshot["channel_region"].as_string().ilike(pattern, escape=escape),
+                Order.account_snapshot["game_type_label"].as_string().ilike(pattern, escape=escape),
+                Order.account_snapshot["channel_region_label"].as_string().ilike(pattern, escape=escape),
                 Account.channel_region.ilike(pattern, escape=escape),
+                func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string()).in_(matching_games),
+                func.coalesce(Account.channel_region, Order.account_snapshot["channel_region"].as_string()).in_(matching_channels),
                 Order.note.ilike(pattern, escape=escape),
                 exists(
                     select(OrderCustomerRole.id)

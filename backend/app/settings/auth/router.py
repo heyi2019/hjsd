@@ -64,7 +64,6 @@ class UserUpdate(RequestModel):
 
 
 class TeamCreate(RequestModel):
-    code: str = Field(min_length=2, max_length=64)
     name: str = Field(min_length=1, max_length=128)
     description: str | None = None
 
@@ -80,6 +79,7 @@ class PublicUserOut(BaseModel):
 
     id: int
     username: str
+    employee_code: str | None = None
     display_name: str = ""
     role: str
     owner_scope: str = "SELF"
@@ -125,7 +125,7 @@ class TeamOut(BaseModel):
 
 def _public(user: User) -> dict:
     return {
-        "id": user.id, "username": user.username, "display_name": user.display_name,
+        "id": user.id, "username": user.username, "employee_code": user.employee_code, "display_name": user.display_name,
         "role": user.role, "owner_scope": user.owner_scope, "phone": user.phone,
         "pool_ids": user.pool_ids or [], "team_ids": user.team_ids or [],
         "is_active": user.is_active, "must_change_password": user.must_change_password,
@@ -284,7 +284,6 @@ def create_team(payload: TeamCreate, actor: CurrentUser = Depends(get_current_us
     _admin(actor)
     item = service.create_team(
         db,
-        code=payload.code,
         name=payload.name,
         description=payload.description,
         actor=actor.username,

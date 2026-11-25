@@ -207,10 +207,11 @@ def check_production_schema(env: dict[str, str]) -> str:
     ports = call(["docker", "port", "heijin-db-1", "5432/tcp"], capture=True)
     if not re.fullmatch(r"127\.0\.0\.1:5433", ports):
         raise RuntimeError("本机 PostgreSQL 不是预期的 127.0.0.1:5433")
-    call([PY313, "-c", "from app.core.settings import get_settings; from sqlalchemy.engine import make_url; "
+    drill_url = call([PY313, "-c", "import sys; from app.core.settings import get_settings; from sqlalchemy.engine import make_url; "
           "u=make_url(get_settings().database_url); "
           "assert u.get_backend_name() == 'postgresql' and u.host in ('127.0.0.1','localhost','::1') "
-          "and u.port == 5433 and u.database == 'heijin_erp_dev'"], env=env)
+          "and u.port == 5433 and u.database == 'heijin_erp_dev'; "
+          "print(u.set(database=sys.argv[1]).render_as_string(hide_password=False))", name], env=env, capture=True)
     psql = ["docker", "exec", "heijin-db-1", "sh", "-c",
             'exec psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 "$@"', "sh"]
     pg_restore = ["docker", "exec", "-i", "heijin-db-1", "sh", "-c",
@@ -233,6 +234,8 @@ docker compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_
             created = True
             with dump.open("rb") as stream:
                 subprocess.run([*pg_restore, "-d", name, "--no-owner", "--single-transaction"], stdin=stream, check=True)
+            call([PY313, "-m", "alembic", "upgrade", "head"], cwd=ROOT / "backend",
+                 env={**env, "DATABASE_URL": drill_url})
             call([PY313, "-m", "scripts.ensure_idempotency_records", "--apply", "--drill-db", name], env=env)
             call([PY313, str(ROOT / "deploy/scripts/schema_diff.py"), name], env=env)
         finally:

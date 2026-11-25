@@ -20,6 +20,42 @@ from app.domain.trade import Cashflow, Installment, InstallmentDisposition, Reba
 from app.shared.audit import record_audit
 
 
+def test_inventory_search_and_export_use_game_and_channel_labels(seeded_client, headers, seeded_db):
+    from app.domain.foundation import GameTypeOption
+    from app.settings.field_definitions.game_types import update_game_type
+    from sqlalchemy import select
+
+    game = seeded_db.scalar(select(GameTypeOption).where(GameTypeOption.name == "原神"))
+    game = update_game_type(seeded_db, game.id, actor="pytest", channel_regions=[{"label": "安卓QQ"}])
+    account = create_account(seeded_db, game_account="code-search", game_type=game.value,
+                             channel_region=game.channel_regions[0]["value"], business_mode="SELF",
+                             inventory_type="RECOVERY", actor="pytest")
+    create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    seeded_db.commit()
+    response = seeded_client.get("/api/stocks/inventory/ledger", headers=headers, params={"keyword": "原神"})
+    assert response.status_code == 200, response.text
+    assert response.json()["total"] == 1
+    exported = seeded_client.get("/api/stocks/inventory/ledger/export.csv", headers=headers)
+    assert exported.status_code == 200, exported.text
+    assert "原神" in exported.text
+    assert "安卓QQ" in exported.text
+    assert game.value not in exported.text
+    assert game.channel_regions[0]["value"] not in exported.text
+
+    channel_code = game.channel_regions[0]["value"]
+    update_game_type(seeded_db, game.id, actor="pytest", name="原神新版",
+                     channel_regions=[{"value": channel_code, "label": "安卓新区"}])
+    seeded_db.commit()
+    for mode in ("full", "visible"):
+        result = seeded_client.get("/api/stocks/inventory/ledger/export.csv", headers=headers, params={"mode": mode})
+        assert result.status_code == 200, result.text
+        assert "原神" in result.text
+        assert "原神新版" not in result.text
+        if mode == "full":
+            assert "安卓QQ" in result.text
+            assert "安卓新区" not in result.text
+
+
 def test_visible_inventory_export_uses_configured_columns_and_no_detail_reads(seeded_client, headers, seeded_db, monkeypatch):
     from app.business.shared.form_config.form_fields import create_order_form_field
     account = create_account(seeded_db, game_account="=visible", game_type="原神", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
@@ -75,7 +111,7 @@ def test_inventory_csv_limits_detail_memory_to_each_batch(seeded_db, monkeypatch
                               camp_account="", stock_no="KU", cost_amount=Decimal("0"), inventory_status="IN_STOCK",
                               inventory_age_days=0, created_by="pytest", channel_region="", bound_phone="",
                               has_secondary=None, account_description="", account_images=[], note="")
-    pairs = [(None, SimpleNamespace(id=i)) for i in range(1001)]
+    pairs = [(None, SimpleNamespace(id=i, account_snapshot=None)) for i in range(1001)]
     calls = []
     def load_batch(_db, order_ids, _user):
         calls.append(len(order_ids))
@@ -94,9 +130,10 @@ def test_inventory_csv_escapes_formula_like_account_text(monkeypatch):
                               inventory_age_days=0, created_by="pytest", channel_region="", bound_phone="",
                               has_secondary=None, account_description="=1+1", account_images=[], note="@SUM(A1)")
     monkeypatch.setattr(inventory_export, "load_order_execution_batch", lambda *_: [None])
+    monkeypatch.setattr(inventory_export, "game_reference_labels", lambda _db: ({}, {}))
     user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
     db = SimpleNamespace(begin_nested=nullcontext)
-    csv_text, _ = inventory_export.build_inventory_ledger_csv([(None, SimpleNamespace(id=1))], [account], db=db, user=user)
+    csv_text, _ = inventory_export.build_inventory_ledger_csv([(None, SimpleNamespace(id=1, account_snapshot=None))], [account], db=db, user=user)
     row = next(csv.DictReader(io.StringIO(csv_text.lstrip("\ufeff"))))
     assert row["账号描述"] == "'=1+1"
     assert row["备注"] == "'@SUM(A1)"
@@ -108,7 +145,7 @@ def test_inventory_csv_keeps_other_batches_when_one_detail_fails(monkeypatch):
                               camp_account="", stock_no="KU", cost_amount=Decimal("0"), inventory_status="IN_STOCK",
                               inventory_age_days=0, created_by="pytest", channel_region="", bound_phone="",
                               has_secondary=None, account_description="", account_images=[], note="")
-    pairs = [(None, SimpleNamespace(id=i)) for i in range(501)]
+    pairs = [(None, SimpleNamespace(id=i, account_snapshot=None)) for i in range(501)]
     detail = SimpleNamespace(orders=[], detail_view=None,
                              finance_summary=SimpleNamespace(total_expense=Decimal("7"), total_income=Decimal("8")))
     def load_batch(_db, ids, _user):
@@ -121,6 +158,7 @@ def test_inventory_csv_keeps_other_batches_when_one_detail_fails(monkeypatch):
         return detail
     monkeypatch.setattr(inventory_export, "load_order_execution_batch", load_batch)
     monkeypatch.setattr(inventory_export, "load_order_execution", load_one)
+    monkeypatch.setattr(inventory_export, "game_reference_labels", lambda _db: ({}, {}))
     db = SimpleNamespace(begin_nested=nullcontext)
     user = CurrentUser.build(id=1, username="admin", roles=["ADMIN"])
     csv_text, failed = inventory_export.build_inventory_ledger_csv(pairs, [account] * len(pairs), db=db, user=user)

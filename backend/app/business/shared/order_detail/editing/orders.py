@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.option_snapshots import update_option_label_snapshot
 from app.core.errors import NotFound
 from app.core.security import CurrentUser
 from app.domain.trade import Order
@@ -24,6 +25,7 @@ def apply_order_edits(db: Session, account_id: int, target_order_id: int, items:
         if "form_extra" in item.model_fields_set and item.form_extra is not None:
             next_extra = {**(order.form_extra or {}), **item.form_extra}
             validate_business_responsible(db, order_type_code=order.order_type, values=next_extra)
+            order.option_label_snapshot = update_option_label_snapshot(db, order.option_label_snapshot, order.form_extra, next_extra) or None
             order.form_extra = next_extra
         if "occurred_at" in item.model_fields_set and item.occurred_at is not None:
             occurred_at = item.occurred_at.replace(tzinfo=None)

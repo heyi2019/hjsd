@@ -30,13 +30,13 @@ function operationPlatforms(extra: Record<string, unknown>): string[] {
     : [];
 }
 
-export function buildUnlistingOptions<T extends { eventId?: number; platform: string; listedAt: string }>(listings: T[]) {
+export function buildUnlistingOptions<T extends { eventId?: number; platform: string; platformLabel?: string; listedAt: string }>(listings: T[]) {
   const choices: Array<{ value: string; label: string }> = [];
   const byKey = new Map<string, T>();
   for (const listing of listings) {
     const key = JSON.stringify([listing.eventId, listing.platform]);
     if (!byKey.has(key)) byKey.set(key, listing);
-    if (listing.eventId != null) choices.push({ value: key, label: `${listing.platform}（上架于 ${listing.listedAt}，事件 ${listing.eventId}）` });
+    if (listing.eventId != null) choices.push({ value: key, label: `${listing.platformLabel ?? listing.platform}（上架于 ${listing.listedAt}，事件 ${listing.eventId}）` });
   }
   return { choices, byKey };
 }
@@ -91,7 +91,9 @@ export function resolveOperationEventContent(
   event: Pick<AccountExecutionEvent, "event_type" | "operation_type" | "form_extra" | "reason">,
 ): ReactNode {
   const extra = event.form_extra ?? {};
-  const platforms = operationPlatforms(extra);
+  const snapshots = extra.consignment_platform_labels;
+  const labels = snapshots && typeof snapshots === "object" && !Array.isArray(snapshots) ? snapshots as Record<string, string> : {};
+  const platforms = operationPlatforms(extra).map((value) => labels[value] ?? value);
   if (operationKey === "consignment" && event.operation_type === "CONSIGNMENT") {
     const platform = platforms.join("、");
     const price = extra.consignment_price;

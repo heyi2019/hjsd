@@ -74,7 +74,7 @@ def validate_camp_account(value: object) -> str | None:
 
 
 def validate_wallet_realname(value: object) -> str | None:
-    """钱包实名只接受「未注销 / 已注销」，空值视作未登记。"""
+    """钱包实名使用 N（未注销）/ Y（已注销），空值视作未登记。"""
     if value is None:
         return None
     if not isinstance(value, str):

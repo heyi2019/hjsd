@@ -11,6 +11,7 @@ import { BusinessActionModal, BusinessRegistrationForm, InlineError } from "../.
 import { ResponsibleEmployeeSelect } from "../../../shared/forms/ResponsibleEmployeeSelect";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useLatestRequest, useRequestSession } from "../../../shared/hooks/useLatestRequest";
+import { useGameReferences } from "../../../shared/hooks/useGameReferences";
 import "./profile-modal.css";
 
 export type OrderProfileTarget = {
@@ -30,10 +31,11 @@ function readImageData(file: Blob): Promise<string> {
 }
 
 function ProfileContext({ account }: { account: Account }) {
+  const { gameLabel } = useGameReferences();
   return (
     <div className="order-profile-context" aria-label="账号上下文">
       <div className="order-profile-context__item"><span>订单编号</span><strong>{account.source_order_no ?? "-"}</strong></div>
-      <div className="order-profile-context__item"><span>游戏类型</span><strong>{account.game_type ?? "-"}</strong></div>
+      <div className="order-profile-context__item"><span>游戏类型</span><strong>{account.game_type ? gameLabel(account.game_type) : "-"}</strong></div>
       <div className="order-profile-context__item"><span>游戏账号</span><strong>{account.game_account ?? "-"}</strong></div>
     </div>
   );

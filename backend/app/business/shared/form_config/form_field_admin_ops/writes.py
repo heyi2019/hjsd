@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.shared.audit import record_audit
+from app.shared.option_codes import allocate_option_code
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.form_scopes import FORM_SCOPES, GROUP_SYSTEM, REQUIRED_CORE_FIELDS
@@ -14,6 +15,32 @@ from app.shared.form_field_rules import (
     _validate_section, _normalize_required_when, _normalize_field_options,
 )
 from .guards import FIXED_LABEL_FIELD_KEYS, _reject_if_dependent
+
+
+def _allocate_field_options(session: Session, code: str, key: str, options: Sequence[Any] | None,
+                            existing: Sequence[dict[str, str]] = ()) -> Sequence[Any] | None:
+    if options is None:
+        return None
+    values = [item.get("value", "") for item in existing]
+    result = []
+    for raw in options:
+        if not isinstance(raw, dict):
+            result.append(raw)
+            continue
+        item = dict(raw)
+        label = str(item.get("label", "")).strip()
+        if not label:
+            raise Validation("字段选项名称不能为空", details={"field": "options"})
+        if not str(item.get("value", "")).strip():
+            if label in {"有", "对", "是"}:
+                item["value"] = "Y"
+            elif label in {"无", "否", "不"}:
+                item["value"] = "N"
+            else:
+                item["value"] = allocate_option_code(session, f"form:{code}:{key}", key, values)
+        values.append(str(item["value"]))
+        result.append(item)
+    return result
 
 def create_order_form_field(
     session: Session,
@@ -60,7 +87,7 @@ def create_order_form_field(
     if not isinstance(label, str) or not label.strip():
         raise Validation("字段名称不能为空", details={"field": "label"})
     _validate_section(section)
-    normalized_options = _normalize_field_options(field_type, options)
+    normalized_options = _normalize_field_options(field_type, _allocate_field_options(session, code, key, options))
     exists = session.scalar(
         select(OrderFormField).where(
             OrderFormField.order_type_code == code, OrderFormField.field_key == key
@@ -178,7 +205,12 @@ def update_order_form_field(
     if options is not None:
         raw_options = list(options)
         if raw_options:
-            next_options = _normalize_field_options(next_type, raw_options)
+            if definition.is_custom:
+                previous_values = {item.get("value") for item in next_options if isinstance(item, dict)}
+                if any(isinstance(item, dict) and item.get("value") and item["value"] not in previous_values
+                       for item in raw_options):
+                    raise Validation("字段选项编码不可修改，新增选项只需填写名称", details={"field": "options"})
+            next_options = _normalize_field_options(next_type, _allocate_field_options(session, definition.order_type_code, definition.field_key, raw_options, next_options))
         elif not next_options:
             # 动态字典字段（game_type/customer_id/pool_id 等）库内 options 为空，
             # 前端编辑改名时会把空选项数组一并回传 → 按「未变更」处理，

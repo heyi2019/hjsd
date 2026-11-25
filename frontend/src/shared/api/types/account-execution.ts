@@ -74,7 +74,7 @@ export interface AccountExecutionOrder {
   order_type: string;
   game_type_label?: string | null;
   channel_region_label?: string | null;
-  option_label_snapshot?: Record<string, string> | null;
+  option_label_snapshot?: Record<string, string | Record<string, string>> | null;
   trade_date: string;
   created_at?: string | null;
   occurred_at?: string | null;

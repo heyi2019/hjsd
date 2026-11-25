@@ -95,11 +95,11 @@ def _execute_order_import(
         note = main_note or detail_note
         operators = _operators(session, record.get("业务操作人", "").strip() or record.get("入库操作人", "").strip(),
                                {"sheet": result["sheet"], "row": result["row"]})
-        custom_values, account_fields = read_custom_order_values(record, number[:2], custom_columns)
+        order = session.scalar(select(Order).where(Order.order_no == number)) if result["action"] == "update" else None
+        custom_values, account_fields = read_custom_order_values(record, number[:2], custom_columns, existing_order=order)
         if operators is not None:
             validate_business_responsible(session, order_type_code=number[:2], values={"business_responsible_ids": operators})
         if result["action"] == "update":
-            order = session.scalar(select(Order).where(Order.order_no == number))
             if order is None:
                 raise Validation("订单状态已变化，请重新预检", details={"order_no": number})
             snapshot = order.account_snapshot or {}

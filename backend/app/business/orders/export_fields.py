@@ -388,6 +388,8 @@ def _order_detail_export_fields(
         value = form_extra.get(key)
         if isinstance(value, str) and isinstance(label, str):
             history_labels.setdefault(key, {})[value] = label
+        elif isinstance(value, list) and isinstance(label, dict):
+            history_labels.setdefault(key, {}).update(label)
     has_secondary = account.get("has_secondary")
     image_count = account.get("account_image_count")
     if image_count is None:

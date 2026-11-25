@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.shared.game_references import game_reference_labels
 from app.shared.option_snapshots import option_label_maps
 from app.settings.lists.scopes import get_scope
-from app.settings.lists.services._shared import _custom_rows_for_scope
+from app.settings.lists.services._shared import _current_field_option_labels, _custom_rows_for_scope
 
 
 def option_labels_by_code(
@@ -52,7 +52,10 @@ def get_value_labels(session: Session, scope_code: str) -> dict[str, dict[str, s
             "studio_income_item_01": "货款",
             "studio_income_item_02": "其他",
         }
-    for column_key, definition in _custom_rows_for_scope(session, scope_code).items():
-        if definition.value_labels:
-            result[column_key] = dict(definition.value_labels)
+    customs = _custom_rows_for_scope(session, scope_code)
+    current_labels = _current_field_option_labels(session, customs.values())
+    for column_key, definition in customs.items():
+        labels = {**current_labels.get(definition.source_key, {}), **(definition.value_labels or {})}
+        if labels:
+            result[column_key] = labels
     return result

@@ -206,12 +206,13 @@ def update_order(
     if form_extra is not _UNSET and form_extra:
         # ORDEREDIT 作用域自定义字段值合并进订单 form_extra。
         checked = (
-            validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra)
+            validate_form_extra(session, order_type_code=form_extra_scope, values=form_extra, existing=order.form_extra)
             if form_extra_scope else dict(form_extra)
         )
         previous_extra = dict(order.form_extra or {})
         order.form_extra = {**previous_extra, **checked}
-        order.option_label_snapshot = update_option_label_snapshot(session, order.option_label_snapshot, previous_extra, order.form_extra) or None
+        scopes = tuple(dict.fromkeys(scope for scope in (form_extra_scope, order.order_type) if scope))
+        order.option_label_snapshot = update_option_label_snapshot(session, order.option_label_snapshot, previous_extra, order.form_extra, scopes=scopes) or None
     record_audit(
         session,
         action=AuditAction.ORDER_UPDATE,

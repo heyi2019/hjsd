@@ -271,6 +271,17 @@ def _extras(orders: list[AccountExecutionOrderOut]) -> list[DetailExtraOut]:
             if key in SELL_DELIVERY_FIELDS or any(key == item or key.endswith(f"-{item}") for item in INTERNAL_EXTRA_KEYS): continue
             value = field.get("value")
             if value in (None, "") or not str(value).strip(): continue
+            label = (order.option_label_snapshot or {}).get(key)
+            if isinstance(value, str) and isinstance(label, str):
+                value = label
+            else:
+                labels = field.get("value_labels") if isinstance(field.get("value_labels"), dict) else {}
+                if isinstance(label, dict):
+                    labels = {**labels, **label}
+                if isinstance(value, str):
+                    value = labels.get(value, value)
+                elif isinstance(value, list) and labels:
+                    value = "、".join(labels.get(item, item) if isinstance(item, str) else str(item) for item in value)
             result.append(DetailExtraOut(key=f"{order.order_no}-{key}", label=str(field.get("label", key)), value=str(value), section=str(field.get("section", "EXTRA"))))
     return result
 

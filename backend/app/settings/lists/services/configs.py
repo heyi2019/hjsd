@@ -14,6 +14,7 @@ from app.settings.lists.services._shared import (
     _AUDIT_ENTITY_TYPE,
     _all_custom_rows,
     _config_snapshot,
+    _current_field_option_labels,
     _custom_rows_for_scope,
     _merge,
     _rows_for_scope,
@@ -23,8 +24,9 @@ from app.settings.lists.services._shared import (
 def list_configs(session: Session) -> list[dict[str, Any]]:
     """列出全部列表作用域及其列配置（设置页与各列表页共用）。"""
     grouped = _all_custom_rows(session)
+    current_labels = _current_field_option_labels(session, (item for rows in grouped.values() for item in rows.values()))
     return [
-        _merge(scope, _rows_for_scope(session, scope.code), grouped.get(scope.code, {}))
+        _merge(scope, _rows_for_scope(session, scope.code), grouped.get(scope.code, {}), current_labels)
         for scope in LIST_SCOPES
     ]
 
@@ -33,11 +35,9 @@ def get_config(session: Session, scope_code: str) -> dict[str, Any]:
     scope = get_scope(scope_code)
     if scope is None:
         raise NotFound(f"列表 {scope_code} 不存在", details={"scope": scope_code})
-    return _merge(
-        scope,
-        _rows_for_scope(session, scope_code),
-        _custom_rows_for_scope(session, scope_code),
-    )
+    customs = _custom_rows_for_scope(session, scope_code)
+    return _merge(scope, _rows_for_scope(session, scope_code), customs,
+                  _current_field_option_labels(session, customs.values()))
 
 
 def reset_config(session: Session, scope_code: str, *, actor: str) -> dict[str, Any]:
@@ -66,7 +66,7 @@ def reset_config(session: Session, scope_code: str, *, actor: str) -> dict[str, 
             before={"scope": scope_code, "columns": before},
             after={"scope": scope_code, "columns": {}},
         )
-    return _merge(scope, {}, customs)
+    return _merge(scope, {}, customs, _current_field_option_labels(session, customs.values()))
 
 
 def save_config(
@@ -150,4 +150,6 @@ def save_config(
             before={"scope": scope_code, "columns": before},
             after={"scope": scope_code, "columns": after},
         )
-    return _merge(scope, _rows_for_scope(session, scope_code), _custom_rows_for_scope(session, scope_code))
+    customs = _custom_rows_for_scope(session, scope_code)
+    return _merge(scope, _rows_for_scope(session, scope_code), customs,
+                  _current_field_option_labels(session, customs.values()))

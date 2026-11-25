@@ -700,6 +700,105 @@ def test_rebate_import_requires_a_real_target_pool_and_rolls_back(seeded_client,
     assert seeded_db.scalar(select(Order.id).where(Order.order_no == "DG0989")) is None
 
 
+@pytest.mark.parametrize("section", ["events", "cashflows", "rebates"])
+def test_import_each_financial_section_resolves_migrated_pool_code(seeded_client, seeded_db, headers, section):
+    from sqlalchemy import select
+    from app.domain.enums import AuditAction
+    from app.domain.foundation import Pool
+    from app.domain.trade import Cashflow, Order
+    from app.shared.audit import record_audit
+
+    pool = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+    record_audit(seeded_db, action=AuditAction.FIELD_DEFINITION_CHANGE, entity_type="pool_code_migration",
+                 entity_id=pool.id, actor="pytest", before={"code": "OLD_POOL"}, after={"code": pool.code})
+    seeded_db.commit()
+    book = Workbook()
+    main = book.active
+    main.title = "主订单信息"
+    if section == "events":
+        main.append(["订单号", "业务日期", "业务类型", "游戏账号/产品"])
+        main.append(["HS0970", "2026-10-17", "回收", "历史账号"])
+        detail = book.create_sheet("操作明细")
+        detail.append(["订单号", "事件号", "事件顺序", "动作", "动作时间", "金额", "金额归属", "资金账户编码", "已过账"])
+        detail.append(["HS0970", "HS0970-EV-BUY-01", "1", "买入", "2026-10-17", "12.50", "PRINCIPAL", "OLD_POOL", "是"])
+        order_no = "HS0970"
+    elif section == "cashflows":
+        main.append(["订单号", "业务日期", "业务类型"])
+        main.append(["DG0970", "2026-10-17", "代挂"])
+        detail = book.create_sheet("资金明细")
+        detail.append(["订单号", "流水号", "业务类别编码", "方向", "金额", "时间", "资金账户编码", "核算属性", "来源类型"])
+        detail.append(["DG0970", "SR09700", "OTHER", "收入", "12.50", "2026-10-18", "OLD_POOL", "OTHER_INCOME", "MANUAL"])
+        order_no = "DG0970"
+    else:
+        main.append(["订单号", "业务日期", "业务类型"])
+        main.append(["DG0970", "2026-10-17", "代挂"])
+        detail = book.create_sheet("返点明细")
+        detail.append(["订单号", "返点单号", "返点类型", "返点金额", "收到日期", "资金账户编码"])
+        detail.append(["DG0970", "DG0970-RB01", "卖号返点", "12.50", "2026-10-18", "OLD_POOL"])
+        order_no = "DG0970"
+    output = BytesIO()
+    book.save(output)
+    response = seeded_client.post("/api/order-imports/execute", headers=headers,
+                                  data={"existing": "skip", "sections": section},
+                                  files={"file": ("旧订单.xlsx", output.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert response.status_code == 200, response.text
+    order = seeded_db.scalar(select(Order).where(Order.order_no == order_no))
+    flows = seeded_db.scalars(select(Cashflow).where(Cashflow.order_id == order.id)).all()
+    assert len(flows) == 1 and flows[0].pool_id == pool.id and str(flows[0].amount) == "12.50"
+
+
+def test_import_rejects_ambiguous_old_pool_code(seeded_db):
+    from sqlalchemy import select
+    from app.business.orders.importing.reference_codes import resolve_pool_code
+    from app.domain.enums import AuditAction
+    from app.domain.foundation import Pool
+    from app.shared.audit import record_audit
+
+    original = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+    seeded_db.add(Pool(code="OLD_POOL", name="不同的现有账户"))
+    record_audit(seeded_db, action=AuditAction.FIELD_DEFINITION_CHANGE, entity_type="pool_code_migration",
+                 entity_id=original.id, actor="pytest", before={"code": "OLD_POOL"}, after={"code": original.code})
+    seeded_db.flush()
+    with pytest.raises(Validation, match="多个账户"):
+        resolve_pool_code(seeded_db, "OLD_POOL")
+
+
+def test_import_recovers_old_pool_code_from_creation_audit_after_existing_migration(seeded_db):
+    from sqlalchemy import select
+    from app.business.orders.importing.reference_codes import resolve_pool_code
+    from app.domain.enums import AuditAction
+    from app.domain.foundation import Pool
+    from app.shared.audit import record_audit
+
+    pool = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+    record_audit(seeded_db, action=AuditAction.POOL_CREATE, entity_type="Pool", entity_id=pool.id,
+                 actor="pytest", after={"code": "OLD_POOL"})
+    assert resolve_pool_code(seeded_db, "OLD_POOL").id == pool.id
+
+
+def test_import_old_pool_code_still_checks_user_pool_access(seeded_db):
+    from datetime import date
+    from sqlalchemy import select
+    from app.business.orders.importing.cashflows import import_cashflows
+    from app.business.orders.importing.parser import ImportRow, ImportTable
+    from app.core.security import CurrentUser, ROLE_OPERATOR
+    from app.domain.enums import AuditAction
+    from app.domain.foundation import Pool
+    from app.domain.trade import Order
+    from app.shared.audit import record_audit
+
+    pool = seeded_db.scalar(select(Pool).where(Pool.is_default.is_(True)))
+    seeded_db.add(Order(order_no="DG0969", order_type="DG", trade_date=date(2026, 1, 1)))
+    record_audit(seeded_db, action=AuditAction.FIELD_DEFINITION_CHANGE, entity_type="pool_code_migration",
+                 entity_id=pool.id, actor="pytest", before={"code": "OLD_POOL"}, after={"code": pool.code})
+    fields = ("订单号", "流水号", "业务类别编码", "方向", "金额", "时间", "资金账户编码", "核算属性", "来源类型")
+    values = ("DG0969", "SR09690", "OTHER", "收入", "12.50", "2026-01-01", "OLD_POOL", "OTHER_INCOME", "MANUAL")
+    tables = {"cashflows": parser.ImportTable(fields, (parser.ImportRow("资金明细", 2, values),))}
+    user = CurrentUser.build(id=42, username="limited", roles=[ROLE_OPERATOR], owner_scope="SELF")
+    with pytest.raises(Validation, match="资金账户不存在或无权使用"):
+        import_cashflows(seeded_db, tables, [], {"DG0969": "update"}, user)
+
+
 def test_manual_cashflow_import_preserves_accounting_and_does_not_duplicate(seeded_client, seeded_db, headers):
     from sqlalchemy import select
     from app.domain.foundation import Pool

@@ -12,7 +12,7 @@ from app.core.errors import Validation
 from app.domain.trade import OrderFormField
 from app.domain.users import User
 from app.domain.form_scopes import SCOPE_CODES
-from app.shared.form_field_value import field_is_required, has_field_value, validate_field_value
+from app.shared.form_field_value import field_is_required, has_field_value, validate_field_value, validate_field_value_for_edit
 
 FIELD_TYPES = ("TEXT", "NUMBER", "DATE", "BOOLEAN", "SELECT", "MULTI_SELECT")
 
@@ -184,6 +184,7 @@ def validate_form_extra(
     order_type_code: str,
     values: Mapping[str, Any] | None,
     context: Mapping[str, Any] | None = None,
+    existing: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """校验任意设置→表单字段作用域的扩展值。
 
@@ -209,7 +210,10 @@ def validate_form_extra(
             continue
         # 宽松口径：空选项放行（运行期动态字段）、未知类型原样返回，校验结果
         # 不写回——本域保留提交原值。三处策略差异由 strict=False 固化。
-        validate_field_value(definition, value, strict=False)
+        if existing is not None and field_key in existing:
+            validate_field_value_for_edit(definition, value, existing[field_key])
+        else:
+            validate_field_value(definition, value, strict=False)
 
     for definition in active_custom:
         if field_is_required(definition, condition_values) and not has_field_value(normalized.get(definition.field_key)):

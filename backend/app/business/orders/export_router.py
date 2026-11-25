@@ -245,6 +245,7 @@ def export_orders_xlsx(
     ]
     main_columns.extend(_import_identity_columns(config))
     main_rows = inject_custom_columns(rows, config)
+    custom_keys = {column["key"] for column in config["columns"] if column.get("custom")}
 
     workbook = new_workbook()
     write_sheet(
@@ -252,7 +253,7 @@ def export_orders_xlsx(
         title="主订单信息",
         rows=main_rows,
         columns=main_columns,
-        value_labels=value_labels,
+        value_labels={key: labels for key, labels in value_labels.items() if key not in custom_keys},
     )
     write_sheet(
         workbook,

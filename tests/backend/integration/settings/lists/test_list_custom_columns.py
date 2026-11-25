@@ -218,6 +218,49 @@ def test_add_custom_column_appends_with_source_and_value_labels(seeded_client, h
     assert all(column["key"] != "extra:vip_tag" for column in _columns(seeded_client, headers, "INVENTORY"))
 
 
+def test_custom_column_resolves_new_form_options_after_column_creation(seeded_client, headers, seeded_db):
+    field = _seed_custom_field(seeded_db, field_key="custom_vip", scope="DG",
+                               options=[{"value": "custom_vip_01", "label": "甲"}])
+    added = seeded_client.post("/api/list-columns/LEDGER/custom", json={"field_key": "custom_vip"}, headers=headers)
+    assert added.status_code == 200, added.text
+    field.options = [{"value": "custom_vip_01", "label": "甲"}, {"value": "custom_vip_02", "label": "乙"}]
+    seeded_db.commit()
+    column = next(item for item in _columns(seeded_client, headers) if item["key"] == "extra:custom_vip")
+    assert column["value_labels"]["custom_vip_02"] == "乙"
+
+
+def test_existing_0002_custom_multi_select_without_snapshot_displays_labels(seeded_db):
+    import csv
+    import io
+    import json
+    from app.business.shared.order_detail.view.assembler import build_order_outputs
+    from app.business.shared.order_detail.view.derived import _extras
+    from app.domain.lists import ListCustomColumn
+    from app.settings.lists.export import build_list_csv
+
+    field = _seed_custom_field(seeded_db, field_key="old_features", label="历史标签", scope="HS",
+                               field_type="MULTI_SELECT", options=[{"value": "old_features_01", "label": "甲"},
+                                                                  {"value": "old_features_02", "label": "乙"}])
+    seeded_db.add(ListCustomColumn(scope="LEDGER", column_key="extra:old_features", label="历史标签",
+                                   source_key="old_features", field_type="MULTI_SELECT",
+                                   value_labels={"旧甲": "甲", "旧乙": "乙"}))
+    order = Order(order_no="HS9971", order_type="HS", trade_date=date(2026, 1, 1),
+                  form_extra={"old_features": ["old_features_01", "old_features_02"]})
+    seeded_db.add(order)
+    seeded_db.flush()
+    config = service.get_config(seeded_db, "LEDGER")
+    column = next(item for item in config["columns"] if item["key"] == "extra:old_features")
+    assert column["value_labels"]["old_features_01"] == "甲"
+    exported, _ = build_list_csv(seeded_db, "LEDGER", [{"order_no": order.order_no, "form_extra": order.form_extra}])
+    row = next(csv.DictReader(io.StringIO(exported.lstrip("\ufeff"))))
+    assert json.loads(row["历史标签"]) == ["甲", "乙"]
+    views = build_order_outputs([order], order_extra_values={order.id: order.form_extra},
+                                field_defs_by_type={"HS": {"old_features": field}},
+                                cashflows_by_order={}, customers_by_order={}, counterparties_by_order={},
+                                rebates_by_order={}, events_by_order={})
+    assert _extras(views)[0].value == "甲、乙"
+
+
 def test_add_custom_column_with_custom_label(seeded_client, headers, seeded_db):
     _seed_custom_field(seeded_db)
     response = seeded_client.post(

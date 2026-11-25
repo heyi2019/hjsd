@@ -208,11 +208,19 @@ function buildCustomColumns<T extends { key?: unknown; dataIndex?: unknown }>(
       const custom = {
         key: column.key,
         title: column.label,
-        render: (_value: unknown, row: unknown) =>
-          formatCustomValue(
-            readCustomValue(row, column.source_key as string),
-            column.value_labels,
-          ),
+        render: (_value: unknown, row: unknown) => {
+          const sourceKey = column.source_key as string;
+          const value = readCustomValue(row, sourceKey);
+          const snapshots = row && typeof row === "object" ? (row as Record<string, unknown>).option_label_snapshot : null;
+          const label = snapshots && typeof snapshots === "object" && !Array.isArray(snapshots)
+            ? (snapshots as Record<string, unknown>)[sourceKey] : null;
+          if (Array.isArray(value) && label && typeof label === "object" && !Array.isArray(label)) {
+            const historical = Object.fromEntries(Object.entries(label).filter(([, text]) => typeof text === "string")) as Record<string, string>;
+            return formatCustomValue(value, { ...column.value_labels, ...historical });
+          }
+          return typeof value === "string" && typeof label === "string"
+            ? label : formatCustomValue(value, column.value_labels);
+        },
       };
       return custom as unknown as T;
     });

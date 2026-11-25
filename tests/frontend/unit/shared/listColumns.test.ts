@@ -87,6 +87,27 @@ describe("markMobileIdentityColumn", () => {
 });
 
 describe("applyColumnConfig", () => {
+  it("自定义列优先显示订单保存的历史选项名称", () => {
+    const configured: ListScopeConfig = {
+      code: "LEDGER", label: "订单台账", columns: [{
+        key: "extra:legacy_quality_tag", source_key: "legacy_quality_tag", label: "质量",
+        locked: false, custom: true, is_visible: true, sort_order: 0,
+        value_labels: { legacy_quality_tag_01: "新名称" },
+      }],
+    };
+    type Column = { key?: string; render?: (value: unknown, row: unknown) => unknown };
+    const column = applyColumnConfig<Column>([], configured)[0];
+    expect(column.render?.(null, {
+      extra_values: { legacy_quality_tag: "legacy_quality_tag_01" },
+      option_label_snapshot: { legacy_quality_tag: "原名称" },
+    })).toBe("原名称");
+    expect(column.render?.(null, { extra_values: { legacy_quality_tag: "legacy_quality_tag_01" } })).toBe("新名称");
+    expect(column.render?.(null, {
+      extra_values: { legacy_quality_tag: ["legacy_quality_tag_01", "legacy_quality_tag_02"] },
+      option_label_snapshot: { legacy_quality_tag: { legacy_quality_tag_01: "原甲", legacy_quality_tag_02: "原乙" } },
+    })).toBe("原甲、原乙");
+  });
+
   it("无配置时原样返回（列表不能因为没配置而少列）", () => {
     expect(applyColumnConfig(columns, undefined)).toEqual(columns);
   });

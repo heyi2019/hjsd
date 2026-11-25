@@ -58,11 +58,13 @@ def preview_order_import(
     scope = owner_scope_filter(Order.owner_id, user, session)
     visible_existing = set(session.scalars(query.where(scope) if scope is not None else query).all())
     references = {}
+    visible_orders = {}
     if existing == "update" and user.has(PERM_ORDER_UPDATE) and visible_existing:
         visible_query = select(Order).where(Order.order_no.in_(visible_existing))
         if scope is not None:
             visible_query = visible_query.where(scope)
-        references = ledger_reference_values(session, list(session.scalars(visible_query).all()))
+        visible_orders = {order.order_no: order for order in session.scalars(visible_query).all()}
+        references = ledger_reference_values(session, list(visible_orders.values()))
 
     results = []
     for source, record, number in zip(main.rows, records, numbers):
@@ -114,7 +116,8 @@ def preview_order_import(
             custom_labels = {label for code, label in custom_columns if match and code == match.group(1)}
             if match:
                 try:
-                    read_custom_order_values(record, match.group(1), custom_columns)
+                    read_custom_order_values(record, match.group(1), custom_columns,
+                                             existing_order=visible_orders.get(number) if action == "update" else None)
                 except Validation as exc:
                     errors.append(exc.message)
             readonly_labels = reference_labels() if action == "update" and number in references else set()

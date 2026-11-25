@@ -14,11 +14,11 @@ from app.core.errors import PermissionDenied, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, PERM_ORDER_EVENT_POST
 from app.domain.trade import Order, OrderEvent
-from app.domain.foundation import Pool
 from app.domain.users import User
 from app.shared.user_identity import user_id_for_actor
 
 from .parser import ImportTable, detail_records
+from .reference_codes import resolve_pool_code
 
 _OPERATION = {"CONSIGNMENT": "CONSIGNMENT", "寄售": "CONSIGNMENT", "UNLIST": "UNLIST", "下架": "UNLIST",
               "IMAGE": "IMAGE", "更新图片": "IMAGE", "DESCRIPTION": "DESCRIPTION", "更新描述": "DESCRIPTION"}
@@ -119,7 +119,7 @@ def import_events(
             if portion is None:
                 raise Validation("资金事件须填写金额归属", details=details)
             code = row.get("资金账户编码", "").strip()
-            pool = session.scalar(select(Pool).where(Pool.code == code)) if code else None
+            pool = resolve_pool_code(session, code)
             if pool is None or not user.can_see_pool(pool.id):
                 raise Validation("资金账户不存在或无权使用", details=details)
             if event_type == "SELL":

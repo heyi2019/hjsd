@@ -471,6 +471,113 @@ def test_upgrade_0002_migrates_existing_data_without_changing_financial_links(mi
     assert again.returncode == 0, again.stdout + again.stderr
 
 
+def test_upgrade_0002_keeps_custom_option_names_in_detail_and_export(migration_0001_db):
+    import csv
+    import io
+    from datetime import date
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from app.business.shared.order_detail.view.derived import _extras
+    from app.business.shared.order_detail.view.execution_schemas import AccountExecutionOrderOut
+    from app.domain.lists import ListCustomColumn
+    from app.domain.trade import Order, OrderFormField
+    from app.settings.lists.export import build_list_csv
+
+    engine, env = migration_0001_db
+    with Session(engine) as session:
+        session.add(OrderFormField(order_type_code="HS", field_key="legacy_quality_tag", label="历史质量",
+                                   field_type="SELECT", options=[{"value": "旧代码", "label": "原质量"}],
+                                   is_custom=True, section="PARTICIPANT"))
+        session.add(OrderFormField(order_type_code="HS", field_key="legacy_feature_tags", label="历史标签",
+                                   field_type="MULTI_SELECT", options=[{"value": "旧甲", "label": "原甲"},
+                                                                       {"value": "旧乙", "label": "原乙"}],
+                                   is_custom=True, section="PARTICIPANT"))
+        session.add(ListCustomColumn(scope="LEDGER", column_key="extra:legacy_quality_tag", label="历史质量",
+                                     source_key="legacy_quality_tag", field_type="SELECT",
+                                     value_labels={"旧代码": "原质量", "已删代码": "已删原名称",
+                                                   "legacy_quality_tag_03": "已删编码名称"}))
+        session.add(ListCustomColumn(scope="LEDGER", column_key="extra:legacy_feature_tags", label="历史标签",
+                                     source_key="legacy_feature_tags", field_type="MULTI_SELECT",
+                                     value_labels={"旧甲": "原甲", "旧乙": "原乙"}))
+        session.add(Order(order_no="HS9981", order_type="HS", trade_date=date(2026, 1, 1),
+                          form_extra={"legacy_quality_tag": "旧代码", "legacy_feature_tags": ["旧甲", "旧乙"]}))
+        session.add(Order(order_no="HS9983", order_type="HS", trade_date=date(2026, 1, 1),
+                          form_extra={"legacy_quality_tag": "已删代码"}))
+        session.add(Order(order_no="HS9984", order_type="HS", trade_date=date(2026, 1, 1),
+                          form_extra={"legacy_quality_tag": "legacy_quality_tag_03"}))
+        session.commit()
+    with engine.begin() as connection:
+        connection.execute(text("ALTER TABLE orders DROP COLUMN option_label_snapshot"))
+
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+    with Session(engine) as session:
+        order = session.scalar(select(Order).where(Order.order_no == "HS9981"))
+        column = session.scalar(select(ListCustomColumn).where(ListCustomColumn.source_key == "legacy_quality_tag"))
+        assert order.form_extra["legacy_quality_tag"] == "legacy_quality_tag_01"
+        assert column.value_labels == {"legacy_quality_tag_01": "原质量", "legacy_quality_tag_02": "已删原名称",
+                                       "legacy_quality_tag_03": "已删编码名称"}
+        exported, _ = build_list_csv(session, "LEDGER", [{"order_no": order.order_no, "form_extra": order.form_extra,
+                                                            "option_label_snapshot": order.option_label_snapshot}])
+        exported_row = next(csv.DictReader(io.StringIO(exported.lstrip("\ufeff"))))
+        assert exported_row["历史质量"] == "原质量"
+        assert json.loads(exported_row["历史标签"]) == ["原甲", "原乙"]
+        view = AccountExecutionOrderOut(
+            order_id=order.id, order_no=order.order_no, order_type=order.order_type,
+            trade_date=order.trade_date, created_at=order.created_at, status=order.status,
+            operator="-", events=[], option_label_snapshot=order.option_label_snapshot,
+            extra_values=order.form_extra,
+            extra_fields=[{"key": "legacy_quality_tag", "label": "历史质量", "section": "PARTICIPANT",
+                           "value": order.form_extra["legacy_quality_tag"]},
+                          {"key": "legacy_feature_tags", "label": "历史标签", "section": "PARTICIPANT",
+                           "value": order.form_extra["legacy_feature_tags"]}],
+        )
+        assert _extras([view])[0].value == "原质量"
+        assert _extras([view])[1].value == "原甲、原乙"
+        deleted_order = session.scalar(select(Order).where(Order.order_no == "HS9983"))
+        assert deleted_order.form_extra["legacy_quality_tag"] == "legacy_quality_tag_02"
+        assert deleted_order.option_label_snapshot["legacy_quality_tag"] == "已删原名称"
+        from app.business.shared.form_config.form_field_admin_ops.writes import update_order_form_field
+        field = session.scalar(select(OrderFormField).where(OrderFormField.field_key == "legacy_quality_tag"))
+        update_order_form_field(session, field.id, actor="pytest", options=[
+            {"value": "legacy_quality_tag_01", "label": "原质量"}, {"label": "新选项"},
+        ])
+        assert field.options[-1]["value"] == "legacy_quality_tag_04"
+
+
+def test_upgrade_0002_allows_old_pool_code_in_finance_import(migration_0001_db):
+    from datetime import date
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+    from app.business.orders.importing.cashflows import import_cashflows
+    from app.business.orders.importing.parser import ImportRow, ImportTable
+    from app.core.security import CurrentUser, ROLE_ADMIN
+    from app.domain.foundation import Pool
+    from app.domain.trade import Cashflow, Order
+
+    engine, env = migration_0001_db
+    with Session(engine) as session:
+        pool = Pool(code="OLD_POOL", name="原资金账户")
+        session.add_all([pool, Order(order_no="HS9982", order_type="HS", trade_date=date(2026, 1, 1))])
+        session.flush()
+        pool_id = pool.id
+        session.commit()
+    result = _alembic(env, "upgrade", "head")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+    headers = ("订单号", "流水号", "业务类别编码", "方向", "金额", "时间", "资金账户编码", "核算属性", "来源类型")
+    values = ("HS9982", "SR09982", "OTHER", "收入", "12.50", "2026-01-01", "OLD_POOL", "OTHER_INCOME", "MANUAL")
+    tables = {"cashflows": ImportTable(headers, (ImportRow("资金明细", 2, values),))}
+    user = CurrentUser.build(id=1, username="pytest", roles=[ROLE_ADMIN], owner_scope="ALL")
+    with Session(engine) as session:
+        assert session.get(Pool, pool_id).code == "pool_01"
+        assert import_cashflows(session, tables, [], {"HS9982": "update"}, user)[0] == 1
+        flow = session.scalar(select(Cashflow).where(Cashflow.flow_no == "SR09982"))
+        assert flow.pool_id == pool_id and str(flow.amount) == "12.50"
+        assert import_cashflows(session, tables, [], {"HS9982": "update"}, user)[1] == 1
+        assert len(session.scalars(select(Cashflow).where(Cashflow.flow_no == "SR09982")).all()) == 1
+
+
 def test_upgrade_0002_recognizes_previously_migrated_local_data(migration_0001_db):
     from sqlalchemy.orm import Session
     from app.domain.options import OptionSet

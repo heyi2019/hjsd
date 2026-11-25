@@ -92,7 +92,7 @@ class AccountExecutionOrderOut(BaseModel):
     occurred_at: datetime | None = None
     status: str
     note: str | None = None
-    option_label_snapshot: dict[str, str] | None = None
+    option_label_snapshot: dict[str, str | dict[str, str]] | None = None
     extra_values: dict[str, object] = Field(default_factory=dict)
     extra_fields: list[dict[str, object]] = Field(default_factory=list)
     cashflows: list[ExecutionCashflowOut] = Field(default_factory=list)

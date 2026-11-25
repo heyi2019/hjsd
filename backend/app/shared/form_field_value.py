@@ -106,6 +106,18 @@ def _option_values(definition: FieldDefinition, *, strict: bool) -> list[str]:
     return values
 
 
+def validate_field_value_for_edit(definition: FieldDefinition, value: Any, previous: Any) -> Any:
+    """已有记录可保留已下线选项；新增选项仍按当前配置校验。"""
+    if definition.field_type == "SELECT" and isinstance(value, str) and value == previous:
+        return value
+    if definition.field_type == "MULTI_SELECT" and isinstance(value, list) and isinstance(previous, list):
+        if any(not isinstance(item, str) for item in value):
+            return validate_field_value(definition, value, strict=False)
+        validate_field_value(definition, [item for item in value if item not in previous], strict=False)
+        return value
+    return validate_field_value(definition, value, strict=False)
+
+
 def validate_field_value(
     definition: FieldDefinition, value: Any, *, strict: bool
 ) -> Any:

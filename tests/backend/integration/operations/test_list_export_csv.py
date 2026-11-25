@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 from datetime import date
 from decimal import Decimal
 
@@ -106,6 +107,146 @@ def test_order_keeps_original_delivery_option_labels_after_rename(seeded_client,
     assert exported.status_code == 200, exported.text
     assert "包赔" in exported.text
     assert "保障交易" not in exported.text
+
+
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_order_custom_options_keep_names_from_when_each_order_was_created(seeded_client, headers, seeded_db, extension):
+    from app.business.orders.create import create_order
+    from app.business.orders.importing.parser import parse_order_import
+    from app.domain.lists import ListCustomColumn
+
+    field = OrderFormField(order_type_code="DG", field_key="custom_quality", label="自定义质量",
+                           field_type="SELECT", options=[{"value": "custom_quality_01", "label": "原名称"}],
+                           is_custom=True, is_active=True, section="PARTICIPANT")
+    seeded_db.add_all([field, ListCustomColumn(scope="LEDGER", column_key="extra:custom_quality",
+                                               source_key="custom_quality", label="自定义质量", field_type="SELECT",
+                                               value_labels={"custom_quality_01": "原名称"})])
+    seeded_db.flush()
+    old_order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 1), actor="pytest",
+                             form_extra={"custom_quality": "custom_quality_01"})
+    field.options = [{"value": "custom_quality_01", "label": "中间名称"}]
+    seeded_db.flush()
+    middle_order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 2), actor="pytest",
+                                form_extra={"custom_quality": "custom_quality_01"})
+    field.options = [{"value": "custom_quality_01", "label": "新名称"}]
+    seeded_db.flush()
+    new_order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 2), actor="pytest",
+                             form_extra={"custom_quality": "custom_quality_01"})
+    seeded_db.commit()
+
+    listed = seeded_client.get("/api/orders", headers=headers)
+    assert listed.status_code == 200, listed.text
+    rows = {row["order_no"]: row for row in listed.json()["items"]}
+    assert rows[old_order.order_no]["option_label_snapshot"]["custom_quality"] == "原名称"
+    assert rows[middle_order.order_no]["option_label_snapshot"]["custom_quality"] == "中间名称"
+    assert rows[new_order.order_no]["option_label_snapshot"]["custom_quality"] == "新名称"
+    exported = seeded_client.get(f"/api/orders/export.{extension}", headers=headers)
+    assert exported.status_code == 200, exported.text
+    table = parse_order_import(f"订单.{extension}", exported.content)["main"]
+    records = {row.values[table.headers.index("订单号")]: dict(zip(table.headers, row.values)) for row in table.rows}
+    assert records[old_order.order_no]["自定义质量"] == "原名称"
+    assert records[middle_order.order_no]["自定义质量"] == "中间名称"
+    assert records[new_order.order_no]["自定义质量"] == "新名称"
+    mime = "text/csv" if extension == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    for order in (middle_order, new_order):
+        single = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+        imported = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "update"},
+                                      files={"file": (f"订单.{extension}", single.content, mime)})
+        assert imported.status_code == 200, imported.text
+        seeded_db.refresh(order)
+        assert order.form_extra["custom_quality"] == "custom_quality_01"
+
+
+def test_order_multi_select_preserves_existing_names_and_snapshots_new_choices(seeded_client, headers, seeded_db):
+    from app.business.orders.create import create_order
+    from app.business.orders.mutations import update_order
+    from app.business.orders.importing.parser import parse_order_import
+    from app.domain.lists import ListCustomColumn
+
+    field = OrderFormField(order_type_code="DG", field_key="custom_features", label="自定义标签",
+                           field_type="MULTI_SELECT", options=[{"value": "custom_features_01", "label": "原甲"},
+                                                               {"value": "custom_features_02", "label": "原乙"}],
+                           is_custom=True, is_active=True, section="PARTICIPANT")
+    seeded_db.add_all([field, ListCustomColumn(scope="LEDGER", column_key="extra:custom_features",
+                                               source_key="custom_features", label="自定义标签", field_type="MULTI_SELECT",
+                                               value_labels={"custom_features_01": "原甲", "custom_features_02": "原乙"})])
+    seeded_db.flush()
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 1), actor="pytest",
+                         form_extra={"custom_features": ["custom_features_01"]})
+    field.options = [{"value": "custom_features_01", "label": "新甲"}, {"value": "custom_features_02", "label": "新乙"}]
+    seeded_db.flush()
+    update_order(seeded_db, order.id, actor="pytest", form_extra_scope=None,
+                 form_extra={"custom_features": ["custom_features_01", "custom_features_02"]})
+    seeded_db.commit()
+    assert order.option_label_snapshot["custom_features"] == {"custom_features_01": "原甲", "custom_features_02": "新乙"}
+    for extension in ("csv", "xlsx"):
+        exported = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+        assert exported.status_code == 200, exported.text
+        table = parse_order_import(f"订单.{extension}", exported.content)["main"]
+        row = dict(zip(table.headers, table.rows[0].values))
+        assert json.loads(row["自定义标签"]) == ["原甲", "新乙"]
+        mime = "text/csv" if extension == "csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        imported = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "update"},
+                                      files={"file": (f"订单.{extension}", exported.content, mime)})
+        assert imported.status_code == 200, imported.text
+        seeded_db.refresh(order)
+        assert order.option_label_snapshot["custom_features"] == {"custom_features_01": "原甲", "custom_features_02": "新乙"}
+
+
+@pytest.mark.parametrize("extension", ["csv", "xlsx"])
+def test_custom_option_label_equal_to_another_code_is_not_translated_twice(seeded_client, headers, seeded_db, extension):
+    from app.business.orders.create import create_order
+    from app.business.orders.importing.parser import parse_order_import
+    from app.domain.lists import ListCustomColumn
+
+    seeded_db.add_all([
+        OrderFormField(order_type_code="DG", field_key="custom_alias", label="选项名称", field_type="SELECT",
+                       options=[{"value": "custom_alias_01", "label": "custom_alias_02"},
+                                {"value": "custom_alias_02", "label": "另一个选项"}],
+                       is_custom=True, is_active=True, section="PARTICIPANT"),
+        ListCustomColumn(scope="LEDGER", column_key="extra:custom_alias", source_key="custom_alias",
+                         label="选项名称", field_type="SELECT",
+                         value_labels={"custom_alias_01": "custom_alias_02", "custom_alias_02": "另一个选项"}),
+    ])
+    seeded_db.flush()
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 1), actor="pytest",
+                         form_extra={"custom_alias": "custom_alias_01"})
+    seeded_db.commit()
+    response = seeded_client.get(f"/api/orders/export.{extension}", headers=headers, params={"keyword": order.order_no})
+    assert response.status_code == 200, response.text
+    table = parse_order_import(f"订单.{extension}", response.content)["main"]
+    record = dict(zip(table.headers, table.rows[0].values))
+    assert record["选项名称"] == "custom_alias_02"
+
+
+def test_deleted_custom_choice_remains_visible_and_can_round_trip_for_existing_order(seeded_client, headers, seeded_db):
+    from app.business.orders.create import create_order
+    from app.domain.lists import ListCustomColumn
+
+    field = OrderFormField(order_type_code="DG", field_key="custom_discontinued", label="已停售选项",
+                           field_type="SELECT", options=[{"value": "custom_discontinued_01", "label": "历史选项"},
+                                                        {"value": "custom_discontinued_02", "label": "现有选项"}],
+                           is_custom=True, is_active=True, section="PARTICIPANT")
+    seeded_db.add_all([field, ListCustomColumn(scope="LEDGER", column_key="extra:custom_discontinued",
+                                               source_key="custom_discontinued", label="已停售选项", field_type="SELECT",
+                                               value_labels={"custom_discontinued_01": "历史选项", "custom_discontinued_02": "现有选项"})])
+    seeded_db.flush()
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 1), actor="pytest",
+                         form_extra={"custom_discontinued": "custom_discontinued_01"})
+    field.options = [{"value": "custom_discontinued_02", "label": "现有选项"}]
+    seeded_db.commit()
+    exported = seeded_client.get("/api/orders/export.csv", headers=headers, params={"keyword": order.order_no})
+    assert exported.status_code == 200 and "历史选项" in exported.text
+    imported = seeded_client.post("/api/order-imports/execute", headers=headers, data={"existing": "update"},
+                                  files={"file": ("订单.csv", exported.content, "text/csv")})
+    assert imported.status_code == 200, imported.text
+    seeded_db.refresh(order)
+    assert order.form_extra["custom_discontinued"] == "custom_discontinued_01"
+    new_content = "订单号,业务日期,业务类型,已停售选项\nDG0999,2026-01-02,代挂,历史选项\n".encode()
+    preview = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "update"},
+                                 files={"file": ("新订单.csv", new_content, "text/csv")})
+    assert preview.status_code == 200 and preview.json()["rows"][0]["action"] == "error"
+    assert any("选项内" in error for error in preview.json()["rows"][0]["errors"])
 
 
 def test_order_party_source_keeps_original_option_label(seeded_client, headers, seeded_db):

@@ -102,6 +102,10 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             **(order.form_extra or {}),
             **(account_values if isinstance(account_values, dict) else {}),
         }
+        option_snapshot = dict(order.option_label_snapshot or {})
+        for key, value in (order.form_extra or {}).items():
+            if extra_values.get(key) != value:
+                option_snapshot.pop(key, None)
         events = events_by_order.get(order.id, [])
         installment = installments.get(order.id)
         amounts = amount_summaries[order.id]
@@ -133,6 +137,7 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
             "owner_id": order.owner_id,
             "note": order.note,
             "extra_values": extra_values,
+            "option_label_snapshot": option_snapshot or None,
             "created_at": order.created_at,
             # HS / TH / DG 从库存实体展示安全的业务字段，
             # 不把快照中的 game_password 原样带入列表响应。

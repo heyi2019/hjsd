@@ -12,11 +12,11 @@ from app.business.collaboration import create_rebate, update_rebate
 from app.core.errors import PermissionDenied, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, PERM_ORDER_EVENT_POST
-from app.domain.foundation import Pool
 from app.domain.trade import Cashflow, Order, OrderEvent, RebateRecord
 
 from .parser import ImportTable, detail_records
 from .events import _operators
+from .reference_codes import resolve_pool_code
 
 _TYPE = {"BUY": "BUY", "SELL": "SELL", "买号返点": "BUY", "卖号返点": "SELL"}
 
@@ -63,7 +63,7 @@ def import_rebates(
         except ValueError as exc:
             raise Validation("返点金额或收到日期无效", details={"sheet": sheet, "row": row_number}) from exc
         code = row.get("资金账户编码", "").strip()
-        pool = session.scalar(select(Pool).where(Pool.code == code)) if code else None
+        pool = resolve_pool_code(session, code)
         if code and (pool is None or not user.can_see_pool(pool.id)):
             raise Validation("资金账户不存在或无权使用", details={"sheet": sheet, "row": row_number})
         existing = session.scalar(select(RebateRecord).where(RebateRecord.rebate_no == number))

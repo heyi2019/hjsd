@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from sqlalchemy import case, cast, func, literal, select, true
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.lists import ListColumnConfig, ListCustomColumn
 from app.domain.parties import Customer
-from app.domain.trade import Order
+from app.domain.trade import Order, OrderFormField
 from app.domain.form_scopes import FORM_SCOPES
 from app.settings.lists.scopes import ListScope
 
@@ -63,10 +63,24 @@ def _value_labels(options: Any) -> dict[str, str] | None:
     return {item["value"]: item["label"] for item in items} or None
 
 
+def _current_field_option_labels(session: Session, customs: Iterable[ListCustomColumn]) -> dict[str, dict[str, str]]:
+    keys = {column.source_key for column in customs if column.field_type in {"SELECT", "MULTI_SELECT"}}
+    if not keys:
+        return {}
+    definitions = session.scalars(select(OrderFormField).where(
+        OrderFormField.is_custom.is_(True), OrderFormField.is_active.is_(True), OrderFormField.field_key.in_(keys),
+    ).order_by(OrderFormField.sort_order, OrderFormField.id)).all()
+    labels: dict[str, dict[str, str]] = {}
+    for definition in definitions:
+        labels.setdefault(definition.field_key, _value_labels(definition.options) or {})
+    return labels
+
+
 def _merge(
     scope: ListScope,
     rows: dict[str, ListColumnConfig],
     customs: dict[str, ListCustomColumn],
+    current_labels: dict[str, dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """把注册表列 + 自定义列定义与库内状态合并成对外结构。
 
@@ -102,7 +116,7 @@ def _merge(
                 "locked": False,
                 "custom": True,
                 "source_key": definition.source_key,
-                "value_labels": definition.value_labels or None,
+                "value_labels": {**(current_labels or {}).get(definition.source_key, {}), **(definition.value_labels or {})} or None,
                 "is_visible": row.is_visible if row is not None else True,
                 "sort_order": row.sort_order if row is not None else base + position * 10,
                 "fixed": row.fixed if row is not None else None,

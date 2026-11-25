@@ -131,7 +131,7 @@ function DeliverySubSection({
       } else {
         const snapshotKey = direction === "SELL" ? `sell_${key}` : key;
         const snapshot = order?.option_label_snapshot?.[snapshotKey];
-        value = snapshot && (!editing || order?.extra_values?.[snapshotKey] === raw)
+        value = typeof snapshot === "string" && (!editing || order?.extra_values?.[snapshotKey] === raw)
           ? snapshot : formatExtraDisplayValue(raw, optionsByField[key]);
       }
     }

@@ -99,7 +99,7 @@ def inject_custom_columns(
     CSV 与 xlsx 导出共用同一份注入逻辑，避免两种格式的取值口径漂移。
     """
     custom_sources = {
-        column["key"]: column["source_key"]
+        column["key"]: (column["source_key"], column.get("value_labels") or {})
         for column in config["columns"]
         if column.get("custom") and column.get("source_key")
     }
@@ -109,9 +109,20 @@ def inject_custom_columns(
     for row in rows:
         item = dict(row)
         extras = item.get("extra_values") or item.get("form_extra") or {}
+        snapshots = item.get("option_label_snapshot") or {}
         if isinstance(extras, dict):
-            for key, source_key in custom_sources.items():
-                item[key] = extras.get(source_key)
+            for key, (source_key, labels) in custom_sources.items():
+                value = extras.get(source_key)
+                label = snapshots.get(source_key) if isinstance(snapshots, dict) else None
+                if isinstance(value, str) and isinstance(label, str):
+                    item[key] = label
+                elif isinstance(value, str):
+                    item[key] = labels.get(value, value)
+                elif isinstance(value, list) and (isinstance(label, dict) or labels):
+                    translations = {**labels, **(label if isinstance(label, dict) else {})}
+                    item[key] = [translations.get(entry, entry) if isinstance(entry, str) else entry for entry in value]
+                else:
+                    item[key] = value
         items.append(item)
     return items
 
@@ -147,6 +158,10 @@ def build_list_csv(
         report["total"] = total
     dynamic_value_labels = list_columns_service.get_value_labels(db, scope_code)
     value_labels = merge_static_value_labels(dynamic_value_labels)
+    # 自定义列已按每行的名称快照翻译；避免名称恰好等于另一选项编码时再次翻译。
+    for column in config["columns"]:
+        if column.get("custom"):
+            value_labels.pop(column["key"], None)
     if scope_code == "CASHFLOW":
         for key, labels in CASHFLOW_VALUE_LABELS.items():
             value_labels[key] = {**labels, **value_labels.get(key, {})}

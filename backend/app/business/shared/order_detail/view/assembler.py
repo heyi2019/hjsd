@@ -38,6 +38,11 @@ def build_order_outputs(
                 "label": definitions.get(key).label if definitions.get(key) else key,
                 "section": definitions.get(key).section if definitions.get(key) else "EXTRA",
                 "value": value,
+                **({"value_labels": {item["value"]: item["label"] for item in (definitions[key].options or [])
+                                    if isinstance(item, dict) and isinstance(item.get("value"), str)
+                                    and isinstance(item.get("label"), str)}}
+                   if definitions.get(key) and definitions[key].is_custom
+                   and definitions[key].field_type in {"SELECT", "MULTI_SELECT"} else {}),
             }
             for key, value in extra_values.items()
             if value not in (None, "", [])

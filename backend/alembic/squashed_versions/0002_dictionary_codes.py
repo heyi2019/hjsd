@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.domain.enums import AuditAction
 from app.domain.foundation import GameTypeOption, Pool
+from app.domain.lists import ListCustomColumn
 from app.domain.options import OptionSet
 from app.domain.parties import Counterparty, Customer, CustomerLead, OrderCounterpartyRole, OrderCustomerRole
 from app.domain.trade import Account, Cashflow, Deposit, Installment, Order, OrderEvent, OrderFormField, RebateRecord, Reconciliation
@@ -25,7 +26,7 @@ from app.domain.users import Team
 from app.shared.audit import record_audit
 from app.shared.game_references import archive_game_references
 from app.shared.numbering import allocate_number, ensure_sequence
-from app.shared.option_codes import allocate_option_code
+from app.shared.option_codes import allocate_option_code, sync_option_sequence
 from app.shared.option_snapshots import option_label_maps
 from app.business.shared.listing_state import active_listings_from_events
 
@@ -137,23 +138,27 @@ def _snapshot_financial_invariants(session: Session) -> tuple[list, list]:
     return flows, orders
 
 
-def _assign_master_codes(session: Session, model: type, namespace: str, prefix: str) -> int:
+def _assign_master_codes(session: Session, model: type, namespace: str, prefix: str, *, actor: str) -> int:
     rows = list(session.scalars(select(model).order_by(model.id)))
     existing = [row.code for row in rows]
-    changed: list[tuple[Any, str]] = []
+    changed: list[tuple[Any, str, str]] = []
     for row in rows:
         if re.fullmatch(rf"{prefix}_\d{{2,}}", row.code):
             continue
         code = allocate_option_code(session, namespace, prefix, existing)
         existing.append(code)
-        changed.append((row, code))
+        changed.append((row, row.code, code))
     token = uuid4().hex[:12]
-    for row, _code in changed:
+    for row, _old, _code in changed:
         row.code = f"__migration_{token}_{row.id}"
     session.flush()
-    for row, code in changed:
+    for row, _old, code in changed:
         row.code = code
     session.flush()
+    if model is Pool:
+        for row, old, code in changed:
+            record_audit(session, action=AuditAction.FIELD_DEFINITION_CHANGE, entity_type="pool_code_migration",
+                         entity_id=row.id, actor=actor, before={"code": old}, after={"code": code})
     return len(changed)
 
 
@@ -231,7 +236,7 @@ def migrate_codes(session: Session, *, actor: str) -> dict[str, Any]:
         raise Validation("字典编码迁移仅支持 PostgreSQL")
     with session.begin_nested():
         session.execute(text(
-            "LOCK TABLE pools,teams,game_type_options,option_sets,document_sequences,order_form_fields,"
+            "LOCK TABLE pools,teams,game_type_options,option_sets,document_sequences,order_form_fields,list_custom_columns,"
             "stocks,orders,order_events,cashflow,customers,counterparties,customer_leads,"
             "deposits,rebate_records,installments,reconciliations,order_customer_roles,order_counterparty_roles "
             "IN ACCESS EXCLUSIVE MODE"
@@ -239,8 +244,8 @@ def migrate_codes(session: Session, *, actor: str) -> dict[str, Any]:
         session.execute(text("ALTER TABLE orders ADD COLUMN IF NOT EXISTS option_label_snapshot JSON"))
         before_flows, before_orders = _snapshot_financial_invariants(session)
         counts = {
-            "pools": _assign_master_codes(session, Pool, "fund-pool", "pool"),
-            "teams": _assign_master_codes(session, Team, "team", "team"),
+            "pools": _assign_master_codes(session, Pool, "fund-pool", "pool", actor=actor),
+            "teams": _assign_master_codes(session, Team, "team", "team", actor=actor),
         }
 
         dictionaries: dict[str, dict[str, tuple[str, str]]] = {}
@@ -318,15 +323,60 @@ def migrate_codes(session: Session, *, actor: str) -> dict[str, Any]:
         custom: dict[tuple[str, str], dict[str, tuple[str, str]]] = {}
         definitions = list(session.scalars(select(OrderFormField).order_by(OrderFormField.id)))
         for field in definitions:
-            if field.is_custom and field.field_type in {"SELECT", "MULTI_SELECT"} and field.options:
-                field.options, custom[(field.order_type_code, field.field_key)] = _options(
-                    session, f"form:{field.order_type_code}:{field.field_key}", field.field_key, field.options,
-                )
+            if field.is_custom and field.field_type in {"SELECT", "MULTI_SELECT"}:
+                if field.options:
+                    field.options, custom[(field.order_type_code, field.field_key)] = _options(
+                        session, f"form:{field.order_type_code}:{field.field_key}", field.field_key, field.options,
+                    )
+                else:
+                    custom[(field.order_type_code, field.field_key)] = {}
             elif field.field_key in {"has_secondary", "wallet_realname", *GROUPS} and field.options:
                 mapping = ({value: (code, value) for value, code in YES_NO.items()} if field.field_key == "has_secondary"
                            else {value: (code, value) for value, code in WALLET.items()} if field.field_key == "wallet_realname"
                            else dictionaries.get(GROUPS[field.field_key], {}))
                 field.options = [{**item, "value": _remap(item.get("value"), mapping, field.field_key)[0]} for item in field.options]
+
+        for column in session.scalars(select(ListCustomColumn)):
+            if not isinstance(column.value_labels, dict):
+                continue
+            mappings = [mapping for (_scope, key), mapping in custom.items() if key == column.source_key]
+            candidates = sorted(
+                (field for field in definitions if field.is_custom and field.is_active
+                 and field.field_key == column.source_key and field.field_type in {"SELECT", "MULTI_SELECT"}),
+                key=lambda field: (field.sort_order, field.id),
+            )
+            converted_labels: dict[str, str] = {}
+            for old, label in column.value_labels.items():
+                if not isinstance(old, str) or not isinstance(label, str) or not old or not label:
+                    raise _mapping_error("自定义列表选项", old)
+                matches = {mapping[old][0] for mapping in mappings if old in mapping}
+                if len(matches) > 1:
+                    raise _mapping_error("自定义列表选项", old)
+                if not matches and candidates:
+                    owner = candidates[0]
+                    mapping = custom[(owner.order_type_code, owner.field_key)]
+                    used = [code for code, _label in mapping.values()] + list(converted_labels)
+                    if old in YES_NO:
+                        code = YES_NO[old]
+                    elif re.fullmatch(rf"{re.escape(owner.field_key.lower())}_\d{{2,}}", old):
+                        code = old
+                    else:
+                        code = allocate_option_code(session, f"form:{owner.order_type_code}:{owner.field_key}", owner.field_key, used)
+                    archived = (code, label)
+                    for key in (old, label, code):
+                        if key in mapping and mapping[key] != archived:
+                            raise _mapping_error("自定义列表选项", old)
+                        mapping[key] = archived
+                    matches.add(code)
+                code = next(iter(matches), old)
+                if code in converted_labels and converted_labels[code] != label:
+                    raise _mapping_error("自定义列表选项", old)
+                converted_labels[code] = label
+            column.value_labels = converted_labels
+
+        for (scope, key), mapping in custom.items():
+            if mapping:
+                sync_option_sequence(session, f"form:{scope}:{key}", key, [code for code, _label in mapping.values()])
 
         for field in definitions:
             condition = field.required_when
@@ -343,7 +393,7 @@ def migrate_codes(session: Session, *, actor: str) -> dict[str, Any]:
             if mapping:
                 field.required_when = {**condition, "values": [_remap(value, mapping, str(key))[0] for value in condition["values"]]}
 
-        def extras(values: Any, scopes: set[str], snapshots: dict[str, str] | None = None) -> Any:
+        def extras(values: Any, scopes: set[str], snapshots: dict[str, Any] | None = None) -> Any:
             if values is None:
                 return None
             if not isinstance(values, dict):
@@ -363,14 +413,16 @@ def migrate_codes(session: Session, *, actor: str) -> dict[str, Any]:
                     continue
                 entries = value if isinstance(value, list) else [value]
                 converted_values = []
+                converted_labels = {}
                 for entry in entries:
                     matches = {mapping[entry] for mapping in maps if isinstance(entry, str) and entry in mapping}
                     if len(matches) != 1:
                         raise _mapping_error(f"自定义字段 {key}", entry)
                     code, label = matches.pop()
                     converted_values.append(code)
-                    if snapshots is not None and not isinstance(value, list):
-                        snapshots.setdefault(key, label)
+                    converted_labels[code] = label
+                if snapshots is not None:
+                    snapshots.setdefault(key, converted_labels if isinstance(value, list) else label)
                 result[key] = converted_values if isinstance(value, list) else converted_values[0]
             return result
 

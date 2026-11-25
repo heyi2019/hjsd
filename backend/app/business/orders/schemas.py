@@ -190,7 +190,7 @@ class OrderOut(BaseModel):
     value_added_service: str | None = None
     trade_date: date
     account_snapshot: dict | None = None
-    option_label_snapshot: dict[str, str] | None = None
+    option_label_snapshot: dict[str, str | dict[str, str]] | None = None
     account_id: int | None = None
     status: str
     owner_id: int | None = None

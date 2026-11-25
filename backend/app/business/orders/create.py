@@ -289,7 +289,7 @@ def create_order(
             for key, value in account_snapshot.items()
             if key not in {"secondary_images", "wallet_realname_images"}
         }
-    option_snapshots = update_option_label_snapshot(session, None, None, form_extra)
+    option_snapshots = update_option_label_snapshot(session, None, None, form_extra, scopes=(definition.code,))
     if customer_participants or counterparty_participants:
         source_labels = option_label_maps(session, {"CUSTOMER_SOURCE", "SUPPLIER_SOURCE"})
         for kind, group, participants in (

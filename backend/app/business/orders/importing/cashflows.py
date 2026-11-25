@@ -12,12 +12,13 @@ from app.core.errors import PermissionDenied, Validation
 from app.core.money import to_money
 from app.core.security import CurrentUser, PERM_ORDER_EVENT_POST
 from app.domain.enums import AccountingAttribute, SequenceKey
-from app.domain.foundation import DocumentSequence, Pool
+from app.domain.foundation import DocumentSequence
 from app.domain.trade import Cashflow, Order, OrderEvent
 from app.settings.field_definitions.pools import assert_pool_usable
 
 from .parser import ImportTable, detail_records
 from .events import _operators
+from .reference_codes import resolve_pool_code
 
 _DIRECTION = {"IN": "IN", "OUT": "OUT", "收入": "IN", "支出": "OUT"}
 
@@ -69,7 +70,7 @@ def import_cashflows(
         if amount < 0 or (amount == 0 and source != "ORDER_EVENT"):
             raise Validation("资金金额必须大于零", details=details)
         code = row.get("资金账户编码", "").strip()
-        pool = session.scalar(select(Pool).where(Pool.code == code)) if code else None
+        pool = resolve_pool_code(session, code)
         if pool is None or not user.can_see_pool(pool.id):
             raise Validation("资金账户不存在或无权使用", details=details)
         operators = _operators(session, row.get("操作人", ""), details)

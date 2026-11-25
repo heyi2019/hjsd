@@ -135,7 +135,7 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     expect((axios as any).__getCallCount()).toBe(3);
   });
 
-  it("重新读取经营报表和通知摘要时等待最新结果", async () => {
+  it("经营报表和通知摘要走缓存，切页不再强制回源", async () => {
     const params = { from: "2026-10-01", to: "2026-10-31" };
     const reports = [
       () => reportsApi.monthlyPnl(params),
@@ -144,17 +144,25 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
       () => reportsApi.dataCenter(params),
       () => reportsApi.orderProfit(params),
     ];
+    // 同参连续读取命中缓存（不再每次强制回源），切 Tab 不被网络往返阻塞。
     for (const read of reports) {
       const first = await read();
-      expect(await read()).not.toBe(first);
+      expect(await read()).toBe(first);
     }
     const summary = await notificationsApi.profitDetails([1]);
-    expect(await notificationsApi.profitDetails([1])).not.toBe(summary);
+    expect(await notificationsApi.profitDetails([1])).toBe(summary);
     const firstWorkbench = await workbenchApi.summary(params);
-    expect(await workbenchApi.summary(params)).not.toBe(firstWorkbench);
+    expect(await workbenchApi.summary(params)).toBe(firstWorkbench);
+    // 并发读取仍只发一次请求（去重）。
     const [firstConcurrent, secondConcurrent] = await Promise.all([workbenchApi.summary(params), workbenchApi.summary(params)]);
     expect(firstConcurrent).toBe(secondConcurrent);
-    expect((axios as any).__getCallCount()).toBe(15);
+    expect((axios as any).__getCallCount()).toBe(7);
+
+    // 安全网：任何写操作清空缓存后，再次读取必须拿到新值。
+    await apiInstance().request({ method: "post", url: "/reports-write", data: {} });
+    expect(await workbenchApi.summary(params)).not.toBe(firstWorkbench);
+    // POST 本身计 1 次 transport 请求，随后重新读取再计 1 次。
+    expect((axios as any).__getCallCount()).toBe(9);
   });
 
   it("切换操作用户后不会复用上一用户的缓存", async () => {

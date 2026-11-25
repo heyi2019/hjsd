@@ -7,8 +7,9 @@ type ReportPageParams = { limit?: number; offset?: number; sort_desc?: boolean }
 export type ReportExportParams = ReportPeriodParams & { mine?: boolean; all_people?: boolean; user_id?: number; sort_desc?: boolean };
 
 function getFreshReport<T>(url: string, params?: ReportPeriodParams): Promise<T> {
-  const config: CacheAwareRequestConfig = { params, refreshCache: true };
-  return api.get<T>(url, config).then((response) => response.data);
+  // 报表走共享 GET 缓存（SWR）：写操作会 clearApiCache，切回页面时缓存必已失效；
+  // 切 Tab 因此不再强制回源阻塞。函数名保留 getFreshReport 以免触碰所有调用点。
+  return api.get<T>(url, { params }).then((response) => response.data);
 }
 
 export const reportsApi = {

@@ -378,7 +378,9 @@ it("消息为空时显示空状态", async () => {
 
     const alerts = await screen.findByRole("region", { name: "我的消息" });
     expect(await within(alerts).findByText("暂无消息")).toBeInTheDocument();
-    expect(vi.mocked(workbenchApi.summary)).toHaveBeenCalledTimes(1);
+    // 工作台摘要分两阶段加载：periodReady 就绪前按默认周期发一次，就绪后再按实际周期校准发一次。
+    // fixture 的 period（2026-11-01~11-16）与按默认起始日算出的当期不一致，第二次校准请求必然发生，稳定为 2 次。
+    expect(vi.mocked(workbenchApi.summary)).toHaveBeenCalledTimes(2);
   });
 
 });

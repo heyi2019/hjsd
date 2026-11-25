@@ -8,7 +8,6 @@
 结算展示层与模型层均已下线（11-05 二次裁决）：`rebate_settlements` 表 /
 ORM / 编号器移除，「已结算返点 / 未归集返点 / 完整收益」三列和
 `基数 × 费率%` 派生算法全部移除；返点金额全站唯一取 `rebate_records.amount`。
-已有库的历史表保留不 drop，只是代码不再读写。
 """
 
 from __future__ import annotations

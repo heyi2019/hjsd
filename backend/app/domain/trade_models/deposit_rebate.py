@@ -121,9 +121,9 @@ class RebateRecord(Base, AuditMixin):
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     # 返点业务操作人：可多选；created_by 仍保留为审计操作者。
     operator_user_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
-    # REBATE/REBATEVOID 作用域自定义字段值。
+    # INVREBATE 作用域自定义字段值（REBATEVOID 已下线）。
     form_extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 # 返点分次结算模型 `RebateSettlement`（rebate_settlements 表）已于 2026-11-05 下线：
 # 返点登记即完成收入确认，金额唯一取 rebate_records.amount，不再有分次到账、
-# 手续费与冲销子记录。已有库（含生产）中的历史表保留、不 drop，避免破坏历史数据。
+# 手续费与冲销子记录。

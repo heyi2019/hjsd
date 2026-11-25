@@ -375,7 +375,7 @@ TH 是客户需求驱动的分销买卖：向同行采购形成 `OUT + TH_DIRECT
 
 返点是 `REBATE` 业务事件，并关联资金明细：返点实际归本方时使用 `CASHFLOW_DIRECTION=IN`、`CASHFLOW_REASON=REBATE`，资金明细通过 `source_type=ORDER_EVENT`、`source_id=event_no` 回指事件。返点金额进入经营收入统计，但必须与订单收益和平台手续费分开核算，避免重复计入销售收入；当前版本不提供“返点退回”专用接口。
 
-业务口径：返点是收入，返点收益为返点金额，金额全站唯一取 `rebate_records.amount`，`rate` 只留痕不参与金额计算；返点登记即完成收入确认，不再生成分次结算流水。报表按返点金额展示，不得再 `+rebate` / `+settled_rebate` 重复加回。`rebate_settlements` 表 / ORM / 编号器于 2026-11-05 下线，已有库历史表保留不 drop。
+业务口径：返点是收入，返点收益为返点金额，金额全站唯一取 `rebate_records.amount`，`rate` 只留痕不参与金额计算；返点登记即完成收入确认，不再生成分次结算流水。报表按返点金额展示，不得再 `+rebate` / `+settled_rebate` 重复加回。`rebate_settlements` 表 / ORM / 编号器于 2026-11-05 下线。
 
 返点业务事实必须关联来源订单（`source_order_id` 非空），记录 `REBATE_TYPE=BUY/SELL`、渠道、费率、返点金额与实际日期；**无状态字段、无状态机**——登记即确认收入，退回走真实 `OUT` 流水，不设作废 / 结算态。返点金额由登记人明确填写，规则费率只作留痕，不按成交额、本金或利润反推返点金额。返点登记直接关联一笔 `IN` 返点收入资金明细；如产生平台手续费，另登记一笔 `OUT` 经营支出资金明细。
 

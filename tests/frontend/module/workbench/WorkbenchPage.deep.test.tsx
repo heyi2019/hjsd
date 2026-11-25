@@ -2,9 +2,12 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderLight } from "@fixtures/render";
+import { setAntdDateRange } from "@fixtures/antdRange";
 import { WorkbenchPage } from "@/workbench/WorkbenchPage";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
+import { optionSetsApi } from "@/shared/api/options.api";
+import { currentReportPeriod } from "@/shared/lib/reportPeriod";
 import { workbenchSummary } from "@fixtures/api-responses";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { seedOptionSets } from "@fixtures/optionSetsSeed";
@@ -32,7 +35,9 @@ let ui: ReturnType<typeof userEvent.setup>;
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.clearAllMocks();
-  vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary());
+  vi.mocked(optionSetsApi.get).mockResolvedValue(undefined as never);
+  vi.mocked(workbenchApi.summary).mockImplementation(async (period) =>
+    workbenchSummary({ period: period === undefined ? currentReportPeriod() : period }));
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.syncReminders).mockResolvedValue({ created: 0 });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
@@ -49,8 +54,8 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "系统管理员", is_active: true }] as never);
     vi.mocked(ordersApi.create).mockResolvedValue({ id: 31, order_no: "HS0031", status: "ACTIVE" } as never);
     vi.mocked(workbenchApi.summary)
-      .mockResolvedValueOnce(workbenchSummary({ orders: { total_count: 1 } }))
-      .mockResolvedValue(workbenchSummary({ orders: { total_count: 2 } }));
+      .mockResolvedValueOnce(workbenchSummary({ period: currentReportPeriod(), orders: { total_count: 1 } }))
+      .mockResolvedValue(workbenchSummary({ period: currentReportPeriod(), orders: { total_count: 2 } }));
 
     renderLight(<WorkbenchPage />, { user: "admin" });
     const total = screen.getByTestId("workbench-orders");
@@ -87,10 +92,11 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("没有订单权限时个人订单和客户数显示占位且不可跳转", async () => {
     const navigate = vi.fn();
-    vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({ orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null }));
+    vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({ period: currentReportPeriod(), orders: null, personal_orders: null, personal_customers: null, inventory: null, installments: null }));
     renderLight(<WorkbenchPage onWorkbenchNavigate={navigate} />, { user: "admin" });
     await screen.findByRole("tab", { name: "最新消息" });
     await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("region", { name: "我的业务总览" })).toHaveAttribute("aria-busy", "false"));
     for (const id of ["workbench-personal-orders", "workbench-personal-customers"]) {
       const card = screen.getByTestId(id);
       await waitFor(() => expect(within(card).getByText("-")).toBeInTheDocument());
@@ -108,6 +114,7 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("我的当期卡片展示当前登录用户的订单数与分润收益", async () => {
     vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({
+      period: currentReportPeriod(),
       orders: { total_count: 3 },
       personal_orders: 2,
       personal_customers: 2,
@@ -120,7 +127,7 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     const totalCard = (await screen.findByText("订单总量")).closest(".ui-stat") as HTMLElement;
     const customerCard = (await screen.findByText("我的当期客户数")).closest(".ui-stat") as HTMLElement;
     const earningsCard = screen.getByText("我的当期收益").closest(".ui-stat") as HTMLElement;
-    expect(within(orderCard).getByText("2")).toBeInTheDocument();
+    expect(await within(orderCard).findByText("2")).toBeInTheDocument();
     expect(within(totalCard).getByText("3")).toBeInTheDocument();
     expect(within(customerCard).getByText("2")).toBeInTheDocument();
     expect(within(earningsCard).getByText("123.45")).toBeInTheDocument();
@@ -130,11 +137,11 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
 
   it("业务总览卡片跳转到对应明细并携带当前周期与状态", async () => {
     const onWorkbenchNavigate = vi.fn();
-    vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({
-      period: { from: "2026-11-01", to: "2026-11-16" },
-    }));
     renderLight(<WorkbenchPage onWorkbenchNavigate={onWorkbenchNavigate} />, { user: "admin" });
 
+    await waitFor(() => expect(screen.getAllByLabelText("当期日期区间")[0]).toBeEnabled());
+    await setAntdDateRange(document.body, ui, "2026-11-01", "2026-11-16");
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith({ from: "2026-11-01", to: "2026-11-16" }));
     await waitFor(() => expect(screen.getByTestId("workbench-personal-orders")).toHaveAttribute("role", "button"));
     await ui.click((await screen.findByText("我的当期订单")).closest(".ui-stat") as HTMLElement);
     await ui.click(screen.getByText("我的当期收益").closest(".ui-stat") as HTMLElement);

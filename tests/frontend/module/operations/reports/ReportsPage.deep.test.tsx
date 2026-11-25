@@ -129,9 +129,9 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await waitFor(() => expect(vi.mocked(reportsApi.monthlyPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await waitFor(() => expect(vi.mocked(reportsApi.businessPnl)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
     await setRange("commission");
-    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true, limit: 10, offset: 0, sort_desc: true }));
     await setRange("profit");
-    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", limit: 10, offset: 0, sort_desc: true }));
   });
 
   it("FE-053：页内导出成功后创建下载锚点并显示结果反馈", async () => {
@@ -235,7 +235,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await screen.findByText("HS-FE272");
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
-    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31" }));
+    await waitFor(() => expect(vi.mocked(reportsApi.orderProfit)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", limit: 10, offset: 0, sort_desc: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE272")).not.toBeInTheDocument());
   });
 
@@ -254,7 +254,7 @@ describe("ReportsPage：其余报表 Tab 渲染与导出成功分支", () => {
     await screen.findByText("HS-FE273");
     let pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     await setAntdDateRange(pane, ui, "2026-10-01", "2026-10-31");
-    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true }));
+    await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({ from: "2026-10-01", to: "2026-10-31", all_people: true, limit: 10, offset: 0, sort_desc: true }));
     await waitFor(() => expect(screen.queryByText("HS-FE273")).not.toBeInTheDocument());
 
   });

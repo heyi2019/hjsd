@@ -67,9 +67,10 @@ test("分期页面收款结清后交付，不重复产生流水", async ({ page,
 test("资金明细展示接口登记的真实流水", async ({ page, request }) => {
   const base = process.env.ERP_E2E_API_BASE ?? "http://127.0.0.1:8124/api";
   const headers = { "X-Dev-User": "admin" };
-  const pools = await (await request.get(`${base}/pools`, { headers })).json() as Array<{ id: number; code: string }>;
-  const pool = pools.find((item) => item.code === "HJ_INVEST");
+  const pools = await (await request.get(`${base}/pools`, { headers })).json() as Array<{ id: number; code: string; name: string }>;
+  const pool = pools.find((item) => item.name === "投资款荷包");
   expect(pool).toBeTruthy();
+  expect(pool!.code).toMatch(/^pool_\d{2,}$/);
   const note = `页面联调资金明细-${Date.now()}`;
   const created = await request.post(`${base}/cashflows`, { headers, data: {
     pool_id: pool!.id, occurred_on: "2026-10-17", direction: "IN", category: "OTHER",

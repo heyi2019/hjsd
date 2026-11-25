@@ -16,7 +16,7 @@ import sys
 import tarfile
 import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 PY313 = "/Users/aries/Applications/Python_3.13/bin/python3"
@@ -198,49 +198,75 @@ def production_schema_digest() -> str:
     return schema_digest_bytes(data)
 
 
-def check_production_schema(env: dict[str, str]) -> str:
-    """把线上只读快照恢复到本机独立临时库，并对照候选 ORM。"""
-    name = "heijin_erp_drill_" + secrets.token_hex(10)
-    if not re.fullmatch(r"heijin_erp_drill_[0-9a-f]{20}", name):
-        raise RuntimeError("不安全的演练库名称")
-    # 演练只允许使用本机约定容器和端口，不依赖传入的目标连接串。
-    ports = call(["docker", "port", "heijin-db-1", "5432/tcp"], capture=True)
-    if not re.fullmatch(r"127\.0\.0\.1:5433", ports):
-        raise RuntimeError("本机 PostgreSQL 不是预期的 127.0.0.1:5433")
-    drill_url = call([PY313, "-c", "import sys; from app.core.settings import get_settings; from sqlalchemy.engine import make_url; "
-          "u=make_url(get_settings().database_url); "
-          "assert u.get_backend_name() == 'postgresql' and u.host in ('127.0.0.1','localhost','::1') "
-          "and u.port == 5433 and u.database == 'heijin_erp_dev'; "
-          "print(u.set(database=sys.argv[1]).render_as_string(hide_password=False))", name], env=env, capture=True)
-    psql = ["docker", "exec", "heijin-db-1", "sh", "-c",
-            'exec psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 "$@"', "sh"]
-    pg_restore = ["docker", "exec", "-i", "heijin-db-1", "sh", "-c",
-                  'exec pg_restore -U "$POSTGRES_USER" "$@"', "sh"]
-    backup = """set -eu
-cd /opt/heijin/deploy
-docker compose exec -T db sh -c 'exec pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc'
-"""
-    before = production_schema_digest()
-    created = False
-    with tempfile.TemporaryDirectory(prefix="heijin-schema-drill-") as temp:
-        dump = Path(temp) / "production.dump"
-        with os.fdopen(os.open(dump, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600), "wb") as stream:
-            subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", SSH_TARGET, "bash", "-s"],
-                           input=backup.encode(), stdout=stream, check=True)
+DRILL_SOURCE_PATHS = (
+    "VERSION", "backend/Dockerfile", "backend/requirements.lock.txt", "backend/alembic.ini",
+    "backend/app", "backend/alembic", "backend/scripts/ensure_idempotency_records.py",
+    "backend/scripts/split_sale_form_scopes.py", "deploy/scripts/schema_diff.py",
+)
+DRILL_REQUIRED_FILES = {
+    "VERSION", "backend/Dockerfile", "backend/requirements.lock.txt", "backend/alembic.ini",
+    "backend/app/core/settings.py", "backend/alembic/env.py", "backend/scripts/ensure_idempotency_records.py",
+    "backend/scripts/split_sale_form_scopes.py", "deploy/scripts/schema_diff.py",
+}
+
+
+def validate_drill_source_archive(archive: Path) -> None:
+    """演练包只允许候选源码，拒绝密钥、数据、链接和越界路径。"""
+    seen: set[str] = set()
+    files: set[str] = set()
+    with tarfile.open(archive, "r:") as data:
+        for member in data.getmembers():
+            name = member.name.rstrip("/")
+            path = PurePosixPath(name)
+            allowed = (name in DRILL_SOURCE_PATHS or name in {"backend", "backend/scripts", "deploy", "deploy/scripts"}
+                       or name.startswith(("backend/app/", "backend/alembic/")))
+            if (not allowed or path.is_absolute() or ".." in path.parts or name in seen
+                    or member.issym() or member.islnk() or not (member.isfile() or member.isdir())
+                    or any(part.startswith(".env") for part in path.parts)
+                    or path.suffix in {".db", ".dump", ".sqlite", ".sqlite3"}
+                    or "data" in path.parts):
+                raise ValueError("演练源码包包含不允许的路径或文件")
+            seen.add(name)
+            if member.isfile():
+                files.add(name)
+    if not DRILL_REQUIRED_FILES.issubset(files):
+        raise ValueError("演练源码包缺少必需文件")
+
+
+def run_server_drill(commit: str) -> None:
+    """仅上传候选源码；生产快照和临时库均留在服务器内。"""
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise ValueError("无效的候选提交")
+    token = secrets.token_hex(10)
+    stage = f"/tmp/heijin-server-drill-{token}"
+    ssh = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ServerAliveInterval=15", SSH_TARGET]
+    script = subprocess.check_output(["git", "show", f"{commit}:scripts/ops/production_drill_remote.sh"], cwd=ROOT)
+    with tempfile.TemporaryDirectory(prefix="heijin-drill-source-") as temp:
+        archive = Path(temp) / "source.tar"
+        with archive.open("wb") as stream:
+            subprocess.run(["git", "archive", "--format=tar", commit, *DRILL_SOURCE_PATHS], cwd=ROOT, stdout=stream, check=True)
+        validate_drill_source_archive(archive)
+        checksum = sha256(archive)
+        call([*ssh, "mkdir", "-m", "700", stage])
+        started = False
         try:
-            with dump.open("rb") as stream:
-                subprocess.run([*pg_restore, "--list"], stdin=stream, stdout=subprocess.DEVNULL, check=True)
-            call([*psql, "-c", f'CREATE DATABASE "{name}"'])
-            created = True
-            with dump.open("rb") as stream:
-                subprocess.run([*pg_restore, "-d", name, "--no-owner", "--single-transaction"], stdin=stream, check=True)
-            call([PY313, "-m", "alembic", "upgrade", "head"], cwd=ROOT / "backend",
-                 env={**env, "DATABASE_URL": drill_url})
-            call([PY313, "-m", "scripts.ensure_idempotency_records", "--apply", "--drill-db", name], env=env)
-            call([PY313, str(ROOT / "deploy/scripts/schema_diff.py"), name], env=env)
+            with archive.open("rb") as stream:
+                subprocess.run([*ssh, f"umask 077; cat > {shlex.quote(stage + '/source.tar')}"], stdin=stream, check=True)
+            subprocess.run([*ssh, f"umask 077; cat > {shlex.quote(stage + '/drill.sh')}"], input=script, check=True)
+            started = True
+            args = ["bash", stage + "/drill.sh", token, checksum]
+            subprocess.run([*ssh, " ".join(map(shlex.quote, args))], stdin=subprocess.DEVNULL, check=True)
         finally:
-            if created:
-                call([*psql, "-c", f'DROP DATABASE "{name}" WITH (FORCE)'])
+            if not started:
+                cleanup = f"test ! -L {shlex.quote(stage)} && rm -rf -- {shlex.quote(stage)}"
+                subprocess.run([*ssh, cleanup], stdin=subprocess.DEVNULL, check=False)
+
+
+def check_production_schema(env: dict[str, str]) -> str:
+    """在服务器内恢复生产快照并演练候选迁移；不下载生产数据。"""
+    del env
+    before = production_schema_digest()
+    run_server_drill(git("rev-parse", "HEAD"))
     after = production_schema_digest()
     if before != after:
         raise RuntimeError("线上数据库结构在演练期间发生变化")

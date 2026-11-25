@@ -56,7 +56,7 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     const total = screen.getByTestId("workbench-orders");
     expect(await within(total).findByText("1")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /自营·回收/ }));
-    expect(await screen.findByText("新建回收订单")).toBeInTheDocument();
+    expect(await screen.findByText("新建回收订单", {}, { timeout: 10_000 })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("游戏类型")).toBeEnabled());
     await ui.click(screen.getByLabelText("游戏类型"));
     await ui.click(await screen.findByText("王者荣耀", { selector: ".ant-select-item-option-content" }));

@@ -385,12 +385,8 @@ test.describe("UI visual baseline", () => {
   test("登录页 mobile", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
-    // 移动端顶栏隐藏了「退出登录」（responsive.css: 主题/角色/退出收进用户中心），
-    // 须先开「用户中心」，再在其内点「退出登录」→ Popconfirm「确认退出」才真正登出。
-    await page.getByRole("button", { name: "用户中心" }).click();
-    await expect(page.locator(".user-center-modal").first()).toBeVisible();
     await page.getByRole("button", { name: "退出登录" }).click();
-    await page.getByRole("button", { name: "确认退出" }).click();
+    await page.getByRole("button", { name: /^退\s*出$/ }).click();
     await expect(page.getByRole("heading", { name: "登录工作台" })).toBeVisible();
     await expect(page.getByLabel("用户名")).toBeVisible();
     await expect(page.getByLabel("密码", { exact: true })).toBeVisible();

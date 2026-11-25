@@ -186,6 +186,67 @@ def test_schema_fingerprint_ignores_dump_tokens_but_detects_schema_changes():
     assert module.schema_digest_bytes(first) == apply_module.schema_digest_bytes(first)
 
 
+@pytest.mark.parametrize("schema_changed", [False, True])
+def test_local_drill_stays_on_server_and_rechecks_production_schema(monkeypatch, schema_changed):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("local_release_server_drill", PROJECT_ROOT / "scripts/ops/local_release.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    commit = "a" * 40
+    digests = iter(["b" * 64, ("c" if schema_changed else "b") * 64])
+    called = []
+    monkeypatch.setattr(module, "git", lambda *_: commit)
+    monkeypatch.setattr(module, "production_schema_digest", lambda: next(digests))
+    monkeypatch.setattr(module, "run_server_drill", lambda candidate: called.append(candidate))
+    if schema_changed:
+        with pytest.raises(RuntimeError, match="线上数据库结构在演练期间发生变化"):
+            module.check_production_schema({})
+    else:
+        assert module.check_production_schema({}) == "b" * 64
+    assert called == [commit]
+
+
+def test_server_drill_source_archive_rejects_sensitive_files_and_links(tmp_path):
+    import importlib.util
+    import io
+    import tarfile
+
+    spec = importlib.util.spec_from_file_location("local_release_drill_archive", PROJECT_ROOT / "scripts/ops/local_release.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    required = ["VERSION", "backend/alembic.ini", "backend/Dockerfile", "backend/requirements.lock.txt",
+                "backend/alembic/env.py", "backend/app/core/settings.py",
+                "backend/scripts/ensure_idempotency_records.py", "backend/scripts/split_sale_form_scopes.py",
+                "deploy/scripts/schema_diff.py"]
+    archive = tmp_path / "source.tar"
+
+    def write_archive(extra=None):
+        with tarfile.open(archive, "w") as data:
+            for name in required:
+                info = tarfile.TarInfo(name)
+                info.size = 1
+                data.addfile(info, io.BytesIO(b"x"))
+            if extra:
+                data.addfile(extra)
+
+    write_archive()
+    module.validate_drill_source_archive(archive)
+    for invalid in (tarfile.TarInfo("backend/.env"), tarfile.TarInfo("backend/app/.env/secret"),
+                    tarfile.TarInfo("backend/data/production.dump"),
+                    tarfile.TarInfo("../escape")):
+        write_archive(invalid)
+        with pytest.raises(ValueError, match="不允许"):
+            module.validate_drill_source_archive(archive)
+    link = tarfile.TarInfo("backend/app/link")
+    link.type, link.linkname = tarfile.SYMTYPE, "/etc/passwd"
+    write_archive(link)
+    with pytest.raises(ValueError, match="不允许"):
+        module.validate_drill_source_archive(archive)
+
+
 @pytest.mark.parametrize("backup_fails", [True, False])
 def test_local_cd_stops_before_changes_without_backup_and_deploys_after_backup(tmp_path, monkeypatch, backup_fails):
     """备份失败不能导入镜像或覆盖配置；成功后才允许切换版本。"""
@@ -818,50 +879,18 @@ def test_offline_deploy_refuses_missing_rate_limit_image(tmp_path):
     assert "redis:7.4-alpine" in result.stdout + result.stderr
 
 
-def test_local_release_provisions_only_restored_drill_before_schema_check(monkeypatch):
-    """线上副本先走完整版本迁移，再补表、对照结构并核验线上未变化。"""
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("local_release_provision_drill", PROJECT_ROOT / "scripts/ops/local_release.py")
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    name = "heijin_erp_drill_" + "a" * 20
-    monkeypatch.setattr(module.secrets, "token_hex", lambda _: "a" * 20)
-    calls = []
-    call_options = []
-    digests = []
-    def fake_call(args, **kwargs):
-        calls.append(args)
-        call_options.append(kwargs)
-        if args[:2] == ["docker", "port"]:
-            return "127.0.0.1:5433"
-        if len(args) > 2 and "render_as_string" in args[2]:
-            return f"postgresql+psycopg://erp_app:test@127.0.0.1:5433/{name}"
-        return ""
-    def fake_run(args, **kwargs):
-        calls.append(args)
-        call_options.append(kwargs)
-    def digest():
-        digests.append(True)
-        return "same"
-    monkeypatch.setattr(module, "call", fake_call)
-    monkeypatch.setattr(module.subprocess, "run", fake_run)
-    monkeypatch.setattr(module, "production_schema_digest", digest)
-    assert module.check_production_schema({}) == "same"
-    provision = next(i for i, command in enumerate(calls) if "scripts.ensure_idempotency_records" in command)
-    restore = next(i for i, command in enumerate(calls) if "--single-transaction" in command)
-    upgrade = next(i for i, command in enumerate(calls) if command[-4:] == ["-m", "alembic", "upgrade", "head"])
-    diff = next(i for i, command in enumerate(calls) if any(str(x).endswith("schema_diff.py") for x in command))
+def test_local_release_provisions_only_restored_drill_before_schema_check():
+    """恢复、迁移、补表和结构校验的顺序及目标库防护必须保留。"""
+    source = (PROJECT_ROOT / "scripts/ops/production_drill_remote.sh").read_text(encoding="utf-8")
+    restore = source.index("pg_restore")
+    upgrade = source.index("['alembic', 'upgrade', 'head']")
+    provision = source.index("'scripts.ensure_idempotency_records'")
+    diff = source.index("'/candidate/deploy/scripts/schema_diff.py'")
     assert restore < upgrade < provision < diff
-    assert call_options[upgrade]["env"]["DATABASE_URL"].endswith("/" + name)
-    assert calls[provision][-2:] == ["--drill-db", name]
-    assert calls[diff][-1] == name
-    assert len(digests) == 2
-    changed = iter(("before", "after"))
-    monkeypatch.setattr(module, "production_schema_digest", lambda: next(changed))
-    with pytest.raises(RuntimeError, match="线上数据库结构"):
-        module.check_production_schema({})
+    assert "heijin_erp_drill_[0-9a-f]{20}" in source
+    assert "SELECT current_database()" in source
+    assert "DROP DATABASE IF EXISTS" in source
+    assert "trap cleanup EXIT" in source
 
 
 def test_drill_provision_rejects_nonlocal_or_unowned_database():

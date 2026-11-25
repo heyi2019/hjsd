@@ -80,7 +80,6 @@ function ContractTable({
     isOperatorUpdating,
     updateOperationOperators,
   } = controller;
-  const employeeNames = new Map(employees.map((employee) => [employee.id, employee.display_name]));
   const operationLabel = (operation: InstallmentOperationOperator) => {
     const [action, period] = operation.operation_key.split(":");
     const label: Record<string, string> = {

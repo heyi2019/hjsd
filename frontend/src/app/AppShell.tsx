@@ -1,5 +1,5 @@
 import { Modal, Space } from "antd";
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MOBILE_NAV_ORDER, navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
@@ -10,7 +10,7 @@ import { startPageLoadTiming } from "../shared/lib/pageLoadTiming";
 import { WorkbenchPage } from "../workbench/WorkbenchPage";
 import { LoginPage } from "../settings/auth/LoginPage";
 import { ChangePasswordPage } from "../settings/auth/ChangePasswordPage";
-import type { ComponentType } from "react";
+import type { ComponentType, RefObject } from "react";
 import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import type { InitialLedgerFilters } from "../business/orders/useLedgerList";
 import { ConfirmButton } from "../shared/ui";
@@ -58,6 +58,100 @@ const PAGES: Record<string, ComponentType<PageProps>> = {
   settings: SettingsPage,
 };
 
+/** keep-alive 页面槽位。memo 化后，AppShell 因 userCenterOpen / moreOpen / 主题等
+ *  无关 state 重渲染时，props 未变的隐藏页跳过整棵子树重渲染。
+ *
+ *  关键：传给各页面的 props 必须摊平为「原始值或稳定引用」——对象/回调若在
+ *  AppShell 每次渲染新建，浅比较必然失败，memo 就形同虚设。isActive 是原始值，
+ *  切页变化时 props 必变，memo 自动放行（页面内 useEffect([active]) 照常重拉数据）。
+ *  这是安全失败设计：漏稳定某个 prop 至多多渲染一次，不会导致数据该刷新却不刷新。 */
+type PageSlotProps = {
+  slotKey: string;
+  isActive: boolean;
+  hostRef: RefObject<HTMLDivElement> | undefined;
+  PageComponent: ComponentType<PageProps>;
+  onNavigate: (key: string, tab?: BusinessCenterEntryTab) => void;
+  onWorkbenchNavigate: (path: string) => void;
+  initialTab?: BusinessCenterEntryTab;
+  initialMine?: boolean;
+  initialLedgerFilters?: InitialLedgerFilters;
+  initialAllocationOrderId?: number;
+  initialAllocationNotificationId?: number;
+  initialInventoryAgeGtDays?: number;
+  initialInstallmentStatus?: string;
+  initialReportTab?: "commission" | "my-earnings";
+  initialReportFrom?: string;
+  initialReportTo?: string;
+  initialReportAll?: boolean;
+  focusCustomerId?: number;
+  focusCounterpartyId?: number;
+  customerOrderFilter?: { from?: string; to?: string };
+  clearCustomerOrderFilter: () => void;
+};
+
+const PageSlot = memo(function PageSlot({
+  slotKey,
+  isActive,
+  hostRef,
+  PageComponent,
+  onNavigate,
+  onWorkbenchNavigate,
+  initialTab,
+  initialMine,
+  initialLedgerFilters,
+  initialAllocationOrderId,
+  initialAllocationNotificationId,
+  initialInventoryAgeGtDays,
+  initialInstallmentStatus,
+  initialReportTab,
+  initialReportFrom,
+  initialReportTo,
+  initialReportAll,
+  focusCustomerId,
+  focusCounterpartyId,
+  customerOrderFilter,
+  clearCustomerOrderFilter,
+}: PageSlotProps) {
+  return (
+    <div
+      ref={hostRef}
+      className={`page-slot${slotKey === "business" || slotKey === "customers" ? " page-slot--quick-entry" : ""}${isActive ? " page-enter" : " page-slot--hidden"}`}
+      aria-hidden={!isActive}
+    >
+      {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，
+          page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
+          当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
+      <ErrorBoundary name={slotKey}>
+        <DataTableLoadingProvider enabled={["business", "customers", "funds", "operations"].includes(slotKey)}>
+          {slotKey === "workbench" ? (
+            <WorkbenchPage active={isActive} onNavigate={onNavigate} onWorkbenchNavigate={onWorkbenchNavigate} />
+          ) : (
+            <PageComponent
+              onNavigate={onNavigate}
+              initialTab={initialTab}
+              initialMine={initialMine}
+              initialLedgerFilters={initialLedgerFilters}
+              initialAllocationOrderId={initialAllocationOrderId}
+              initialAllocationNotificationId={initialAllocationNotificationId}
+              initialInventoryAgeGtDays={initialInventoryAgeGtDays}
+              initialInstallmentStatus={initialInstallmentStatus}
+              initialReportTab={initialReportTab}
+              initialReportFrom={initialReportFrom}
+              initialReportTo={initialReportTo}
+              initialReportAll={initialReportAll}
+              active={isActive}
+              focusCustomerId={focusCustomerId}
+              customerOrderFilter={customerOrderFilter}
+              onClearCustomerOrderFilter={slotKey === "customers" ? clearCustomerOrderFilter : undefined}
+              focusCounterpartyId={focusCounterpartyId}
+            />
+          )}
+        </DataTableLoadingProvider>
+      </ErrorBoundary>
+    </div>
+  );
+});
+
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,21 +169,28 @@ export function AppShell() {
   const parsedCounterpartyFocusId = Number(customerFocusParams?.get("counterparty_id"));
   const focusCustomerId = Number.isInteger(parsedCustomerFocusId) && parsedCustomerFocusId > 0 ? parsedCustomerFocusId : undefined;
   const focusCounterpartyId = Number.isInteger(parsedCounterpartyFocusId) && parsedCounterpartyFocusId > 0 ? parsedCounterpartyFocusId : undefined;
-  const customerOrderFrom = customerFocusParams?.get("trade_date_from");
-  const customerOrderTo = customerFocusParams?.get("trade_date_to");
-  const customerOrderFilter = customerFocusParams?.get("mine_orders") === "true"
-    ? { from: customerOrderFrom || undefined, to: customerOrderTo || undefined } : undefined;
+  // keep-alive 下传给页面槽位的对象 props 必须引用稳定，否则 memo 化形同虚设。
+  // 依赖只取原始值（active / location.search），不用每次新建的 URLSearchParams 对象。
+  const customerOrderFilter = useMemo(() => {
+    if (active !== "customers") return undefined;
+    const params = new URLSearchParams(location.search);
+    return params.get("mine_orders") === "true"
+      ? { from: params.get("trade_date_from") || undefined, to: params.get("trade_date_to") || undefined }
+      : undefined;
+  }, [active, location.search]);
   const rawBizTab = (segments[1] as BusinessCenterEntryTab | undefined) ?? undefined;
   const query = new URLSearchParams(location.search);
   const businessMine = active === "business" && query.get("mine") === "true";
-  const initialLedgerFilters: InitialLedgerFilters | undefined = active === "business" && rawBizTab === "ledger"
-    ? {
-      status: query.get("status") || undefined,
-      keyword: query.get("keyword") || undefined,
-      tradeDateFrom: query.get("trade_date_from") || undefined,
-      tradeDateTo: query.get("trade_date_to") || undefined,
-    }
-    : undefined;
+  const initialLedgerFilters = useMemo<InitialLedgerFilters | undefined>(() => {
+    if (active !== "business" || rawBizTab !== "ledger") return undefined;
+    const params = new URLSearchParams(location.search);
+    return {
+      status: params.get("status") || undefined,
+      keyword: params.get("keyword") || undefined,
+      tradeDateFrom: params.get("trade_date_from") || undefined,
+      tradeDateTo: params.get("trade_date_to") || undefined,
+    };
+  }, [active, rawBizTab, location.search]);
   const parsedAllocationOrderId = Number(query.get("allocation_order_id"));
   const initialAllocationOrderId = active === "business" && rawBizTab === "ledger"
     && Number.isInteger(parsedAllocationOrderId) && parsedAllocationOrderId > 0
@@ -134,15 +235,16 @@ export function AppShell() {
     const label = keyboardNavigation ? "页签" : tab.textContent?.trim();
     startPageLoadTiming(`${item?.label ?? "页面"} / ${label || "页签"}`, root);
   };
-  const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
+  const navigateTo = useCallback((key: string, tab?: BusinessCenterEntryTab) => {
     // 回到业务中心但不指定子页时，进入库存中心。
     if (key === "business" && !tab) {
       navigate("/business/inventory");
       return;
     }
     navigate(`/${key}${tab ? `/${tab}` : ""}`);
-  };
-  const navigateToWorkbenchPath = (path: string) => navigate(path);
+  }, [navigate]);
+  const navigateToWorkbenchPath = useCallback((path: string) => navigate(path), [navigate]);
+  const clearCustomerOrderFilter = useCallback(() => navigate("/customers", { replace: true }), [navigate]);
   // 空路径 / 或 "" 统一重定向到工作台，保证默认落点稳定。
   useEffect(() => {
     if (location.pathname === "/" || location.pathname === "") {
@@ -315,43 +417,30 @@ export function AppShell() {
               const PageComponent = key === "workbench" ? WorkbenchPage : PAGES[key];
               if (!PageComponent) return null;
               return (
-                <div
+                <PageSlot
                   key={key}
-                  ref={isActive ? pageRef : undefined}
-                  className={`page-slot${key === "business" || key === "customers" ? " page-slot--quick-entry" : ""}${isActive ? " page-enter" : " page-slot--hidden"}`}
-                  aria-hidden={!isActive}
-                >
-                  {/* 边界必须挂在 .page-slot 内部：挂在外面时降级卡会顶掉整个 slot，
-                      page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
-                      当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
-                  <ErrorBoundary name={key}>
-                    <DataTableLoadingProvider enabled={["business", "customers", "funds", "operations"].includes(key)}>
-                    {key === "workbench" ? (
-                      <WorkbenchPage active={isActive} onNavigate={navigateTo} onWorkbenchNavigate={navigateToWorkbenchPath} />
-                    ) : (
-                      <PageComponent
-                        onNavigate={navigateTo}
-                        initialTab={key === "business" ? businessTab : undefined}
-                        initialMine={key === "business" && active === "business" ? businessMine : undefined}
-                        initialLedgerFilters={key === "business" && active === "business" ? initialLedgerFilters : undefined}
-                        initialAllocationOrderId={key === "business" && active === "business" ? initialAllocationOrderId : undefined}
-                        initialAllocationNotificationId={key === "business" && active === "business" ? initialAllocationNotificationId : undefined}
-                        initialInventoryAgeGtDays={key === "business" && active === "business" ? initialInventoryAgeGtDays : undefined}
-                        initialInstallmentStatus={key === "business" && active === "business" ? initialInstallmentStatus : undefined}
-                        initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
-                        initialReportFrom={key === "operations" && active === "operations" ? initialReportFrom : undefined}
-                        initialReportTo={key === "operations" && active === "operations" ? initialReportTo : undefined}
-                        initialReportAll={key === "operations" && active === "operations" && query.get("period") === "all"}
-                        active={isActive}
-                        focusCustomerId={key === "customers" ? focusCustomerId : undefined}
-                        customerOrderFilter={key === "customers" ? customerOrderFilter : undefined}
-                        onClearCustomerOrderFilter={key === "customers" ? () => navigate("/customers", { replace: true }) : undefined}
-                        focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
-                      />
-                    )}
-                    </DataTableLoadingProvider>
-                  </ErrorBoundary>
-                </div>
+                  slotKey={key}
+                  isActive={isActive}
+                  hostRef={isActive ? pageRef : undefined}
+                  PageComponent={PageComponent}
+                  onNavigate={navigateTo}
+                  onWorkbenchNavigate={navigateToWorkbenchPath}
+                  initialTab={key === "business" ? businessTab : undefined}
+                  initialMine={key === "business" && active === "business" ? businessMine : undefined}
+                  initialLedgerFilters={key === "business" && active === "business" ? initialLedgerFilters : undefined}
+                  initialAllocationOrderId={key === "business" && active === "business" ? initialAllocationOrderId : undefined}
+                  initialAllocationNotificationId={key === "business" && active === "business" ? initialAllocationNotificationId : undefined}
+                  initialInventoryAgeGtDays={key === "business" && active === "business" ? initialInventoryAgeGtDays : undefined}
+                  initialInstallmentStatus={key === "business" && active === "business" ? initialInstallmentStatus : undefined}
+                  initialReportTab={key === "operations" && active === "operations" ? initialReportTab : undefined}
+                  initialReportFrom={key === "operations" && active === "operations" ? initialReportFrom : undefined}
+                  initialReportTo={key === "operations" && active === "operations" ? initialReportTo : undefined}
+                  initialReportAll={key === "operations" && active === "operations" && query.get("period") === "all"}
+                  focusCustomerId={key === "customers" ? focusCustomerId : undefined}
+                  customerOrderFilter={key === "customers" ? customerOrderFilter : undefined}
+                  clearCustomerOrderFilter={clearCustomerOrderFilter}
+                  focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
+                />
               );
             })}
           </Suspense>

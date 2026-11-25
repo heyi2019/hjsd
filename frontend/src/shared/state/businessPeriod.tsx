@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import dayjs from "dayjs";
 import { optionSetsApi } from "../api/options.api";
 import { currentReportPeriod, previousReportPeriod, type ReportPeriod } from "../lib/reportPeriod";
@@ -31,7 +31,8 @@ function usePeriodState(enabled = true): PeriodState {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const version = useRef(0);
-  const [, setToday] = useState(() => dayjs().format("YYYY-MM-DD"));
+  // today 值本身不参与计算，但跨天时用它作为 period memo 的依赖，保证「当期」随日期滚动重算。
+  const [today, setToday] = useState(() => dayjs().format("YYYY-MM-DD"));
   useEffect(() => {
     if (!enabled) return undefined;
     let cancelled = false;
@@ -65,20 +66,33 @@ function usePeriodState(enabled = true): PeriodState {
     const timer = window.setInterval(() => setToday(dayjs().format("YYYY-MM-DD")), 60_000);
     return () => { cancelled = true; window.removeEventListener(PERIOD_CHANGED, changed); window.removeEventListener("focus", onFocus); window.clearInterval(timer); };
   }, [enabled, retryCount]);
-  return {
-    period: selection === undefined ? currentReportPeriod(dayjs(), startDay) : selection,
+  // 稳定 state 对象与 action 引用：Provider value 在无关渲染时保持同一引用，
+  // 避免 4 个页面级消费者（含 keep-alive 隐藏页）连同子树整棵重渲染。
+  // 周期切换 / 配置回填 / 跨天滚动时依赖变化，行为与改造前完全一致。
+  const period = useMemo(
+    () => (selection === undefined ? currentReportPeriod(dayjs(), startDay) : selection),
+    [selection, startDay, today],
+  );
+  const retry = useCallback(() => setRetryCount((value) => value + 1), []);
+  const setPeriod = useCallback((next: ReportPeriod) => {
+    const current = currentReportPeriod(dayjs(), startDay);
+    setSelection(next.from === current.from && next.to === current.to ? undefined : next);
+  }, [startDay]);
+  const useCurrentPeriod = useCallback(() => setSelection(undefined), []);
+  const usePreviousPeriod = useCallback(() => setSelection(previousReportPeriod(dayjs(), startDay)), [startDay]);
+  const useAllPeriods = useCallback(() => setSelection(null), []);
+
+  return useMemo(() => ({
+    period,
     startDay,
     ready,
     error,
-    retry: () => setRetryCount((value) => value + 1),
-    setPeriod: (period) => {
-      const current = currentReportPeriod(dayjs(), startDay);
-      setSelection(period.from === current.from && period.to === current.to ? undefined : period);
-    },
-    useCurrentPeriod: () => setSelection(undefined),
-    usePreviousPeriod: () => setSelection(previousReportPeriod(dayjs(), startDay)),
-    useAllPeriods: () => setSelection(null),
-  };
+    retry,
+    setPeriod,
+    useCurrentPeriod,
+    usePreviousPeriod,
+    useAllPeriods,
+  }), [period, startDay, ready, error, retry, setPeriod, useCurrentPeriod, usePreviousPeriod, useAllPeriods]);
 }
 
 export function BusinessPeriodProvider({ children }: { children: ReactNode }) {

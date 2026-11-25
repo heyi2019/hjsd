@@ -10,6 +10,9 @@ import { subscribeReferenceDataChanged } from "../../state/referenceDataEvents";
 
 export type FieldConfigMap = Record<string, OrderFormField>;
 
+/** 配置未就绪时的稳定空表：避免每次渲染返回新 {}，使下游依赖 config 的 useMemo 反复失效。 */
+const EMPTY_FIELD_CONFIG: FieldConfigMap = Object.freeze({}) as FieldConfigMap;
+
 export function fieldConfigFor(config: FieldConfigMap, key: string): OrderFormField | undefined {
   return config[key];
 }
@@ -54,7 +57,7 @@ export function useOrderFormConfig(orderType: string | undefined): {
   const error = failure && failure.scope === orderType ? failure.error : null;
   const ready = !orderType || (loaded?.scope === orderType && !error && !loading);
   return {
-    config: loaded && loaded.scope === orderType ? loaded.config : {},
+    config: loaded && loaded.scope === orderType ? loaded.config : EMPTY_FIELD_CONFIG,
     loading: Boolean(orderType && !ready && !error) || loading,
     ready,
     error,

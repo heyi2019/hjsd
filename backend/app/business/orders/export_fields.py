@@ -379,6 +379,7 @@ def _order_detail_export_fields(
     detail: dict, value_labels: dict[str, dict[str, str]],
     user_names: dict[int, str] | None = None,
     account_profile: dict[str, object] | None = None,
+    *, include_separate_details: bool = True,
 ) -> dict[str, str | None]:
     account = account_profile if account_profile is not None else (detail.get("account_snapshot") or {})
     snapshot = detail.get("account_snapshot") or {}
@@ -403,9 +404,11 @@ def _order_detail_export_fields(
         "detail_order_note": detail.get("note"),
         "detail_order_extra": detail_json(form_extra, history_labels),
         **_delivery_export_fields(detail, value_labels, form_extra),
-        "detail_events": detail_json(detail.get("events") or [], value_labels),
-        "detail_cashflows": detail_json(detail.get("cashflows") or [], value_labels),
-        "detail_rebates": detail_json(detail.get("rebates") or [], value_labels),
+        **({
+            "detail_events": detail_json(detail.get("events") or [], value_labels),
+            "detail_cashflows": detail_json(detail.get("cashflows") or [], value_labels),
+            "detail_rebates": detail_json(detail.get("rebates") or [], value_labels),
+        } if include_separate_details else {}),
         "detail_installment": detail_json(detail.get("installment"), value_labels),
         "detail_installment_schedule": detail_json(detail.get("installment_schedule") or [], value_labels),
         "detail_links": detail_json(detail.get("links") or [], value_labels),

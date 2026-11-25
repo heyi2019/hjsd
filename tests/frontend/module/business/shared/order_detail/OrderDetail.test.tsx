@@ -13,6 +13,7 @@ import { buildCustomerOptions, getPartySelectionDelta, groupCustomerIdsByRole, m
 import type { OrderDetailMeta } from "@/business/shared/order_detail/OrderDetail.shared";
 import { orderFormFieldsApi, ordersApi } from "@/shared/api/orders.api";
 import { customersApi, counterpartiesApi } from "@/shared/api/customers.api";
+import { gameTypesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
 import { optionSetList } from "@fixtures/api-responses";
 import { renderApp, renderLight } from "@fixtures/render";
@@ -52,8 +53,9 @@ beforeEach(() => {
   vi.spyOn(orderFormFieldsApi, "list").mockResolvedValue([]);
   vi.spyOn(orderFormFieldsApi, "listSectionLabels").mockResolvedValue({});
   vi.spyOn(optionSetsApi, "list").mockResolvedValue(optionSetList());
+  vi.spyOn(gameTypesApi, "list").mockResolvedValue([]);
   vi.spyOn(customersApi, "options").mockResolvedValue([]);
-  vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+  vi.spyOn(counterpartiesApi, "options").mockResolvedValue([]);
 });
 
 async function settleFieldConfig() {
@@ -819,7 +821,7 @@ describe("OrderDetail", () => {
   ])("%s 订单按业务类型显示参与方角色", async (orderType, customerLabels, hasPartner) => {
     const detail = { orders: [{ order_id: 22, order_no: "TEST0022", order_type: orderType, customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "options").mockResolvedValue([]);
-    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    vi.spyOn(counterpartiesApi, "options").mockResolvedValue([]);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     for (const label of customerLabels) expect(await screen.findByRole("combobox", { name: label })).toBeInTheDocument();
     expect(Boolean(screen.queryByRole("combobox", { name: "选择合作方" }))).toBe(hasPartner);
@@ -828,7 +830,7 @@ describe("OrderDetail", () => {
   it.each([ ["HS", "选择卖家", "新建卖家"], ["TH", "选择合作方", "新建合作方"] ])("%s 新建参与方请求期间快速重复点击只创建一次", async (orderType, selectName, buttonName) => {
     const detail = { orders: [{ order_id: 22, order_no: "TEST0022", order_type: orderType, customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "options").mockResolvedValue([]);
-    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    vi.spyOn(counterpartiesApi, "options").mockResolvedValue([]);
     let finish!: (value: never) => void;
     const pending = new Promise<never>((resolve) => { finish = resolve; });
     const create = orderType === "HS" ? vi.spyOn(customersApi, "create").mockReturnValue(pending) : vi.spyOn(counterpartiesApi, "create").mockReturnValue(pending);
@@ -846,7 +848,7 @@ describe("OrderDetail", () => {
   it.each([ ["HS", "选择卖家", "新建卖家"], ["TH", "选择合作方", "新建合作方"] ])("%s 新建参与方完成时，不写入后来切换的订单", async (orderType, selectName, buttonName) => {
     const detail = (id: number) => ({ orders: [{ order_id: id, order_no: `TEST${id}`, order_type: orderType, customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } }) as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "options").mockResolvedValue([]);
-    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    vi.spyOn(counterpartiesApi, "options").mockResolvedValue([]);
     let finish!: (value: never) => void;
     const pending = new Promise<never>((resolve) => { finish = resolve; });
     const create = orderType === "HS" ? vi.spyOn(customersApi, "create").mockReturnValue(pending) : vi.spyOn(counterpartiesApi, "create").mockReturnValue(pending);
@@ -880,7 +882,7 @@ describe("OrderDetail", () => {
     const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "options").mockRejectedValueOnce(new Error("客户名单读取失败")).mockResolvedValue([{ id: 1, customer_no: "C001", display_name: "已有客户" }]);
     vi.spyOn(customersApi, "create");
-    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
+    vi.spyOn(counterpartiesApi, "options").mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     expect(await screen.findByText(/客户名单读取失败/)).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "选择买家" })).toBeDisabled();
@@ -897,7 +899,7 @@ describe("OrderDetail", () => {
   it("渠道方名单加载失败时保留客户选择，并可重试渠道方加载", async () => {
     const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     vi.spyOn(customersApi, "options").mockResolvedValue([{ id: 1, customer_no: "C001", display_name: "已有客户" }]);
-    vi.spyOn(counterpartiesApi, "list").mockRejectedValueOnce(new Error("渠道名单读取失败")).mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
+    vi.spyOn(counterpartiesApi, "options").mockRejectedValueOnce(new Error("渠道名单读取失败")).mockResolvedValue([{ id: 2, counterparty_no: "CP002", display_name: "渠道甲", type: "PEER", status: "ACTIVE" }] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     expect(await screen.findByText(/渠道名单读取失败/)).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeDisabled();
@@ -908,6 +910,44 @@ describe("OrderDetail", () => {
     await waitFor(() => expect(screen.getByRole("combobox", { name: "选择合作方" })).toBeEnabled());
     await userEvent.click(screen.getByRole("combobox", { name: "选择合作方" }));
     expect(await screen.findByRole("option", { name: /渠道甲/ })).toBeInTheDocument();
+  });
+
+  it("合作方搜索保留历史已选项，新建前精确查找首批以外的同名记录", async () => {
+    const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [{ id: 7, display_name: "历史合作方", role: "PEER" }], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    const options = vi.spyOn(counterpartiesApi, "options").mockImplementation(async (_type, _keyword, exact) => exact ? [{ id: 99, counterparty_no: "CP099", display_name: "末尾同行" }] : []);
+    const create = vi.spyOn(counterpartiesApi, "create").mockResolvedValue({ id: 100, counterparty_no: "CP100", display_name: "末尾同行", type: "PEER", status: "ACTIVE" });
+    const onPartyEdit = vi.fn();
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} onPartyEdit={onPartyEdit} />);
+    const select = await screen.findByRole("combobox", { name: "选择合作方" });
+    await waitFor(() => expect(select).toBeEnabled());
+    expect(screen.getByText("历史合作方", { selector: ".ant-select-selection-item-content" })).toBeInTheDocument();
+    await userEvent.type(select, "末尾同行");
+    await userEvent.click(screen.getByRole("button", { name: /新建合作方/ }));
+    await waitFor(() => expect(onPartyEdit).toHaveBeenCalledWith(22, { entity_type: "counterparty", entity_id: 99, role: "PEER" }));
+    expect(options).toHaveBeenCalledWith("PEER", "末尾同行", true);
+    expect(create).not.toHaveBeenCalled();
+    expect(screen.getByText("历史合作方", { selector: ".ant-select-selection-item-content" })).toBeInTheDocument();
+  });
+
+  it("合作方搜索较早的响应不能覆盖较新的关键词", async () => {
+    const detail = { orders: [{ order_id: 22, order_no: "TH0022", order_type: "TH", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
+    let resolveOld!: (value: Awaited<ReturnType<typeof counterpartiesApi.options>>) => void;
+    const old = new Promise<Awaited<ReturnType<typeof counterpartiesApi.options>>>((resolve) => { resolveOld = resolve; });
+    vi.spyOn(counterpartiesApi, "options").mockImplementation(async (_type, keyword) => keyword === "旧" ? old : keyword === "新" ? [{ id: 2, counterparty_no: "CP2", display_name: "新渠道" }] : []);
+    renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
+    const select = await screen.findByRole("combobox", { name: "选择合作方" });
+    await waitFor(() => expect(select).toBeEnabled());
+    await userEvent.type(select, "旧");
+    await waitFor(() => expect(counterpartiesApi.options).toHaveBeenCalledWith("PEER", "旧"));
+    await userEvent.clear(select);
+    await userEvent.type(select, "新");
+    expect(await screen.findByRole("option", { name: /新渠道/ })).toBeInTheDocument();
+    await act(async () => { resolveOld([{ id: 1, counterparty_no: "CP1", display_name: "旧渠道" }]); await old; });
+    expect(screen.queryByRole("option", { name: /旧渠道/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /新渠道/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("option", { name: /新渠道/ }));
+    await waitFor(() => expect(counterpartiesApi.options).toHaveBeenCalledWith("PEER", ""));
+    expect(screen.getByText(/新渠道/, { selector: ".ant-select-selection-item-content" })).toBeInTheDocument();
   });
 
   it("客户较多时下拉只渲染可见选项，仍能搜索末尾客户", async () => {
@@ -928,7 +968,7 @@ describe("OrderDetail", () => {
     const first = Array.from({ length: 500 }, (_, index) => ({ id: index + 1, customer_no: `C${index + 1}`, display_name: `客户${index + 1}`, status: "ACTIVE" }));
     const last = { id: 501, customer_no: "C501", display_name: "末尾客户", status: "ACTIVE" };
     vi.spyOn(customersApi, "options").mockImplementation(async (keyword) => keyword === "末尾客户" ? [last] : first.slice(0, 20));
-    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([]);
+    vi.spyOn(counterpartiesApi, "options").mockResolvedValue([]);
     const detail = { orders: [{ order_id: 22, order_no: "HS0022", order_type: "HS", customers: [], counterparties: [], events: [] }], detail_view: { operation_rows: [], finance_rows: [], execution_rows: [], lifecycle: {}, order_notes: "-", parties: [], extras: [] }, finance_summary: { total_expense: "0", total_income: "0" } } as unknown as AccountExecutionDetail;
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     const select = await screen.findByRole("combobox", { name: "选择卖家" });
@@ -953,7 +993,7 @@ describe("OrderDetail", () => {
     } as unknown as AccountExecutionDetail;
 
     vi.spyOn(customersApi, "options").mockImplementation(async (keyword) => [{ id: 1, customer_no: "C001", display_name: "买家A" }, { id: 2, customer_no: "C002", display_name: "卖家B" }].filter((item) => !keyword || item.display_name.includes(keyword)));
-    vi.spyOn(counterpartiesApi, "list").mockResolvedValue([] as never);
+    vi.spyOn(counterpartiesApi, "options").mockResolvedValue([] as never);
     renderApp(<OrderDetail row={account} detail={detail} contextOrderId={22} loading={false} editing={account} employees={[]} />);
     await settleFieldConfig();
 

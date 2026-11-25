@@ -102,7 +102,8 @@ def personal_commission_total(
 def commission_reconciliation(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
     user: CurrentUser | None = None, mine: bool = False, all_people: bool = False,
-    user_id: int | None = None, order_id: int | None = None,
+    user_id: int | None = None, order_id: int | None = None, limit: int | None = None,
+    offset: int = 0, sort_desc: bool = True,
 ) -> dict[str, Any]:
     """分润对账：按订单汇总，展开订单查看人员明细。"""
     rows, base_by_allocation = _commission_rows_and_bases(
@@ -189,11 +190,18 @@ def commission_reconciliation(
         (group["profit_base"] for group in order_groups),
         ZERO,
     )
+    order_count = len(order_groups)
+    if limit is not None:
+        order_groups.sort(
+            key=lambda group: (str(group["outbound_date"] or group["inventory_date"] or ""), group["order_id"]),
+            reverse=sort_desc,
+        )
+        order_groups = order_groups[offset:offset + limit]
     return {
         "order_groups": order_groups,
         "people": people,
         "total": {
-            "order_count": len(order_groups),
+            "order_count": order_count,
             "profit_base": total_profit_base,
         },
     }

@@ -223,6 +223,43 @@ def test_parse_rejects_duplicate_headers_and_formula_cells():
         parse_order_import("订单.xlsx", output.getvalue())
 
 
+def test_import_processing_does_not_block_the_event_loop(monkeypatch):
+    import asyncio
+    import threading
+    from starlette.datastructures import UploadFile
+    from app.business.orders.importing import router as import_router
+
+    async def exercise(handler):
+        started = threading.Event()
+        release = threading.Event()
+        timed_out = []
+
+        def slow_parse(_filename, _content):
+            started.set()
+            if not release.wait(timeout=3):
+                timed_out.append(True)
+            return {"parsed": True}
+
+        monkeypatch.setattr(import_router, "parse_order_import", slow_parse)
+        file = UploadFile(filename="订单.csv", file=BytesIO("订单号\n".encode()))
+        task = asyncio.create_task(handler(file=file, existing="skip", sections=[], db=None, user=None))
+        try:
+            assert await asyncio.to_thread(started.wait, 3)
+            release.set()
+            assert await task == {"ok": True}
+        finally:
+            release.set()
+            if not task.done():
+                await task
+        assert not timed_out
+        assert file.file.closed
+
+    monkeypatch.setattr(import_router, "preview_order_import", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(import_router, "execute_order_import", lambda *_args, **_kwargs: {"ok": True})
+    asyncio.run(exercise(import_router.order_import_preview))
+    asyncio.run(exercise(import_router.order_import_execute))
+
+
 def test_parse_rejects_unsupported_or_excessively_large_files():
     with pytest.raises(Validation, match="格式"):
         parse_order_import("订单.txt", b"no")
@@ -409,6 +446,116 @@ def test_import_preserves_required_business_operator_instead_of_guessing(seeded_
     assert response.status_code == 200, response.text
     order = seeded_db.scalar(select(Order).where(Order.order_no == "DG0982"))
     assert order.form_extra["business_responsible_ids"] == [user.id]
+
+
+def test_import_operator_with_separator_matches_full_name_once(seeded_db):
+    from sqlalchemy import event
+    from app.business.orders.importing.events import _operators
+    from app.domain.users import User
+
+    employee = User(username="import-employee", display_name="甲、乙", password_hash="test", role="OPERATOR")
+    seeded_db.add(employee)
+    seeded_db.flush()
+    queries = []
+
+    def capture(_conn, _cursor, statement, _params, _context, _many):
+        if statement.lstrip().lower().startswith("select"):
+            queries.append(statement)
+
+    event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        result = _operators(seeded_db, "甲、乙", {"sheet": "主订单信息", "row": 2})
+    finally:
+        event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+
+    assert result == [employee.id]
+    assert len(queries) <= 2
+
+
+def test_preview_reuses_repeated_reference_checks_and_refreshes_between_requests(seeded_client, seeded_db, headers):
+    from sqlalchemy import event, select
+    from app.domain.users import User
+    from app.settings.field_definitions.game_types import create_game_type
+
+    game = create_game_type(seeded_db, name="批量导入游戏", channel_regions=[], actor="pytest")
+    username = seeded_db.scalar(select(User.username).where(User.username == "admin"))
+    seeded_db.commit()
+    statements = []
+
+    def capture(_conn, _cursor, statement, _params, _context, _many):
+        if statement.lstrip().lower().startswith("select"):
+            statements.append(statement)
+
+    def preview(copies):
+        rows = []
+        for index in range(copies):
+            for offset, (operator, game_name) in enumerate(((username, "批量导入游戏"), ("不存在的员工", "批量导入游戏"), (username, "不存在的游戏"))):
+                number = 9001 + index * 3 + offset
+                rows.append(f"DG{number:04d},2026-10-17,代挂,{operator},账号,{game_name}")
+        content = ("订单号,业务日期,业务类型,业务操作人,游戏账号/产品,游戏/产品类型\n" + "\n".join(rows) + "\n").encode()
+        response = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "skip"},
+                                      files={"file": ("订单.csv", content, "text/csv")})
+        assert response.status_code == 200, response.text
+        return response.json()["rows"]
+
+    event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        first = preview(1)
+        first_count = len(statements)
+        statements.clear()
+        many = preview(10)
+        many_count = len(statements)
+    finally:
+        event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+
+    assert [row["action"] for row in first] == ["create", "error", "error"]
+    assert [row["action"] for row in many] == ["create", "error", "error"] * 10
+    assert all("操作人" in row["errors"][0] for row in many[1::3])
+    assert all("游戏类型" in row["errors"][0] for row in many[2::3])
+    assert many_count <= first_count + 2
+
+    game.is_active = False
+    seeded_db.commit()
+    refreshed = preview(1)
+    assert refreshed[0]["action"] == "error"
+    assert any("游戏类型" in error for error in refreshed[0]["errors"])
+
+
+def test_update_preview_only_loads_ledger_for_filled_readonly_fields(seeded_client, seeded_db, headers):
+    from datetime import date
+    from sqlalchemy import event
+    from app.business.orders.create import create_order
+
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 17), actor="pytest")
+    seeded_db.commit()
+    order_no = order.order_no
+    statements = []
+
+    def capture(_conn, _cursor, statement, _params, _context, _many):
+        if statement.lstrip().lower().startswith("select"):
+            statements.append(statement)
+
+    def preview(cost):
+        content = f"订单号,业务日期,业务类型,订单备注,成本\n{order_no},2026-10-17,代挂,新备注,{cost}\n".encode()
+        response = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "update"},
+                                      files={"file": ("订单.csv", content, "text/csv")})
+        assert response.status_code == 200, response.text
+        return response.json()["rows"][0]
+
+    event.listen(seeded_db.get_bind(), "before_cursor_execute", capture)
+    try:
+        empty = preview("")
+        empty_count = len(statements)
+        statements.clear()
+        mismatch = preview("999999")
+        filled_count = len(statements)
+    finally:
+        event.remove(seeded_db.get_bind(), "before_cursor_execute", capture)
+
+    assert empty["action"] == "update"
+    assert mismatch["action"] == "error"
+    assert any("成本" in error and "不一致" in error for error in mismatch["errors"])
+    assert empty_count < filled_count
 
 
 def test_unbound_order_export_keeps_business_operator_when_inventory_operator_is_visible(seeded_client, seeded_db, headers):

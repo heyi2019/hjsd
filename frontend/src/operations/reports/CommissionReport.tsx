@@ -4,14 +4,14 @@ import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
 
 import { Card, Segmented, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useEmployeeOptions } from "../../shared/hooks/useEmployeeOptions";
 import { reportsApi } from "../../shared/api/reports.api";
 import type { CommissionOrderGroup, CommissionReport, CommissionRow } from "../../shared/api/types/reporting";
 import { normalizeError } from "../../shared/api/client";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow } from "../../shared/ui";
-import { Note, type ReportRange, useReport } from "./shared";
+import { Note, type ReportRange, useReport, useReportPagination } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 import { CommissionDetailsTable } from "./CommissionDetailsTable";
 import { useSession } from "../../shared/state/session";
@@ -23,6 +23,7 @@ export function Commission({ range, mine = false, onMineChange }: { range: Repor
   const { employees, error: employeeCause, reloadFresh: reloadEmployees } = useEmployeeOptions();
   const employeeError = employeeCause ? { ...normalizeError(employeeCause), message: `员工目录加载失败：${normalizeError(employeeCause).message}` } : null;
   const [selectedUserId, setSelectedUserId] = useState<number>(0);
+  const { page, pageSize, onPageChange } = useReportPagination(JSON.stringify([params.from, params.to, mine, selectedUserId, sortDesc]));
   const commissionParams = {
     ...(params.from ? { from: params.from } : {}),
     ...(params.to ? { to: params.to } : {}),
@@ -31,10 +32,14 @@ export function Commission({ range, mine = false, onMineChange }: { range: Repor
     ...(!mine && selectedUserId ? { user_id: selectedUserId } : {}),
   };
   const { data, loading, error, reload } = useReport<CommissionReport>(
-    () => reportsApi.commission(commissionParams),
-    [params.from, params.to, mine, selectedUserId],
+    () => reportsApi.commission({ ...commissionParams, limit: pageSize, offset: (page - 1) * pageSize, sort_desc: sortDesc }),
+    [params.from, params.to, mine, selectedUserId, page, pageSize, sortDesc],
   );
-  const orderRows = [...(data?.order_groups ?? [])].sort((a, b) => (sortDesc ? -1 : 1) * ((a.outbound_date ?? a.inventory_date ?? "").localeCompare(b.outbound_date ?? b.inventory_date ?? "") || a.order_id - b.order_id));
+  const count = data?.total.order_count ?? 0;
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(count / pageSize));
+    if (data && page > lastPage) onPageChange(lastPage, pageSize);
+  }, [count, data, page, pageSize, onPageChange]);
   const employeeOptions = new Map(employees.map((employee) => [employee.id, { name: employee.display_name, isActive: employee.is_active }]));
   for (const person of data?.people ?? []) {
     employeeOptions.set(person.user_id, { name: person.user_name, isActive: person.is_active });
@@ -83,12 +88,12 @@ export function Commission({ range, mine = false, onMineChange }: { range: Repor
       <DataTable<CommissionOrderGroup>
          className="ui-datatable--expandable"
          columns={arrangeCommission(columns)}
-         rows={orderRows}
+         rows={data?.order_groups ?? []}
          loading={loading}
-         resetKey={JSON.stringify([params.from, params.to, mine, selectedUserId, sortDesc])}
-         page={1}
-         pageSize={10}
-         total={data?.total.order_count ?? 0}
+         controlledPaging
+         page={page}
+         pageSize={pageSize}
+         total={count}
          rowKey="order_id"
          expandable={{
            expandRowByClick: true,
@@ -97,7 +102,7 @@ export function Commission({ range, mine = false, onMineChange }: { range: Repor
            ),
          }}
          emptyText={error ? "分润数据不可用，请点击重新加载" : "所选区间无分润记录"}
-         onPageChange={() => undefined}
+         onPageChange={onPageChange}
       />
     </Card>
   );

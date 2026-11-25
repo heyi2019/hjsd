@@ -572,6 +572,39 @@ def test_orders_export_xlsx_has_five_sheets(seeded_client, headers, seeded_db):
     assert any(cell_range.startswith("B1:") for cell_range in merged)
 
 
+def test_orders_xlsx_converts_details_in_bounded_batches(seeded_client, headers, seeded_db, monkeypatch):
+    from app.business.orders import export_router as orders_export
+
+    for index in range(3):
+        _seed_order(seeded_db, order_no=f"HS-BATCH-XLSX-{index}")
+    actual = orders_export._order_details_output
+    batch_sizes = []
+
+    def collect_batch(db, orders, user):
+        batch_sizes.append(len(orders))
+        return actual(db, orders, user)
+
+    monkeypatch.setattr(orders_export, "_DETAIL_BATCH_SIZE", 2, raising=False)
+    monkeypatch.setattr(orders_export, "_order_details_output", collect_batch)
+    response = seeded_client.get("/api/orders/export.xlsx", headers=headers)
+    assert response.status_code == 200, response.text
+    sheet = openpyxl.load_workbook(io.BytesIO(response.content))["详情信息"]
+    assert {sheet.cell(row=index, column=1).value for index in range(4, 7)} == {
+        "HS-BATCH-XLSX-0", "HS-BATCH-XLSX-1", "HS-BATCH-XLSX-2",
+    }
+    assert batch_sizes == [2, 1]
+
+
+def test_order_detail_export_can_skip_json_present_on_separate_sheets():
+    detail = {"events": [{"event_no": "EV1"}], "cashflows": [{"flow_no": "SR1"}],
+              "rebates": [{"rebate_no": "RB1"}], "note": "备注"}
+    csv_fields = _order_detail_export_fields(detail, {})
+    xlsx_fields = _order_detail_export_fields(detail, {}, include_separate_details=False)
+    assert all(csv_fields[key] for key in ("detail_events", "detail_cashflows", "detail_rebates"))
+    assert not {"detail_events", "detail_cashflows", "detail_rebates"} & xlsx_fields.keys()
+    assert xlsx_fields["detail_order_note"] == "备注"
+
+
 def test_orders_export_xlsx_splits_delivery_into_buy_and_sell_groups(seeded_client, headers, seeded_db):
     """同一订单的买号和卖号交付分别导出，只有卖号资料的订单买号列留空。"""
     from app.settings.field_definitions.catalog_seed import seed_catalog

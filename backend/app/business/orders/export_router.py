@@ -50,6 +50,7 @@ from app.business.orders.export_fields import (
 # 订单类型 → 库存业务类型：与前端 InventoryPanel.inventoryTypeOfOrder 的
 # 「无账号时按订单类型兜底」同口径（HS 回收 / TH 提号 / DG 代挂）。
 _INVENTORY_TYPE_BY_ORDER_TYPE = {"HS": "RECOVERY", "TH": "PICKUP", "DG": "CONSIGNMENT"}
+_DETAIL_BATCH_SIZE = 500
 
 
 export_router = APIRouter(tags=["ORD-01/02 订单与事件"])
@@ -225,17 +226,19 @@ def export_orders_xlsx(
     cashflow_rows: list[dict[str, object]] = []
     rebate_rows: list[dict[str, object]] = []
     pool_names = _pool_name_map(db)
-    details = _order_details_output(db, orders, _user)
-    account_profiles = _account_export_profiles(db, orders)
-    for row, order, detail_output in zip(rows, orders, details, strict=True):
-        detail = detail_output.model_dump(mode="json")
-        order_no = row.get("order_no")
-        detail_rows.append(
-            {"order_no": order_no, **_order_detail_export_fields(detail, value_labels, names, account_profiles.get(order.account_id))}
-        )
-        event_rows.extend(_order_event_export_rows(order_no, detail))
-        cashflow_rows.extend(_cashflow_export_rows(order_no, detail, pool_names))
-        rebate_rows.extend(_rebate_export_rows(order_no, detail))
+    for start in range(0, len(orders), _DETAIL_BATCH_SIZE):
+        batch = orders[start:start + _DETAIL_BATCH_SIZE]
+        details = _order_details_output(db, batch, _user)
+        account_profiles = _account_export_profiles(db, batch)
+        for row, order, detail_output in zip(rows[start:start + _DETAIL_BATCH_SIZE], batch, details, strict=True):
+            detail = detail_output.model_dump(mode="json")
+            order_no = row.get("order_no")
+            detail_rows.append({"order_no": order_no, **_order_detail_export_fields(
+                detail, value_labels, names, account_profiles.get(order.account_id), include_separate_details=False,
+            )})
+            event_rows.extend(_order_event_export_rows(order_no, detail))
+            cashflow_rows.extend(_cashflow_export_rows(order_no, detail, pool_names))
+            rebate_rows.extend(_rebate_export_rows(order_no, detail))
 
     config = list_columns_service.get_config(db, "LEDGER")
     main_columns = [
@@ -247,7 +250,7 @@ def export_orders_xlsx(
     main_rows = inject_custom_columns(rows, config)
     custom_keys = {column["key"] for column in config["columns"] if column.get("custom")}
 
-    workbook = new_workbook()
+    workbook = new_workbook(write_only=True)
     write_sheet(
         workbook,
         title="主订单信息",

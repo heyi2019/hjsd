@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import date, datetime
+from functools import lru_cache
 import json
 import re
 
@@ -49,6 +50,24 @@ def preview_order_import(
     if not main.rows:
         raise Validation("导入文件没有订单数据")
 
+    @lru_cache(maxsize=None)
+    def operator_error(order_type: str, raw: str, creating: bool) -> str | None:
+        try:
+            operators = _operators(session, raw, {})
+            if creating or operators is not None:
+                validate_business_responsible(session, order_type_code=order_type, values={"business_responsible_ids": operators})
+        except Validation as exc:
+            return exc.message
+        return None
+
+    @lru_cache(maxsize=None)
+    def reference_error(game_type: str, channel: str | None) -> str | None:
+        try:
+            resolve_new_account_references(session, game_type, channel)
+        except Validation as exc:
+            return exc.message
+        return None
+
     records = [dict(zip(main.headers, row.values)) for row in main.rows]
     custom_columns = configured_order_columns(session)
     numbers = [record["订单号"].strip().upper() for record in records]
@@ -57,6 +76,7 @@ def preview_order_import(
     all_existing = set(session.scalars(query).all())
     scope = owner_scope_filter(Order.owner_id, user, session)
     visible_existing = set(session.scalars(query.where(scope) if scope is not None else query).all())
+    ledger_labels = reference_labels()
     references = {}
     visible_orders = {}
     if existing == "update" and user.has(PERM_ORDER_UPDATE) and visible_existing:
@@ -64,7 +84,11 @@ def preview_order_import(
         if scope is not None:
             visible_query = visible_query.where(scope)
         visible_orders = {order.order_no: order for order in session.scalars(visible_query).all()}
-        references = ledger_reference_values(session, list(visible_orders.values()))
+        reference_numbers = {
+            number for number, record in zip(numbers, records, strict=True)
+            if number in visible_orders and any(record.get(label, "").strip() for label in ledger_labels)
+        }
+        references = ledger_reference_values(session, [visible_orders[number] for number in reference_numbers])
 
     results = []
     for source, record, number in zip(main.rows, records, numbers):
@@ -107,12 +131,9 @@ def preview_order_import(
             if business_operator and inventory_operator and business_operator != inventory_operator:
                 errors.append("业务操作人与入库操作人不一致")
             elif match:
-                try:
-                    operators = _operators(session, business_operator or inventory_operator, {"sheet": source.sheet, "row": source.row})
-                    if action == "create" or operators is not None:
-                        validate_business_responsible(session, order_type_code=match.group(1), values={"business_responsible_ids": operators})
-                except Validation as exc:
-                    errors.append(exc.message)
+                error = operator_error(match.group(1), business_operator or inventory_operator, action == "create")
+                if error is not None:
+                    errors.append(error)
             custom_labels = {label for code, label in custom_columns if match and code == match.group(1)}
             if match:
                 try:
@@ -120,7 +141,7 @@ def preview_order_import(
                                              existing_order=visible_orders.get(number) if action == "update" else None)
                 except Validation as exc:
                     errors.append(exc.message)
-            readonly_labels = reference_labels() if action == "update" and number in references else set()
+            readonly_labels = ledger_labels if action == "update" and number in references else set()
             if readonly_labels:
                 errors.extend(reference_errors(record, references[number]))
             unsupported = [key for key, value in record.items() if key not in _MASTER_FIELDS and key not in _DETAIL_FIELDS and key not in custom_labels and key not in readonly_labels and value.strip()]
@@ -199,10 +220,9 @@ def preview_order_import(
         game_type = record.get("游戏/产品类型", "").strip()
         channel = detail_values.get(result["order_no"], {}).get("channel_region")
         if game_type or channel:
-            try:
-                resolve_new_account_references(session, game_type, channel)
-            except Validation as exc:
-                result["errors"].append(exc.message)
+            error = reference_error(game_type, channel)
+            if error is not None:
+                result["errors"].append(error)
                 result["action"] = "error"
     for name in ("events", "cashflows", "rebates"):
         if name not in sections or any(error["sheet"] == _SECTION_LABELS[name] for error in detail_errors):

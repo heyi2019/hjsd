@@ -11,6 +11,18 @@ export type ReportRange = { params: { from?: string; to?: string }; picker: Reac
 /** 经营中心是否处于激活态：透传给 useReport，使 keep-alive 隐藏期间写入的数据在切回时自动重拉。 */
 export const ReportsActiveContext = createContext(true);
 
+export function useReportPagination(filterKey: string) {
+  const [paging, setPaging] = useState({ filterKey, page: 1, pageSize: 10 });
+  const page = paging.filterKey === filterKey ? paging.page : 1;
+  useEffect(() => {
+    setPaging((current) => current.filterKey === filterKey ? current : { ...current, filterKey, page: 1 });
+  }, [filterKey]);
+  const onPageChange = useCallback((nextPage: number, pageSize: number) => {
+    setPaging((current) => ({ filterKey, page: pageSize === current.pageSize ? nextPage : 1, pageSize }));
+  }, [filterKey]);
+  return { page, pageSize: paging.pageSize, onPageChange };
+}
+
 /** 所有报表共用的取数/错误态壳：避免每个报表各写一遍 try/catch。 */
 export function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
   const pageActive = useContext(ReportsActiveContext);

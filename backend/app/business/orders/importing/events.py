@@ -41,7 +41,7 @@ def _operators(session: Session, raw: str, details: dict) -> list[int] | None:
     parts = [name] if len(full) == 1 else [part.strip() for part in re.split(r"[、,，]", name) if part.strip()]
     result = []
     for part in parts:
-        ids = matches(part)
+        ids = full if part == name else matches(part)
         if len(ids) != 1:
             raise Validation("操作人无法唯一匹配在职员工", details=details)
         result.append(next(iter(ids)))

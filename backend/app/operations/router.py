@@ -68,6 +68,9 @@ def commission(
     all_people: bool = Query(default=False),
     user_id: int | None = Query(default=None, gt=0),
     notification_id: int | None = Query(default=None, gt=0),
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    sort_desc: bool = Query(default=True),
 ) -> CommissionOut:
     """分润对账：默认按权限范围汇总；经营中心可显式查看全员并按人员筛选。"""
     if notification_id is not None:
@@ -94,7 +97,8 @@ def commission(
     if not user.has(PERM_REPORT_READ):
         raise PermissionDenied("当前角色无权查看分润报表")
     return commission_reconciliation(
-        db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people, user_id=user_id
+        db, from_date=from_date, to_date=to_date, user=user, mine=mine, all_people=all_people,
+        user_id=user_id, limit=limit, offset=offset, sort_desc=sort_desc,
     )
 
 
@@ -126,9 +130,12 @@ def order_profit(
     user: CurrentUser = read_access,
     from_date: date | None = Query(default=None, alias="from"),
     to_date: date | None = Query(default=None, alias="to"),
+    limit: int | None = Query(default=None, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    sort_desc: bool = Query(default=True),
 ) -> OrderProfitOut:
     """订单利润明细：按订单日期筛选，金额汇总该订单全部收支。"""
-    return order_profit_detail(db, from_date=from_date, to_date=to_date, user=user)
+    return order_profit_detail(db, from_date=from_date, to_date=to_date, user=user, limit=limit, offset=offset, sort_desc=sort_desc)
 
 
 @router.get("/reports/{report_name}/export.csv")

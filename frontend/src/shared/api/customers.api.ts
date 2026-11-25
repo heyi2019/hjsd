@@ -6,6 +6,7 @@ type CreatedDateFilter = { created_from?: string; created_to?: string };
 type CustomerFilterParams = CreatedDateFilter & { keyword?: string; status?: string; created_by?: string[]; mine_orders?: boolean; trade_date_from?: string; trade_date_to?: string };
 type CustomerListParams = CustomerFilterParams & { limit?: number; offset?: number; sort_desc?: boolean };
 export type CustomerOption = Pick<Customer, "id" | "customer_no" | "display_name">;
+export type CounterpartyOption = Pick<Counterparty, "id" | "counterparty_no" | "display_name">;
 
 const customerPage = (params?: CustomerListParams) =>
   api.get<PageResponse<Customer>>("/customers", {
@@ -45,6 +46,10 @@ export const customersApi = {
 };
 
 export const counterpartiesApi = {
+  options: (type: string, keyword = "", exact = false) => {
+    const config: CacheAwareRequestConfig = { params: { type, keyword, ...(exact ? { exact: true } : {}) }, ...(exact ? { bypassCache: true } : {}) };
+    return api.get<CounterpartyOption[]>("/counterparties/options", config).then((r) => r.data);
+  },
   list: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[] }) =>
     api.get<Counterparty[]>("/counterparties", { params, paramsSerializer: { indexes: null } }).then((r) => r.data),
   page: (params?: CreatedDateFilter & { type?: string; status?: string; created_by?: string[]; keyword?: string; limit?: number; offset?: number; sort_desc?: boolean }) =>

@@ -69,6 +69,14 @@ class CustomerOptionOut(BaseModel):
     display_name: str
 
 
+class CounterpartyOptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    counterparty_no: str
+    display_name: str
+
+
 class CustomerOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

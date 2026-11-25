@@ -130,6 +130,7 @@ class OrderProfitTotalOut(ReportModel):
 
 class OrderProfitOut(ReportModel):
     items: list[OrderProfitItemOut]
+    count: int
     total: OrderProfitTotalOut
 
 

@@ -112,6 +112,7 @@ beforeEach(() => {
   setupLedgerApi();
   vi.mocked(customersApi.options).mockResolvedValue([]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(counterpartiesApi.options).mockResolvedValue([]);
   vi.mocked(orderTypesApi.list).mockResolvedValue(types);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "管理员", is_active: true },

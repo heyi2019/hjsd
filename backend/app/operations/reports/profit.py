@@ -28,14 +28,14 @@ from app.core.money import to_money_or_zero
 from .._shared import (
     ZERO,
     _apply_order_scope,
-    _sum_report_field,
     _validate_date_range,
     cashflow_totals_by_order,
 )
 
 def order_profit_detail(
     session: Session, *, from_date: date | None = None, to_date: date | None = None,
-    user: CurrentUser | None = None,
+    user: CurrentUser | None = None, limit: int | None = None, offset: int = 0,
+    sort_desc: bool = True,
 ) -> dict[str, Any]:
     """订单利润明细：按订单日期筛选，金额包含该订单所有日期的收支。
 
@@ -58,10 +58,16 @@ def order_profit_detail(
         orders_stmt = orders_stmt.where(Order.trade_date >= from_date)
     if to_date is not None:
         orders_stmt = orders_stmt.where(Order.trade_date <= to_date)
-    orders = session.execute(orders_stmt).all()
-    order_ids = [row.id for row in orders]
+    if limit is None:
+        orders = session.execute(orders_stmt).all()
+        order_ids = [row.id for row in orders]
+    else:
+        order_columns = (Order.trade_date.desc(), Order.id.desc()) if sort_desc else (Order.trade_date.asc(), Order.id.asc())
+        order_ids = list(session.scalars(orders_stmt.with_only_columns(Order.id).order_by(*order_columns)))
+        page_ids = order_ids[offset:offset + limit]
+        orders = session.execute(orders_stmt.where(Order.id.in_(page_ids)).order_by(*order_columns)).all() if page_ids else []
     extra_values = get_extra_values_bulk(
-        session, entity_type="order", entity_ids=order_ids
+        session, entity_type="order", entity_ids=[row.id for row in orders]
     )
     cashflow_by_order = cashflow_totals_by_order(session, order_ids=order_ids)
     # 返点收益列 = 该订单返点记录金额合计，与收入列里的返点部分是同一笔钱。
@@ -97,12 +103,15 @@ def order_profit_detail(
                 "extra_values": extra_values.get(order.id, {}),
             }
         )
+    income_total = sum((cashflow_by_order.get(order_id, no_totals)[0] for order_id in order_ids), ZERO)
+    cost_total = sum((cashflow_by_order.get(order_id, no_totals)[1] for order_id in order_ids), ZERO)
     return {
         "items": items,
+        "count": len(order_ids),
         "total": {
-            "income": _sum_report_field(items, "income"),
-            "cost": _sum_report_field(items, "cost"),
-            "rebate": _sum_report_field(items, "rebate"),
-            "net_profit": _sum_report_field(items, "net_profit"),
+            "income": income_total,
+            "cost": cost_total,
+            "rebate": sum((rebate_by_order.get(order_id, ZERO) for order_id in order_ids), ZERO),
+            "net_profit": income_total - cost_total,
         },
     }

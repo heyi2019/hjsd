@@ -126,6 +126,66 @@ def test_report_export_matches_page_order(seeded_db, seeded_client, headers, rep
             assert len(rows) > len(order_numbers)  # one group expands to several people, kept together
 
 
+def test_order_profit_pages_keep_full_totals_and_export(seeded_db, seeded_client, headers, monkeypatch):
+    import app.operations.reports.profit as profit_service
+
+    orders = []
+    for trade_day in (EARLY, D, D):
+        order = _order(seeded_db, trade_date=trade_day)
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=trade_day, actor="pytest")
+        post_event(seeded_db, order.id, event_type="SELL", amount="160", occurred_on=trade_day, actor="pytest")
+        orders.append(order)
+    actual_extra_values = profit_service.get_extra_values_bulk
+    loaded_ids = []
+
+    def capture_extra_values(session, *, entity_type, entity_ids):
+        loaded_ids.append(list(entity_ids))
+        return actual_extra_values(session, entity_type=entity_type, entity_ids=entity_ids)
+
+    monkeypatch.setattr(profit_service, "get_extra_values_bulk", capture_extra_values)
+    params = {"limit": 1, "offset": 1, "sort_desc": True}
+    page = seeded_client.get("/api/reports/order-profit", params=params, headers=headers)
+    assert page.status_code == 200, page.text
+    data = page.json()
+    assert data["count"] == 3
+    assert [row["order_id"] for row in data["items"]] == [orders[1].id]
+    assert data["total"] == {"income": "480.00", "cost": "300.00", "rebate": "0", "net_profit": "180.00"}
+    assert loaded_ids == [[orders[1].id]]
+    ascending = seeded_client.get("/api/reports/order-profit", params={"limit": 2, "offset": 0, "sort_desc": False}, headers=headers)
+    assert [row["order_id"] for row in ascending.json()["items"]] == [orders[0].id, orders[1].id]
+    empty = seeded_client.get("/api/reports/order-profit", params={"limit": 1, "offset": 20}, headers=headers).json()
+    assert empty["items"] == [] and empty["count"] == 3 and empty["total"] == data["total"]
+    exported = seeded_client.get("/api/reports/order-profit/export.csv", params={"sort_desc": "true"}, headers=headers)
+    rows = [row for row in csv.DictReader(io.StringIO(exported.text.lstrip("\ufeff"))) if row["行类型"] == "明细"]
+    assert [row["订单号"] for row in rows] == [order.order_no for order in reversed(orders)]
+
+
+def test_commission_pages_keep_filtered_totals_people_and_export(seeded_db, seeded_client, headers):
+    orders = []
+    for trade_day in (EARLY, D, D):
+        order = _order(seeded_db, trade_date=trade_day)
+        post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=trade_day, actor="pytest")
+        post_event(seeded_db, order.id, event_type="SELL", amount="160", occurred_on=trade_day, actor="pytest")
+        policy_allocations.set_allocations(seeded_db, order.id, items=[
+            {"user_id": 7, "role": "OWNER", "allocation_rate": 50},
+            {"user_id": 8, "role": "OWNER", "allocation_rate": 50},
+        ], actor="pytest")
+        orders.append(order)
+    params = {"all_people": "true", "user_id": 7, "limit": 1, "offset": 1, "sort_desc": "true"}
+    page = seeded_client.get("/api/reports/commission", params=params, headers=headers)
+    assert page.status_code == 200, page.text
+    result = page.json()
+    assert [group["order_id"] for group in result["order_groups"]] == [orders[1].id]
+    assert result["total"] == {"order_count": 3, "profit_base": "54.00"}
+    assert {person["user_id"] for person in result["people"]} == {7, 8}
+    assert all(row["user_id"] == 7 for row in _commission_details(result))
+    ascending = seeded_client.get("/api/reports/commission", params={**params, "offset": 0, "limit": 2, "sort_desc": "false"}, headers=headers)
+    assert [group["order_id"] for group in ascending.json()["order_groups"]] == [orders[0].id, orders[1].id]
+    exported = seeded_client.get("/api/reports/commission/export.csv", params={"all_people": "true", "user_id": 7, "sort_desc": "true"}, headers=headers)
+    rows = [row for row in csv.DictReader(io.StringIO(exported.text.lstrip("\ufeff"))) if row["行类型"] == "明细"]
+    assert [row["订单号"] for row in rows] == [order.order_no for order in reversed(orders)]
+
+
 # --------------------------------------------------------------------- 月度损益 月度
 class TestMonthlyPnl:
     def test_studio_income_and_cost_are_included_once_and_cross_period_reversals_follow_their_dates(self, seeded_db, seeded_client, headers):

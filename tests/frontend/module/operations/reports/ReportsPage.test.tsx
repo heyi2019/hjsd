@@ -24,6 +24,7 @@ import { optionSetsApi } from "@/shared/api/options.api";
 import { useBusinessPeriod } from "@/shared/state/businessPeriod";
 import { useReport } from "@/operations/reports/shared";
 let ui: ReturnType<typeof userEvent.setup>;
+const firstReportPage = { limit: 10, offset: 0, sort_desc: true };
 
 beforeEach(() => {
   ui = userEvent.setup({ pointerEventsCheck: 0 });
@@ -187,7 +188,7 @@ describe("ReportsPage：经营中心报表", () => {
     vi.mocked(reportsApi.businessPnl).mockClear();
     rerender(<ReportsPage active initialReportTab="my-earnings" initialReportFrom="2020-01-01" initialReportTo="2020-01-31" />);
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalledWith({
-      from: "2020-01-01", to: "2020-01-31", mine: true,
+      from: "2020-01-01", to: "2020-01-31", mine: true, ...firstReportPage,
     }));
     expect(vi.mocked(reportsApi.monthlyPnl)).not.toHaveBeenCalled();
     expect(vi.mocked(reportsApi.businessPnl)).not.toHaveBeenCalled();
@@ -281,12 +282,12 @@ describe("ReportsPage：经营中心报表", () => {
 
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
     expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
-      [{ from: "2020-01-01", to: "2020-01-31", mine: true }],
+      [{ from: "2020-01-01", to: "2020-01-31", mine: true, ...firstReportPage }],
     ]);
     const pane = document.querySelector(".ant-tabs-tabpane-active") as HTMLElement;
     await setAntdDateRange(pane, ui, "2020-02-01", "2020-02-29");
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenLastCalledWith({
-      from: "2020-02-01", to: "2020-02-29", mine: true,
+      from: "2020-02-01", to: "2020-02-29", mine: true, ...firstReportPage,
     }));
     vi.mocked(optionSetsApi.get).mockRejectedValueOnce(new Error("配置加载失败"));
     await act(async () => { window.dispatchEvent(new Event("focus")); });
@@ -295,7 +296,7 @@ describe("ReportsPage：经营中心报表", () => {
     await ui.click(screen.getByRole("button", { name: /重新加载/ }));
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
     expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
-      [{ from: "2020-02-01", to: "2020-02-29", mine: true }],
+      [{ from: "2020-02-01", to: "2020-02-29", mine: true, ...firstReportPage }],
     ]);
   });
 
@@ -309,14 +310,14 @@ describe("ReportsPage：经营中心报表", () => {
     rerender(<ReportsPage active initialReportTab="my-earnings" initialReportFrom="2020-01-01" initialReportTo="2020-01-31" />);
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
     expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
-      [{ from: "2020-01-01", to: "2020-01-31", mine: true }],
+      [{ from: "2020-01-01", to: "2020-01-31", mine: true, ...firstReportPage }],
     ]);
     rerender(<ReportsPage active={false} />);
     vi.mocked(reportsApi.commission).mockClear();
     rerender(<ReportsPage active />);
     await waitFor(() => expect(vi.mocked(reportsApi.commission)).toHaveBeenCalled());
     expect(vi.mocked(reportsApi.commission).mock.calls).toEqual([
-      [{ from: "2020-01-01", to: "2020-01-31", all_people: true }],
+      [{ from: "2020-01-01", to: "2020-01-31", all_people: true, ...firstReportPage }],
     ]);
   });
 

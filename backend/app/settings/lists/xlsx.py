@@ -11,11 +11,13 @@ from __future__ import annotations
 
 import io
 import json
+from copy import copy
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
@@ -64,10 +66,11 @@ def _cell_value(value: Any, value_labels: dict[str, str] | None) -> Any:
     return text
 
 
-def new_workbook() -> Workbook:
+def new_workbook(*, write_only: bool = False) -> Workbook:
     """新建空 workbook 并移除 openpyxl 自带默认 sheet，让第一个写入的 sheet 成为首页。"""
-    workbook = Workbook()
-    workbook.remove(workbook.active)
+    workbook = Workbook(write_only=write_only)
+    if not write_only:
+        workbook.remove(workbook.active)
     return workbook
 
 
@@ -147,6 +150,20 @@ def _write_group_rows(
         start = index
 
 
+def _set_column_widths(sheet: Worksheet, visible: list[tuple[str, str]], rows: list[dict[str, Any]]) -> None:
+    sample = rows[:200]
+    for column_index, (key, label) in enumerate(visible, start=1):
+        widest = _display_width(label)
+        for row in sample:
+            value = row.get(key)
+            if value is not None:
+                text = value if isinstance(value, str) else str(value)
+                widest = max(widest, _display_width(text[:60]))
+        sheet.column_dimensions[get_column_letter(column_index)].width = min(
+            max(widest + 2, _MIN_WIDTH), _MAX_WIDTH
+        )
+
+
 def write_sheet(
     workbook: Workbook,
     *,
@@ -198,6 +215,12 @@ def _write_single_sheet(
     - `value_labels` 只翻译「字符串且命中字典」的值，与 CSV 同口径；
     - 冻结窗格固定在表头下方（`freeze_key_column` 时同时冻结首列）。
     """
+    if workbook.write_only:
+        return _write_streaming_sheet(
+            workbook, title=title, rows=rows, columns=columns, value_labels=value_labels,
+            header_groups=header_groups, sub_header_groups=sub_header_groups,
+            freeze_key_column=freeze_key_column,
+        )
     sheet = workbook.create_sheet(title=title)
     visible = [(key, label) for key, label, is_visible in columns if is_visible]
     if not visible:
@@ -242,19 +265,8 @@ def _write_single_sheet(
         for column_index in range(1, len(visible) + 1):
             sheet.cell(row=row_index, column=column_index).border = _BORDER
 
-    # 列宽按「表头 + 前 200 行样本」估算，明细 JSON 列受 _MAX_WIDTH 上限保护
-    sample = rows[:200]
-    for column_index, (key, label) in enumerate(visible, start=1):
-        widest = _display_width(label)
-        for row in sample:
-            value = row.get(key)
-            if value is None:
-                continue
-            text = value if isinstance(value, str) else str(value)
-            widest = max(widest, _display_width(text[:60]))
-        sheet.column_dimensions[get_column_letter(column_index)].width = min(
-            max(widest + 2, _MIN_WIDTH), _MAX_WIDTH
-        )
+    # 列宽按「表头 + 前 200 行样本」估算。
+    _set_column_widths(sheet, visible, rows)
 
     sheet.freeze_panes = (
         f"{'B' if freeze_key_column else 'A'}{body_start}"
@@ -264,6 +276,53 @@ def _write_single_sheet(
         if rows
         else None
     )
+    return sheet
+
+
+def _write_streaming_sheet(
+    workbook: Workbook, *, title: str, rows: list[dict[str, Any]],
+    columns: list[tuple[str, str, bool]], value_labels: dict[str, dict[str, str]] | None,
+    header_groups: dict[str, str] | None, sub_header_groups: dict[str, str] | None,
+    freeze_key_column: bool,
+) -> Worksheet:
+    # 复用普通工作表的表头及合并规则，正文只顺序写入。
+    layout = _write_single_sheet(
+        new_workbook(), title=title, rows=[], columns=columns,
+        value_labels=value_labels, header_groups=header_groups,
+        sub_header_groups=sub_header_groups, freeze_key_column=freeze_key_column,
+    )
+    sheet = workbook.create_sheet(title=title)
+    visible = [(key, label) for key, label, shown in columns if shown]
+    header_count = 1 + bool(header_groups) + bool(header_groups and sub_header_groups) if visible else 1
+    sheet.freeze_panes = layout.freeze_panes
+    _set_column_widths(sheet, visible, rows)
+    for merged in layout.merged_cells.ranges:
+        sheet.merged_cells.add(str(merged))
+    if visible and rows:
+        sheet.auto_filter.ref = f"A{header_count}:{get_column_letter(len(visible))}{header_count + len(rows)}"
+    for cells in layout.iter_rows(min_row=1, max_row=header_count):
+        header = []
+        for source in cells:
+            cell = WriteOnlyCell(sheet, value=source.value)
+            if isinstance(source.value, str) and cell.data_type == "f":
+                cell.data_type = "s"
+            cell.font, cell.fill, cell.border, cell.alignment = (
+                copy(source.font), copy(source.fill), copy(source.border), copy(source.alignment)
+            )
+            header.append(cell)
+        sheet.append(header)
+    if not visible:
+        return sheet
+    for row in rows:
+        cells = []
+        for key, _label in visible:
+            value = _cell_value(row.get(key), value_labels.get(key) if value_labels else None)
+            cell = WriteOnlyCell(sheet, value=value)
+            if isinstance(value, str) and cell.data_type == "f":
+                cell.data_type = "s"
+            cell.font, cell.alignment = _BODY_FONT, _BODY_ALIGN
+            cells.append(cell)
+        sheet.append(cells)
     return sheet
 
 

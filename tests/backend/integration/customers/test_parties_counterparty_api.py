@@ -149,6 +149,28 @@ class TestCounterpartyGuards:
         assert response.json()["total"] == 1
         assert response.json()["items"][0]["display_name"] == "搜索同行甲"
 
+    def test_counterparty_options_limit_search_and_exact_name_by_type_and_status(self, seeded_client, seeded_db):
+        from app.domain.parties import Counterparty
+
+        seeded_db.add_all([
+            Counterparty(counterparty_no=f"CPX{index:04d}", display_name=f"渠道相似{index:02d}", type="PLATFORM")
+            for index in range(25)
+        ])
+        exact = Counterparty(counterparty_no="CPXEXACT", display_name="渠道", type="PLATFORM")
+        seeded_db.add_all([exact, Counterparty(counterparty_no="CPXOTHER", display_name="渠道", type="PEER"),
+                           Counterparty(counterparty_no="CPXINACTIVE", display_name="渠道", type="PLATFORM", status="DISABLED")])
+        seeded_db.flush()
+        headers = {"X-Dev-User": "admin"}
+        options = seeded_client.get(f"{COUNTERPARTIES}/options", params={"type": "PLATFORM", "keyword": "渠道"}, headers=headers)
+        assert options.status_code == 200, options.text
+        assert len(options.json()) == 20
+        assert exact.id not in {row["id"] for row in options.json()}
+        match = seeded_client.get(f"{COUNTERPARTIES}/options", params={"type": "PLATFORM", "keyword": "渠道", "exact": "true"}, headers=headers)
+        assert match.status_code == 200, match.text
+        assert match.json() == [{"id": exact.id, "counterparty_no": "CPXEXACT", "display_name": "渠道"}]
+        literal = seeded_client.get(f"{COUNTERPARTIES}/options", params={"type": "PLATFORM", "keyword": "%"}, headers=headers)
+        assert literal.json() == []
+
     def test_get_counterparty_notfound(self, seeded_db):
         with pytest.raises(NotFound):
             get_counterparty(seeded_db, 999999)

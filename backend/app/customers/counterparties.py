@@ -132,6 +132,20 @@ def list_counterparties(
     return list(session.scalars(stmt.order_by(Counterparty.created_at.desc() if sort_desc else Counterparty.created_at.asc(), Counterparty.id.desc() if sort_desc else Counterparty.id.asc())).all())
 
 
+def list_counterparty_options(session: Session, *, type: str, keyword: str = "", exact: bool = False):
+    name = keyword.strip()
+    stmt = select(Counterparty.id, Counterparty.counterparty_no, Counterparty.display_name).where(
+        Counterparty.type == type, Counterparty.status == CounterpartyStatus.ACTIVE.value,
+    )
+    if exact:
+        stmt = stmt.where(Counterparty.display_name == name)
+    elif name:
+        pattern, escape = like_contains(name)
+        stmt = stmt.where(or_(Counterparty.counterparty_no.ilike(pattern, escape=escape),
+                              Counterparty.display_name.ilike(pattern, escape=escape)))
+    return session.execute(stmt.order_by(Counterparty.created_at, Counterparty.id).limit(1 if exact else 20)).all()
+
+
 def count_counterparties(
     session: Session, *, type: str | None = None, status: str | None = None,
     created_by: Sequence[str] | None = None,

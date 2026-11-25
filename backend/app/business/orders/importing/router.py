@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -63,8 +64,9 @@ async def order_import_preview(
 ):
     try:
         content = await file.read(MAX_FILE_BYTES + 1)
-        tables = parse_order_import(file.filename or "", content)
-        return preview_order_import(db, tables, existing=existing, sections=set(sections), user=user)
+        return await run_in_threadpool(
+            lambda: preview_order_import(db, parse_order_import(file.filename or "", content), existing=existing, sections=set(sections), user=user)
+        )
     finally:
         await file.close()
 
@@ -79,7 +81,8 @@ async def order_import_execute(
 ):
     try:
         content = await file.read(MAX_FILE_BYTES + 1)
-        tables = parse_order_import(file.filename or "", content)
-        return execute_order_import(db, tables, existing=existing, sections=set(sections), user=user)
+        return await run_in_threadpool(
+            lambda: execute_order_import(db, parse_order_import(file.filename or "", content), existing=existing, sections=set(sections), user=user)
+        )
     finally:
         await file.close()

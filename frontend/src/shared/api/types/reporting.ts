@@ -89,5 +89,6 @@ export interface OrderProfitReport {
   from?: string | null;
   to?: string | null;
   total: { income: string; cost: string; rebate: string; net_profit: string };
+  count?: number;
   items: OrderProfitRow[];
 }

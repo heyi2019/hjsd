@@ -221,6 +221,7 @@ beforeEach(() => {
   seedOrderFormFields();
   vi.mocked(customersApi.options).mockResolvedValue([]);
   vi.mocked(counterpartiesApi.list).mockResolvedValue([]);
+  vi.mocked(counterpartiesApi.options).mockResolvedValue([]);
   vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
   ui = userEvent.setup({ pointerEventsCheck: 0 });
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse(orders));

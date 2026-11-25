@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 /** OrderProfit：从 ReportsPage.tsx 拆出的单个报表视图。 */
 
@@ -9,17 +9,22 @@ import type { OrderProfitReport, OrderProfitRow } from "../../shared/api/types/r
 import { ORDER_TYPE_LABEL } from "../../shared/lib/labels";
 import { useListViewColumns } from "../../shared/lib/listColumns";
 import { DataTable, ErrorBanner, MoneyText, StatRow, StatusTag } from "../../shared/ui";
-import { type ReportRange, useReport } from "./shared";
+import { type ReportRange, useReport, useReportPagination } from "./shared";
 import { ReportExportButton } from "./ReportExportButton";
 
 export function OrderProfit({ range }: { range: ReportRange }) {
   const { params, picker } = range;
   const [sortDesc, setSortDesc] = useState(true);
+  const { page, pageSize, onPageChange } = useReportPagination(JSON.stringify([params.from, params.to, sortDesc]));
   const { data, loading, error, reload } = useReport<OrderProfitReport>(
-    () => reportsApi.orderProfit(params),
-    [params.from, params.to],
+    () => reportsApi.orderProfit({ ...params, limit: pageSize, offset: (page - 1) * pageSize, sort_desc: sortDesc }),
+    [params.from, params.to, page, pageSize, sortDesc],
   );
-  const sortedRows = [...(data?.items ?? [])].sort((a, b) => (sortDesc ? -1 : 1) * (a.trade_date.localeCompare(b.trade_date) || a.order_id - b.order_id));
+  const count = data?.count ?? data?.items.length ?? 0;
+  useEffect(() => {
+    const lastPage = Math.max(1, Math.ceil(count / pageSize));
+    if (data && page > lastPage) onPageChange(lastPage, pageSize);
+  }, [count, data, page, pageSize, onPageChange]);
   const { arrange: arrangeOrderProfit } = useListViewColumns("RPT_ORDER_PROFIT");
   const columns: ColumnsType<OrderProfitRow> = [
     { title: "订单号", dataIndex: "order_no", width: 160 },
@@ -50,14 +55,14 @@ export function OrderProfit({ range }: { range: ReportRange }) {
       />
              <DataTable<OrderProfitRow>
          columns={arrangeOrderProfit(columns)}
-         rows={sortedRows}
+         rows={data?.items ?? []}
          loading={loading}
-         resetKey={JSON.stringify([params.from, params.to, sortDesc])}
-         page={1}
-         pageSize={10}
-         total={data?.items.length ?? 0}
+         controlledPaging
+         page={page}
+         pageSize={pageSize}
+         total={count}
          emptyText={error ? "报表数据不可用，请点击重新加载" : "所选区间无订单"}
-         onPageChange={() => undefined}
+         onPageChange={onPageChange}
       />
     </Card>
   );

@@ -3,6 +3,7 @@ import type { AuditLogRow } from "./types/ops";
 import type { BusinessPnlReport, CommissionReport, DataCenterSummary, MonthlyPnlReport, OrderProfitReport } from "./types/reporting";
 
 type ReportPeriodParams = { from?: string; to?: string };
+type ReportPageParams = { limit?: number; offset?: number; sort_desc?: boolean };
 export type ReportExportParams = ReportPeriodParams & { mine?: boolean; all_people?: boolean; user_id?: number; sort_desc?: boolean };
 
 function getFreshReport<T>(url: string, params?: ReportPeriodParams): Promise<T> {
@@ -17,13 +18,13 @@ export const reportsApi = {
   },
   monthlyPnl: (params?: { from?: string; to?: string }) =>
     getFreshReport<MonthlyPnlReport>("/reports/monthly-pnl", params),
-  commission: (params?: { from?: string; to?: string; mine?: boolean; all_people?: boolean; user_id?: number; notification_id?: number }) =>
+  commission: (params?: ReportPeriodParams & ReportPageParams & { mine?: boolean; all_people?: boolean; user_id?: number; notification_id?: number }) =>
     getFreshReport<CommissionReport>("/reports/commission", params),
   businessPnl: (params?: { from?: string; to?: string }) =>
     getFreshReport<BusinessPnlReport>("/reports/business-pnl", params),
   dataCenter: (params?: { from?: string; to?: string }) =>
     getFreshReport<DataCenterSummary>("/reports/data-center", params),
-  orderProfit: (params?: { from?: string; to?: string }) =>
+  orderProfit: (params?: ReportPeriodParams & ReportPageParams) =>
     getFreshReport<OrderProfitReport>("/reports/order-profit", params),
 };
 

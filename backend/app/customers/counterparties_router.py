@@ -19,6 +19,7 @@ from app.customers.counterparties import (
     create_counterparty as parties_create_counterparty,
     count_counterparties as parties_count_counterparties,
     get_counterparty as parties_get_counterparty,
+    list_counterparty_options as parties_list_counterparty_options,
     list_counterparties as parties_list_counterparties,
     set_counterparty_status,
     update_counterparty as parties_update_counterparty,
@@ -87,6 +88,19 @@ def list_counterparties_page(
         limit=limit,
         offset=offset,
     )
+
+
+@router.get("/counterparties/options", response_model=list[schemas.CounterpartyOptionOut])
+def counterparty_options(
+    type: str = Query(...),
+    keyword: str = Query(default="", max_length=128),
+    exact: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    user: CurrentUser = read_counterparties,
+) -> list[schemas.CounterpartyOptionOut]:
+    return [schemas.CounterpartyOptionOut.model_validate(item) for item in parties_list_counterparty_options(
+        db, type=type, keyword=keyword, exact=exact,
+    )]
 
 
 @router.get("/counterparties/{counterparty_id}", response_model=schemas.CounterpartyOut)

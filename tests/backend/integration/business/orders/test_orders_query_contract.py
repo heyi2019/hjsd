@@ -140,9 +140,15 @@ class TestGetAndListOrders:
         try:
             response = seeded_client.get("/api/orders/export.xlsx", params={"keyword": order.order_no})
             assert response.status_code == 200, response.text
+            # write_only 生成的 xlsx 不写 sheet dimension，read_only 模式下
+            # max_row 会是 None；用实际迭代行数判定，兼容流式导出且不误判。
             workbook = load_workbook(BytesIO(response.content), read_only=True)
-            assert workbook["资金明细"].max_row == 1
-            assert workbook["返点明细"].max_row == 1
+            for sheet_name in ("资金明细", "返点明细"):
+                rows_with_content = [
+                    row for row in workbook[sheet_name].iter_rows(values_only=True)
+                    if any(cell is not None for cell in row)
+                ]
+                assert len(rows_with_content) == 1, f"{sheet_name} 应只有表头，实际 {len(rows_with_content)} 行"
         finally:
             app.dependency_overrides.pop(get_current_user, None)
 

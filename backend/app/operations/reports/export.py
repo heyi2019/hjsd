@@ -1,4 +1,4 @@
-"""reporting.export：报表统一导出（JSON / CSV）。
+"""operations.reports.export：报表统一导出（JSON / CSV）。
 """
 
 from __future__ import annotations
@@ -70,5 +70,5 @@ def report_for_export(
 
 # report_csv 已归位 core 层（2026-11-18 P0-A 第三批）：本模块顶部拉起重报表实现
 # （间接依赖 orders），lists.export 引用它会形成跨域环。改由 core.report_csv
-# 提供，这里保留 re-export 兼容 reporting/router 的既有 import 路径。
+# 提供，这里保留 re-export 兼容 operations/router 的既有 import 路径。
 from app.core.report_csv import report_csv  # noqa: E402,F401

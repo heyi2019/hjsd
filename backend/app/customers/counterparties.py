@@ -1,4 +1,4 @@
-"""customer_center.counterparties：合作方档案与合作方参与方校验。
+"""customers.counterparties：合作方档案与合作方参与方校验。
 
 规则来源：BAS-02-05。停用后不可参与新订单，历史参与关系不物理删除。
 """

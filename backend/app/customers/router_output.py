@@ -1,4 +1,4 @@
-"""customer_center.router 输出装配 helper（需求池 / 合作方）。"""
+"""customers.router 输出装配 helper（需求池 / 合作方）。"""
 from __future__ import annotations
 
 from collections.abc import Sequence

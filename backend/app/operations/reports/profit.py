@@ -1,4 +1,4 @@
-"""reporting.profit：订单利润明细（RPT-01）。
+"""operations.reports.profit：订单利润明细（RPT-01）。
 
 利润口径（2026-11-05 用户裁决）：**该订单所有收入 − 所有支出**，
 可正可负可 0；与分润基数同源，取数统一走 `cashflow_totals_by_order`。

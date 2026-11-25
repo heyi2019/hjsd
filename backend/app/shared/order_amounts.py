@@ -1,7 +1,7 @@
 """订单金额口径：事件口径的成交额 / 本金，以及资金明细口径的利润。
 
 为什么单独成模块：
-- 报表（app/reporting/）与规则派生（分期服务费基数）必须
+- 报表（app/operations/）与规则派生（分期服务费基数）必须
   用同一套口径，否则「报表说成交额 1000，返点按 900 计提」这类不一致会查不出来。
 - 该口径是订单域事实，不属于报表，下沉到 orders 域避免反向依赖。
 
@@ -263,7 +263,7 @@ def cashflow_buckets_by_order(
     """按订单汇总三大现金流桶：`{order_id: (所有收入, 所有支出, 其中账号成本)}`。
 
     这是分润基数（``order_cashflow_profit_by_order``）与报表取数
-    （``reporting._shared.cashflow_totals_by_order``）共用的**唯一聚合原语**——
+    （``operations._shared.cashflow_totals_by_order``）共用的**唯一聚合原语**——
     两者从同一个 bucket 投影，杜绝「利润说 100、报表说 90」的口径漂移（PROFIT-02 /
     REPORT-01 铁律）。口径：收入 = 流水 IN + 返点记录；支出 = 流水 OUT + 分期坏账；
     其中账号成本 = category=BUY 的 OUT 流水（仅作报表「其中项」展示，不参与净额）。

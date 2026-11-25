@@ -1,4 +1,4 @@
-"""customer_center 实体扩展字段服务。
+"""customers 实体扩展字段服务。
 
 扩展字段**不单独建表**：
 - 定义：就是「客户建档」表单里的**自定义字段**（``order_form_fields``，作用域 ``CUSTOMER``，

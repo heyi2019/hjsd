@@ -1,4 +1,4 @@
-"""customer_center.customer_detail：客户详情聚合与活动摘要。"""
+"""customers.customer_detail：客户详情聚合与活动摘要。"""
 from __future__ import annotations
 
 from collections.abc import Sequence

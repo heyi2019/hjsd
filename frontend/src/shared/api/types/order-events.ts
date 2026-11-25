@@ -1,5 +1,5 @@
 /** 订单事件、审计、附件与关联单（含记账结果）。
- * 由原 shared/api/types.ts 按领域拆分；对外仍从 `./types` 统一导入。
+ * 按领域拆分的独立类型模块；从本文件路径直接导入。
  * 金额一律以字符串传输，前端不做浮点数计算。 */
 
 export interface OrderAuditEntry {

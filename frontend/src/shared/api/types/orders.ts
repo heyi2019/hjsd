@@ -1,5 +1,5 @@
 /** 订单主档与订单挂载的流水/返点/分期/排期行。
- * 由原 shared/api/types.ts 按领域拆分；对外仍从 `./types` 统一导入。
+ * 按领域拆分的独立类型模块；从本文件路径直接导入。
  * 金额一律以字符串传输，前端不做浮点数计算。 */
 
 import type { OrderAttachment, OrderAuditEntry, OrderEvent } from "./order-events";

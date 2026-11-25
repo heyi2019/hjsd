@@ -1,6 +1,6 @@
-/** 订单相关 API 整合出口。
- *  实现已拆至 orders-api/（orders / order-types / order-form-fields / list-columns），
- *  本文件保留全部符号 re-export，调用方无需改动。 */
+/** 订单相关 API 稳定出口。
+ *  实现位于 orders-api/（orders / order-types / order-form-fields / list-columns），
+ *  本文件统一 re-export 全部符号，调用方从本路径导入。 */
 export { ordersApi } from "./orders-api/orders";
 export type { OrderListParams, OrderExecutionEditPayload } from "./orders-api/orders";
 export { orderTypesApi } from "./orders-api/order-types";

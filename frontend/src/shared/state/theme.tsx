@@ -8,7 +8,7 @@
  * 暗色双轨：自定义 CSS 由 data-theme 接管；antd 组件内部由 antdTheme.darkAlgorithm
  * 接管（见 antdTheme.ts 的 buildTheme）。两者必须同时切，缺一则半边仍是浅色。
  */
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type ResolvedThemeMode = "light" | "dark";
@@ -60,18 +60,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return () => media.removeEventListener?.("change", sync);
   }, [mode]);
 
-  const setMode = (next: ThemeMode) => {
+  const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);
     const resolved = next === "system" ? resolveSystem() : next;
     setResolvedMode(resolved);
     document.documentElement.setAttribute("data-theme", resolved);
     window.localStorage.setItem(STORAGE_KEY, next);
-  };
+  }, []);
 
-  const toggle = () => setMode(mode === "dark" ? "light" : "dark");
+  const toggle = useCallback(() => setMode(mode === "dark" ? "light" : "dark"), [mode, setMode]);
+
+  const value = useMemo(() => ({ mode, resolvedMode, setMode, toggle }), [mode, resolvedMode, setMode, toggle]);
 
   return (
-    <ThemeContext.Provider value={{ mode, resolvedMode, setMode, toggle }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

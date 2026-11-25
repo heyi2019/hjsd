@@ -405,7 +405,8 @@ it("独立字段板块共享配置分组，并在原配置对象更新后重新�
     get is_custom() { reads += 1; return true; },
   }));
   const config: FieldConfigMap = Object.fromEntries(fields.map((field) => [field.field_key, field]));
-  const view = () => <Form><FieldConfigContext.Provider value={config}><CustomFieldSectionsProvider>
+  // 真实配置更新走 setLoaded({ config: map }) 产生新引用；用新对象替换而非原地 mutate，贴合生产数据流。
+  const view = (current: FieldConfigMap = config) => <Form><FieldConfigContext.Provider value={current}><CustomFieldSectionsProvider>
     {sections.map((section) => <CustomFieldSection key={section} section={section} />)}
     <CustomFieldSections excludeSections={[...sections]} />
   </CustomFieldSectionsProvider></FieldConfigContext.Provider></Form>;
@@ -413,8 +414,7 @@ it("独立字段板块共享配置分组，并在原配置对象更新后重新�
   expect(screen.getByLabelText("字段0")).toBeInTheDocument();
   expect(screen.getByLabelText("字段6")).toBeInTheDocument();
   expect(reads).toBeLessThanOrEqual(fields.length * 2);
-  config.field_0 = { ...config.field_0, label: "更新字段", section: "BUSINESS" };
-  rerender(view());
+  rerender(view({ ...config, field_0: { ...config.field_0, label: "更新字段", section: "BUSINESS" } }));
   expect(screen.queryByLabelText("字段0")).toBeNull();
   expect(screen.getByLabelText("更新字段")).toBeInTheDocument();
 });

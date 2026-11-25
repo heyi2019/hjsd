@@ -10,7 +10,7 @@
  * 整条覆盖为不透明实底，此时系数写入不产生视觉变化。UI 层须用 useGlassReduced() 提示用户，
  * 避免给出「滑桿坏了」的错觉。这是 Web 平台的既定边界，非缺陷。
  */
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 export const GLASS_MIN = 0.2;
 export const GLASS_MAX = 1.6;
@@ -60,13 +60,15 @@ export function GlassProvider({ children }: { children: ReactNode }) {
     return () => queries.forEach((q) => q.removeEventListener?.("change", sync));
   }, []);
 
-  const setAlpha = (next: number) => {
+  const setAlpha = useCallback((next: number) => {
     const v = clamp(Number.isFinite(next) ? next : GLASS_DEFAULT);
     setAlphaState(v);
     window.localStorage.setItem(STORAGE_KEY, String(v));
-  };
+  }, []);
 
-  return <GlassContext.Provider value={{ alpha, setAlpha, reduced }}>{children}</GlassContext.Provider>;
+  const value = useMemo(() => ({ alpha, setAlpha, reduced }), [alpha, setAlpha, reduced]);
+
+  return <GlassContext.Provider value={value}>{children}</GlassContext.Provider>;
 }
 
 export function useGlass(): GlassValue {

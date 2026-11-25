@@ -1,6 +1,6 @@
 /** 自定义字段渲染与选项解析；拆分自 ConfigurableField.tsx。 */
 import { DatePicker, Form, Input, InputNumber, Switch, Typography } from "antd";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 import type { ReactElement, ReactNode } from "react";
 import { dateValueFromEvent, dateValueProps, Select } from "../../ui";
 import type { OrderFormField } from "../../api/types/forms";
@@ -37,7 +37,9 @@ function groupCustomFields(config: FieldConfigMap): SectionGroups {
 /** 多个独立板块共享当前表单的字段分组；每次表单重渲染时重新读取配置。 */
 export function CustomFieldSectionsProvider({ children }: { children: ReactNode }): ReactElement {
   const config = useFieldConfig();
-  return <CustomFieldSectionsContext.Provider value={{ config, groups: groupCustomFields(config) }}>{children}</CustomFieldSectionsContext.Provider>;
+  // config 引用稳定（EMPTY_FIELD_CONFIG / state.config）；缓存 value 避免每次渲染重跑分组并让所有消费者重渲染。
+  const value = useMemo(() => ({ config, groups: groupCustomFields(config) }), [config]);
+  return <CustomFieldSectionsContext.Provider value={value}>{children}</CustomFieldSectionsContext.Provider>;
 }
 
 /** 渲染当前作用域（FieldConfigContext）下的自定义字段区块；无自定义字段时不渲染。

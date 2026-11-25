@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { installmentsApi } from "../../shared/api/installments.api";
 import type { Installment, InstallmentTotals } from "../../shared/api/types/installments";
 import { normalizeError } from "../../shared/api/client";
@@ -132,12 +132,19 @@ export function useContractTableController(params: { contractType: string; reloa
   const overdueCount = totals?.overdue_count ?? 0;
 
   const { arrange: arrangeColumns } = useListViewColumns("INSTALLMENT");
-  const { columns, scheduleColumns } = buildContractColumns({
+  // 所有依赖均为稳定引用：gameLabel(useCallback) / forms(FormInstance) / setXxxTarget(useState setter)
+  // / settlePermission(字符串值) / openDeliver(已 useCallback)。故列数组只在依赖真正变化时重建，
+  // 搜索键入、翻页、loading 变化不再重复构造两个大列数组。
+  const { columns: rawColumns, scheduleColumns } = useMemo(() => buildContractColumns({
     gameLabel,
     payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
     setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
     setWaiveTarget, setExtendTarget, openDeliver, settlePermission,
-  });
+  }), [gameLabel, payForm, recoverForm, cancelForm, settleForm, defaultForm, waiveForm, extendForm,
+    setPayTarget, setRecoverTarget, setCancelTarget, setSettleTarget, setDefaultTarget,
+    setWaiveTarget, setExtendTarget, openDeliver, settlePermission]);
+  // 列编排收敛到 controller 一次完成（arrange 引用由共享模块稳定），Panel 直接用 columns。
+  const columns = useMemo(() => arrangeColumns(rawColumns), [arrangeColumns, rawColumns]);
 
   return {
     rows,
@@ -206,7 +213,6 @@ export function useContractTableController(params: { contractType: string; reloa
     employeeError: employeeError ? normalizeError(employeeError) : null,
     employeesSettled,
     reloadEmployees,
-    arrangeColumns,
     columns,
     scheduleColumns,
   };

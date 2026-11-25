@@ -8,7 +8,7 @@
  *    避免「新列因为没人配置而永远看不见」；
  *  - 设置页保存后通过订阅即时刷新已挂载的列表，不需要重新进入页面。
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { listColumnsApi } from "../api/orders.api";
 import type { ListScopeConfig } from "../api/types/forms";
 
@@ -139,20 +139,26 @@ export function useListViewColumns(scope: string): ListViewColumns {
     };
   }, [scope]);
 
-  if (!config) {
-    return {
-      ready: false,
-      isVisible: () => true,
-      arrange: (columns) => columns,
-    };
-  }
+  // config 引用由 setConfig(scopeCache.get(scope)) 写入：配置未变时同一引用（React 同值 bail out），
+  // 设置页保存后 emit() → setConfig 拿到新引用。故以 config 为依赖即可让 arrange/isVisible 在配置
+  // 不变时保持引用稳定，配置变更时正确重建——下游 columns useMemo 依赖 arrange 才不会被无谓打断。
+  const visible = useMemo(
+    () => (config ? new Map(config.columns.map((column) => [column.key, column.is_visible])) : null),
+    [config],
+  );
 
-  const visible = new Map(config.columns.map((column) => [column.key, column.is_visible]));
+  const isVisible = useCallback((key: string) => visible?.get(key) ?? true, [visible]);
+
+  const arrange = useCallback(
+    <T extends { key?: unknown; dataIndex?: unknown }>(columns: T[]): T[] =>
+      config ? applyColumnConfig(columns, config) : columns,
+    [config],
+  );
 
   return {
-    ready: true,
-    isVisible: (key) => visible.get(key) ?? true,
-    arrange: (columns) => applyColumnConfig(columns, config),
+    ready: Boolean(config),
+    isVisible,
+    arrange,
   };
 }
 

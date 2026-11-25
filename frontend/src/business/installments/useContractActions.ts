@@ -1,5 +1,5 @@
 /** 分期合约的写操作与导出。 */
-import { useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { appMessage } from "../../shared/ui/appFeedback";
 import { installmentsApi, type InstallmentListParams } from "../../shared/api/installments.api";
 import type { Installment } from "../../shared/api/types/installments";
@@ -90,7 +90,9 @@ export function useContractActions(params: {
     });
   };
 
-  const openDeliver = (row: Installment) => {
+  // 依赖均为稳定引用（useState setter / FormInstance），today() 为纯函数无需入依赖。
+  // 稳定 openDeliver 后，下游 buildContractColumns 的 useMemo 才不会每次渲染失效。
+  const openDeliver = useCallback((row: Installment) => {
     deliverForm.resetFields();
     setDeliverTarget(row);
     deliverForm.setFieldsValue({
@@ -98,7 +100,7 @@ export function useContractActions(params: {
       bound_phone: row.order.bound_phone ?? undefined,
       bound_phone_owner: row.order.bound_phone_owner ?? undefined,
     });
-  };
+  }, [deliverForm, setDeliverTarget]);
 
   const submitRecover = async (values: Record<string, unknown>) => {
     if (!recoverTarget) return;

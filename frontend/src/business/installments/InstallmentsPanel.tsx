@@ -38,7 +38,6 @@ function ContractTable({
     dateRange: dateRange ? [dateRange[0].format("YYYY-MM-DD"), dateRange[1].format("YYYY-MM-DD")] : null,
   });
   const {
-    arrangeColumns,
     can,
     cancelForm,
     columns,
@@ -145,7 +144,7 @@ function ContractTable({
           ]}
         />
         <DataTable<Installment>
-          columns={arrangeColumns(columns)}
+          columns={columns}
           rows={rows}
           loading={loading}
           page={page}

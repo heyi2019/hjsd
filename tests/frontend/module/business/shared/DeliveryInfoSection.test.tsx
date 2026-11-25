@@ -8,13 +8,14 @@ import { Button, Form } from "antd";
 import { DeliveryInfoSection } from "@/business/shared/forms/DeliveryInfoSection";
 import { renderLight } from "@fixtures/render";
 
-vi.mock("@/shared/lib/optionSets", () => ({
-  useOptionSetResource: () => ({ options: [{ value: "淘宝", label: "淘宝" }, { value: "其他", label: "其他" }], loading: false, error: null, retry: vi.fn() }),
+vi.mock("@/shared/lib/optionSets", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/shared/lib/optionSets")>(),
+  useOptionSetResource: () => ({ options: [{ value: "intermediary_platform_01", label: "淘宝" }, { value: "intermediary_platform_02", label: "其他", behavior: "OTHER" }], loading: false, error: null, retry: vi.fn() }),
   useOptionSet: (code: string) =>
     code === "INTERMEDIARY_PLATFORM"
       ? [
-          { value: "淘宝", label: "淘宝" },
-          { value: "其他", label: "其他" },
+          { value: "intermediary_platform_01", label: "淘宝" },
+          { value: "intermediary_platform_02", label: "其他", behavior: "OTHER" },
         ]
       : [],
 }));

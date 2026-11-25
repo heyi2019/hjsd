@@ -1,14 +1,14 @@
-/** 测试用选项词典种子，与当前 ORM 基线保持一致。 */
+/** 测试用选项词典，保留部分历史值及其业务行为。 */
 import { optionSetsApi } from "@/shared/api/options.api";
+import type { OptionItem } from "@/shared/api/types/common";
 import { customerSourceOptions, intermediaryPlatformOptions } from "@fixtures/catalogOptions";
 
-/** T20：选项词典种子与当前 ORM 基线一致。 */
 export interface SeedOptionSet {
   code: string;
   label: string;
   group: string;
   editable: boolean;
-  options: Array<{ value: string; label: string }>;
+  options: OptionItem[];
 }
 
 export const OPTION_SET_SEED: SeedOptionSet[] = [
@@ -23,6 +23,12 @@ export const OPTION_SET_SEED: SeedOptionSet[] = [
     { value: "RECOVERY", label: "回收" }, { value: "PICKUP", label: "提号" }, { value: "CONSIGNMENT", label: "代挂" },
   ] },
   { code: "INTERMEDIARY_PLATFORM", label: "经手平台", group: "BUSINESS", editable: true, options: intermediaryPlatformOptions },
+  { code: "INTERMEDIARY_TYPE", label: "中介类型", group: "BUSINESS", editable: true, options: [
+    { value: "普中", label: "普中" }, { value: "包赔", label: "包赔", behavior: "COMPENSATION" },
+  ] },
+  { code: "COMPENSATION_TYPE", label: "包赔类型", group: "BUSINESS", editable: true, options: [
+    { value: "首保", label: "首保" }, { value: "续保", label: "续保" },
+  ] },
   { code: "FUND_FLOW_DIRECTION", label: "流水方向", group: "FUND", editable: false, options: [
     { value: "IN", label: "收入" }, { value: "OUT", label: "支出" },
   ] },

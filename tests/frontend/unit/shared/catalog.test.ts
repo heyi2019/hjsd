@@ -66,7 +66,7 @@ describe("组织 API：统一通过领域客户端访问", () => {
     await teamsApi.update(1, { is_active: false });
     expect(api.get).toHaveBeenNthCalledWith(1, "/teams");
     expect(api.get).toHaveBeenNthCalledWith(2, "/teams", { refreshCache: true });
-    expect(api.post).toHaveBeenCalledWith("/teams", { code: "T1", name: "一队" });
+    expect(api.post).toHaveBeenCalledWith("/teams", { name: "一队" });
     expect(api.patch).toHaveBeenCalledWith("/teams/1", { is_active: false });
   });
 });

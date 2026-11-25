@@ -21,7 +21,8 @@ it("FE-207：修改密码请求未返回时仍可关闭真实用户中心弹窗"
 
   fireEvent.click(await screen.findByRole("button", { name: "用户中心" }));
   const dialog = await screen.findByRole("dialog");
-  fireEvent.change(within(dialog).getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
+  const passwordCard = within(dialog).getByText("修改密码", { selector: ".ant-card-head-title" }).closest(".ant-card") as HTMLElement;
+  fireEvent.change(within(passwordCard).getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
   fireEvent.change(within(dialog).getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
   fireEvent.change(within(dialog).getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
   fireEvent.click(within(dialog).getByRole("button", { name: /修改密码/ }));

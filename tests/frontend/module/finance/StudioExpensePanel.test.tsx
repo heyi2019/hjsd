@@ -177,9 +177,9 @@ describe("StudioExpensePanel：工作室支出", () => {
   });
 
   it("科目筛选可选择工作室收入科目", async () => {
-    const income = { ...expenseFlows[0], flow_no: "CF-IN", category: "货款", direction: "IN", amount: "800.00" };
+    const income = { ...expenseFlows[0], flow_no: "CF-IN", category: "studio_income_item_01", direction: "IN", amount: "800.00" };
     vi.mocked(studioExpensesApi.summary).mockImplementation(async (params) =>
-      params?.category === "货款"
+      params?.category === "studio_income_item_01"
         ? studioExpenseSummary([income] as never, { income: "800.00", net: "800.00" })
         : studioExpenseSummary(expenseFlows as never));
     renderLight(<StudioExpensePanel pools={pools} />, { user: "admin" });
@@ -187,7 +187,7 @@ describe("StudioExpensePanel：工作室支出", () => {
     await ui.click(screen.getByRole("combobox", { name: "工作室收支科目" }));
     await ui.click(await screen.findByText("货款", { selector: ".ant-select-item-option-content" }));
     expect(await screen.findByText("CF-IN")).toBeInTheDocument();
-    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ category: "货款" }));
+    expect(vi.mocked(studioExpensesApi.summary)).toHaveBeenLastCalledWith(expect.objectContaining({ category: "studio_income_item_01" }));
     expect(screen.queryByText("CF-001")).toBeNull();
   });
   it("翻页时加载后端对应页的流水", async () => {
@@ -497,7 +497,7 @@ describe("StudioExpensePanel：工作室支出", () => {
       pool_id: 1,
       direction: "IN",
       accounting_attribute: "SELF_REVENUE",
-      category: "货款",
+      category: "studio_income_item_01",
       amount: "800.00",
     });
   });

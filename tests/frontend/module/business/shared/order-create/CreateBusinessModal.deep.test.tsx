@@ -34,7 +34,8 @@ beforeEach(() => {
   vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", is_active: true }]);
   resolveMock(vi.mocked(poolsApi.list), [{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }]);
   vi.mocked(gameTypesApi.list).mockResolvedValue([
-    { id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true },
+    { id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true,
+      channel_regions: [{ value: "channel_01", label: "安卓一区" }] },
   ]);
   vi.mocked(employeesApi.list).mockResolvedValue([
     { id: 1, username: "admin", display_name: "系统管理员", is_active: true },
@@ -88,10 +89,13 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     resolveMockOnce(vi.mocked(ordersApi.create), { id: 31, order_no: "HS-2026-0031", status: "ACTIVE" });
 
     await openTypedModal("HS");
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await waitFor(() => expect(screen.getByLabelText("游戏类型")).toBeEnabled());
+    await ui.click(screen.getByLabelText("游戏类型"));
+    await ui.click(await screen.findByText("王者荣耀", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.click(screen.getByLabelText("渠道／区服"));
+    await ui.click(await screen.findByText("安卓一区", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
     // CfgNestedItem 把客户手机号嵌在客户信息区，label 会被 antd 组合前缀；按字段 id 精确定位。
     await ui.type(document.querySelector("#customer_phone") as Element, "13800008888");
@@ -107,6 +111,7 @@ describe("CreateBusinessModal.deep：加载失败/取消确认/联动清除", ()
     expect(payload.customer_input).toMatchObject({
       display_name: "张三", phone: "13800008888", role: "SELLER",
     });
+    expect(payload.account_snapshot).toMatchObject({ game_type: "game_01", channel_region: "channel_01" });
   });
 
   it("客户来源只能从预置选项选择，选择其他后填写具体来源", async () => {

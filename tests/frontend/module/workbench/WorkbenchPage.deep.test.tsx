@@ -44,7 +44,8 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     seedOrderFormFields();
     vi.mocked(orderTypesApi.list).mockResolvedValue([{ id: 1, code: "HS", name: "回收", is_active: true }]);
     vi.mocked(poolsApi.list).mockResolvedValue([{ id: 1, name: "主账户", code: "MAIN", status: "ACTIVE" }] as never);
-    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true }]);
+    vi.mocked(gameTypesApi.list).mockResolvedValue([{ id: 1, value: "game_01", name: "王者荣耀", sort_order: 10, is_active: true, is_default: true,
+      channel_regions: [{ value: "channel_01", label: "安卓一区" }] }]);
     vi.mocked(employeesApi.list).mockResolvedValue([{ id: 1, username: "admin", display_name: "系统管理员", is_active: true }] as never);
     vi.mocked(ordersApi.create).mockResolvedValue({ id: 31, order_no: "HS0031", status: "ACTIVE" } as never);
     vi.mocked(workbenchApi.summary)
@@ -56,10 +57,13 @@ describe("WorkbenchPage.deep：失败路径/计数/未覆盖入口", () => {
     expect(await within(total).findByText("1")).toBeInTheDocument();
     await ui.click(screen.getByRole("button", { name: /自营·回收/ }));
     expect(await screen.findByText("新建回收订单")).toBeInTheDocument();
-    await ui.type(screen.getByLabelText("游戏类型"), "王者荣耀");
+    await waitFor(() => expect(screen.getByLabelText("游戏类型")).toBeEnabled());
+    await ui.click(screen.getByLabelText("游戏类型"));
+    await ui.click(await screen.findByText("王者荣耀", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("游戏账号"), "recovery-account");
     await ui.type(screen.getByLabelText("账号密码"), "secret");
-    await ui.type(screen.getByLabelText("渠道／区服"), "安卓一区");
+    await ui.click(screen.getByLabelText("渠道／区服"));
+    await ui.click(await screen.findByText("安卓一区", { selector: ".ant-select-item-option-content" }));
     await ui.type(screen.getByLabelText("客户昵称"), "张三");
     await ui.type(screen.getByPlaceholderText("请输入金额"), "1000");
     const pool = screen.getByText("请选择资金账户", { exact: true });

@@ -1,5 +1,5 @@
 /** 资金中心：总览 / 资金明细 / 工作室运营 / 对账 / 押金。
- *  逻辑层见 useFinancePageController；视图层拆为 FinancePage.tabs 与 FinancePage.modals。 */
+ *  逻辑层见 useFinancePageController；视图层按所属功能分目录，弹窗见 FinancePage.modals。 */
 import { Tabs } from "antd";
 import { useState } from "react";
 import { ErrorBanner } from "../shared/ui";
@@ -7,7 +7,10 @@ import { DataTableLoadingProvider } from "../shared/ui/DataTable";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFinancePageController } from "./useFinancePageController";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
-import { DepositSection, OverviewTab, CashflowTab, ReconciliationTab } from "./FinancePage.tabs";
+import { OverviewTab } from "./overview/OverviewTab";
+import { CashflowTab } from "./cashflow/CashflowTab";
+import { DepositSection } from "./deposits/DepositSection";
+import { ReconciliationTab } from "./reconciliation/ReconciliationTab";
 import {
   CancelModal,
   DepositModal,

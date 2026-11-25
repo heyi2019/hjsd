@@ -1,4 +1,4 @@
-/** 押金占用区块：从 FinancePage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
+/** 押金占用区块：押金明细与占用/释放/没收操作。 */
 import { Card, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, ErrorBanner, MoneyText, PermissionButton, StatusTag } from "../../shared/ui";

@@ -1,4 +1,4 @@
-"""orders.form_fields：建单表单字段配置的 CRUD 与护栏。
+"""business.shared.form_config.form_fields：建单表单字段配置的 CRUD 与护栏。
 
 本模块是**全站唯一的表单字段配置来源**：描述「建单表单」与「客户建档」等表单的字段构成
 （显示/必填/停用/排序/增删），不存储实体附加属性值。自定义字段（is_custom=1）即扩展字段，

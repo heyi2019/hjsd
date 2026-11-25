@@ -1,4 +1,4 @@
-"""orders.section_labels：建单表单板块标题的读写（含核心板块锁定）。"""
+"""business.shared.form_config.section_labels：建单表单板块标题的读写（含核心板块锁定）。"""
 from __future__ import annotations
 
 from collections.abc import Mapping

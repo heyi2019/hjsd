@@ -1,7 +1,7 @@
 import { SearchInput } from "../../shared/ui/SearchInput";
 import { TimeOrderControl } from "../../shared/ui/TimeOrderControl";
 import { ToolbarSelect } from "../../shared/ui/ToolbarSelect";
-/** 资金明细 Tab：从 FinancePage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
+/** 资金明细 Tab：资金流水列表与筛选。 */
 import { Card, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, ErrorBanner, ExportButton, MoneyText, StatRow } from "../../shared/ui";

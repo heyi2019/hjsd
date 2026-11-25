@@ -1,4 +1,4 @@
-"""orders.form_fields_router：建单表单字段配置 API（设置页「表单」）。
+"""business.shared.form_config.form_fields_router：建单表单字段配置 API（设置页「表单」）。
 
 端点只围绕 `OrderFormField` 定义与板块标题（含核心字段锁定）做增删改查，
 与订单交易主流程无耦合，故从 orders.router 独立出来。

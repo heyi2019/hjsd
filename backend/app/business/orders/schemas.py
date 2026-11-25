@@ -1,4 +1,4 @@
-"""orders.schemas：订单、事件、划转的请求/响应模型。
+"""business.orders.schemas：订单、事件、划转的请求/响应模型。
 
 金额一律以字符串传输（如 `"1400.00"`），后端转 `Decimal`，禁止 float 参与计算（V15）。
 """

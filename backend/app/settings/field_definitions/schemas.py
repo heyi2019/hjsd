@@ -1,4 +1,4 @@
-"""field_definitions.schemas：基础主数据的请求/响应模型。
+"""settings.field_definitions.schemas：基础主数据的请求/响应模型。
 
 金额字段在本阶段为空；一旦出现必须走 `Amount`（DECIMAL(18,2)），禁止 float。
 """

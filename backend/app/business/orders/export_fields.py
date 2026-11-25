@@ -1,4 +1,4 @@
-"""orders.export_fields：订单台账导出的列定义、分组表头与明细行展开。
+"""business.orders.export_fields：订单台账导出的列定义、分组表头与明细行展开。
 
 只含纯常量与纯函数，不依赖 router 的权限注入与事务；
 /orders/export.csv 与 /orders/export.xlsx 共用同一套口径。

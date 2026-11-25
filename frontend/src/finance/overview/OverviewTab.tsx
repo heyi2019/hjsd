@@ -1,4 +1,4 @@
-/** 资金账户总览 Tab：从 FinancePage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
+/** 资金账户总览 Tab：各资金池余额与收支汇总。 */
 import { Card } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, MoneyText, PermissionButton, StatRow, StatusTag } from "../../shared/ui";

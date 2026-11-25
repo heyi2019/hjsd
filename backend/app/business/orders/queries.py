@@ -1,4 +1,4 @@
-"""orders.queries：订单列表与计数查询（ORD-01）。
+"""business.orders.queries：订单列表与计数查询（ORD-01）。
 """
 
 from __future__ import annotations

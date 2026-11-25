@@ -1,4 +1,4 @@
-"""orders.output_labels：订单/事件输出的纯标签计算（在手时长、操作人、表单责任人）。
+"""business.orders.output_labels：订单/事件输出的纯标签计算（在手时长、操作人、表单责任人）。
 
 只依赖标准库与类型注解，不碰 Session / 权限 / 事务；由 router_output 具名导入使用。
 """

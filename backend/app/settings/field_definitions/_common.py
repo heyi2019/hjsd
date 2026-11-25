@@ -1,4 +1,4 @@
-"""field_definitions.service：资金账户 / 业务类型 / 路由 / 编号序列的 Service 层。
+"""settings.field_definitions._common：资金账户 / 业务类型 / 路由 / 编号序列的 Service 层。
 所有写操作在同一个 Service 事务内完成：**业务落库 + 审计写盘**，失败整体回滚。
 业务类型与资金账户都是主数据：新增业务/新增池不需要改代码、不改表（V32/V33）。
 """

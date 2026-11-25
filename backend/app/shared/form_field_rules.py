@@ -1,4 +1,4 @@
-"""orders.form_field_rules：表单字段的枚举常量、键格式校验与 form_extra 规则校验。"""
+"""shared.form_field_rules：表单字段的枚举常量、键格式校验与 form_extra 规则校验。"""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

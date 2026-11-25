@@ -1,4 +1,4 @@
-"""orders.mutations：订单更新与取消（ORD-02）。
+"""business.orders.mutations：订单更新与取消（ORD-02）。
 
 状态流转走 `ORDER_TRANSITIONS`，取消不物理删除，保留事件与审计；物理删除见 `orders.deletion`。
 """

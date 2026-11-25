@@ -1,4 +1,4 @@
-/** 资金对账 Tab：从 FinancePage.tabs.tsx 拆出，函数体与拆前逐字等价。 */
+/** 资金对账 Tab：对账记录列表、创建与处理。 */
 import { Card, Space, Tooltip, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { DataTable, ErrorBanner, MoneyText, PermissionButton, StatusTag } from "../../shared/ui";

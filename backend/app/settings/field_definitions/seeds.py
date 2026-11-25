@@ -1,4 +1,4 @@
-"""field_definitions.seeds：M0 基础主数据种子（**幂等**，可重复执行）。
+"""settings.field_definitions.seeds：M0 基础主数据种子（**幂等**，可重复执行）。
 
 生产初始化的种子内容包括：
 - 三类主业务 `HS` 回收 / `TH` 提号 / `DG` 代挂（PRD §2.0）；

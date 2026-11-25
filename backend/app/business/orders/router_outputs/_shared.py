@@ -1,4 +1,4 @@
-"""orders.router_outputs._shared：订单/事件输出共用的装配与金额原语。"""
+"""business.orders.router_outputs._shared：订单/事件输出共用的装配与金额原语。"""
 from __future__ import annotations
 
 from decimal import Decimal

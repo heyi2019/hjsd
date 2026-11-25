@@ -1,4 +1,4 @@
-"""orders.router_outputs.detail：订单详情输出装配。"""
+"""business.orders.router_outputs.detail：订单详情输出装配。"""
 from __future__ import annotations
 
 from collections.abc import Sequence

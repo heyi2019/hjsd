@@ -1,4 +1,4 @@
-"""orders.events_rules：事件准入规则、冲销配对、交付与账号状态派生（ORD-02）。
+"""business.orders.events_rules：事件准入规则、冲销配对、交付与账号状态派生（ORD-02）。
 
 由 `orders.events.post_event` 调用；本模块不负责事件落库与流水生成。
 """

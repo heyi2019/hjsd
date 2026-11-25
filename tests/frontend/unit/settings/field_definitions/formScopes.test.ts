@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { buildGroupedScopeOptions } from "@/settings/formScopes";
 import { normalizeOptionItems } from "@/settings/field_definitions/OrderFormFieldsPanel.fragments";

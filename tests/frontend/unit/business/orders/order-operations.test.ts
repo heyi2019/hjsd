@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { authorizedOrderOperationItems, orderOperationMenuItems } from "@/business/shared/operations";
 

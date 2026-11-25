@@ -416,6 +416,58 @@ def test_removed_test_path_uses_full_regression_but_new_unregistered_file_still_
         rr.groups_for_changes([new])
 
 
+def _list_changed_tests(monkeypatch, capsys, paths):
+    monkeypatch.setattr(rr.sys, "argv", [
+        "run_regression.py", "changed", "--backend-only", "--list", "--changed-paths", ",".join(paths),
+    ])
+    assert rr.main() == 0
+    return capsys.readouterr().out.splitlines()
+
+
+def test_changed_backend_test_runs_only_its_file_locally(monkeypatch, capsys):
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    target = "tests/backend/integration/finance/shared/test_finance_api.py"
+    selected = _list_changed_tests(monkeypatch, capsys, [target])
+    assert [path for path in selected if path.startswith("tests/backend/")] == [target]
+
+
+def test_changed_shared_guard_can_run_as_a_single_file(monkeypatch, capsys):
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    target = "tests/backend/unit/system/test_db_channel.py"
+    selected = _list_changed_tests(monkeypatch, capsys, [target])
+    assert [path for path in selected if path.startswith("tests/backend/")] == [target]
+
+
+def test_changed_backend_test_keeps_shared_guards_in_ci(monkeypatch, capsys):
+    monkeypatch.setenv("CI", "true")
+    target = "tests/backend/integration/finance/shared/test_finance_api.py"
+    selected = _list_changed_tests(monkeypatch, capsys, [target])
+    assert target in selected
+    assert "tests/backend/unit/system/test_group_coverage.py" in selected
+    assert "tests/backend/integration/finance/shared/test_cashflow_write_concurrency.py" not in selected
+
+
+def test_changed_backend_source_and_other_domain_test_keep_both_scopes(monkeypatch, capsys):
+    target = "tests/backend/integration/finance/shared/test_finance_api.py"
+    selected = _list_changed_tests(monkeypatch, capsys, ["backend/app/business/orders/create.py", target])
+    assert "tests/backend/integration/business/orders/test_orders.py" in selected
+    assert target in selected
+    assert "tests/backend/integration/finance/shared/test_cashflow_write_concurrency.py" not in selected
+
+
+@pytest.mark.parametrize("path", [
+    "tests/frontend/module/finance/FinancePage.test.tsx",
+    "tests/e2e/finance/other-integration.spec.ts",
+    "tests/fixtures/financePageSetup.tsx",
+])
+def test_changed_frontend_test_does_not_expand_backend_business_groups(monkeypatch, capsys, path):
+    selected = _list_changed_tests(monkeypatch, capsys, [path])
+    assert "tests/backend/unit/system/test_group_coverage.py" in selected
+    assert "tests/backend/integration/finance/shared/test_finance_api.py" not in selected
+
+
 @pytest.mark.parametrize("path", [
     "backend/app/business/orders/mutations.py",
     "backend/app/business/orders/events.py",

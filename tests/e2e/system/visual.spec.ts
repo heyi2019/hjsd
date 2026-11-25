@@ -320,18 +320,17 @@ test.describe("UI visual baseline", () => {
   });
 
   test("回收页桌面弹窗四边可缩放", async ({ page }) => {
-    // 4 个方向各自 goto + 开窗 + 等动画收敛 + 拖动，默认 30s 在全量负载下不够
-    // （实测一次 30s 超时），慢速化三倍预算。
+    // 4 个方向各自开窗 + 等动画收敛 + 拖动，默认 30s 在全量负载下不够。
     test.slow();
     // 视口加高到 1200：拖「南」边向下增高时不会被 heightCeiling（视口高-32）钳死，保证高度确有增量。
     await page.setViewportSize({ width: 1440, height: 1200 });
+    await page.goto("/");
     for (const [direction, deltaX, deltaY, dimension] of [
       ["e", -240, 0, "width"],
       ["w", 240, 0, "width"],
       ["s", 0, 240, "height"],
       ["n", 0, -240, "height"],
     ] as const) {
-      await page.goto("/");
       await page.getByRole("button", { name: /自营·回收/ }).click();
       const modal = page.locator(".business-registration-modal .ant-modal").first();
       const handle = page.locator(`.resizable-modal__resize-handle--${direction}`);
@@ -367,6 +366,9 @@ test.describe("UI visual baseline", () => {
           .poll(async () => (await readSize()).heightVar, { timeout: 5000 })
           .toBeGreaterThan(before.heightVar + 60);
       }
+      // 关闭后重新挂载弹窗，下一方向从初始尺寸开始，无需整页重新加载。
+      await page.keyboard.press("Escape");
+      await expect(modal).toHaveCount(0);
     }
   });
 

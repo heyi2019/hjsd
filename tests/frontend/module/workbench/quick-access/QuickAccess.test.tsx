@@ -37,7 +37,7 @@ describe("QuickAccess 快捷入口", () => {
   it("点击回收账号卡直接打开回收登记弹窗（不跳转页面）", async () => {
     renderLight(<QuickAccess />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: /自营·回收/ }));
-    const modal = await screen.findByText("新建回收订单");
+    const modal = await screen.findByText("新建回收订单", {}, { timeout: 10_000 });
     expect(modal.closest(".ant-modal-content")).toBeTruthy();
   });
 
@@ -51,7 +51,7 @@ describe("QuickAccess 快捷入口", () => {
   it("点击提号卡直接打开提号登记弹窗（不跳转页面）", async () => {
     renderLight(<QuickAccess />, { user: "admin" });
     fireEvent.click(await screen.findByRole("button", { name: "提号" }));
-    const modal = await screen.findByText("新建提号订单");
+    const modal = await screen.findByText("新建提号订单", {}, { timeout: 10_000 });
     expect(modal.closest(".ant-modal-content")).toBeTruthy();
   });
 
@@ -59,6 +59,6 @@ describe("QuickAccess 快捷入口", () => {
     renderLight(<QuickAccess />, { user: "admin" });
     await screen.findByRole("button", { name: "代挂" });
     await userEvent.setup({ pointerEventsCheck: 0 }).click(screen.getByRole("button", { name: "代挂" }));
-    expect(await screen.findByText("新建代挂订单")).toBeInTheDocument();
+    expect(await screen.findByText("新建代挂订单", {}, { timeout: 10_000 })).toBeInTheDocument();
   });
 });

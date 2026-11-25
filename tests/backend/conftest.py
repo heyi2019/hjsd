@@ -554,7 +554,15 @@ def _replay_seeds(db: Session) -> None:
     位置收到字符串列，PG 直接报 DatatypeMismatch。带列名插入按名对齐，顺序无关。
     """
     connection = db.connection()
-    for table in Base.metadata.sorted_tables:  # 依赖序，父表先插
+    tables = Base.metadata.sorted_tables
+    # 一次查询识别当前有种子的表，避免每个用例对大量空表发 INSERT；每次查询
+    # 模板的当前状态，仍支持测试在同一事务中修改模板数据。
+    populated = connection.execute(text("SELECT " + ", ".join(
+        f'EXISTS (SELECT 1 FROM {SEED_SCHEMA}."{table.name}")' for table in tables
+    ))).one()
+    for table, has_rows in zip(tables, populated):  # 依赖序，父表先插
+        if not has_rows:
+            continue
         columns = ", ".join(f'"{column.name}"' for column in table.columns)
         connection.execute(
             text(

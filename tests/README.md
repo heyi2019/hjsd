@@ -106,7 +106,7 @@ tests/
 cd backend
 .venv/bin/python3 run_regression.py smoke        # 提交前（契约 + 编号 + 状态机 + 金额守卫）
 .venv/bin/python3 run_regression.py unit         # 秒级
-.venv/bin/python3 run_regression.py changed      # 按 git 变更反查分组
+.venv/bin/python3 run_regression.py changed      # 按变更选择测试文件或业务组
 .venv/bin/python3 run_regression.py <域>         # orders / finance / parties / …
 .venv/bin/python3 run_regression.py all          # 全量（发版前）
 .venv/bin/python3 run_regression.py ci          # 后端全量回归
@@ -148,14 +148,14 @@ pytest 已把传递依赖展开进 `item.fixturenames`，`conftest.py` 的 `pyte
 
 ```text
 cd frontend
-npm run test:fast            # 纯逻辑与静态守卫
+npm run test:fast            # 纯逻辑与静态守卫；需要浏览器的文件显式使用 jsdom
 npm run test:quick           # 常用路径冒烟
 npm run test:react           # 组件与页面
 npm run test:react-deep      # 较重的交互用例
 npm run test:full            # fast + quick + react
 npm run test:full:all        # 四档前端全量，含 react-deep
 npm run test:panel business  # 只跑某区域：tests/frontend/<unit|module>/business
-npm run test:changed         # 按 git 变更自动选区域
+npm run test:changed         # 按 git 变更自动选择文件或区域
 npm run test:e2e             # Playwright + 真实后端 + 每轮独立临时库
 ```
 
@@ -169,7 +169,7 @@ CI（`frontend-gate`）默认按变更选测：`workflow_dispatch` 传 `full_sui
 后端 CI（`backend-gate`）同样默认按 `main-ci-cd` 注入的「原始 push 范围」路径集选测：
 `workflow_dispatch` 传 `full_suite=true` → `ci` 全量（发版收口/里程碑）；
 命中核心、共享、配置、测试基建或跨模块取数路径，以及 `backend/` 下无法归入业务域的改动
-→ 自动降级全量；其余按业务域选组，且每轮固定附 `smoke` + `unit` 秒级资产守卫
+→ 自动降级全量；源码变更按业务域选组，已登记的后端测试文件变更直接选该文件，且每轮固定附 `smoke` + `unit` 资产守卫
 （分组覆盖 / 承诺归属 / 清单一致性）；无后端业务变更 → 只跑 `smoke` + `unit`，不静默跳过。
 PR 与手动 dispatch 未带路径集仍走原分层策略。命令形态：
 `run_regression.py changed --backend-only --changed-paths <逗号分隔路径>`，

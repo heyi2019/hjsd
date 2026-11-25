@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { buildEventEdits, buildFinanceEdits, buildOrderEdits } from "@/business/shared/order_detail/editing/execution-edit-payload";
 import { propagateSharedOrderExtra, sharedOrderIdsForEdit } from "@/business/shared/order_detail/editing/editor-utils";

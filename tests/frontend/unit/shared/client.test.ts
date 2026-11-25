@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import axios, { type AxiosAdapter } from "axios";
 import { cashflowsApi } from "@/shared/api/cashflows.api";

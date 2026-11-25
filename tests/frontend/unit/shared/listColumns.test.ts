@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /** applyColumnConfig：按列表列配置过滤 + 排序的纯函数。
  *  口径：无配置原样返回；未知列视为可见并排末尾；隐藏列剔除。 */
 import { describe, expect, it } from "vitest";

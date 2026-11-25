@@ -66,7 +66,6 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    setupFiles: ["tests/config/setup.ts"],
     // 单个用例超时放宽：写路径重型用例（大量 userEvent 交互 + antd Modal）临界耗时较长，
     // 资源紧张时易被拖超；给 60s 余量避免偶发误判。
     testTimeout: 60000,
@@ -109,6 +108,9 @@ export default defineConfig({
           // 否则报 "Provide unique 'sequence.groupOrder' for them"。
           sequence: { groupOrder: 1 },
           include: fastTests,
+          // 纯逻辑与脚本测试不需要 jsdom；浏览器行为用例在文件内显式启用 jsdom。
+          environment: "node",
+          setupFiles: ["tests/config/setup-fast.ts"],
           pool: "forks",
           maxWorkers: 3,
           minWorkers: 1,
@@ -121,6 +123,7 @@ export default defineConfig({
           name: "quick",
           sequence: { groupOrder: 2 },
           include: quickTests,
+          setupFiles: ["tests/config/setup.ts"],
           // [2026-11-04 实测] forks → threads：8 文件 / 88 例 27.20s → 19.28s（-29%）。
           // quick 层只有 8 个文件，forks 每个文件起一个进程，Node+jsdom 冷启动成本占大头；
           // threads 复用同一进程池，本层用例之间没有跨文件模块状态依赖。
@@ -136,6 +139,7 @@ export default defineConfig({
         test: {
           name: "react",
           sequence: { groupOrder: 3 },
+          setupFiles: ["tests/config/setup.ts"],
           include: ["tests/frontend/**/*.{test,spec}.{ts,tsx}"],
           // react 层的 include 覆盖整个 tests/frontend，故必须显式排掉 fast/quick 与 .deep：
           //   - 漏排 fast/quick → 同一文件双跑，四层计数静默错位（manifest-parity 会红）
@@ -159,6 +163,7 @@ export default defineConfig({
         test: {
           name: "react-deep",
           sequence: { groupOrder: 4 },
+          setupFiles: ["tests/config/setup.ts"],
           include: ["tests/frontend/**/*.deep.test.{ts,tsx}"],
           // 与 react 同构的 threads 池，但 worker 数按核数取 1/4（8 核 → 2）。
           // [2026-11-04 实测] 单 worker 45.77s → 2 worker 34.08s（-26%），4 worker 32.65s（边际很小）。

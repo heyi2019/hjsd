@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { depositsApi } from "@/shared/api/deposits.api";
 import { reconciliationsApi } from "@/shared/api/reconciliations.api";

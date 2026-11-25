@@ -5,10 +5,11 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select, text
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import NotFound, Validation
+from app.domain.base import Base
 from app.domain.enums import PoolStatus
 from app.domain.foundation import OrderTypeDef
 from app.settings.field_definitions import seeds
@@ -32,6 +33,36 @@ from app.shared.numbering import ensure_sequence, peek_number
 
 def _pool(seeded_db, code: str, **kwargs):
     return create_pool(seeded_db, name=f"池-{code}", actor="pytest", **kwargs)
+
+
+def test_seed_replay_copies_current_rows_without_writing_empty_tables(db, seed_template, request):
+    """种子回放保留所有数据，且不会逐表写入空表。"""
+    db.execute(text(
+        "INSERT INTO seed_template.teams (id, code, name, is_active) "
+        "VALUES (999999, 'seed-replay-probe', '回放验证', true)"
+    ))
+    connection = db.connection()
+    inserts = []
+
+    def record_insert(_conn, _cursor, statement, _params, _context, _many):
+        if statement.lstrip().upper().startswith("INSERT INTO PUBLIC."):
+            inserts.append(statement)
+
+    event.listen(connection, "before_cursor_execute", record_insert)
+    try:
+        replayed = request.getfixturevalue("seeded_db")
+    finally:
+        event.remove(connection, "before_cursor_execute", record_insert)
+
+    comparisons = " UNION ALL ".join(
+        f'''SELECT '{table.name}', (SELECT count(*) FROM seed_template."{table.name}"), '''
+        f'''(SELECT count(*) FROM public."{table.name}")'''
+        for table in Base.metadata.sorted_tables
+    )
+    counts = replayed.execute(text(comparisons)).all()
+    assert all(expected == actual for _, expected, actual in counts)
+    assert replayed.execute(text("SELECT code FROM public.teams WHERE id = 999999")).scalar_one() == "seed-replay-probe"
+    assert len(inserts) <= sum(expected > 0 for _, expected, _ in counts)
 
 
 class TestPoolGuards:

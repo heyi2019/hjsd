@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { findCancelableBuy } from "@/business/inventory/InventoryPanel/helpers";
 import type { AccountExecutionDetail } from "@/shared/api/types/account-execution";

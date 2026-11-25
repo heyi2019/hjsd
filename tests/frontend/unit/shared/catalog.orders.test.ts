@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 受控 axios mock：transport 按 params.offset/limit 从一个共 627 条的数据集切片返回，

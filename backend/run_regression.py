@@ -491,7 +491,7 @@ def is_structural_change(paths: list[str]) -> bool:
     for path in paths:
         if any(path.startswith(x) for x in STRUCTURAL_PREFIXES):
             return True
-        if path.startswith("frontend/"):
+        if path.startswith(("frontend/", "tests/frontend/", "tests/e2e/", "tests/fixtures/")):
             continue
         if path.startswith("tests/backend/"):
             # 被删除或迁走的测试没有当前分组可供反查，无法安全判断影响范围。
@@ -514,11 +514,14 @@ def groups_for_changes(paths: list[str]) -> list[str]:
         for test_path in test_paths
     }
     for path in paths:
-        if path.startswith("frontend/"):
+        if path.startswith(("frontend/", "tests/frontend/", "tests/e2e/", "tests/fixtures/")):
             continue
         if path.startswith("tests/backend/"):
             if path in test_groups:
                 selected.add(test_groups[path])
+            elif any(path in GROUPS[group] for group in CROSSCUT_GROUPS):
+                # 横切守卫可能仅属于 smoke/unit/p0，本身已登记且无需反查业务组。
+                continue
             else:
                 # 旧行为是「退化成跑全部非横切组」——多跑，不报错，于是 GROUPS 里
                 # 写错/漏写的路径永远不会被发现（搬目录时 141 条路径全变，靠这条
@@ -688,16 +691,24 @@ def main() -> int:
             paths = all_paths()
             label = f"ci（结构性变更降级全量；来源={source}）"
         else:
-            selected = groups_for_changes(paths_changed)
-            if not selected:
-                # 静默跳过等于没有门禁：无业务变更 / 仅前端变更时跑秒级冒烟 + 资产守卫。
-                selected = ["smoke", "unit"]
+            changed_tests = list(dict.fromkeys(
+                path for path in paths_changed if path.startswith("tests/backend/")
+            ))
+            # 保留测试文件必须登记分组的守卫，但文件自身变化不再扩展整组。
+            groups_for_changes(changed_tests)
+            selected = groups_for_changes([
+                path for path in paths_changed if not path.startswith("tests/backend/")
+            ])
+            is_ci = bool(os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"))
+            if changed_tests and not selected and not is_ci:
+                paths = changed_tests
+                label = f"changed（本地测试文件；来源={source}）"
             else:
-                # 横切守卫（分组覆盖 / 承诺归属 / 清单一致性）秒级，每轮都带上，
-                # 保证选测不会让测试资产漂移无人发现。
+                # CI 和源码变更保留横切守卫；没有后端业务变更时仍运行冒烟。
                 selected = ["smoke", "unit", *selected]
-            paths = unique_paths(selected)
-            label = f"changed（{', '.join(selected)}；来源={source}）"
+                paths = unique_paths(selected)
+                paths.extend(path for path in changed_tests if path not in paths)
+                label = f"changed（{', '.join(selected)}；来源={source}）"
         print(f"按变更自动选择：{label}")
         if args.list:
             if frontend_changed and not args.backend_only:

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 在 jsdom 下用受控的 axios mock 验证 GET 缓存层三行为：

@@ -6,6 +6,10 @@ import { fileURLToPath } from "node:url";
 // HERE = <repo>/tests/frontend/unit/system
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
 
+it("快速层的纯脚本测试运行在 Node 环境", () => {
+  expect(typeof document).toBe("undefined");
+});
+
 describe("开发服务器 API 转发", () => {
   it("将同源 /api 请求转给本机后端", () => {
     // 直接读配置源文件，避免 jsdom 的 TextEncoder shim 干扰 Vite/esbuild 的加载。

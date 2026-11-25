@@ -1,6 +1,6 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Typography } from "antd";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { errorMessage } from "../../shared/api/client";
 import { teamsApi, usersApi } from "../../shared/api/org.api";
 import { poolsApi } from "../../shared/api/pools.api";
@@ -74,7 +74,16 @@ export function UsersPanel() {
   const rows = loaded?.rows ?? [];
   const teams = loaded?.teams ?? [];
   const pools = loaded?.pools ?? [];
-  const submit = async (values: Record<string, string>) => { try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await reload(); } catch (err) { appMessage.error(errorMessage(err)); } };
+  const createInFlight = useRef(false);
+  const [creating, setCreating] = useState(false);
+  const submit = async (values: Record<string, string>) => {
+    if (createInFlight.current) return;
+    createInFlight.current = true;
+    setCreating(true);
+    try { await usersApi.create(values); appMessage.success("用户已创建"); form.resetFields(); await reload(); }
+    catch (err) { appMessage.error(errorMessage(err)); }
+    finally { createInFlight.current = false; setCreating(false); }
+  };
   const updateUser = async (values: Record<string, string>) => {
     if (!editing) return;
     try { await usersApi.update(editing.id, values); appMessage.success("用户信息已更新"); setEditing(null); await reload(); }
@@ -137,7 +146,7 @@ export function UsersPanel() {
       <Form.Item name="owner_scope" initialValue="SELF"><Select options={scopeOptions} aria-label="数据范围" className="ui-control-width-100" /></Form.Item>
       <Form.Item name="team_ids"><Select mode="multiple" aria-label="所属团队" options={teams.filter((team) => team.is_active).map((team) => ({ value: team.id, label: team.name }))} onOpenChange={(open) => { if (open) void refreshOptions("teams"); }} placeholder="所属团队" className="ui-control-min-180" /></Form.Item>
       <Form.Item name="pool_ids"><Select mode="multiple" aria-label="可见资金账户" options={pools.filter((pool) => pool.status === "ACTIVE").map((pool) => ({ value: pool.id, label: pool.name }))} onOpenChange={(open) => { if (open) void refreshOptions("pools"); }} placeholder="可见资金账户" className="ui-control-min-180" /></Form.Item>
-      <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={Boolean(loadError)}>新增用户</PermissionButton>
+      <PermissionButton permission="user.manage" type="primary" htmlType="submit" loading={creating} disabled={Boolean(loadError) || creating}>新增用户</PermissionButton>
     </BusinessRegistrationForm>
     <BusinessActionModal title={`编辑用户：${editing?.username ?? ""}`} fieldCount={6} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={() => editForm.submit()} destroyOnHidden>
       <BusinessRegistrationForm

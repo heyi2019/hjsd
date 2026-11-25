@@ -1,6 +1,6 @@
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input } from "antd";
-import { useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import { normalizeError } from "../../shared/api/client";
 import { teamsApi } from "../../shared/api/org.api";
 import type { Team } from "../../shared/api/types/org";
@@ -17,13 +17,19 @@ export function TeamsPanel() {
   const { data: loadedRows, loading, error, reload } = useSettingsResource(load, { onError: handleLoadError });
   useReferenceRefresh("teams", reload, true);
   const rows = loadedRows ?? [];
+  const createInFlight = useRef(false);
+  const [creating, setCreating] = useState(false);
   const submit = async (values: Record<string, string>) => {
+    if (createInFlight.current) return;
+    createInFlight.current = true;
+    setCreating(true);
     try {
       await teamsApi.create(values);
       appMessage.success("团队已创建");
       form.resetFields();
       await reload();
     } catch (err) { appMessage.error(normalizeError(err).message); }
+    finally { createInFlight.current = false; setCreating(false); }
   };
   const toggle = async (team: Team) => { try { await teamsApi.update(team.id, { is_active: !team.is_active }); appMessage.success(team.is_active ? "团队已停用" : "团队已启用"); await reload(); } catch (err) { appMessage.error(normalizeError(err).message); } };
   return <Card className="glass" title="团队管理">
@@ -57,7 +63,7 @@ export function TeamsPanel() {
     <BusinessRegistrationForm form={form} layout="inline" onFinish={submit}>
       <Form.Item name="name" rules={[{ required: true }]}><Input placeholder="团队名称" /></Form.Item>
       <Form.Item name="description"><Input placeholder="说明（可选）" /></Form.Item>
-      <PermissionButton permission="user.manage" type="primary" htmlType="submit" disabled={loading || Boolean(error)}>新增团队</PermissionButton>
+      <PermissionButton permission="user.manage" type="primary" htmlType="submit" loading={creating} disabled={loading || Boolean(error) || creating}>新增团队</PermissionButton>
     </BusinessRegistrationForm>
   </Card>;
 }

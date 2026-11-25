@@ -1,5 +1,5 @@
 import { Button, Card, Form, Input } from "antd";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { errorMessage } from "../../shared/api/client";
 import { useSession } from "../../shared/state/session";
 import { LoginAside } from "./LoginAside";
@@ -15,12 +15,15 @@ export function ChangePasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const submitInFlight = useRef(false);
   const submit = async (values: ChangePasswordFormValues) => {
+    if (submitInFlight.current) return;
     if (values.new_password !== values.confirm_password) {
       setError("两次输入的新密码不一致");
       return;
     }
 
+    submitInFlight.current = true;
     try {
       setError(null);
       setSubmitting(true);
@@ -28,6 +31,7 @@ export function ChangePasswordPage() {
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

@@ -1,5 +1,5 @@
 import { Button, Card, Form, Input } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   checkBackendHealth,
   errorMessage,
@@ -24,7 +24,10 @@ export function LoginPage() {
     };
   }, []);
 
+  const submitInFlight = useRef(false);
   const submit = async (values: { username: string; password: string }) => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
     try {
       setError(null);
       setSubmitting(true);
@@ -32,6 +35,7 @@ export function LoginPage() {
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

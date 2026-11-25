@@ -2,7 +2,7 @@ import { CfgGroup, CfgItem, FieldConfigScope } from "../../shared/forms/Configur
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Checkbox, Form, Input, InputNumber, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { gameTypesApi } from "../../shared/api/misc.api";
 import type { GameTypeOption } from "../../shared/api/types/org";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
@@ -23,7 +23,12 @@ export function GameTypeSettingsPanel() {
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
 
+  const submitInFlight = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
   const submit = async (values: { game_type_name: string; sort_order?: number; is_default?: boolean; channel_regions?: Array<{ value?: string; label: string }> }) => {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+    setSubmitting(true);
     try {
       const previous = rows.find((row) => row.id === editingId);
       const payload = { name: values.game_type_name, sort_order: Number(values.sort_order ?? previous?.sort_order ?? 0), channel_regions: (values.channel_regions ?? previous?.channel_regions ?? []).map((item) => ({ ...(item.value ? { value: item.value } : {}), label: item.label.trim() })).filter((item) => item.label) };
@@ -41,6 +46,9 @@ export function GameTypeSettingsPanel() {
       await reload();
     } catch (err) {
       setMutationError(normalizeError(err));
+    } finally {
+      submitInFlight.current = false;
+      setSubmitting(false);
     }
   };
 
@@ -54,13 +62,18 @@ export function GameTypeSettingsPanel() {
     form.resetFields();
   };
 
+  const runInFlight = useRef(false);
   const run = async (action: () => Promise<unknown>) => {
+    if (runInFlight.current) return;
+    runInFlight.current = true;
     try {
       await action();
       setMutationError(null);
       await reload();
     } catch (err) {
       setMutationError(normalizeError(err));
+    } finally {
+      runInFlight.current = false;
     }
   };
 
@@ -182,7 +195,7 @@ export function GameTypeSettingsPanel() {
               </CfgItem>
             ) : null}
             <Form.Item>
-              <PermissionButton permission="order-type.manage" type="primary" htmlType="submit">
+              <PermissionButton permission="order-type.manage" type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
                 {editingId === null ? "新增游戏类型" : "保存游戏类型"}
               </PermissionButton>
             </Form.Item>

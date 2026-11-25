@@ -2,7 +2,7 @@ import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField"
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Form, Input, Space, Switch, Typography, InputNumber } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { orderTypesApi } from "../../shared/api/orders.api";
 import type { OrderType } from "../../shared/api/types/orders";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
@@ -30,7 +30,12 @@ export function OrderTypesPanel() {
     catch (err) { setMutationError(normalizeError(err)); }
   };
 
+  const createInFlight = useRef(false);
+  const [creating, setCreating] = useState(false);
   const create = async (values: Record<string, unknown>) => {
+    if (createInFlight.current) return;
+    createInFlight.current = true;
+    setCreating(true);
     try {
       await orderTypesApi.create({
         code: String(values.code).trim().toUpperCase(),
@@ -46,10 +51,15 @@ export function OrderTypesPanel() {
       setMutationError(null);
       await reload();
     } catch (err) { appMessage.error(normalizeError(err).message); }
+    finally { createInFlight.current = false; setCreating(false); }
   };
 
+  const updateInFlight = useRef(false);
+  const [updating, setUpdating] = useState(false);
   const update = async (values: Record<string, unknown>) => {
-    if (!editTarget) return;
+    if (!editTarget || updateInFlight.current) return;
+    updateInFlight.current = true;
+    setUpdating(true);
     try {
       await orderTypesApi.update(editTarget.id, {
         name: values.name as string,
@@ -63,6 +73,7 @@ export function OrderTypesPanel() {
       setMutationError(null);
       await reload();
     } catch (err) { setMutationError(normalizeError(err)); }
+    finally { updateInFlight.current = false; setUpdating(false); }
   };
 
   const columns: ColumnsType<OrderType> = [
@@ -129,6 +140,8 @@ export function OrderTypesPanel() {
         onCancel={() => setCreateOpen(false)}
         okText="创建"
         onOk={() => void createForm.submit()}
+        confirmLoading={creating}
+        okButtonProps={{ disabled: creating }}
       >
         <FieldConfigScope scope="SYSORDER" active={true}><BusinessRegistrationForm
           layout="horizontal"
@@ -158,7 +171,7 @@ export function OrderTypesPanel() {
           </CfgItem>
         </BusinessRegistrationForm></FieldConfigScope>
       </BusinessActionModal>
-      <BusinessActionModal title={editTarget ? `编辑业务类型 · ${editTarget.code}` : "编辑业务类型"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => { setEditTarget(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
+      <BusinessActionModal title={editTarget ? `编辑业务类型 · ${editTarget.code}` : "编辑业务类型"} fieldCount={5} open={Boolean(editTarget)} onCancel={() => { setEditTarget(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} confirmLoading={updating} okButtonProps={{ disabled: updating }} okText="保存">
         <FieldConfigScope scope="SYSORDER" active={true}><BusinessRegistrationForm
           layout="horizontal"
           labelAlign="left"

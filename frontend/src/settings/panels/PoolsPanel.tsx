@@ -2,7 +2,7 @@ import { CfgItem, FieldConfigScope } from "../../shared/forms/ConfigurableField"
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Card, Form, Input, Space, Switch, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { poolsApi } from "../../shared/api/pools.api";
 import type { Pool } from "../../shared/api/types/finance";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
@@ -36,7 +36,12 @@ export function PoolsPanel() {
     await reload();
   }, [reload]);
 
+  const createInFlight = useRef(false);
+  const [creating, setCreating] = useState(false);
   const submit = async (values: Record<string, unknown>) => {
+    if (createInFlight.current) return;
+    createInFlight.current = true;
+    setCreating(true);
     try {
       await poolsApi.create({
         name: values.name as string,
@@ -49,6 +54,9 @@ export function PoolsPanel() {
       await reload();
     } catch (err) {
       setMutationError(normalizeError(err));
+    } finally {
+      createInFlight.current = false;
+      setCreating(false);
     }
   };
 
@@ -68,8 +76,12 @@ export function PoolsPanel() {
     }
   };
 
+  const updateInFlight = useRef(false);
+  const [updating, setUpdating] = useState(false);
   const update = async (values: Record<string, unknown>) => {
-    if (!editing) return;
+    if (!editing || updateInFlight.current) return;
+    updateInFlight.current = true;
+    setUpdating(true);
     try {
       await poolsApi.update(editing.id, {
         name: values.name as string,
@@ -83,6 +95,9 @@ export function PoolsPanel() {
       await reload();
     } catch (err) {
       setMutationError(normalizeError(err));
+    } finally {
+      updateInFlight.current = false;
+      setUpdating(false);
     }
   };
 
@@ -140,13 +155,13 @@ export function PoolsPanel() {
             <Switch checkedChildren="默认" unCheckedChildren="否" />
           </CfgItem>
           <Form.Item>
-            <PermissionButton permission="pool.manage" type="primary" htmlType="submit" disabled={Boolean(error)}>
+            <PermissionButton permission="pool.manage" type="primary" htmlType="submit" loading={creating} disabled={Boolean(error) || creating}>
               新增资金账户
             </PermissionButton>
           </Form.Item>
         </BusinessRegistrationForm></FieldConfigScope>
       </PermissionGate>
-      <BusinessActionModal title={editing ? `编辑资金账户 · ${editing.code}` : "编辑资金账户"} fieldCount={5} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} okText="保存">
+      <BusinessActionModal title={editing ? `编辑资金账户 · ${editing.code}` : "编辑资金账户"} fieldCount={5} open={Boolean(editing)} onCancel={() => { setEditing(null); editForm.resetFields(); }} onOk={() => void editForm.submit()} confirmLoading={updating} okButtonProps={{ disabled: updating }} okText="保存">
         <InlineError error={editing ? error : null} />
         <FieldConfigScope scope="SYSPOOL" active={true}><BusinessRegistrationForm
           layout="horizontal"

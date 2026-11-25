@@ -1,7 +1,7 @@
 /** 用户中心：当前账号信息、修改用户名和修改密码。 */
 import { appMessage } from "../../shared/ui/appFeedback";
 import { Button, Card, Form, Input } from "antd";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ErrorBanner } from "../../shared/ui";
 import { normalizeError } from "../../shared/api/client";
 import { DEV_ROLES, ROLE_PERMISSIONS, useSession } from "../../shared/state/session";
@@ -18,7 +18,10 @@ export function UserCenterPage() {
   const roleLabel = DEV_ROLES.find((r) => r.value === role)?.label ?? "未设置角色";
   const permissions = ROLE_PERMISSIONS[role] ?? [];
 
+  const usernameInFlight = useRef(false);
   const submitUsername = async (values: { username: string; current_password: string }) => {
+    if (usernameInFlight.current) return;
+    usernameInFlight.current = true;
     setUsernameError(null);
     setSavingUsername(true);
     try {
@@ -28,15 +31,19 @@ export function UserCenterPage() {
     } catch (err) {
       setUsernameError(normalizeError(err));
     } finally {
+      usernameInFlight.current = false;
       setSavingUsername(false);
     }
   };
 
+  const submitInFlight = useRef(false);
   const submit = async (values: { old_password: string; new_password: string; confirm_password: string }) => {
+    if (submitInFlight.current) return;
     if (values.new_password !== values.confirm_password) {
       setError({ message: "两次输入的新密码不一致" });
       return;
     }
+    submitInFlight.current = true;
     try {
       setError(null);
       setSubmitting(true);
@@ -47,6 +54,7 @@ export function UserCenterPage() {
       // 出错保留已填内容（含旧密码），仅顶部横幅提示，不清空表单。
       setError(normalizeError(err));
     } finally {
+      submitInFlight.current = false;
       setSubmitting(false);
     }
   };

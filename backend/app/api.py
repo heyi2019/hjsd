@@ -6,11 +6,13 @@
 """
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from uuid import uuid4
@@ -133,7 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_exception_handlers(app)
 
     @app.middleware("http")
-    async def request_context_middleware(request: Request, call_next):
+    async def request_context_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         incoming = request.headers.get("X-Request-ID", "").strip()
         request_id = (
             incoming

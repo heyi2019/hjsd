@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 
+from collections.abc import Sequence
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.domain.trade import InstallmentSchedule, Order
+from app.domain.trade import Installment, InstallmentSchedule, Order
 from app.business.installments import schemas
 from app.business.installments import queries as inst_queries
 from app.business.installments import action_availability as actions
@@ -25,7 +28,7 @@ INSTALLMENT_DETAIL_EXPORT_COLUMNS = [
     ("installment_dispositions", "处置记录", True),
 ]
 
-def _schedule_output(row, contract_status: str) -> schemas.ScheduleOut:
+def _schedule_output(row: InstallmentSchedule, contract_status: str) -> schemas.ScheduleOut:
     return schemas.ScheduleOut.model_validate({
         **row.__dict__,
         "available_actions": actions.available_schedule_actions(
@@ -35,7 +38,7 @@ def _schedule_output(row, contract_status: str) -> schemas.ScheduleOut:
     })
 
 
-def _operation_output(row, installment_id: int, historical_periods: dict[tuple[int, int], int]) -> schemas.OperationOperatorOut:
+def _operation_output(row: Any, installment_id: int, historical_periods: dict[tuple[int, int], int]) -> schemas.OperationOperatorOut:
     parts = row.operation_key.split(":")
     period_no = None
     flow_no = None
@@ -53,7 +56,7 @@ def _operation_output(row, installment_id: int, historical_periods: dict[tuple[i
 
 def _installment_outputs(
     db: Session,
-    items,
+    items: Sequence[Installment],
     *,
     include_details: bool = False,
 ) -> list[schemas.InstallmentOut]:
@@ -115,5 +118,5 @@ def _installment_outputs(
         for item in items
     ]
 
-def _installment_output(db: Session, item) -> schemas.InstallmentOut:
+def _installment_output(db: Session, item: Installment) -> schemas.InstallmentOut:
     return _installment_outputs(db, [item])[0]

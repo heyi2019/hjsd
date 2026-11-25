@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import CurrentUser, PERM_AUDIT_READ, PERM_FINANCE_READ
 from app.domain.foundation import AuditLog
-from app.domain.trade import Account, Order
+from app.domain.trade import Account, Cashflow, Order
 from app.domain.users import User
 from app.shared.order_access import get_order
 from app.shared.scope import owner_scope_filter
@@ -58,7 +58,7 @@ def _assemble_order_execution_detail(
     relations = preloaded.relations if preloaded is not None else load_relations(db, orders)
     context = preloaded.context if preloaded is not None else load_event_context(db, [order.id])
     all_events = context.events_by_order.get(order.id, [])
-    def flow_visible(flow) -> bool:
+    def flow_visible(flow: Cashflow | None) -> bool:
         return flow is not None and user.has(PERM_FINANCE_READ) and flow.pool_id is not None and user.can_see_pool(flow.pool_id)
 
     events = {order.id: [event.model_copy(update={

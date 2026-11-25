@@ -82,7 +82,7 @@ def _literal_cell(sheet: Worksheet, *, row: int, column: int, value: Any):
     return cell
 
 
-def _style_group_cell(cell, fill: PatternFill) -> None:
+def _style_group_cell(cell: WriteOnlyCell[Any], fill: PatternFill) -> None:
     cell.fill = fill
     cell.font = _HEADER_FONT
     cell.alignment = _HEADER_ALIGN

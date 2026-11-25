@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from datetime import date, datetime, time, timedelta
 from typing import Any
 
+from sqlalchemy import Select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
@@ -18,7 +19,7 @@ CONTACT_FIELDS: tuple[str, ...] = ("contact_name", "phone", "wechat", "qq", "not
 _UNSET = object()
 
 
-def apply_created_range(stmt, column, created_from: date | None, created_to: date | None):
+def apply_created_range(stmt: Select[Any], column: Any, created_from: date | None, created_to: date | None) -> Select[Any]:
     if created_from is not None:
         stmt = stmt.where(column >= datetime.combine(created_from, time.min))
     if created_to is not None and created_to < date.max:

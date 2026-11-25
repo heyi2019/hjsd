@@ -19,7 +19,7 @@
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Any
 
@@ -91,7 +91,7 @@ def set_allocations(
     if order.status != OrderStatus.COMPLETED.value:
         raise Validation("订单售出完成后才能配置分润", details={"order_id": order_id})
 
-    def snapshot(rows):
+    def snapshot(rows: Sequence[dict[str, Any]]) -> frozenset[tuple]:
         return frozenset((row["user_id"], row["role"], row["allocation_type"], row["allocation_rate"], row["allocation_amount"]) for row in rows)
 
     previous_allocations = snapshot(collect_allocations(session, order))

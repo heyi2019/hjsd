@@ -8,20 +8,20 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
-from app.domain.trade import Cashflow, OrderEvent
+from app.domain.trade import Cashflow, Order, OrderEvent
 from app.domain.users import User
 from app.business.orders import schemas
 from app.business.orders.output_labels import _selected_operator_label
 
 
-def _apply_common_output(output, order):
+def _apply_common_output(output: schemas.OrderOut, order: Order) -> schemas.OrderOut:
     """回显订单表单扩展值与账号快照。"""
     # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
     output.extra_values = dict(order.form_extra or {})
     return output
 
 
-def _order_output(order) -> schemas.OrderOut:
+def _order_output(order: Order) -> schemas.OrderOut:
     """输出订单详情。"""
     output = schemas.OrderOut.model_validate(order)
     return _apply_common_output(output, order)

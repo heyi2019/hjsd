@@ -1,14 +1,17 @@
 """field_definitions.router 输出装配 helper（资金账户 / 业务类型）。"""
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
+from app.domain.foundation import Pool
 from app.settings.field_definitions import schemas
 from app.settings.field_definitions.classification import classification_for_order_type
 from app.shared.form_values import get_extra_values
 
 
-def _pool_output(db: Session, pool) -> schemas.PoolOut:
+def _pool_output(db: Session, pool: Pool) -> schemas.PoolOut:
     output = schemas.PoolOut.model_validate(pool)
     output.extra_values = get_extra_values(
         db, entity_type="pool", entity_id=pool.id
@@ -16,7 +19,7 @@ def _pool_output(db: Session, pool) -> schemas.PoolOut:
     return output
 
 
-def _order_type_output(order_type) -> schemas.OrderTypeOut:
+def _order_type_output(order_type: Any) -> schemas.OrderTypeOut:
     payload = schemas.OrderTypeOut.model_validate(order_type)
     classification = classification_for_order_type(order_type.code)
     if classification:

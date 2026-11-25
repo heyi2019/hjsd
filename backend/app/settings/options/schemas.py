@@ -1,7 +1,7 @@
 """options.schemas：选项词典的请求/响应模型。"""
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import Any, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
@@ -16,7 +16,7 @@ class OptionItem(BaseModel):
     behavior: Literal["OTHER", "COMPENSATION"] | None = None
 
     @model_serializer(mode="wrap")
-    def omit_empty_behavior(self, handler):
+    def omit_empty_behavior(self, handler: Any) -> dict[str, Any]:
         result = handler(self)
         if result.get("behavior") is None:
             result.pop("behavior", None)

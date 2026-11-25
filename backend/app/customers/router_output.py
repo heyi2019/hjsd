@@ -1,22 +1,25 @@
 """customer_center.router 输出装配 helper（需求池 / 合作方）。"""
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.customers import schemas
 from app.customers._common import to_counterparty_out
-from app.domain.parties import Customer
+from app.domain.parties import Counterparty, Customer, CustomerLead
 from app.shared.form_values import get_extra_values, get_extra_values_bulk
 from app.shared.operation_operators import list_operation_operators_bulk
 
 
 def _lead_output(
     db: Session,
-    item,
+    item: CustomerLead,
     *,
     customer_display_name: str | None = None,
-    extra_values: dict | None = None,
+    extra_values: dict[str, Any] | None = None,
     operation_operators: list[schemas.LeadOperationOperatorOut] | None = None,
 ) -> schemas.LeadOut:
     if customer_display_name is None:
@@ -44,7 +47,7 @@ def _lead_output(
     return output
 
 
-def _lead_outputs(db: Session, items) -> list[schemas.LeadOut]:
+def _lead_outputs(db: Session, items: Sequence[CustomerLead]) -> list[schemas.LeadOut]:
     extras = get_extra_values_bulk(
         db, entity_type="lead", entity_ids=[item.id for item in items]
     )
@@ -74,7 +77,7 @@ def _lead_outputs(db: Session, items) -> list[schemas.LeadOut]:
     ]
 
 
-def _counterparty_output(db: Session, item) -> schemas.CounterpartyOut:
+def _counterparty_output(db: Session, item: Counterparty) -> schemas.CounterpartyOut:
     data = to_counterparty_out(
         item,
         extra_values=get_extra_values(

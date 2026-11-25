@@ -1,11 +1,13 @@
 """finance.router_output：流水、押金、返点、对账与划转的输出装配。"""
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.shared.operation_operators import list_operation_operators
-from app.domain.trade import Cashflow, Deposit, Order, RebateRecord
+from app.domain.trade import Cashflow, Deposit, Order, RebateRecord, Reconciliation
 from app.domain.foundation import BusinessOperationOperator
 from app.domain.users import User
 from app.domain.enums import CashflowSourceType
@@ -31,7 +33,7 @@ def _cashflow_outputs(db: Session, flows: list) -> list[schemas.CashflowOut]:
     return [_cashflow_out(db, flow, reversed_numbers=reversed_numbers, operator_names=operator_names) for flow in flows]
 
 
-def _cashflow_out(db: Session, flow, *, reversed_numbers: set | None = None, operator_names: dict[int, str] | None = None) -> schemas.CashflowOut:
+def _cashflow_out(db: Session, flow: Cashflow | dict[str, Any], *, reversed_numbers: set[str] | None = None, operator_names: dict[int, str] | None = None) -> schemas.CashflowOut:
     def value(key: str):
         if isinstance(flow, dict):
             return flow.get(key)
@@ -146,7 +148,7 @@ def _rebate_out(item: RebateRecord) -> schemas.RebateOut:
 
 
 def _reconciliation_out(
-    item, db: Session, *,
+    item: Reconciliation, db: Session, *,
     operation_operators: list[BusinessOperationOperator] | None = None,
 ) -> schemas.ReconciliationOut:
     if operation_operators is None:

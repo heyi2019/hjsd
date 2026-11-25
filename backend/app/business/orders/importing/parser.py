@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from io import BytesIO, StringIO
@@ -67,7 +68,7 @@ def _headers(values: tuple[str, ...], sheet: str) -> tuple[str, ...]:
     return result
 
 
-def _rows(items, headers: tuple[str, ...], sheet: str):
+def _rows(items: Iterable[tuple[int, Sequence[str]]], headers: tuple[str, ...], sheet: str) -> tuple[ImportRow, ...]:
     rows = []
     for row_number, values in items:
         if len(values) > MAX_COLUMNS:

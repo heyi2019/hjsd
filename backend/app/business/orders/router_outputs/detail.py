@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from collections import defaultdict
 import json
+from typing import Any
 
 from sqlalchemy import or_, select, tuple_
 from sqlalchemy.orm import Session
@@ -14,6 +15,7 @@ from app.domain.foundation import AuditLog, Pool
 from app.domain.trade import (
     Cashflow,
     Installment,
+    Order,
     InstallmentSchedule,
     OrderEvent,
     RebateRecord,
@@ -29,7 +31,7 @@ from app.business.orders.router_outputs._shared import (
 
 
 def _order_detail_output(
-    db: Session, order, user: CurrentUser, *, preloaded: dict | None = None
+    db: Session, order: Order, user: CurrentUser, *, preloaded: dict[str, Any] | None = None
 ) -> schemas.OrderDetailOut:
     """订单详情统一返回主字段和执行事件，避免前端再拼接隐式查询。"""
     output = schemas.OrderDetailOut.model_validate(order)

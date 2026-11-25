@@ -7,8 +7,9 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import case, func, select
+from sqlalchemy import Select, case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import to_money
@@ -21,7 +22,7 @@ from app.domain.trade import Account
 
 
 def _apply_installment_filters(
-    stmt,
+    stmt: Select[Any],
     *,
     session: Session,
     status: str | None = None,

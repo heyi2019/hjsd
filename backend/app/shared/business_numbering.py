@@ -1,6 +1,8 @@
 """面向业务的从属编号生成器。"""
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -12,7 +14,7 @@ from app.domain.trade import (
 )
 
 
-def _lock_row(session: Session, model, row_id: int) -> None:
+def _lock_row(session: Session, model: type[Any], row_id: int) -> None:
     """锁住编号所属主记录，避免并发事务同时生成同一个从属编号。"""
     session.execute(
         select(model.id).where(model.id == row_id).with_for_update()

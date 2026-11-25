@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
@@ -35,7 +35,7 @@ from app.shared.user_identity import actor_names
 from app.shared.form_values import _validate_required_extras, set_extra_values
 
 # --------------------------------------------------------------------- 合作方
-def _keyword_filter(stmt, keyword: str | None):
+def _keyword_filter(stmt: Select[Any], keyword: str | None) -> Select[Any]:
     if not keyword:
         return stmt
     pattern, escape = like_contains(keyword)

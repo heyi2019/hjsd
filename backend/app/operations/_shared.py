@@ -12,6 +12,7 @@ from typing import Any
 from app.core.errors import Validation
 from app.core.security import CurrentUser
 from app.shared.scope import owner_scope_filter
+from sqlalchemy import Select
 from sqlalchemy.orm import Session
 from app.domain.trade import Order
 from app.shared.order_amounts import cashflow_buckets_by_order
@@ -69,7 +70,7 @@ def _month_key(value: date) -> str:
     return f"{value.year:04d}-{value.month:02d}"
 
 
-def _apply_order_scope(stmt, user: CurrentUser | None, session: Session):
+def _apply_order_scope(stmt: Select[Any], user: CurrentUser | None, session: Session) -> Select[Any]:
     if user is None:
         return stmt
     scope = owner_scope_filter(Order.owner_id, user, session)

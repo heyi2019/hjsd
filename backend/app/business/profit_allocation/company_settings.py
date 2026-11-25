@@ -12,8 +12,7 @@ from app.core.errors import Validation
 from app.domain.options import OptionSet
 from app.domain.enums import AuditAction
 from app.shared.audit import record_audit
-
-COMPANY_PROFIT_CODE = "COMPANY_PROFIT_SHARE"
+from app.shared.fixed_option_codes import COMPANY_PROFIT_CODE
 
 
 @dataclass(frozen=True)

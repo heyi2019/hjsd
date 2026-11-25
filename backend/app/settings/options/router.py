@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.errors import AppError, ErrorCode, Validation
 from app.shared.business_period import PERIOD_CONFIG_CODE
-from app.business.profit_allocation.company_settings import COMPANY_PROFIT_CODE
+from app.shared.fixed_option_codes import COMPANY_PROFIT_CODE, REMINDER_CODE
 from app.core.security import (
     PERM_FIELD_DEFINITION_MANAGE,
     PERM_OPTION_SET_MANAGE,
@@ -36,7 +36,7 @@ from app.settings.options.custom_dictionaries import (
     delete_custom_dictionary,
     list_custom_dictionaries,
 )
-from app.workbench.reminder_config import REMINDER_CODE, validate_reminder_options
+from app.shared.reminder_config import validate_reminder_options
 
 router = APIRouter(tags=["option-sets"])
 

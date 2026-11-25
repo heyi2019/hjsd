@@ -30,6 +30,7 @@ REGISTRY: dict[str, str] = {
     "business_numbering": "业务编号发放，business/finance 共用",
     "business_period": "业务期间口径，settings(期末日配置)与 workbench(看板)共用",
     "form_field_rules": "表单字段校验规则，business/finance 共用",
+    "fixed_option_codes": "固定 OptionSet 编码常量，business(公司分润)/settings(选项字典)/workbench(提醒) 共用",
     "form_field_value": "单值校验纯函数，经 form_values/form_field_rules 间接服务多域",
     "form_values": "form_extra 读写，business/customers/finance/operations/settings 共用",
     "game_references": "游戏与渠道编码、历史名称映射，business/settings 共用",
@@ -42,6 +43,7 @@ REGISTRY: dict[str, str] = {
     "option_snapshots": "字典编码与历史名称解析，订单及设置导出共用",
     "order_access": "订单只读访问，business/finance 共用",
     "order_amounts": "订单收入/支出/利润唯一权威，business/customers/finance/operations 共用",
+    "reminder_config": "业务提醒配置读写与校验，settings(选项字典)/workbench(通知与看板) 共用",
     "scope": "数据范围判定，六个业务域全量共用",
     "user_identity": "登录改名前后的历史操作人归属，供 business、customers、finance、settings、workbench 共用",
 }

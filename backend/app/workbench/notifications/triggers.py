@@ -16,7 +16,7 @@ from app.domain.enums import OrderStatus
 from app.domain.trade import Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
 from app.shared.user_identity import user_id_for_actor
-from app.workbench.reminder_config import read_reminder_config
+from app.shared.reminder_config import read_reminder_config
 
 from .service import PROFIT_ALLOCATED, PROFIT_PENDING, create_notification, ensure_notification
 

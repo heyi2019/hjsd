@@ -19,7 +19,7 @@ def sync_inventory_notifications_for_user(db: Session, user: CurrentUser) -> int
     if not user.has_any((PERM_ORDER_CREATE, PERM_FINANCE_READ)):
         return 0
     from app.business.inventory.inventory import _inventory_ledger_scope
-    from app.workbench.reminder_config import read_reminder_config
+    from app.shared.reminder_config import read_reminder_config
 
     # 与同用户同步/已读操作串行，同时允许通知插入时的外键 KEY SHARE，避免与编号锁死锁。
     lock_recipient(db, user.id)

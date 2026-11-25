@@ -12,7 +12,7 @@ from app.domain.enums import InstallmentContractType, InstallmentStatus
 from app.domain.notifications import Notification
 from app.domain.trade import Installment, InstallmentSchedule, Order
 from app.shared.scope import owner_scope_filter
-from app.workbench.reminder_config import read_reminder_config
+from app.shared.reminder_config import read_reminder_config
 from app.workbench.notifications.service import INSTALLMENT_OVERDUE
 from ._writes import add_numbered_notifications, lock_recipient
 

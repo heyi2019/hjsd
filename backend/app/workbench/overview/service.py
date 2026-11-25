@@ -13,7 +13,7 @@ from app.core.security import (
     CurrentUser,
 )
 from app.domain.enums import InstallmentContractType
-from app.workbench.reminder_config import read_reminder_config
+from app.shared.reminder_config import read_reminder_config
 from app.business.orders.queries import order_customer_count, workbench_order_counts
 from app.operations.reports.commission import personal_commission_total
 from app.business.inventory.inventory import dashboard_inventory_summary

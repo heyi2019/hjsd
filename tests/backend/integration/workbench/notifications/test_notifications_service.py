@@ -40,7 +40,8 @@ def _make_unread(seeded_db, **kwargs):
 
 def test_inventory_reminder_uses_default_for_noncanonical_or_out_of_range_days(seeded_db):
     from app.domain.options import OptionSet
-    from app.workbench.reminder_config import REMINDER_CODE, read_reminder_config
+    from app.shared.fixed_option_codes import REMINDER_CODE
+    from app.shared.reminder_config import read_reminder_config
 
     setting = seeded_db.scalar(select(OptionSet).where(OptionSet.code == REMINDER_CODE))
     if setting is None:
@@ -194,7 +195,7 @@ def test_pending_profit_target_uses_exact_order_and_owner_scope(seeded_client, s
 def test_inventory_reminder_respects_calendar_threshold_and_changes(seeded_db, monkeypatch):
     from app.domain.options import OptionSet
     from app.workbench.notifications import inventory
-    from app.workbench.reminder_config import REMINDER_CODE
+    from app.shared.fixed_option_codes import REMINDER_CODE
 
     class FixedDate(date):
         @classmethod

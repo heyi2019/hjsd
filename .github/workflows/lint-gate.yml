@@ -64,3 +64,9 @@ jobs:
         # 归位理由，且被 ≥2 业务域直接或传递引用，防止 shared 退化成垃圾桶层。
         working-directory: backend
         run: python scripts/check_shared_layer.py
+
+      - name: Run global no-cycle gate
+        # 补固定边清单的盲区：AST 检测模块顶层 import 的文件级强连通分量。
+        # 函数内延迟 import 是既定解耦手法，不计入环。
+        working-directory: backend
+        run: python scripts/check_no_cycles.py

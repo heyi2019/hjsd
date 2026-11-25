@@ -100,5 +100,26 @@ source_modules =
 forbidden_modules =
     app.finance
 
-# 2026-11-19 域归并后契约收敛为 3 条：子模块均随父包被既有契约覆盖，
-# 不新增禁止边（inventory/notifications/settings 六子模块均已并入对应父域）。
+# 2026-11-25：新增两条禁止边，锁死 settings 对 business / workbench 的反向依赖。
+# 背景：settings/options/router.py 原先为校验两个固定 OptionSet code 反向 import
+# 了 business.profit_allocation 与 workbench.reminder_config，形成包级双向边。
+# 归位方案：code 常量落 shared/fixed_option_codes，提醒校验落 shared/reminder_config。
+# 归位后 settings 只依赖 core/domain/shared，两条边可零豁免收紧。
+[importlinter:contract:settings-not-import-business]
+name = settings 不得依赖 business（合法方向只有 business -> settings）
+type = forbidden
+source_modules =
+    app.settings
+forbidden_modules =
+    app.business
+
+[importlinter:contract:settings-not-import-workbench]
+name = settings 不得依赖 workbench（合法方向只有 workbench -> settings）
+type = forbidden
+source_modules =
+    app.settings
+forbidden_modules =
+    app.workbench
+
+# 2026-11-19 域归并曾把契约收敛为 3 条（子模块随父包覆盖）；2026-11-25 归位
+# settings 的两条反向边后重新收紧为 5 条。全部零豁免，新增违规 import 即红。

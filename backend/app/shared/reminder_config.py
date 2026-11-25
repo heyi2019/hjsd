@@ -1,4 +1,4 @@
-"""工作台总览和库存通知共用的提醒配置。"""
+"""工作台总览和库存通知共用的提醒配置（跨域共享原语）。"""
 from __future__ import annotations
 
 from typing import Any
@@ -8,8 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.domain.options import OptionSet
 from app.core.errors import Validation
+from app.shared.fixed_option_codes import REMINDER_CODE
 
-REMINDER_CODE = "BUSINESS_OVERVIEW_REMINDERS"
 DEFAULT_REMINDERS = {
     "inventory_aging_days": 7,
     "profit_notifications_enabled": True,

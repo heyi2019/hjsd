@@ -14,7 +14,7 @@ from app.domain.options import OptionSet
 from app.domain.users import User
 from app.business.profit_allocation.service import set_allocations
 from app.workbench.notifications.service import PROFIT_ALLOCATED, PROFIT_PENDING
-from app.workbench.reminder_config import REMINDER_CODE
+from app.shared.fixed_option_codes import REMINDER_CODE
 
 
 def test_profit_notification_setting_controls_new_messages_only(seeded_db):

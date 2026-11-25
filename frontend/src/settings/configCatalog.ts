@@ -102,10 +102,18 @@ export const SETTINGS_ITEMS: SettingsItemMeta[] = [
   {
     key: "party-sources",
     label: "参与方来源",
-    summary: "维护客户来源选项",
+    summary: "维护客户来源与供货方来源选项",
     group: "MASTER",
     entityTypes: [],
-    optionSetCodes: ["CUSTOMER_SOURCE"],
+    optionSetCodes: ["CUSTOMER_SOURCE", "SUPPLIER_SOURCE"],
+  },
+  {
+    key: "studio-expense-items",
+    label: "工作室费用科目",
+    summary: "维护工作室支出使用的费用科目",
+    group: "MASTER",
+    entityTypes: [],
+    optionSetCodes: ["STUDIO_EXPENSE_ITEM"],
   },
   {
     key: "business-reminders",

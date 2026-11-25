@@ -14,6 +14,30 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.domain.base import Base
 from app.domain.base import AuditMixin
 
+CUSTOM_DICTIONARY_REGISTRY = "CUSTOM_FIELD_DICTIONARIES"
+
+
+def custom_dictionary_bindings(options: list | None) -> list[tuple[int, str]]:
+    """解析自定义字段与字典名称的关联，发现异常时拒绝覆盖原配置。"""
+    if options is None:
+        return []
+    if not isinstance(options, list):
+        raise ValueError("自定义字典配置格式不正确")
+    result: list[tuple[int, str]] = []
+    seen: set[int] = set()
+    for item in options:
+        if not isinstance(item, dict):
+            raise ValueError("自定义字典配置格式不正确")
+        value, label = item.get("value"), item.get("label")
+        if not isinstance(value, str) or not value.isascii() or not value.isdigit() or int(value) <= 0:
+            raise ValueError("自定义字典关联字段不正确")
+        if not isinstance(label, str) or not label.strip() or int(value) in seen:
+            raise ValueError("自定义字典配置重复或名称为空")
+        field_id = int(value)
+        seen.add(field_id)
+        result.append((field_id, label))
+    return result
+
 
 class OptionSet(Base, AuditMixin):
     """通用选项词典：按 code 唯一标识一组选项。"""
@@ -35,4 +59,4 @@ class OptionSet(Base, AuditMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-__all__ = ["OptionSet"]
+__all__ = ["CUSTOM_DICTIONARY_REGISTRY", "OptionSet", "custom_dictionary_bindings"]

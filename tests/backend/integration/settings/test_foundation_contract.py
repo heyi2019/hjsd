@@ -254,6 +254,52 @@ class TestFoundationApi:
         assert response.status_code == 200, response.text
         assert response.json()["name"] == "代挂API"
 
+    def test_sequences_endpoint_resolves_master_data_descriptions(self, seeded_client, seeded_db, headers):
+        from app.business.shared.form_config.form_field_admin_ops.writes import create_order_form_field
+        from app.domain.foundation import DocumentSequence
+        from app.settings.users.teams import create_team
+
+        created = seeded_client.post(
+            "/api/option-sets", json={"code": "MY_SOURCE", "label": "自定义来源"}, headers=headers,
+        )
+        assert created.status_code == 201, created.text
+        added = seeded_client.post(
+            "/api/option-sets/MY_SOURCE/items", json={"label": "来源甲"}, headers=headers,
+        )
+        assert added.status_code == 201, added.text
+        create_order_form_field(
+            seeded_db, order_type_code="CUSTOMER", field_key="extra_tag", label="自定义客户标签",
+            field_type="SELECT", options=[{"value": "", "label": "标签甲"}], actor="pytest",
+        )
+        _pool(seeded_db, "SEQ")
+        create_team(seeded_db, name="序列团队", description=None, actor="pytest")
+        seeded_db.add(DocumentSequence(
+            sequence_key="OPTION_00000000000000000000000000000000", prefix="D", padding=2, current_value=1,
+        ))
+        seeded_db.commit()
+
+        response = seeded_client.get("/api/sequences", headers=headers)
+        assert response.status_code == 200, response.text
+        rows = {row["sequence_key"]: row for row in response.json()}
+        for key, label, prefix in [
+            ("OPTION_88f31dee9b71b399bf36d804b54efa52", "自定义来源", "my_source_"),
+            ("OPTION_1033e218677090082b73a6aa10409667", "客户建档 · 自定义客户标签", "extra_tag_"),
+            ("OPTION_f71119e8a0ac3c2741de645165eebc4d", "资金账户", "pool_"),
+            ("OPTION_ca8b22d0db83a22db163b560b3e4e515", "团队", "team_"),
+        ]:
+            assert rows[key]["display_label"] == label
+            assert rows[key]["display_prefix"] == prefix
+            assert rows[key]["prefix"] == "D"
+        assert rows["OPTION_88f31dee9b71b399bf36d804b54efa52"]["next_number"] == "D02"
+        assert rows["OPTION_00000000000000000000000000000000"]["display_label"] is None
+
+        renamed = seeded_client.put(
+            "/api/option-sets/MY_SOURCE", json={"label": "已改名来源"}, headers=headers,
+        )
+        assert renamed.status_code == 200, renamed.text
+        rows = {row["sequence_key"]: row for row in seeded_client.get("/api/sequences", headers=headers).json()}
+        assert rows["OPTION_88f31dee9b71b399bf36d804b54efa52"]["display_label"] == "已改名来源"
+
     def test_sequences_endpoint_expands_at_padding_boundary(self, seeded_client, seeded_db, headers):
         from app.domain.foundation import DocumentSequence
         target = seeded_db.scalar(select(DocumentSequence).order_by(DocumentSequence.sequence_key))

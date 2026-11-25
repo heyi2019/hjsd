@@ -34,18 +34,35 @@ const HIDDEN_SEQUENCE_KEYS = new Set(["IMPORT", "QUALITY_ISSUE", "INSTALLMENT", 
 
 type SequenceRow = DocumentSequence & { group: string; label: string };
 
+const isOptionSequence = (key: string) => /^OPTION_[a-f0-9]{32}$/.test(key);
+
 const columns: ColumnsType<SequenceRow> = [
   { title: "分组", dataIndex: "group", key: "group" },
   { title: "编号类别", dataIndex: "label", key: "label" },
   {
     title: "编号格式",
     key: "format",
-    render: (_value, row) => row.sequence_key === "NOTIFICATION"
-      ? `${row.prefix} + ${row.padding} 位（上限 NTF9999）`
-      : `${row.prefix} + 至少 ${row.padding} 位`,
+    render: (_value, row) => {
+      if (isOptionSequence(row.sequence_key)) {
+        return row.prefix === "D" && row.display_prefix
+          ? `${row.display_prefix} + 至少 ${row.padding} 位`
+          : "无法识别";
+      }
+      return row.sequence_key === "NOTIFICATION"
+        ? `${row.prefix} + ${row.padding} 位（上限 NTF9999）`
+        : `${row.prefix} + 至少 ${row.padding} 位`;
+    },
   },
   { title: "当前序列值", dataIndex: "current_value", key: "current_value", align: "right" },
-  { title: "预计下一编号", dataIndex: "next_number", key: "next_number" },
+  {
+    title: "预计下一编号", dataIndex: "next_number", key: "next_number",
+    render: (_value, row) => {
+      if (!isOptionSequence(row.sequence_key)) return row.next_number;
+      return row.prefix === "D" && row.display_prefix && /^D\d+$/.test(row.next_number)
+        ? `${row.display_prefix}${row.next_number.slice(1)}`
+        : "无法识别";
+    },
+  },
 ];
 
 export function SequencesPanel() {
@@ -59,9 +76,9 @@ export function SequencesPanel() {
   const makeRow = (row: DocumentSequence, group: string): SequenceRow => ({
     ...row,
     group,
-    label: row.sequence_key === "STOCK_NO"
+    label: row.display_label ?? (row.sequence_key === "STOCK_NO"
       ? SEQUENCE_KEY_LABEL.STOCK_NO
-      : configurableLabel("SEQUENCE_KEY", row.sequence_key, SEQUENCE_KEY_LABEL),
+      : configurableLabel("SEQUENCE_KEY", row.sequence_key, SEQUENCE_KEY_LABEL)),
   });
   const sequenceRows = SEQUENCE_GROUPS.flatMap((group) => group.keys.flatMap((key) => {
     const row = byKey.get(key);
@@ -69,7 +86,7 @@ export function SequencesPanel() {
   }));
   sequenceRows.push(...rows
     .filter((row) => !coveredKeys.has(row.sequence_key) && !HIDDEN_SEQUENCE_KEYS.has(row.sequence_key))
-    .map((row) => makeRow(row, "其他／待核对")));
+    .map((row) => makeRow(row, isOptionSequence(row.sequence_key) ? "业务主数据" : "其他／待核对")));
 
   return (
     <section className="sequences-panel">

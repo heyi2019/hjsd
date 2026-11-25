@@ -22,7 +22,7 @@ export const orderFormFieldsApi = {
       .then((r) => r.data),
   create: (payload: Partial<OrderFormField>) =>
     api.post<OrderFormField>("/order-form-fields", payload).then((r) => fieldsChanged(r.data)),
-  update: (id: number, payload: Partial<OrderFormField>) =>
+  update: (id: number, payload: Partial<OrderFormField> & { expected_options?: NonNullable<OrderFormField["options"]> }) =>
     api.patch<OrderFormField>(`/order-form-fields/${id}`, payload).then((r) => fieldsChanged(r.data)),
   setActive: (id: number, active: boolean) =>
     api

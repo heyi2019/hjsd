@@ -12,6 +12,60 @@ from app.domain.trade import OrderFormField
 OPTION_SETS = "/api/option-sets"
 
 
+def test_custom_dictionary_uses_existing_field_options_and_preserves_them(client, headers, db):
+    from app.business.shared.form_config.form_field_admin_ops.writes import create_order_form_field
+
+    field = create_order_form_field(
+        db, order_type_code="CUSTOMER", field_key="preference", label="客户偏好", field_type="SELECT",
+        options=[{"value": "", "label": "原选项"}], note="保留备注", actor="pytest",
+    )
+    db.commit()
+    catalog = client.get("/api/custom-dictionaries", headers=headers).json()
+    assert any(item["field_id"] == field.id for item in catalog["available_fields"])
+
+    response = client.post("/api/custom-dictionaries", json={"label": "偏好字典", "field_id": field.id}, headers=headers)
+    assert response.status_code == 201, response.text
+    assert response.json()["field_id"] == field.id
+    catalog = client.get("/api/custom-dictionaries", headers=headers).json()
+    assert any(item["field_id"] == field.id and item["label"] == "偏好字典" for item in catalog["items"])
+    assert all(item["field_id"] != field.id for item in catalog["available_fields"])
+    registry = "/api/option-sets/CUSTOM_FIELD_DICTIONARIES"
+    assert client.put(registry, json={"options": []}, headers=headers).status_code == 422
+    assert client.post(f"{registry}/items", json={"label": "绕过关联"}, headers=headers).status_code == 422
+    assert client.delete(registry, headers=headers).status_code == 422
+    duplicate = client.post("/api/custom-dictionaries", json={"label": "另一字典", "field_id": field.id}, headers=headers)
+    assert duplicate.status_code == 422
+
+    original = [{"value": "preference_01", "label": "原选项"}]
+    assert field.options == original
+    changed = client.patch(f"/api/order-form-fields/{field.id}", json={"options": [*original, {"label": "新选项"}], "expected_options": original}, headers=headers)
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["options"] == [*original, {"value": "preference_02", "label": "新选项"}]
+    assert changed.json()["note"] == "保留备注"
+    stale = client.patch(f"/api/order-form-fields/{field.id}", json={"options": [*original, {"label": "后写入"}], "expected_options": original}, headers=headers)
+    assert stale.status_code == 409
+    assert client.delete(f"/api/order-form-fields/{field.id}", headers=headers).status_code == 422
+    assert client.delete(f"/api/custom-dictionaries/{field.id}", headers=headers).status_code == 204
+    fields = client.get("/api/order-form-fields?order_type_code=CUSTOMER", headers=headers).json()
+    assert next(item for item in fields if item["id"] == field.id)["options"] == changed.json()["options"]
+
+
+def test_custom_dictionary_requires_eligible_field_and_permissions(client, headers, viewer_headers, db):
+    from app.business.shared.form_config.form_field_admin_ops.writes import create_order_form_field
+
+    catalog = client.get("/api/custom-dictionaries", headers=headers).json()
+    assert catalog["available_fields"] == []
+    missing = client.post("/api/custom-dictionaries", json={"label": "客户偏好"}, headers=headers)
+    assert missing.status_code == 422
+    denied = client.post("/api/custom-dictionaries", json={"label": "客户偏好", "field_id": 1}, headers=viewer_headers)
+    assert denied.status_code == 403
+    text_field = create_order_form_field(db, order_type_code="CUSTOMER", field_key="note_extra", label="备注",
+                                         field_type="TEXT", actor="pytest")
+    db.commit()
+    invalid = client.post("/api/custom-dictionaries", json={"label": "客户偏好", "field_id": text_field.id}, headers=headers)
+    assert invalid.status_code == 422
+
+
 def test_dictionary_item_codes_increase_and_are_not_reused_after_deletion(client, headers):
     created = client.post(OPTION_SETS, json={"code": "TEST_SOURCE", "label": "来源"}, headers=headers)
     assert created.status_code == 201

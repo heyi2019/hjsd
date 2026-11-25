@@ -67,6 +67,31 @@ describe("SequencesPanel", () => {
     expect(screen.queryByText("FQ0001")).toBeNull();
   });
 
+  it("业务主数据序列展示真实名称和编码格式，无法识别的配置不猜测编号", async () => {
+    vi.mocked(sequencesApi.list).mockResolvedValue([
+      {
+        sequence_key: "OPTION_3d0b7293e220dff669157b17b6932008", prefix: "D", padding: 2,
+        current_value: 3, next_number: "D04", display_label: "包赔类型", display_prefix: "compensation_type_",
+      },
+      {
+        sequence_key: "OPTION_00000000000000000000000000000000", prefix: "D", padding: 2,
+        current_value: 1, next_number: "D02", display_label: null, display_prefix: null,
+      },
+    ]);
+    renderLight(<SequencesPanel />, { user: "admin" });
+
+    const knownRow = await screen.findByRole("row", { name: /包赔类型/ });
+    expect(within(knownRow).getByText("业务主数据")).toBeInTheDocument();
+    expect(within(knownRow).getByText("compensation_type_ + 至少 2 位")).toBeInTheDocument();
+    expect(within(knownRow).getByText("compensation_type_04")).toBeInTheDocument();
+    expect(within(knownRow).queryByText("D04")).toBeNull();
+
+    const unknownRow = screen.getByRole("row", { name: /OPTION_00000000000000000000000000000000/ });
+    expect(within(unknownRow).getByText("业务主数据")).toBeInTheDocument();
+    expect(within(unknownRow).getAllByText("无法识别")).toHaveLength(2);
+    expect(within(unknownRow).queryByText("D02")).toBeNull();
+  });
+
   it("移除已停用的编号域，同时保留其他未识别的序列", async () => {
     vi.mocked(sequencesApi.list).mockResolvedValue([
       { sequence_key: "ORDER_HS", prefix: "HS", padding: 4, current_value: 128, next_number: "HS0129" },

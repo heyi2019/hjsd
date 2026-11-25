@@ -364,6 +364,7 @@ const CONFIG_MODULE_RE = /from\s+"[^"]*ConfigurableField"/;
 const WIRED_RE = /FieldConfigScope|useOrderFormConfig/;
 const FORM_SCOPE_WHITELIST = new Map([
   ["src/settings/panels/CompanyProfitSettingsPanel.tsx", "公司分润比例为系统策略配置，非业务表单字段；保存受 policy.manage 权限控制"],
+  ["src/settings/panels/ConfigCenterPanel.tsx", "配置中心创建自定义字典的系统配置表单，非业务录入字段"],
   ["src/shared/ui/BusinessRegistrationForm.tsx", "共享表单容器，字段配置由使用它的业务表单提供"],
   ["src/settings/auth/LoginPage.tsx", "登录表单，非业务数据录入"],
   ["src/settings/auth/ChangePasswordPage.tsx", "改密表单，非业务数据录入"],

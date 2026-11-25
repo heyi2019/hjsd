@@ -12,7 +12,7 @@
 import type { ReactElement } from "react";
 import { BusinessDictionaryPanel } from "./BusinessDictionaryPanel";
 import { GameTypeSettingsPanel } from "./GameTypeSettingsPanel";
-import { IntermediaryPlatformSettingsPanel } from "../options/IntermediaryPlatformSettingsPanel";
+import { IntermediaryPlatformSettingsPanel, OptionDictionarySection } from "../options/IntermediaryPlatformSettingsPanel";
 import { OrderTypesPanel } from "./OrderTypesPanel";
 import { OrderFormFieldsPanel } from "../field_definitions/OrderFormFieldsPanel";
 import { ListColumnsPanel } from "../lists/ListColumnsPanel";
@@ -50,6 +50,7 @@ export const PANEL_REGISTRY: Record<string, PanelRenderer> = {
   "game-types": () => <GameTypeSettingsPanel />,
   "intermediary-platforms": () => <IntermediaryPlatformSettingsPanel />,
   "party-sources": () => <PartySourceSettingsPanel />,
+  "studio-expense-items": () => <OptionDictionarySection code="STUDIO_EXPENSE_ITEM" title="工作室支出费用科目" description="维护工作室支出使用的费用科目。" />,
   "organization": () => <OrganizationSettingsPanel />,
   "audit": () => <AuditPanel />,
   "appearance": () => <AppearancePanel />,

@@ -9,7 +9,10 @@ from app.core.security import CurrentUser
 from app.shared.numbering import NOTIFICATION_MAX, format_next_number
 from app.domain.enums import SequenceKey
 from app.settings.field_definitions import schemas
-from app.settings.field_definitions.sequences import list_sequences as foundation_list_sequences
+from app.settings.field_definitions.sequences import (
+    list_sequences as foundation_list_sequences,
+    option_sequence_descriptions,
+)
 from ._router_shared import manage_order_types
 
 router = APIRouter(tags=["BAS-02/03 业务与资金主数据"])
@@ -22,7 +25,11 @@ def list_sequences(
 ) -> list[schemas.SequenceOut]:
     del user
     result: list[schemas.SequenceOut] = []
-    for sequence in foundation_list_sequences(db):
+    sequences = foundation_list_sequences(db)
+    descriptions = option_sequence_descriptions(db) if any(
+        sequence.sequence_key.startswith("OPTION_") for sequence in sequences
+    ) else {}
+    for sequence in sequences:
         remaining = max(0, NOTIFICATION_MAX - sequence.current_value) if sequence.sequence_key == SequenceKey.NOTIFICATION.value else None
         next_number = format_next_number(
             sequence_key=sequence.sequence_key,
@@ -30,6 +37,7 @@ def list_sequences(
             padding=sequence.padding,
             current_value=sequence.current_value,
         )
+        display_label, display_prefix = descriptions.get(sequence.sequence_key, (None, None))
         result.append(
             schemas.SequenceOut(
                 sequence_key=sequence.sequence_key,
@@ -37,6 +45,8 @@ def list_sequences(
                 padding=sequence.padding,
                 current_value=sequence.current_value,
                 next_number=next_number,
+                display_label=display_label,
+                display_prefix=display_prefix,
                 remaining=remaining,
                 near_exhaustion=remaining is not None and remaining <= 100,
             )

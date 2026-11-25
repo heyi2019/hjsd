@@ -119,6 +119,7 @@ class OrderFormFieldUpdate(BaseModel):
     label: str | None = None
     field_type: str | None = None
     options: list[FieldOption] | None = None
+    expected_options: list[FieldOption] | None = None
     flow_direction: FlowDirection | None = None
     required: bool | None = None
     required_when: RequiredWhen | None = None

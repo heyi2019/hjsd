@@ -4,24 +4,38 @@ import { Card, Form, Input, Space, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useCallback, useRef, useState } from "react";
 import { optionSetsApi } from "../../shared/api/options.api";
-import type { OptionItem } from "../../shared/api/types/common";
+import { orderFormFieldsApi } from "../../shared/api/orders.api";
+import type { CustomDictionaryField, OptionItem } from "../../shared/api/types/common";
 import { normalizeError, type NormalizedError } from "../../shared/api/client";
 import { useSettingsResource } from "../../shared/state/useSettingsResource";
 import { useReferenceRefresh } from "../../shared/hooks/useReferenceRefresh";
 import { BusinessRegistrationForm, ConfirmButton, DataTable, ErrorBanner, PermissionButton, PermissionGate } from "../../shared/ui";
 
-export function OptionDictionarySection({ code, title, description }: { code: string; title: string; description: string }) {
+export function OptionDictionarySection({ code, title, description, linkedField }: {
+  code: string; title: string; description: string; linkedField?: CustomDictionaryField;
+}) {
   const [editingValue, setEditingValue] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<NormalizedError | null>(null);
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
   const [form] = Form.useForm<{ option: string }>();
+  const linkedFieldId = linkedField?.field_id;
+  const linkedScope = linkedField?.order_type_code;
+  const permission = linkedField ? "field-definition.manage" : "option-set.manage";
   const load = useCallback(async () => {
+    if (linkedFieldId !== undefined) {
+      if (!linkedScope) throw new Error("关联的自定义字段不可用");
+      const fields = await orderFormFieldsApi.list(linkedScope, true);
+      const field = fields.find((item) => item.id === linkedFieldId);
+      if (!field) throw new Error("关联的自定义字段不存在");
+      return field.options ?? [];
+    }
     const set = await optionSetsApi.get(code);
     return set.options ?? [];
-  }, [code]);
+  }, [code, linkedFieldId, linkedScope]);
   const { data: loadedRows, loading, error: loadError, reload } = useSettingsResource(load);
   useReferenceRefresh("optionSets", reload, true);
+  useReferenceRefresh("formFields", reload, true);
   const rows = loadedRows ?? [];
   const error = mutationError ?? loadError;
   const canEdit = !loading && !saving && !error && loadedRows !== null;
@@ -46,7 +60,9 @@ export function OptionDictionarySection({ code, title, description }: { code: st
     }
   };
   const updateOptions = (options: OptionItem[], onSuccess?: () => void) =>
-    runMutation(() => optionSetsApi.update(code, { options }), onSuccess);
+    runMutation(() => linkedFieldId !== undefined
+      ? orderFormFieldsApi.update(linkedFieldId, { options, expected_options: rows })
+      : optionSetsApi.update(code, { options }), onSuccess);
   const save = async ({ option }: { option: string }) => {
     if (!canEdit) return;
     const label = option.trim(); if (!label) return;
@@ -58,6 +74,8 @@ export function OptionDictionarySection({ code, title, description }: { code: st
     };
     if (editingValue !== null) {
       await updateOptions(rows.map((item) => item.value === editingValue ? { ...item, label } : item), onSuccess);
+    } else if (linkedFieldId !== undefined) {
+      await updateOptions([...rows, { value: "", label }], onSuccess);
     } else {
       await runMutation(() => optionSetsApi.addItem(code, label), onSuccess);
     }
@@ -74,12 +92,12 @@ export function OptionDictionarySection({ code, title, description }: { code: st
   const columns: ColumnsType<OptionItem> = [
     { title, dataIndex: "label" },
     { title: "排序", render: (_value, _row, index) => index + 1, width: 80 },
-    { title: "操作", render: (_value, row) => <PermissionGate permission="option-set.manage"><Space size={4}>
-      <PermissionButton permission="option-set.manage" size="small" disabled={!canEdit} onClick={() => { setEditingValue(row.value); form.setFieldsValue({ option: row.label }); }}>编辑</PermissionButton>
-      <PermissionButton permission="option-set.manage" size="small" disabled={!canEdit} onClick={() => void move(row.value, -1)}>上移</PermissionButton>
-      <PermissionButton permission="option-set.manage" size="small" disabled={!canEdit} onClick={() => void move(row.value, 1)}>下移</PermissionButton>
+    { title: "操作", render: (_value, row) => <PermissionGate permission={permission}><Space size={4}>
+      <PermissionButton permission={permission} size="small" disabled={!canEdit} onClick={() => { setEditingValue(row.value); form.setFieldsValue({ option: row.label }); }}>编辑</PermissionButton>
+      <PermissionButton permission={permission} size="small" disabled={!canEdit} onClick={() => void move(row.value, -1)}>上移</PermissionButton>
+      <PermissionButton permission={permission} size="small" disabled={!canEdit} onClick={() => void move(row.value, 1)}>下移</PermissionButton>
       <ConfirmButton
-        permission="option-set.manage"
+        permission={permission}
         size="small"
         danger
         disabled={!canEdit}
@@ -97,10 +115,10 @@ export function OptionDictionarySection({ code, title, description }: { code: st
   return <Card size="small" title={title}>
     <ErrorBanner error={error} onRetry={() => void reloadSection()} /><Typography.Paragraph type="secondary">{description}</Typography.Paragraph>
     <DataTable<OptionItem> columns={columns} rows={rows} page={1} pageSize={Math.max(rows.length, 10)} total={rows.length} emptyText={`暂无${title}`} onPageChange={() => undefined} pagination={false} rowKey="value" />
-    <PermissionGate permission="option-set.manage"><FieldConfigScope scope="SYSDICT" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={save} disabled={!canEdit}>
+    <PermissionGate permission={permission}><FieldConfigScope scope="SYSDICT" active={true}><BusinessRegistrationForm form={form} layout="inline" onFinish={save} disabled={!canEdit}>
       <CfgItem name="option" label={title} rules={[{ required: true, message: `请输入${title}` }]}><Input placeholder={`请输入${title}`} /></CfgItem>
-      <Form.Item><PermissionButton permission="option-set.manage" type="primary" htmlType="submit">{editingValue ? `保存${title}` : `新增${title}`}</PermissionButton></Form.Item>
-      {editingValue ? <Form.Item><PermissionButton permission="option-set.manage" onClick={() => { setEditingValue(null); form.resetFields(); }}>取消编辑</PermissionButton></Form.Item> : null}
+      <Form.Item><PermissionButton permission={permission} type="primary" htmlType="submit">{editingValue ? `保存${title}` : `新增${title}`}</PermissionButton></Form.Item>
+      {editingValue ? <Form.Item><PermissionButton permission={permission} onClick={() => { setEditingValue(null); form.resetFields(); }}>取消编辑</PermissionButton></Form.Item> : null}
     </BusinessRegistrationForm></FieldConfigScope></PermissionGate>
   </Card>;
 }

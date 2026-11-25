@@ -17,6 +17,7 @@ from app.core.errors import AppError, ErrorCode, Validation
 from app.shared.business_period import PERIOD_CONFIG_CODE
 from app.business.profit_allocation.company_settings import COMPANY_PROFIT_CODE
 from app.core.security import (
+    PERM_FIELD_DEFINITION_MANAGE,
     PERM_OPTION_SET_MANAGE,
     CurrentUser,
 )
@@ -25,11 +26,16 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.shared.audit import record_audit
-from app.domain.options import OptionSet
+from app.domain.options import CUSTOM_DICTIONARY_REGISTRY, OptionSet
 from app.shared.option_codes import allocate_option_code
 from app.shared.option_archive import archive_option_items
 from app.settings.field_definitions.catalog_seed import accounting_attribute_options, builtin_option_set_policy
 from app.settings.options import schemas
+from app.settings.options.custom_dictionaries import (
+    create_custom_dictionary,
+    delete_custom_dictionary,
+    list_custom_dictionaries,
+)
 from app.workbench.reminder_config import REMINDER_CODE, validate_reminder_options
 
 router = APIRouter(tags=["option-sets"])
@@ -38,6 +44,7 @@ router = APIRouter(tags=["option-sets"])
 # 会导致鉴权被静默跳过（user 收到函数对象本身）。
 _read_access = Depends(get_current_user)
 _write_access = require_permissions(PERM_OPTION_SET_MANAGE)
+_custom_write_access = require_permissions(PERM_OPTION_SET_MANAGE, PERM_FIELD_DEFINITION_MANAGE)
 
 SPECIAL_OPTION_BEHAVIORS = {
     ("CUSTOMER_SOURCE", "其他"): "OTHER",
@@ -137,6 +144,36 @@ def create_option_set(
     return _output(row)
 
 
+@router.get("/custom-dictionaries", response_model=schemas.CustomDictionaryCatalog)
+def get_custom_dictionaries(
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _read_access,
+) -> schemas.CustomDictionaryCatalog:
+    del user
+    return schemas.CustomDictionaryCatalog.model_validate(list_custom_dictionaries(db))
+
+
+@router.post("/custom-dictionaries", response_model=schemas.CustomDictionaryOut, status_code=status.HTTP_201_CREATED)
+def add_custom_dictionary(
+    payload: schemas.CustomDictionaryCreate,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _custom_write_access,
+) -> schemas.CustomDictionaryOut:
+    return schemas.CustomDictionaryOut.model_validate(create_custom_dictionary(
+        db, field_id=payload.field_id, label=payload.label, actor=user.username,
+    ))
+
+
+@router.delete("/custom-dictionaries/{field_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_custom_dictionary(
+    field_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    user: CurrentUser = _custom_write_access,
+) -> Response:
+    delete_custom_dictionary(db, field_id=field_id, actor=user.username)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.put("/option-sets/{code}", response_model=schemas.OptionSetOut)
 def update_option_set(
     code: str,
@@ -144,6 +181,8 @@ def update_option_set(
     db: Annotated[Session, Depends(get_db)],
     user: CurrentUser = _write_access,
 ) -> schemas.OptionSetOut:
+    if code == CUSTOM_DICTIONARY_REGISTRY:
+        raise Validation("自定义字典配置请通过对应入口维护")
     if code == COMPANY_PROFIT_CODE:
         raise Validation("请通过公司分润设置修改")
     row = db.scalars(select(OptionSet).where(OptionSet.code == code).with_for_update()).first()

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain.enums import AuditAction
-from app.domain.options import OptionSet
+from app.domain.options import CUSTOM_DICTIONARY_REGISTRY, OptionSet
 from app.domain.trade_models.form_config import OrderFormField
 
 SALE_PAYMENT_METHOD_OPTIONS = [
@@ -269,9 +269,9 @@ _AUDIT_ACTION_ADDITIONS = {
 def builtin_option_set_policy() -> tuple[frozenset[str], frozenset[str]]:
     """系统词典不可删除；后端固定取值的词典不受历史 editable 标记影响。"""
     data = json.loads(zlib.decompress(base64.b64decode(_CATALOG_BLOB)))
-    builtins = frozenset(row["code"] for row in data["option_sets"]) | {"BUSINESS_PERIOD", "GAME_REFERENCE_ARCHIVE", "OPTION_ITEM_ARCHIVE"}
+    builtins = frozenset(row["code"] for row in data["option_sets"]) | {"BUSINESS_PERIOD", "GAME_REFERENCE_ARCHIVE", "OPTION_ITEM_ARCHIVE", CUSTOM_DICTIONARY_REGISTRY}
     fixed = frozenset(row["code"] for row in data["option_sets"] if not row.get("editable")) | {
-        "ALLOCATION_TYPE", "BUSINESS_PERIOD", "GAME_REFERENCE_ARCHIVE", "OPTION_ITEM_ARCHIVE",
+        "ALLOCATION_TYPE", "BUSINESS_PERIOD", "GAME_REFERENCE_ARCHIVE", "OPTION_ITEM_ARCHIVE", CUSTOM_DICTIONARY_REGISTRY,
     }
     return builtins, fixed
 

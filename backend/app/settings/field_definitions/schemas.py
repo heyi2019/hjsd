@@ -149,6 +149,8 @@ class SequenceOut(BaseModel):
     padding: int
     current_value: int
     next_number: str
+    display_label: str | None = None
+    display_prefix: str | None = None
     remaining: int | None = None
     near_exhaustion: bool = False
 

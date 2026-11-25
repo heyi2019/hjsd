@@ -31,6 +31,34 @@ class OptionItemCreate(BaseModel):
     label: str = Field(min_length=1, max_length=128)
 
 
+class CustomDictionaryCreate(BaseModel):
+    """自定义字典必须关联已有的选择型扩展字段。"""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    label: str = Field(min_length=1, max_length=128)
+    field_id: int = Field(gt=0)
+
+
+class CustomDictionaryField(BaseModel):
+    field_id: int
+    order_type_code: str
+    field_key: str
+    field_label: str
+    scope_label: str
+    field_type: str
+    is_active: bool
+
+
+class CustomDictionaryOut(CustomDictionaryField):
+    label: str
+
+
+class CustomDictionaryCatalog(BaseModel):
+    items: list[CustomDictionaryOut]
+    available_fields: list[CustomDictionaryField]
+
+
 class OptionSetOut(BaseModel):
     """选项词典输出；options 为 [{value,label}]。"""
 
@@ -79,6 +107,10 @@ class OptionSetUpdate(BaseModel):
 __all__ = [
     "OptionItem",
     "OptionItemCreate",
+    "CustomDictionaryCreate",
+    "CustomDictionaryField",
+    "CustomDictionaryOut",
+    "CustomDictionaryCatalog",
     "OptionSetOut",
     "OptionSetListOut",
     "OptionSetCreate",

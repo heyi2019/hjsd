@@ -169,6 +169,10 @@ def update_order_form_field(
         )
     if "flow_direction" in payload.model_fields_set:
         extra["flow_direction"] = payload.flow_direction if payload.flow_direction else None
+    if "note" in payload.model_fields_set:
+        extra["note"] = payload.note
+    if "expected_options" in payload.model_fields_set:
+        extra["expected_options"] = [item.model_dump() for item in (payload.expected_options or [])]
 
     return schemas.OrderFormFieldOut.model_validate(
         ff.update_order_form_field(
@@ -181,7 +185,6 @@ def update_order_form_field(
             required=payload.required,
             sort_order=payload.sort_order,
             section=payload.section,
-            note=payload.note,
             **extra,
         )
     )

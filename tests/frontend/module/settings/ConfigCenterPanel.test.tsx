@@ -1,10 +1,11 @@
-import { screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameTypesApi, sequencesApi } from "@/shared/api/misc.api";
 import { optionSetsApi } from "@/shared/api/options.api";
-import { listColumnsApi, orderTypesApi } from "@/shared/api/orders.api";
+import { listColumnsApi, orderFormFieldsApi, orderTypesApi } from "@/shared/api/orders.api";
 import { poolsApi } from "@/shared/api/pools.api";
+import { notifyReferenceDataChanged } from "@/shared/state/referenceDataEvents";
 import type { OrderType } from "@/shared/api/types/orders";
 import { optionSet, optionSetList } from "@fixtures/api-responses";
 vi.mock("@/shared/api/cashflows.api");
@@ -45,12 +46,88 @@ beforeEach(() => {
   vi.mocked(gameTypesApi.list).mockResolvedValue([] as never);
   vi.mocked(optionSetsApi.list).mockResolvedValue(optionSetList() as never);
   vi.mocked(optionSetsApi.get).mockResolvedValue(optionSet() as never);
+  Object.assign(optionSetsApi, { listCustom: vi.fn().mockResolvedValue({ items: [], available_fields: [] }) });
   vi.mocked(listColumnsApi.all).mockResolvedValue([] as never);
   vi.mocked(sequencesApi.list).mockResolvedValue([] as never);
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
 describe("ConfigCenterPanel", () => {
+  it("可在业务主数据中维护供货方来源和工作室费用科目", async () => {
+    vi.mocked(optionSetsApi.get).mockResolvedValue({ options: [] } as never);
+    vi.mocked(optionSetsApi.addItem).mockResolvedValue(undefined as never);
+    vi.mocked(orderFormFieldsApi.list).mockResolvedValue([]);
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<ConfigCenterPanel />, { user: "admin" });
+
+    await ui.click(screen.getByTestId("center-nav-party-sources"));
+    const supplierInput = await screen.findByPlaceholderText("请输入供货方来源主数据");
+    await ui.type(supplierInput, "供货渠道甲");
+    await ui.click(screen.getByRole("button", { name: "新增供货方来源主数据" }));
+    await waitFor(() => expect(optionSetsApi.addItem).toHaveBeenCalledWith("SUPPLIER_SOURCE", "供货渠道甲"));
+
+    await ui.click(screen.getByTestId("center-nav-studio-expense-items"));
+    const expenseInput = await screen.findByPlaceholderText("请输入工作室支出费用科目");
+    await ui.type(expenseInput, "办公室用品");
+    await ui.click(screen.getByRole("button", { name: "新增工作室支出费用科目" }));
+    await waitFor(() => expect(optionSetsApi.addItem).toHaveBeenCalledWith("STUDIO_EXPENSE_ITEM", "办公室用品"));
+  });
+
+  it("新增自定义字典后可在业务主数据中继续新增字典项", async () => {
+    const field = { field_id: 88, order_type_code: "CUSTOMER", field_key: "preference", field_label: "客户偏好",
+      scope_label: "客户建档", field_type: "SELECT", is_active: true };
+    const created = { ...field, label: "偏好字典" };
+    const createCustom = vi.fn().mockResolvedValue(created);
+    Object.assign(optionSetsApi, { createCustom, listCustom: vi.fn().mockResolvedValue({ items: [], available_fields: [field] }) });
+    const formField = { id: 88, order_type_code: "CUSTOMER", field_key: "preference", label: "客户偏好", field_type: "SELECT",
+      is_custom: true, is_active: true, options: [{ value: "preference_01", label: "原选项" }] };
+    vi.mocked(orderFormFieldsApi.list).mockImplementation(async (scope) => scope === "CUSTOMER" ? [formField as never] : []);
+    vi.mocked(orderFormFieldsApi.listSectionLabels).mockResolvedValue({});
+    vi.mocked(orderFormFieldsApi.update).mockResolvedValue(formField as never);
+    const ui = userEvent.setup({ pointerEventsCheck: 0 });
+    renderLight(<ConfigCenterPanel />, { user: "admin" });
+
+    await ui.click(await screen.findByRole("button", { name: "新增字典" }));
+    const dialog = screen.getByRole("dialog", { name: "新增字典" });
+    await ui.type(within(dialog).getByLabelText("字典名称"), "偏好字典");
+    await ui.click(within(dialog).getByRole("combobox", { name: "关联扩展字段" }));
+    await ui.click(await screen.findByText("客户建档 · 客户偏好"));
+    await ui.click(within(dialog).getByRole("button", { name: "创建" }));
+    await waitFor(() => expect(createCustom).toHaveBeenCalledWith("偏好字典", 88));
+    expect(await screen.findByTestId("center-nav-custom-88")).toBeInTheDocument();
+    const input = await screen.findByPlaceholderText("请输入偏好字典");
+    await ui.type(input, "偏好甲");
+    await ui.click(screen.getByRole("button", { name: "新增偏好字典" }));
+    await waitFor(() => expect(orderFormFieldsApi.update).toHaveBeenCalledWith(88, {
+      options: [{ value: "preference_01", label: "原选项" }, { value: "", label: "偏好甲" }],
+      expected_options: [{ value: "preference_01", label: "原选项" }],
+    }));
+  });
+
+  it("无维护权限时可查看自定义字典但不能新增", async () => {
+    Object.assign(optionSetsApi, { listCustom: vi.fn().mockResolvedValue({ items: [{
+      field_id: 88, label: "客户偏好", order_type_code: "CUSTOMER", field_key: "preference",
+      field_label: "客户偏好", scope_label: "客户建档", field_type: "SELECT", is_active: true,
+    }], available_fields: [] }) });
+    renderLight(<ConfigCenterPanel />, { user: "viewer" });
+    expect(await screen.findByTestId("center-nav-custom-88")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "新增字典" })).toBeNull();
+  });
+
+  it("没有可关联字段时禁止新建，新增字段后无需刷新页面", async () => {
+    const field = { field_id: 88, order_type_code: "CUSTOMER", field_key: "preference", field_label: "客户偏好",
+      scope_label: "客户建档", field_type: "SELECT", is_active: true };
+    Object.assign(optionSetsApi, { listCustom: vi.fn()
+      .mockResolvedValueOnce({ items: [], available_fields: [] })
+      .mockResolvedValue({ items: [], available_fields: [field] }) });
+    renderLight(<ConfigCenterPanel />, { user: "admin" });
+    expect(await screen.findByText("请先添加自定义单选或多选字段")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "新增字典" })).toBeDisabled();
+    await act(async () => notifyReferenceDataChanged("formFields"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "新增字典" })).toBeEnabled());
+  });
+
   it("顶部渲染字段配置、业务主数据与编号管理，默认显示业务类型页面", async () => {
     renderLight(<ConfigCenterPanel />, { user: "admin" });
     // 仅展示配置中心纳入的四组标题

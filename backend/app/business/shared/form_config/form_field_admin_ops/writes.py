@@ -9,6 +9,7 @@ from app.shared.option_codes import allocate_option_code
 from app.core.errors import Conflict, ErrorCode, NotFound, Validation
 from app.domain.enums import AuditAction
 from app.domain.form_scopes import FORM_SCOPES, GROUP_SYSTEM, REQUIRED_CORE_FIELDS
+from app.domain.options import CUSTOM_DICTIONARY_REGISTRY, OptionSet, custom_dictionary_bindings
 from app.domain.trade import OrderFormField
 from app.shared.form_field_rules import (
     FIELD_TYPES, FIELD_KEY_PATTERN, ORDER_TYPE_CODE_PATTERN, _UNSET,
@@ -152,19 +153,22 @@ def update_order_form_field(
     label: str | None = None,
     field_type: str | None = None,
     options: Sequence[str] | None | object = None,
+    expected_options: Sequence[dict] | None | object = _UNSET,
     required: bool | None = None,
     required_when: Any = _UNSET,
     sort_order: int | None = None,
     section: str | None = None,
-    note: str | None = None,
+    note: str | None | object = _UNSET,
     flow_direction: str | None | object = _UNSET,
 ) -> OrderFormField:
     """编辑字段：label/类型/选项/必填态/排序/备注可改；field_key 与 code 固定。"""
-    definition = session.get(OrderFormField, definition_id)
+    definition = session.get(OrderFormField, definition_id, with_for_update=True)
     if definition is None:
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
         )
+    if expected_options is not _UNSET and list(expected_options or []) != list(definition.options or []):
+        raise Conflict("字段选项已更改，请重新加载后再试", code=ErrorCode.VERSION_CONFLICT)
     if definition.field_key in REQUIRED_CORE_FIELDS.get(definition.order_type_code, ()):
         if required is False or (required_when is not _UNSET and required_when is not None):
             raise Validation("该业务必填字段不可改为选填或条件必填")
@@ -260,7 +264,8 @@ def update_order_form_field(
         if isinstance(sort_order, bool) or not isinstance(sort_order, int) or sort_order < 0:
             raise Validation("排序值必须为非负整数", details={"field": "sort_order"})
         definition.sort_order = sort_order
-    definition.note = note
+    if note is not _UNSET:
+        definition.note = note
     if flow_direction is not _UNSET:
         if flow_direction is not None and flow_direction not in {"BASE", "IN", "OUT"}:
             raise Validation("资金流向性质不合法", details={"field": "flow_direction"})
@@ -330,7 +335,7 @@ def set_order_form_field_active(
 
 def delete_order_form_field(session: Session, definition_id: int, *, actor: str) -> None:
     """删除字段：locked 核心字段禁止删除；自定义字段可删（历史值留存在 Order.form_extra）。"""
-    definition = session.get(OrderFormField, definition_id)
+    definition = session.get(OrderFormField, definition_id, with_for_update=True)
     if definition is None:
         raise NotFound(
             f"表单字段 {definition_id} 不存在", details={"order_form_field_id": definition_id}
@@ -342,6 +347,13 @@ def delete_order_form_field(session: Session, definition_id: int, *, actor: str)
             f"核心字段 {definition.label} 已锁定，不可删除（仅可改必填/停用）",
             details={"field_key": definition.field_key},
         )
+    registry = session.scalar(select(OptionSet).where(OptionSet.code == CUSTOM_DICTIONARY_REGISTRY).with_for_update())
+    try:
+        bindings = custom_dictionary_bindings(registry.options if registry is not None else None)
+    except ValueError as exc:
+        raise Validation(str(exc)) from exc
+    if any(field_id == definition_id for field_id, _label in bindings):
+        raise Validation("该扩展字段已关联自定义字典，请先删除字典配置")
     _reject_if_dependent(session, definition, action="删除")
     record_audit(
         session,

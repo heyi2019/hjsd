@@ -31,12 +31,33 @@ export interface OptionSetList {
   items: OptionSet[];
 }
 
+export interface CustomDictionaryField {
+  field_id: number;
+  order_type_code: string;
+  field_key: string;
+  field_label: string;
+  scope_label: string;
+  field_type: string;
+  is_active: boolean;
+}
+
+export interface CustomDictionary extends CustomDictionaryField {
+  label: string;
+}
+
+export interface CustomDictionaryCatalog {
+  items: CustomDictionary[];
+  available_fields: CustomDictionaryField[];
+}
+
 export interface DocumentSequence {
   sequence_key: string;
   prefix: string;
   padding: number;
   current_value: number;
   next_number: string;
+  display_label?: string | null;
+  display_prefix?: string | null;
   remaining?: number | null;
   near_exhaustion?: boolean;
 }

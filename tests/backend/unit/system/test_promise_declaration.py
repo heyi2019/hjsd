@@ -12,6 +12,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 from _repo import BACKEND_DIR as BACKEND, BE_TESTS, REPO_ROOT as REPO
 FRONTEND = REPO / "frontend"
 
@@ -28,22 +30,23 @@ VALID_LEVELS = {"L0", "L1", "L2", "L3"}
 VALID_OWNERS = {"后端", "前端", "双端"}
 
 
-def _rows() -> list[dict]:
+@pytest.fixture(scope="module")
+def promise_rows() -> list[dict]:
     return pc.scan_backend()
 
 
-def test_every_test_file_has_owner() -> None:
+def test_every_test_file_has_owner(promise_rows: list[dict]) -> None:
     """不允许存在既无承诺声明、又不在历史映射表里的测试文件。"""
-    orphans = [row["file"] for row in _rows() if row["source"] == "none"]
+    orphans = [row["file"] for row in promise_rows if row["source"] == "none"]
     assert not orphans, (
         "以下测试文件既没有文件头承诺声明，也不在 catalog.BACKEND_FILE_TO_FUNC 中，"
         f"属于无归属测试：{orphans}"
     )
 
 
-def test_unregistered_promise_budget() -> None:
+def test_unregistered_promise_budget(promise_rows: list[dict]) -> None:
     """文件头声明的承诺必须已登记，或消耗基线额度（只降不升）。"""
-    pending = sorted(row["file"] for row in _rows() if row["source"] == "unregistered")
+    pending = sorted(row["file"] for row in promise_rows if row["source"] == "unregistered")
     assert len(pending) <= UNREGISTERED_BUDGET, (
         f"未登记承诺声明 {len(pending)} 个，超出基线 {UNREGISTERED_BUDGET}。"
         "新增测试请先把承诺写进 docs/testing/测试元数据台账.csv（PROMISE 记录），再改基线。\n"
@@ -121,7 +124,7 @@ def test_missing_promises_state_a_reason() -> None:
     assert not silent, f"以下承诺标记缺失但未写原因：{silent}"
 
 
-def test_no_file_relies_on_legacy_fallback() -> None:
+def test_no_file_relies_on_legacy_fallback(promise_rows: list[dict]) -> None:
     """每个测试文件都必须自己声明承诺码，不得靠历史功能码或别名兜底。
 
     2026-11-04 已完成 112/112 全量改造：历史 ``func``（BACKEND_FILE_TO_FUNC 手写表）
@@ -130,7 +133,7 @@ def test_no_file_relies_on_legacy_fallback() -> None:
     """
     legacy = [
         f"{row['file']}（{row['code']} / {row['source']}）"
-        for row in _rows()
+        for row in promise_rows
         if row["source"] in {"func", "alias", "unregistered", "none"}
     ]
     assert not legacy, (

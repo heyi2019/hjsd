@@ -18,7 +18,9 @@ type EmployeeSelectControlProps = Omit<SelectProps, "options"> & {
 
 /** 统一人员选项与下拉控件；建单操作人、交付操作人、分润配置共用此入口。 */
 export function EmployeeSelectControl({ employees, options, onOpenChange, ...props }: EmployeeSelectControlProps) {
-  const signature = employees ? JSON.stringify(employees) : "";
+  // employees 引用不变时签名不变，避免每次渲染都序列化整个员工数组。
+  // 注意 signatureRef 仍须在渲染期同步更新：handleOpen 的异步回调靠它做竞态检查。
+  const signature = useMemo(() => employees ? JSON.stringify(employees) : "", [employees]);
   const signatureRef = useRef(signature);
   signatureRef.current = signature;
   const sequence = useRef(0);
@@ -34,10 +36,10 @@ export function EmployeeSelectControl({ employees, options, onOpenChange, ...pro
     return () => { sequence.current += 1; unsubscribe(); };
   }, []);
   const currentEmployees = fresh?.signature === signature ? fresh.employees : employees;
-  const employeeOptions = options ?? currentEmployees?.filter((employee) => employee.is_active).map((employee) => ({
+  const employeeOptions = useMemo(() => options ?? currentEmployees?.filter((employee) => employee.is_active).map((employee) => ({
     value: employee.id,
     label: employee.display_name,
-  })) ?? [];
+  })) ?? [], [options, currentEmployees]);
   const handleOpen = (open: boolean) => {
     onOpenChange?.(open);
     if (!open || !employees || options) return;

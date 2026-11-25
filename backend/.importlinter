@@ -121,5 +121,17 @@ source_modules =
 forbidden_modules =
     app.workbench
 
-# 2026-11-19 域归并曾把契约收敛为 3 条（子模块随父包覆盖）；2026-11-25 归位
-# settings 的两条反向边后重新收紧为 5 条。全部零豁免，新增违规 import 即红。
+# 2026-11-25：新增禁止边 customers -> business（唯一反向边是客户列表复用
+# order_customer_ids）。归位方案：orders 把实现注册到 shared/order_access，
+# customers 改读共享原语，口径实现仍留在 orders（单一权威），shared 只转发。
+[importlinter:contract:customers-not-import-business]
+name = customers 不得依赖 business（合法方向只有 business -> customers）
+type = forbidden
+source_modules =
+    app.customers
+forbidden_modules =
+    app.business
+
+# 2026-11-19 域归并曾把契约收敛为 3 条（子模块随父包覆盖）；2026-11-25 先归位
+# settings 的两条反向边收紧为 5 条，再归位 customers 的反向边收紧为 6 条。
+# 全部零豁免，新增违规 import 即红。

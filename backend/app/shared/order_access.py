@@ -14,6 +14,9 @@ installments 四个域直接引用。放在 orders 下导致 policy 反向依赖
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -47,4 +50,35 @@ def lock_order_reference(session: Session, order_id: int) -> None:
         raise NotFound(f"订单 {order_id} 不存在", details={"order_id": order_id})
 
 
-__all__ = ["get_order", "lock_order_reference"]
+# 订单关联客户去重查询：实现依赖 orders 的列表过滤口径（_order_list_stmt /
+# _mine_order_condition），口径必须保持单一权威留在 orders，故用注册点转发，
+# 让 customers 只读访问共享原语、不反向依赖 orders。
+_order_customer_ids_loader: Callable[..., Any] | None = None
+
+
+def register_order_customer_ids(loader: Callable[..., Any]) -> None:
+    """由 orders 域注册「订单关联客户 ID 查询」实现（模块加载时调用）。"""
+    global _order_customer_ids_loader
+    _order_customer_ids_loader = loader
+
+
+def order_customer_ids(*args: Any, **kwargs: Any) -> Any:
+    """按当前可见订单范围返回关联客户 ID 查询（转发给 orders 注册的实现）。
+
+    未注册即抛错：客户列表「我的订单」筛选若静默退化成不过滤，会串出无权限
+    数据，必须 fail-fast。生产由 api 挂载 orders_router、测试由 conftest
+    模块级 import create_app 保证 orders 模块已加载并注册。
+    """
+    if _order_customer_ids_loader is None:
+        raise RuntimeError(
+            "订单关联客户查询未注册：business/orders/queries 未被加载（注册点 app.shared.order_access）"
+        )
+    return _order_customer_ids_loader(*args, **kwargs)
+
+
+__all__ = [
+    "get_order",
+    "lock_order_reference",
+    "register_order_customer_ids",
+    "order_customer_ids",
+]

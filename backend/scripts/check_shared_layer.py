@@ -41,7 +41,7 @@ REGISTRY: dict[str, str] = {
     "option_archive": "保留历史字典项，供字典管理及订单展示与导出共用",
     "option_codes": "可配置选项和主数据的并发安全编码分配，business/settings 共用",
     "option_snapshots": "字典编码与历史名称解析，订单及设置导出共用",
-    "order_access": "订单只读访问，business/finance 共用",
+    "order_access": "订单只读访问与可见性查询，business/customers/finance 共用",
     "order_amounts": "订单收入/支出/利润唯一权威，business/customers/finance/operations 共用",
     "reminder_config": "业务提醒配置读写与校验，settings(选项字典)/workbench(通知与看板) 共用",
     "scope": "数据范围判定，六个业务域全量共用",

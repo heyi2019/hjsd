@@ -10,6 +10,7 @@ from app.core.security import CurrentUser
 from app.domain.enums import OrderStatus
 from app.shared.scope import owner_scope_filter
 from app.shared.game_references import matching_game_references
+from app.shared.order_access import register_order_customer_ids
 from sqlalchemy import (
     case,
     cast,
@@ -427,3 +428,8 @@ def _order_list_stmt(
         if scope is not None:
             stmt = stmt.where(scope)
     return stmt
+
+
+# 注册点到 shared：客户列表「我的订单」筛选经共享原语调用本实现，避免
+# customers 反向依赖 orders。口径实现仍在本模块（单一权威），shared 只转发。
+register_order_customer_ids(order_customer_ids)

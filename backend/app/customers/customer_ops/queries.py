@@ -9,7 +9,7 @@ from app.core.security import CurrentUser
 from app.shared.scope import owner_scope_filter, owner_scope_ids
 from app.core.errors import NotFound
 from app.domain.parties import Customer
-from app.business.orders.queries import order_customer_ids
+from app.shared.order_access import order_customer_ids
 from app.shared.user_identity import actor_names
 from app.customers._common import apply_created_range
 

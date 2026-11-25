@@ -1,9 +1,9 @@
 import { Dropdown, Space } from "antd";
 import type { ColumnsType } from "antd/es/table";
+import { markMobileHiddenColumns, markMobileIdentityColumn, useListViewColumns } from "../../shared/lib/listColumns";
 import type { AccountExecutionDetail } from "../../shared/api/types/account-execution";
 import type { Order } from "../../shared/api/types/orders";
 import { ACCOUNT_STATUS_LABEL, formatDateTimeMinute, formatElapsedTime, money } from "../../shared/lib/format";
-import { useListViewColumns } from "../../shared/lib/listColumns";
 import { PermissionButton, StatusTag } from "../../shared/ui";
 import { authorizedOrderOperationItems, orderOperationMenuItems } from "../shared/operations";
 import { inventoryTypeOfOrder } from "../inventory/InventoryPanel/types";
@@ -171,5 +171,19 @@ export function useLedgerColumns(params: {
       },
     },
   ];
-  return { arrangeLedgerColumns, visibleLedgerColumns: arrangeLedgerColumns(ledgerColumns) };
+  // 列编排（配置过滤/排序 + 移动端标记）收敛到此处，只 arrange 一次；
+  // 调用方直接用 visibleLedgerColumns，不再重复编排（原先 hook 内 arrange 一次、
+  // Panel 内又 arrange + 两次 mark，共四次全列变换）。保持此处编排可随 config
+  // 响应式重算，设置页改列配置后仍即时生效。
+  const arranged = arrangeLedgerColumns(ledgerColumns);
+  const visibleLedgerColumns = markMobileIdentityColumn(
+    markMobileHiddenColumns(arranged, LEDGER_MOBILE_HIDDEN_KEYS),
+    "order_no",
+  );
+  return { visibleLedgerColumns };
 }
+
+/** ≤640px 隐藏列：原规则写 nth-child(4)，但表格有展开列占位，实测命中的是
+ *  「游戏账号/产品」而非入库操作人。保持默认隐藏目标不变，只把序号换成稳定 key，
+ *  避免「设置 → 列表字段」过滤/调序后隐藏错列。 */
+const LEDGER_MOBILE_HIDDEN_KEYS = ["account_game_account"] as const;

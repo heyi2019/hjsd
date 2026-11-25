@@ -178,7 +178,7 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
   } = actions;
 
   // —— 台账列定义域：15 列 + 移动端列编排（回调依赖注入）——
-  const { columns, mobileFieldOrder, arrangeColumns } = useInventoryColumns({
+  const { displayColumns, mobileFieldOrder } = useInventoryColumns({
     editingAccount, executionDetails, loadExecution,
     setSaleTarget: (value) => { actions.invalidatePendingActions(); setSaleTarget(value); },
     setConsignmentTarget: (value) => { actions.invalidatePendingActions(); setConsignmentTarget(value); },
@@ -188,14 +188,13 @@ export function useInventoryController({ refreshKey = 0, active = true, initialA
 
   return {
     active,
-    arrangeColumns,
     businessMode,
     businessOptions,
     cancelInlineEdit,
     cashflowPools,
     cashflowUsers,
     cashflowTarget,
-    columns,
+    displayColumns,
     consignmentTarget,
     countInventoryRows,
     dateRange,

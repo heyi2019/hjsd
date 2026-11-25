@@ -119,7 +119,7 @@ export function useOrdersPageController(params: {
 
 
   // —— 台账列定义域：纯展示配置 + 点击转发 ——
-  const { arrangeLedgerColumns, visibleLedgerColumns } = useLedgerColumns({
+  const { visibleLedgerColumns } = useLedgerColumns({
     ledgerDetails: inlineEdit.ledgerDetails,
     loadLedgerDetail,
     openLedgerEditor,
@@ -137,7 +137,6 @@ export function useOrdersPageController(params: {
     ...exposedActionModals,
     ...inlineEdit,
     activeTab: activeTab,
-    arrangeLedgerColumns: arrangeLedgerColumns,
     businessModeFilter: businessModeFilter,
     cancelEmployees: cancelEmployees,
     cancelForm: cancelForm,

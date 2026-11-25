@@ -178,11 +178,13 @@ export function useInventoryColumns(params: {
       },
     },
   ];
-  const mobileFieldOrder = arrangeColumns(columns).map(columnKey);
+  // 列编排只做一次：displayColumns 供表格直接使用，mobileFieldOrder 复用同一次结果
+  // （原先 mobileFieldOrder 与 Panel 各 arrange 一次）。保持随 config 响应式重算。
+  const displayColumns = arrangeColumns(columns);
+  const mobileFieldOrder = displayColumns.map(columnKey);
 
   return {
-    columns,
+    displayColumns,
     mobileFieldOrder,
-    arrangeColumns,
   };
 }

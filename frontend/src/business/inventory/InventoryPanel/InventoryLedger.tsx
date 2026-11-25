@@ -17,8 +17,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
   const {
     businessMode,
     businessOptions,
-    arrangeColumns,
-    columns,
+    displayColumns,
     countInventoryRows,
     dateRange,
     executionDetails,
@@ -157,7 +156,7 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
       ]} />
       <DataTable
         className="ui-datatable--expandable inventory-table"
-        columns={arrangeColumns(columns)}
+        columns={displayColumns}
         rows={rows}
         loading={controller.listLoading}
         rowKey={(row) => `${row.id}:${row.account.id}`}

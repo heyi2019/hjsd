@@ -9,6 +9,7 @@ NON_JSON_ROUTES = frozenset(
         ("DELETE", "/api/pools/{pool_id}"),
         ("DELETE", "/api/order-form-fields/{field_id}"),
         ("DELETE", "/api/option-sets/{code}"),
+        ("DELETE", "/api/custom-dictionaries/{field_id}"),
         ("DELETE", "/api/orders/{order_id}/links/{link_id}"),
         ("DELETE", "/api/orders/{order_id}"),
         ("GET", "/api/reports/{report_name}/export.csv"),

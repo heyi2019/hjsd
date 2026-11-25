@@ -39,5 +39,5 @@ export function consignmentListings(orders: AccountExecutionOrder[]): Consignmen
 
 /** 订单是否仍有当前寄售上架记录。 */
 export function isActiveConsignmentListing(order: AccountExecutionOrder): boolean {
-  return activeConsignmentListings(order).length > 0;
+  return (order.active_consignments?.length ?? 0) > 0;
 }

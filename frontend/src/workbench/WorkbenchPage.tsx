@@ -10,8 +10,9 @@ import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import { QuickAccess } from "./quick-access/QuickAccess";
 import { BusinessOverview } from "./overview/BusinessOverview";
 import { Notifications } from "./notifications/Notifications";
-import { useWorkbenchSummary } from "./overview/useWorkbenchSummary";
+import { samePeriod, useWorkbenchSummary } from "./overview/useWorkbenchSummary";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
+import { currentReportPeriod } from "../shared/lib/reportPeriod";
 import { useSession } from "../shared/state/session";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 
@@ -38,7 +39,15 @@ export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }
     };
   }, [active]);
   const periodState = useBusinessPeriod();
-  const { summary, error, loading, loadSummary } = useWorkbenchSummary(active && periodState.ready, periodState.period);
+  const { summary: loadedSummary, error, loading, loadSummary } = useWorkbenchSummary(
+    active && !periodState.error,
+    periodState.period,
+    periodState.ready,
+    currentReportPeriod(undefined, periodState.startDay),
+  );
+  const matchesPeriod = loadedSummary !== null && samePeriod(loadedSummary.period, periodState.period);
+  const summary = periodState.ready && matchesPeriod ? loadedSummary : null;
+  const summaryLoading = loading || !periodState.ready || (loadedSummary !== null && !matchesPeriod);
   const period = summary?.period ?? null;
   const withPeriod = (path: string) => {
     if (!period) return path;
@@ -80,7 +89,7 @@ export function WorkbenchPage({ onNavigate, onWorkbenchNavigate, active = true }
           inventoryOverdueCount={summary?.inventory?.overdue_count ?? null}
           installmentCount={summary?.installments?.total_count ?? null}
           overdueInstallmentCount={summary?.installments?.overdue_count ?? null}
-          loading={loading}
+          loading={summaryLoading}
           allPeriods={periodState.period === null}
           personalOrders={summary?.personal_orders ?? null}
           personalCustomers={summary?.personal_customers ?? null}

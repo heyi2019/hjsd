@@ -45,10 +45,20 @@ export function useReport<T>(load: () => Promise<T>, deps: readonly unknown[]) {
 
   useEffect(() => {
     if (pageActive) reload();
+    else {
+      setData(null);
+      setError(null);
+      setLoading(false);
+    }
     return () => { requestRef.current += 1; };
   }, [pageActive, reload]);
 
-  return { data, loading, error, reload };
+  return {
+    data: pageActive ? data : null,
+    loading: pageActive && (loading || (data === null && !error)),
+    error: pageActive ? error : null,
+    reload,
+  };
 }
 
 /** 区间选择已提升到父级（reportRange），各报表通过 range 属性复用父级统计周期。 */

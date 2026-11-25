@@ -35,6 +35,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FinancePageController
     fetchCashflows, exportCashflows, cashflowExporting, cashflowTotal, cashflowPage, cashflowPageSize, setCashflowPage, totalFlowIncome, totalFlowExpense,
     fundsReady, cashflowsReady, cashflowLoading, cashflowError,
   } = ctrl;
+  const viewLoading = cashflowLoading || (!cashflowsReady && !cashflowError && !periodState.error);
   const cashflowUnavailable = !cashflowsReady || Boolean(cashflowError);
   const filtersDisabled = Boolean(cashflowError) || (!cashflowsReady && !cashflowLoading);
   const { arrange: arrangeCashflowColumns } = useListViewColumns("CASHFLOW");
@@ -102,16 +103,16 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FinancePageController
         <ExportButton permission="finance.read" disabled={cashflowUnavailable || cashflowLoading} loading={cashflowExporting} onClick={() => void exportCashflows()} />
       </div>
       <ErrorBanner error={cashflowError} onRetry={() => void fetchCashflows()} retrying={cashflowLoading} />
-      {cashflowLoading ? (
+      {viewLoading ? (
         <Typography.Text type="secondary">正在加载资金流水…</Typography.Text>
       ) : cashflowUnavailable ? (
         <Typography.Text type="warning">资金流水数据不可用，请点击“重新加载”。</Typography.Text>
       ) : null}
       <StatRow
         items={[
-          { label: "总收入", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowIncome },
-          { label: "总支出", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : totalFlowExpense, hint: "流水毛额，包含冲销和押金损失重分类，与实际现金支出可能不同" },
-          { label: "当前结果", kind: "count", amount: cashflowLoading ? null : cashflowUnavailable ? "不可用" : cashflowTotal },
+          { label: "总收入", amount: viewLoading ? null : cashflowUnavailable ? "不可用" : totalFlowIncome },
+          { label: "总支出", amount: viewLoading ? null : cashflowUnavailable ? "不可用" : totalFlowExpense, hint: "流水毛额，包含冲销和押金损失重分类，与实际现金支出可能不同" },
+          { label: "当前结果", kind: "count", amount: viewLoading ? null : cashflowUnavailable ? "不可用" : cashflowTotal },
         ]}
       />
       <DataTable<Cashflow>
@@ -122,7 +123,7 @@ export function CashflowTab({ ctrl, periodState }: { ctrl: FinancePageController
         total={cashflowUnavailable ? 0 : cashflowTotal}
         controlledPaging
         emptyText={cashflowUnavailable ? "资金流水数据不可用，请点击重新加载" : "暂无资金流水"}
-        loading={cashflowLoading}
+        loading={viewLoading}
         onPageChange={setCashflowPage}
       />
     </Card>

@@ -3,6 +3,7 @@
 import { Tabs } from "antd";
 import { useState } from "react";
 import { ErrorBanner } from "../shared/ui";
+import { DataTableLoadingProvider } from "../shared/ui/DataTable";
 import { StudioExpensePanel } from "./StudioExpensePanel";
 import { useFinancePageController } from "./useFinancePageController";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
@@ -20,7 +21,9 @@ export function FinancePage({ active = true }: { active?: boolean } = {}) {
   const periodState = useBusinessPeriod();
   const [activeTab, setActiveTab] = useState("overview");
   const ctrl = useFinancePageController(active, periodState, active && activeTab === "cashflows");
+  const waitingForPeriod = active && !periodState.ready && !periodState.error && ["cashflows", "studio-operations"].includes(activeTab);
   return (
+    <DataTableLoadingProvider preparing={waitingForPeriod}>
     <section className="ui-stack">
       <ErrorBanner error={ctrl.fundsError} onRetry={() => void ctrl.reloadFunds()} retrying={ctrl.fundsLoading} />
       <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
@@ -52,5 +55,6 @@ export function FinancePage({ active = true }: { active?: boolean } = {}) {
       <LossModal ctrl={ctrl} />
       <CancelModal ctrl={ctrl} />
     </section>
+    </DataTableLoadingProvider>
   );
 }

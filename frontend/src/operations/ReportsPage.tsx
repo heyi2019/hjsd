@@ -8,6 +8,7 @@ import { DataCenterPanel } from "./DataCenterPanel";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 import { ErrorBanner } from "../shared/ui";
+import { DataTableLoadingProvider } from "../shared/ui/DataTable";
 import { Commission } from "./reports/CommissionReport";
 import { OrderProfit } from "./reports/OrderProfitReport";
 import { OperatingPnl } from "./reports/OperatingPnlReport";
@@ -47,19 +48,20 @@ export function ReportsPage({ onNavigate, active = true, initialReportTab, initi
     { key: "pnl", label: "经营损益", render: () => <OperatingPnl range={reportRange} /> },
   ];
   const entryReady = periodState.ready && appliedEntry === entryKey;
+  const preparing = active && !entryReady && !periodState.error;
 
   return (
     <ReportsActiveContext.Provider value={active && entryReady}>
     <section className="ui-stack">
       <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
-      {active && !entryReady && !periodState.error ? <div role="status">正在准备报表…</div> : null}
+      {preparing ? <div role="status">正在准备报表…</div> : null}
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
         items={tabItems.map(({ render, ...item }) => ({
           ...item,
           // 隐藏 Tab 不挂载：避免首屏同时发起 13 组请求，也避免切换无关页面时产生状态更新。
-          children: activeTab === item.key ? <div hidden={!entryReady}>{render()}</div> : null,
+          children: activeTab === item.key ? <div hidden={!entryReady && !preparing}><DataTableLoadingProvider preparing={preparing}>{render()}</DataTableLoadingProvider></div> : null,
         }))}
       />
     </section>

@@ -200,6 +200,38 @@ class TestSecurityScopes:
         admin = CurrentUser.build(id=1, username="admin", roles=[ROLE_ADMIN])
         assert owner_scope_filter(Pool.id, admin, seeded_db) is None
 
+    def test_team_scope_only_fetches_users_in_matching_teams(self, seeded_db):
+        from sqlalchemy import event
+        from app.domain.users import User
+
+        matched = [
+            User(username="scope-match-a", display_name="甲", password_hash="test", role=ROLE_OPERATOR, team_ids=[3]),
+            User(username="scope-match-b", display_name="乙", password_hash="test", role=ROLE_OPERATOR, team_ids=[4, 8], is_active=False),
+        ]
+        unrelated = [
+            User(username=f"scope-unrelated-{i}", display_name="其他", password_hash="test", role=ROLE_OPERATOR, team_ids=[9])
+            for i in range(25)
+        ]
+        seeded_db.add_all(matched + unrelated)
+        seeded_db.flush()
+        expected = {999999, *(item.id for item in matched)}
+        team_user = CurrentUser.build(
+            id=999999, username="team", roles=[ROLE_OPERATOR], owner_scope="TEAM", team_ids=frozenset({3, 4}),
+        )
+        returned_rows = []
+
+        def record(_conn, cursor, statement, _params, _context, _many):
+            if " from users " in f" {' '.join(statement.lower().split())} ":
+                returned_rows.append(cursor.rowcount)
+
+        connection = seeded_db.connection()
+        event.listen(connection, "after_cursor_execute", record)
+        try:
+            assert owner_scope_ids(seeded_db, team_user) == expected
+        finally:
+            event.remove(connection, "after_cursor_execute", record)
+        assert returned_rows == [2]
+
 
 class TestTokenGuards:
     def test_malformed_token_rejected(self):

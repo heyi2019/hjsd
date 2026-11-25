@@ -61,6 +61,7 @@ vi.mock("axios", async (importOriginal) => {
 
 import axios from "axios";
 import { clearApiCache, setDevUser } from "@/shared/api/client";
+import { startPageLoadTiming } from "@/shared/lib/pageLoadTiming";
 import { reportsApi } from "@/shared/api/reports.api";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
@@ -76,6 +77,32 @@ describe("GET 缓存层（并发去重 + SWR + 写失效）", () => {
     clearApiCache();
     localStorage.removeItem("hj.dev-user");
     (axios as any).__resetCalls();
+  });
+
+  it("页面计时会等待缓存适配器背后的真实请求", async () => {
+    vi.useFakeTimers();
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const root = document.createElement("main");
+    document.body.append(root);
+    const stop = startPageLoadTiming("测试页面", root);
+    try {
+      let finishNetwork!: (value: unknown) => void;
+      const transport = (axios as any).__instances[1];
+      transport.request.mockImplementationOnce(() => new Promise((resolve) => { finishNetwork = resolve; }));
+      const result = apiInstance().request({ method: "get", url: "/timing-test" });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(console.info).not.toHaveBeenCalled();
+      finishNetwork({ data: "ready", status: 200, headers: {} });
+      expect((await result).data).toBe("ready");
+      root.textContent = "数据显示完成";
+      await vi.advanceTimersByTimeAsync(400);
+      expect(console.info).toHaveBeenCalledWith(expect.stringMatching(/页面加载计时.*测试页面/));
+    } finally {
+      stop();
+      root.remove();
+      log.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("每次报表导出都请求后端，不缓存或合并导出动作", async () => {

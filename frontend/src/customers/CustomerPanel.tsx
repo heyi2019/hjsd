@@ -18,7 +18,7 @@ import { ToolbarMultiSelect } from "../shared/ui/ToolbarMultiSelect";
 /** ≤640px 隐藏：联系方式与建立时间，详情里可看；状态与操作必须常驻。 */
 const CUSTOMER_MOBILE_HIDDEN_KEYS = ["phone", "wechat", "qq", "created_at"] as const;
 
-export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrderFilter, createdPeriod, createdPicker }: { active?: boolean; focusId?: number; orderFilter?: { from?: string; to?: string }; onClearOrderFilter?: () => void; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
+export function CustomerPanel({ active = true, waitingForPeriod = false, focusId, orderFilter, onClearOrderFilter, createdPeriod, createdPicker }: { active?: boolean; waitingForPeriod?: boolean; focusId?: number; orderFilter?: { from?: string; to?: string }; onClearOrderFilter?: () => void; createdPeriod?: { from: string; to: string } | null; createdPicker?: ReactNode }) {
   const { username } = useSession();
   const {
     sortDesc, setSortDesc,
@@ -79,6 +79,8 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
     submitMerge,
     total,
   } = useCustomerController({ active, focusId, orderFilter, createdPeriod });
+  const initialLoading = rows === null && !error && (active || waitingForPeriod);
+  const tableLoading = loading || initialLoading;
   return (
     <Card
       className="glass"
@@ -149,16 +151,17 @@ export function CustomerPanel({ active = true, focusId, orderFilter, onClearOrde
       </Space>
       <StatRow
         items={[
-          { label: "客户总数", kind: "count", amount: loading ? null : error || rows === null ? "不可用" : String(total) },
-          { label: "本月新增客户数", kind: "count", amount: summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
-          { label: "今日新增客户数", kind: "count", amount: summaryLoading ? null : error || summaryError || rows === null ? "不可用" : String(newTodayCount ?? 0) },
+          { label: "客户总数", kind: "count", amount: tableLoading ? null : error || rows === null ? "不可用" : String(total) },
+          { label: "本月新增客户数", kind: "count", amount: summaryLoading || initialLoading ? null : error || summaryError || rows === null ? "不可用" : String(newThisMonthCount ?? 0) },
+          { label: "今日新增客户数", kind: "count", amount: summaryLoading || initialLoading ? null : error || summaryError || rows === null ? "不可用" : String(newTodayCount ?? 0) },
         ]}
       />
       <DataTable<Customer>
         // 移动端隐藏按列 key 绑定，不随「设置 → 列表字段」的过滤/排序而错位。
         columns={markMobileHiddenColumns(arrangeColumns(columns), CUSTOMER_MOBILE_HIDDEN_KEYS)}
         rows={error ? [] : rows ?? []}
-        loading={loading}
+        loading={tableLoading}
+        showHeaderWhileLoading
         page={page}
         pageSize={pageSize}
         total={error ? 0 : total}

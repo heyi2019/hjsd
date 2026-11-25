@@ -8,12 +8,21 @@
  */
 import { Spin, Table } from "antd";
 import type { ColumnsType, TableProps } from "antd/es/table";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+
+const TableLoadingContext = createContext<"default" | "headers" | "preparing">("default");
+
+export function DataTableLoadingProvider({ children, enabled = true, preparing = false }: { children: ReactNode; enabled?: boolean; preparing?: boolean }) {
+  const mode = enabled ? (preparing ? "preparing" : "headers") : "default";
+  return <TableLoadingContext.Provider value={mode}>{children}</TableLoadingContext.Provider>;
+}
 
 export function DataTable<T>(props: {
   columns: ColumnsType<T>;
   rows: T[];
   loading?: boolean;
+  /** 首次加载或空列表刷新时保留表头，在表格内容区显示加载状态。 */
+  showHeaderWhileLoading?: boolean;
   page: number;
   pageSize: number;
   total: number;
@@ -39,6 +48,9 @@ export function DataTable<T>(props: {
   className?: string;
   size?: TableProps<T>["size"];
 }) {
+  const loadingMode = useContext(TableLoadingContext);
+  const loading = Boolean(props.loading || loadingMode === "preparing");
+  const showHeaderWhileLoading = props.showHeaderWhileLoading ?? loadingMode !== "default";
   const defaultRowKey = (row: T) => {
     const candidate = row as T & {
       id?: string | number;
@@ -60,10 +72,10 @@ export function DataTable<T>(props: {
   const settledRows = useRef<T[]>([]);
   const tableContent = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (!props.loading) settledRows.current = props.rows;
-  }, [props.loading, props.rows]);
-  const displayedRows = props.loading ? settledRows.current : props.rows;
-  const refreshing = Boolean(props.loading && displayedRows.length);
+    if (!loading) settledRows.current = props.rows;
+  }, [loading, props.rows]);
+  const displayedRows = loadingMode === "preparing" ? [] : loading ? settledRows.current : props.rows;
+  const refreshing = Boolean(loading && displayedRows.length);
   useLayoutEffect(() => {
     tableContent.current?.toggleAttribute("inert", refreshing);
   }, [refreshing]);
@@ -89,7 +101,7 @@ export function DataTable<T>(props: {
     if (!controlled && props.resetKey !== undefined) setInnerPage(1);
   }, [controlled, props.resetKey]);
 
-  if (props.loading && !refreshing) {
+  if (loading && !refreshing && !showHeaderWhileLoading) {
     return (
       <div className="ui-table-loading" role="status" aria-live="polite" aria-busy="true" aria-label="正在加载数据">
         <Spin />
@@ -119,7 +131,7 @@ export function DataTable<T>(props: {
 
   return (
     <div className={`ui-table-wrap ui-datatable${props.className ? ` ${props.className}` : ""}`}>
-      <div ref={tableContent} aria-hidden={refreshing || undefined} aria-busy={refreshing || undefined}>
+      <div ref={tableContent} aria-hidden={refreshing || undefined} aria-busy={loading || undefined}>
         <Table<T>
           aria-label={props.ariaLabel}
           size={props.size ?? "small"}
@@ -134,7 +146,9 @@ export function DataTable<T>(props: {
           scroll={tableScroll}
           pagination={pagination}
           locale={{
-            emptyText: <div className="ui-datatable__empty">{props.emptyText ?? "暂无数据"}</div>,
+            emptyText: loading && !refreshing
+              ? <div className="ui-table-loading" role="status" aria-live="polite" aria-busy="true" aria-label="正在加载数据"><Spin /></div>
+              : <div className="ui-datatable__empty">{props.emptyText ?? "暂无数据"}</div>,
           }}
         />
       </div>

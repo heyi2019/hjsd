@@ -7,6 +7,7 @@ import { CounterpartyPanel } from "./CounterpartyPanel";
 import { useBusinessPeriod } from "../shared/state/businessPeriod";
 import { BusinessPeriodPicker } from "../shared/ui/BusinessPeriodPicker";
 import { ErrorBanner } from "../shared/ui";
+import { DataTableLoadingProvider } from "../shared/ui/DataTable";
 
 export function CustomersPage({
   active = true,
@@ -43,19 +44,22 @@ export function CustomersPage({
     if (focusedCounterpartyId) setActiveTab("counterparties");
     else if (focusedCustomerId || customerOrderFilter) setActiveTab("customers");
   }, [focusedCounterpartyId, focusedCustomerId, Boolean(customerOrderFilter), customerOrderFilter?.from, customerOrderFilter?.to]);
+  const waitingForPeriod = active && !periodState.ready && !periodState.error;
   return (
+    <DataTableLoadingProvider preparing={waitingForPeriod}>
     <section className="ui-stack">
       <ErrorBanner error={periodState.error ? { message: periodState.error } : null} onRetry={periodState.retry} />
       <Tabs
         activeKey={activeTab}
         onChange={setActiveTab}
         items={[
-          { key: "customers", label: "客户档案", children: <CustomerPanel active={active && periodState.ready && activeTab === "customers"} focusId={focusedCustomerId} orderFilter={customerOrderFilter} onClearOrderFilter={onClearCustomerOrderFilter} createdPeriod={createdPeriod} createdPicker={<BusinessPeriodPicker label="客户中心创建日期区间" state={createdPeriodState} showAll />} /> },
+          { key: "customers", label: "客户档案", children: <CustomerPanel active={active && periodState.ready && activeTab === "customers"} waitingForPeriod={waitingForPeriod && activeTab === "customers"} focusId={focusedCustomerId} orderFilter={customerOrderFilter} onClearOrderFilter={onClearCustomerOrderFilter} createdPeriod={createdPeriod} createdPicker={<BusinessPeriodPicker label="客户中心创建日期区间" state={createdPeriodState} showAll />} /> },
           { key: "counterparties", label: "合作方（同行/供货方/平台）", children: <CounterpartyPanel active={active && periodState.ready && activeTab === "counterparties"} focusId={focusedCounterpartyId} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
           { key: "leads", label: "客户需求池", children: <CustomerLeadPanel active={active && periodState.ready && activeTab === "leads"} createdPeriod={createdPeriod} createdPicker={createdPicker} /> },
         ]}
       />
     </section>
+    </DataTableLoadingProvider>
   );
 }
 

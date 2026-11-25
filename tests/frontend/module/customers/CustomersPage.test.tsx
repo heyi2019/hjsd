@@ -10,6 +10,7 @@ import { renderLight } from "@fixtures/render";
 import { CustomersPage } from "@/customers/CustomersPage";
 
 import { counterpartiesApi, customersApi } from "@/shared/api/customers.api";
+import { optionSetsApi } from "@/shared/api/options.api";
 import { employeesApi } from "@/shared/api/org.api";
 import { orderFormFieldsApi } from "@/shared/api/orders.api";
 import type { OrderFormField } from "@/shared/api/types/forms";
@@ -125,6 +126,34 @@ beforeEach(() => {
   }));
 });
 describe("CustomersPage：客户档案", () => {
+  it("首屏先显示客户表头，数据返回后在同一表格内显示", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    let finishPage!: (value: Awaited<ReturnType<typeof customersApi.page>>) => void;
+    const configPending = new Promise<Awaited<ReturnType<typeof optionSetsApi.get>>>((resolve) => { finishConfig = resolve; });
+    const pagePending = new Promise<Awaited<ReturnType<typeof customersApi.page>>>((resolve) => { finishPage = resolve; });
+    vi.mocked(optionSetsApi.get).mockReturnValueOnce(configPending);
+    vi.mocked(customersApi.page).mockReturnValueOnce(pagePending);
+
+    const { container } = renderLight(<CustomersPage />, { user: "admin" });
+    expect(screen.getByRole("columnheader", { name: "客户编号" })).toBeVisible();
+    const table = container.querySelector(".customer-table");
+    expect(table).not.toBeNull();
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    expect(screen.queryByText("客户数据不可用，请点击重新加载")).not.toBeInTheDocument();
+    expect(screen.queryByText("暂无客户档案")).not.toBeInTheDocument();
+
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "16" }] } as never); });
+    await waitFor(() => expect(customersApi.page).toHaveBeenCalled());
+    expect(container.querySelector(".customer-table")).toBe(table);
+    expect(screen.getByRole("columnheader", { name: "客户编号" })).toBeVisible();
+    expect(screen.queryByText("CUS-0001")).not.toBeInTheDocument();
+
+    await act(async () => { finishPage(pageResponse(customers)); await pagePending; });
+    expect(await screen.findByText("CUS-0001")).toBeVisible();
+    expect(container.querySelector(".customer-table")).toBe(table);
+    expect(screen.queryByRole("status", { name: "正在加载数据" })).toBeNull();
+  });
+
   it("合作方末页拉黑后回到仍有数据的页", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     let changed = false;

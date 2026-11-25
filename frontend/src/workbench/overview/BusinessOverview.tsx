@@ -42,7 +42,7 @@ export function BusinessOverview({
   const amount = (value: number | null) => loading ? null : value;
   const whenAvailable = (value: number | null, onClick?: () => void) => loading || value === null ? undefined : onClick;
   return (
-    <section aria-label="我的业务总览" className="ui-stack">
+    <section aria-label="我的业务总览" aria-busy={loading} className="ui-stack">
       <StatRow className="ui-stat-row--overview" items={[
         { label: allPeriods ? "我的订单" : "我的当期订单", kind: "count", amount: loading || personalOrders === null ? null : String(personalOrders), hint: "入库 / 售出操作人", onClick: loading || personalOrders === null ? undefined : onPersonalOrdersClick, testId: "workbench-personal-orders" },
         { label: allPeriods ? "我的收益" : "我的当期收益", amount: loading ? null : personalEarnings, hint: allPeriods ? "全部 · 本人分润基数" : "当期 · 本人分润基数", onClick: loading || personalEarnings === null ? undefined : onPersonalEarningsClick, testId: "workbench-personal-earnings" },

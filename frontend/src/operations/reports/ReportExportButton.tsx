@@ -1,14 +1,16 @@
 /** 报表导出按钮：按当前页筛选导出该报表 CSV。 */
 
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { reportsApi, type ReportExportParams } from "../../shared/api/reports.api";
 import { normalizeError } from "../../shared/api/client";
 import { downloadBlob } from "../../shared/api/download";
 import { ExportButton } from "../../shared/ui";
 import { appMessage } from "../../shared/ui/appFeedback";
+import { ReportsActiveContext } from "./shared";
 
 export function ReportExportButton({ name, params }: { name: string; params?: ReportExportParams }) {
   const [exporting, setExporting] = useState(false);
+  const pageActive = useContext(ReportsActiveContext);
 
   const exportCsv = async () => {
     const from = params?.from || undefined;
@@ -39,6 +41,6 @@ export function ReportExportButton({ name, params }: { name: string; params?: Re
   };
 
   return (
-    <ExportButton permission="report.export" loading={exporting} onClick={() => void exportCsv()} />
+    <ExportButton permission="report.export" loading={exporting} disabled={!pageActive} onClick={() => void exportCsv()} />
   );
 }

@@ -363,6 +363,7 @@ FRONTEND_FILE_TO_FUNC: dict[str, str] = {
     "AppShell.deep.test.tsx":              "SYS07",
     "AppShell.test.tsx":                   "SYS07",
     "AppShell.user-center.test.tsx":       "SYS07",
+    "pageLoadTiming.test.ts":              "SYS07",
     "AppearancePanel.test.tsx":            "F01",
     "BusinessActionModal.test.tsx":        "SYS07",
     "BusinessRegistrationModal.test.tsx":  "SYS07",

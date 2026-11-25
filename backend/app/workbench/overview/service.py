@@ -14,7 +14,7 @@ from app.core.security import (
 )
 from app.domain.enums import InstallmentContractType
 from app.workbench.reminder_config import read_reminder_config
-from app.business.orders.queries import order_customer_count, order_status_counts
+from app.business.orders.queries import order_customer_count, workbench_order_counts
 from app.operations.reports.commission import personal_commission_total
 from app.business.inventory.inventory import dashboard_inventory_summary
 from app.business.installments import queries as installment_queries
@@ -36,21 +36,13 @@ def workbench_summary(session: Session, *, user: CurrentUser, from_date: date | 
     inventory = None
     installments = None
     if can_orders:
-        counts = order_status_counts(
+        total_orders, personal_orders = workbench_order_counts(
             session,
             trade_date_from=period_from,
             trade_date_to=period_to,
             user=user,
         )
-        personal_counts = order_status_counts(
-            session,
-            trade_date_from=period_from,
-            trade_date_to=period_to,
-            user=user,
-            mine=True,
-        )
-        orders = {"total_count": sum(counts.values())}
-        personal_orders = sum(personal_counts.values())
+        orders = {"total_count": total_orders}
         personal_customers = order_customer_count(
             session,
             trade_date_from=period_from,

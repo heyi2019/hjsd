@@ -1,11 +1,12 @@
 import { Modal, Space } from "antd";
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { MOBILE_NAV_ORDER, navigation } from "./navigation";
 import { DEV_ROLES, useSession } from "../shared/state/session";
 import { useTheme } from "../shared/state/theme";
 import { BusinessPeriodProvider } from "../shared/state/businessPeriod";
 import { loadOptionSets } from "../shared/lib/optionSets";
+import { startPageLoadTiming } from "../shared/lib/pageLoadTiming";
 import { WorkbenchPage } from "../workbench/WorkbenchPage";
 import { LoginPage } from "../settings/auth/LoginPage";
 import { ChangePasswordPage } from "../settings/auth/ChangePasswordPage";
@@ -14,6 +15,7 @@ import type { BusinessCenterEntryTab } from "../business/businessCenter";
 import type { InitialLedgerFilters } from "../business/orders/useLedgerList";
 import { ConfirmButton } from "../shared/ui";
 import { ErrorBoundary } from "../shared/ui/ErrorBoundary";
+import { DataTableLoadingProvider } from "../shared/ui/DataTable";
 import projectVersion from "../../../VERSION?raw";
 
 const brandMark = <span className="app-brand__mark" aria-hidden="true">宜</span>;
@@ -116,6 +118,22 @@ export function AppShell() {
   const { role, dataOwnerKey, authenticated, mustChangePassword, logout, can } = useSession();
   const { mode, setMode } = useTheme();
   const item = navigation.find((entry) => entry.key === active);
+  const timingRootRef = useRef<HTMLElement>(null);
+  const initialTiming = useRef(true);
+  useLayoutEffect(() => {
+    const first = initialTiming.current;
+    initialTiming.current = false;
+    const root = timingRootRef.current;
+    if (!authenticated || mustChangePassword || !root) return;
+    return startPageLoadTiming(item?.label ?? "页面", root, first ? 0 : performance.now());
+  }, [active, authenticated, mustChangePassword, location.pathname, location.search, item?.label]);
+  const startTabTiming = (target: EventTarget | null, keyboardNavigation = false) => {
+    const tab = target instanceof Element ? target.closest('[role="tab"]') : null;
+    const root = timingRootRef.current;
+    if (!tab || !root || (!keyboardNavigation && tab.getAttribute("aria-selected") === "true")) return;
+    const label = keyboardNavigation ? "页签" : tab.textContent?.trim();
+    startPageLoadTiming(`${item?.label ?? "页面"} / ${label || "页签"}`, root);
+  };
   const navigateTo = (key: string, tab?: BusinessCenterEntryTab) => {
     // 回到业务中心但不指定子页时，进入库存中心。
     if (key === "business" && !tab) {
@@ -279,7 +297,14 @@ export function AppShell() {
             </ConfirmButton>
           </Space>
         </header>
-        <BusinessPeriodProvider key={dataOwnerKey}><main className="page-content">
+        <BusinessPeriodProvider key={dataOwnerKey}><main
+          ref={timingRootRef}
+          className="page-content"
+          onClickCapture={(event) => startTabTiming(event.target)}
+          onKeyDownCapture={(event) => {
+            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) startTabTiming(event.target, true);
+          }}
+        >
           {/* 路由化 + keep-alive：
               1) 落点由 URL 决定（深链/刷新/前进后退可用），见 navigateTo。
               2) 访问过的页面持续挂载，仅非激活态 display:none，避免切导航重挂载丢状态（原 key={active} 的副作用）。
@@ -300,6 +325,7 @@ export function AppShell() {
                       page-slot--hidden 随之消失，keep-alive 下隐藏页的错误卡就会叠到
                       当前页底部（2026-11-03 实测库存/订单/分期/资金/报表/设置六处全现）。 */}
                   <ErrorBoundary name={key}>
+                    <DataTableLoadingProvider enabled={["business", "customers", "funds", "operations"].includes(key)}>
                     {key === "workbench" ? (
                       <WorkbenchPage active={isActive} onNavigate={navigateTo} onWorkbenchNavigate={navigateToWorkbenchPath} />
                     ) : (
@@ -323,6 +349,7 @@ export function AppShell() {
                         focusCounterpartyId={key === "customers" ? focusCounterpartyId : undefined}
                       />
                     )}
+                    </DataTableLoadingProvider>
                   </ErrorBoundary>
                 </div>
               );

@@ -136,7 +136,7 @@ def order_status_counts(
     user: CurrentUser | None = None,
     mine: bool = False,
 ) -> dict[str, int]:
-    """按订单状态一次聚合计数，供工作台和数据中心卡片使用。"""
+    """按订单状态一次聚合计数，供数据中心等使用。"""
     stmt = _order_list_stmt(
         order_type=None,
         status=None,
@@ -154,6 +154,38 @@ def order_status_counts(
         maintain_column_froms=True,
     ).group_by(Order.status)
     return {str(status): int(count) for status, count in session.execute(stmt).all()}
+
+
+def workbench_order_counts(
+    session: Session,
+    *,
+    trade_date_from: date | None = None,
+    trade_date_to: date | None = None,
+    user: CurrentUser,
+) -> tuple[int, int]:
+    """同一次订单聚合分别计算可见总量和本人操作量。"""
+    scope = owner_scope_filter(Order.owner_id, user, session)
+    visible_count = func.count(Order.id)
+    if scope is not None:
+        visible_count = visible_count.filter(scope)
+    stmt = _order_list_stmt(
+        order_type=None,
+        status=None,
+        trade_date_from=trade_date_from,
+        trade_date_to=trade_date_to,
+        owner_id=None,
+        pool_id=None,
+        keyword=None,
+        user=None,
+        mine=False,
+        session=session,
+    ).with_only_columns(
+        visible_count,
+        func.count(Order.id).filter(_mine_order_condition(user.id)),
+        maintain_column_froms=True,
+    )
+    total, personal = session.execute(stmt).one()
+    return int(total), int(personal)
 
 
 def order_ledger_summary(
@@ -251,6 +283,13 @@ def _latest_sale_operator_matches(operator_ids: list[int]):
             OrderEvent.id == latest_sale_id,
             or_(*(cast(OrderEvent.operator_user_ids, JSONB).contains([operator_id]) for operator_id in operator_ids)),
         )
+    )
+
+
+def _mine_order_condition(user_id: int):
+    return or_(
+        cast(Order.form_extra, JSONB).contains({"business_responsible_ids": [user_id]}),
+        _latest_sale_operator_matches([user_id]),
     )
 
 
@@ -382,12 +421,7 @@ def _order_list_stmt(
     if mine and user is not None:
         # 「我的订单」= 入库操作人是我，或出库/售出操作人是我。
         # 两个条件都是针对同一订单的 OR；同一订单同时命中两边也只返回一行。
-        stmt = stmt.where(
-            or_(
-                cast(Order.form_extra, JSONB).contains({"business_responsible_ids": [user.id]}),
-                _latest_sale_operator_matches([user.id]),
-            )
-        )
+        stmt = stmt.where(_mine_order_condition(user.id))
     elif user is not None:
         scope = owner_scope_filter(Order.owner_id, user, session)
         if scope is not None:

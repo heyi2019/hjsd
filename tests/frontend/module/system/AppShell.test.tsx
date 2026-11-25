@@ -41,7 +41,7 @@ vi.mock("@/shared/api/reports.api");
 vi.mock("@/shared/api/stocks.api");
 vi.mock("@/shared/api/transfers.api");
 import { renderApp } from "@fixtures/render";
-import { cashflowPage, customerSummary, workbenchSummary, installmentTotals, orderLedgerSummary, pageResponse } from "@fixtures/api-responses";
+import { cashflowPage, customerSummary, workbenchSummary, installmentTotals, inventoryLedgerResponse, orderLedgerSummary, pageResponse, poolBalancesResponse, reportResponse } from "@fixtures/api-responses";
 import { AppShell } from "@/app/AppShell";
 import { navigation } from "@/app/navigation";
 import { MemoryRouter } from "react-router-dom";
@@ -123,7 +123,7 @@ beforeEach(() => {
   vi.mocked(ordersApi.listPage).mockResolvedValue(pageResponse([]));
   vi.mocked(ordersApi.ledgerSummary).mockResolvedValue(orderLedgerSummary());
   vi.mocked(orderTypesApi.list).mockResolvedValue([]);
-  vi.mocked(workbenchApi.summary).mockImplementation(async (period) => workbenchSummary(period ? { period } : {}));
+  vi.mocked(workbenchApi.summary).mockImplementation(async (period) => workbenchSummary({ period: period === undefined ? currentReportPeriod() : period }));
   vi.mocked(customersApi.page).mockResolvedValue(pageResponse([]));
   vi.mocked(customersApi.summary).mockResolvedValue(customerSummary());
   vi.mocked(counterpartiesApi.page).mockResolvedValue(pageResponse([]));
@@ -150,6 +150,126 @@ async function renderShell(options: { user?: string; initialPath?: string } = {}
 }
 
 describe("AppShell：导航可达性（页签 ↔ 页面一一对应）", () => {
+  it("业务中心库存加载时先显示表头", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof stocksApi.inventoryLedger>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof stocksApi.inventoryLedger>>>((resolve) => { finish = resolve; });
+    vi.mocked(stocksApi.inventoryLedger).mockReturnValueOnce(pending);
+    await renderShell({ user: "admin", initialPath: "/business/inventory" });
+    await waitFor(() => expect(stocksApi.inventoryLedger).toHaveBeenCalled(), { timeout: 15_000 });
+    expect(await screen.findByRole("columnheader", { name: "订单号" }, { timeout: 15_000 })).toBeVisible();
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    await act(async () => { finish(inventoryLedgerResponse([])); await pending; });
+  });
+
+  it("客户中心合作方加载时先显示表头", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof counterpartiesApi.page>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof counterpartiesApi.page>>>((resolve) => { finish = resolve; });
+    vi.mocked(counterpartiesApi.page).mockReturnValueOnce(pending);
+    await renderShell({ user: "admin", initialPath: "/customers" });
+    await ui.click(await screen.findByRole("tab", { name: /合作方/ }, { timeout: 15_000 }));
+    await waitFor(() => expect(counterpartiesApi.page).toHaveBeenCalled(), { timeout: 15_000 });
+    expect(await screen.findByRole("columnheader", { name: "编号" }, { timeout: 15_000 })).toBeVisible();
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    await act(async () => { finish(pageResponse([])); await pending; });
+  });
+
+  it("客户需求池等待周期配置时显示表头和加载状态", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    let finishPage!: (value: Awaited<ReturnType<typeof leadsApi.page>>) => void;
+    const configPending = new Promise<Awaited<ReturnType<typeof optionSetsApi.get>>>((resolve) => { finishConfig = resolve; });
+    const pagePending = new Promise<Awaited<ReturnType<typeof leadsApi.page>>>((resolve) => { finishPage = resolve; });
+    vi.mocked(optionSetsApi.get).mockImplementation((code) => code === "BUSINESS_PERIOD" ? configPending : Promise.resolve([] as never));
+    vi.mocked(leadsApi.page).mockReturnValueOnce(pagePending);
+    await renderShell({ user: "admin", initialPath: "/customers" });
+    await ui.click(await screen.findByRole("tab", { name: "客户需求池" }, { timeout: 10_000 }));
+    expect(screen.getByRole("columnheader", { name: "需求编号" })).toBeVisible();
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    expect(screen.queryByText("暂无客户需求")).not.toBeInTheDocument();
+    expect(leadsApi.page).not.toHaveBeenCalled();
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "16" }] } as never); await configPending; });
+    await waitFor(() => expect(leadsApi.page).toHaveBeenCalled(), { timeout: 15_000 });
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    await act(async () => { finishPage(pageResponse([])); await pagePending; });
+  });
+
+  it("资金中心账户加载时先显示表头", async () => {
+    let finish!: (value: Awaited<ReturnType<typeof poolsApi.list>>) => void;
+    const pending = new Promise<Awaited<ReturnType<typeof poolsApi.list>>>((resolve) => { finish = resolve; });
+    vi.mocked(poolsApi.list).mockReturnValueOnce(pending);
+    vi.mocked(poolsApi.balances).mockResolvedValue(poolBalancesResponse([], { pool_count: 0, cash_balance: "0", available: "0", deposit_held: "0" }));
+    await renderShell({ user: "admin", initialPath: "/funds" });
+    await waitFor(() => expect(poolsApi.list).toHaveBeenCalled(), { timeout: 15_000 });
+    expect(await screen.findByRole("columnheader", { name: "资金账户" }, { timeout: 15_000 })).toBeVisible();
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    await act(async () => { finish([]); await pending; });
+  });
+
+  it("资金明细等待周期配置时显示表头和加载状态", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    const configPending = new Promise<Awaited<ReturnType<typeof optionSetsApi.get>>>((resolve) => { finishConfig = resolve; });
+    vi.mocked(optionSetsApi.get).mockImplementation((code) => code === "BUSINESS_PERIOD" ? configPending : Promise.resolve([] as never));
+    await renderShell({ user: "admin", initialPath: "/funds" });
+    await ui.click(await screen.findByRole("tab", { name: "资金明细" }, { timeout: 10_000 }));
+    expect(screen.getByRole("columnheader", { name: "流水号" })).toBeVisible();
+    expect(screen.getByRole("status", { name: "正在加载数据" })).toBeVisible();
+    expect(screen.queryByText(/资金流水数据不可用/)).not.toBeInTheDocument();
+    expect(cashflowsApi.list).not.toHaveBeenCalled();
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "16" }] } as never); await configPending; });
+    await waitFor(() => expect(cashflowsApi.list).toHaveBeenCalled(), { timeout: 15_000 });
+  });
+
+  it("经营中心准备周期和加载报表时先显示表头", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    let finishReport!: (value: Awaited<ReturnType<typeof reportsApi.monthlyPnl>>) => void;
+    const configPending = new Promise<Awaited<ReturnType<typeof optionSetsApi.get>>>((resolve) => { finishConfig = resolve; });
+    const reportPending = new Promise<Awaited<ReturnType<typeof reportsApi.monthlyPnl>>>((resolve) => { finishReport = resolve; });
+    vi.mocked(optionSetsApi.get).mockImplementation((code) => code === "BUSINESS_PERIOD" ? configPending : Promise.resolve([] as never));
+    vi.mocked(reportsApi.monthlyPnl).mockReturnValueOnce(reportPending);
+    await renderShell({ user: "admin", initialPath: "/operations" });
+    expect(await screen.findByRole("columnheader", { name: "月份" }, { timeout: 15_000 })).toBeVisible();
+    expect(reportsApi.monthlyPnl).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("button", { name: "导出" }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true);
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "16" }] } as never); await configPending; });
+    await waitFor(() => expect(reportsApi.monthlyPnl).toHaveBeenCalled(), { timeout: 15_000 });
+    expect(screen.getByRole("columnheader", { name: "月份" })).toBeVisible();
+    expect(screen.getAllByRole("status", { name: "正在加载数据" }).length).toBeGreaterThan(0);
+    await act(async () => { finishReport(reportResponse([], { sales_income: "0", operating_profit: "0" }) as never); await reportPending; });
+  });
+
+  it("页面计时等待工作台数据展示后才结束", async () => {
+    let finishSummary!: (value: Awaited<ReturnType<typeof workbenchApi.summary>>) => void;
+    vi.mocked(workbenchApi.summary).mockReturnValue(new Promise((resolve) => { finishSummary = resolve; }));
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    try {
+      await renderShell({ user: "admin", initialPath: "/workbench" });
+      await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalled());
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(log.mock.calls.some(([message]) => String(message).includes("页面加载计时"))).toBe(false);
+
+      await act(async () => { finishSummary(workbenchSummary({ period: currentReportPeriod(), personal_orders: 7 })); });
+      expect(await screen.findByTestId("workbench-personal-orders")).toHaveTextContent("7");
+      await waitFor(() => expect(log).toHaveBeenCalledWith(expect.stringMatching(/页面加载计时.*工作台/)), { timeout: 5_000 });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("主导航和页面内页签都记录加载耗时", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    try {
+      await renderShell({ user: "admin", initialPath: "/workbench" });
+      const nav = screen.getByRole("navigation", { name: "主导航" });
+      await ui.click(within(nav).getByRole("button", { name: "设置" }));
+      const appearance = await screen.findByRole("tab", { name: "外观" }, { timeout: 15_000 });
+      await waitFor(() => expect(log).toHaveBeenCalledWith(expect.stringMatching(/页面加载计时.*设置/)), { timeout: 5_000 });
+      log.mockClear();
+      await ui.click(appearance);
+      await waitFor(() => expect(log).toHaveBeenCalledWith(expect.stringMatching(/页面加载计时.*设置.*外观/)), { timeout: 5_000 });
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("进入工作台首屏后，建单资料等到点击建单时再加载", async () => {
     await renderShell({ user: "admin", initialPath: "/customers" });
     await screen.findByRole("tab", { name: "客户档案" }, { timeout: 15_000 });

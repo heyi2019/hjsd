@@ -11,5 +11,5 @@ export interface WorkbenchSummary {
 }
 
 export const workbenchApi = {
-  summary: (period: { from: string; to: string } | null) => api.get<WorkbenchSummary>("/workbench/summary", { params: period === null ? { all_time: true } : period, refreshCache: true } as CacheAwareRequestConfig).then((response) => response.data),
+  summary: (period?: { from: string; to: string } | null) => api.get<WorkbenchSummary>("/workbench/summary", { params: period === null ? { all_time: true } : period, refreshCache: true } as CacheAwareRequestConfig).then((response) => response.data),
 };

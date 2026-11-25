@@ -6,6 +6,7 @@ import { WorkbenchPage } from "@/workbench/WorkbenchPage";
 import * as sessionApi from "@/shared/api/client";
 import { workbenchApi } from "@/shared/api/workbench.api";
 import { notificationsApi } from "@/shared/api/notifications.api";
+import { optionSetsApi } from "@/shared/api/options.api";
 import { seedOrderFormFields } from "@fixtures/orderFormFieldsSeed";
 import { workbenchSummary } from "@fixtures/api-responses";
 import { currentReportPeriod, previousReportPeriod } from "@/shared/lib/reportPeriod";
@@ -29,7 +30,8 @@ vi.mock("@/shared/api/stocks.api");
 beforeEach(() => {
   vi.clearAllMocks();
   seedOrderFormFields();
-  vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary());
+  vi.mocked(optionSetsApi.get).mockResolvedValue(undefined as never);
+  vi.mocked(workbenchApi.summary).mockImplementation(async (period) => workbenchSummary({ period: period === undefined ? currentReportPeriod() : period }));
   vi.mocked(notificationsApi.list).mockResolvedValue({ items: [], next_cursor: null });
   vi.mocked(notificationsApi.syncReminders).mockResolvedValue({ created: 0 });
   vi.mocked(notificationsApi.profitDetails).mockResolvedValue([]);
@@ -37,6 +39,57 @@ beforeEach(() => {
 });
 
 describe("WorkbenchPage：动作入口（数据已迁数据中心）", () => {
+it("周期配置和默认汇总并行加载，配置确认后复用同一个请求", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    let finishSummary!: (value: Awaited<ReturnType<typeof workbenchApi.summary>>) => void;
+    vi.mocked(optionSetsApi.get).mockReturnValue(new Promise((resolve) => { finishConfig = resolve; }));
+    vi.mocked(workbenchApi.summary).mockReturnValue(new Promise((resolve) => { finishSummary = resolve; }));
+
+    renderLight(<WorkbenchPage />, { user: "admin" });
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledWith(undefined));
+    const orders = screen.getByTestId("workbench-personal-orders");
+    expect(within(orders).getByText("-")).toBeInTheDocument();
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "16" }] } as never); });
+    expect(workbenchApi.summary).toHaveBeenCalledTimes(1);
+    await act(async () => { finishSummary(workbenchSummary({ period: currentReportPeriod(), personal_orders: 7 })); });
+    expect(await within(orders).findByText("7")).toBeInTheDocument();
+    expect(workbenchApi.summary).toHaveBeenCalledTimes(1);
+  });
+
+it("自定义周期配置返回前隐藏汇总，确认一致后不重复请求", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    vi.mocked(optionSetsApi.get).mockReturnValue(new Promise((resolve) => { finishConfig = resolve; }));
+    const custom = currentReportPeriod(undefined, 10);
+    vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({ period: custom, personal_orders: 8 }));
+
+    renderLight(<WorkbenchPage />, { user: "admin" });
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledWith(undefined));
+    const orders = screen.getByTestId("workbench-personal-orders");
+    expect(within(orders).getByText("-")).toBeInTheDocument();
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "10" }] } as never); });
+    expect(await within(orders).findByText("8")).toBeInTheDocument();
+    expect(workbenchApi.summary).toHaveBeenCalledTimes(1);
+  });
+
+it("周期配置与预取汇总不一致时隐藏旧数据并重新请求", async () => {
+    let finishConfig!: (value: Awaited<ReturnType<typeof optionSetsApi.get>>) => void;
+    let finishFresh!: (value: Awaited<ReturnType<typeof workbenchApi.summary>>) => void;
+    vi.mocked(optionSetsApi.get).mockReturnValue(new Promise((resolve) => { finishConfig = resolve; }));
+    vi.mocked(workbenchApi.summary)
+      .mockResolvedValueOnce(workbenchSummary({ period: currentReportPeriod(), personal_orders: 99 }))
+      .mockReturnValueOnce(new Promise((resolve) => { finishFresh = resolve; }));
+
+    renderLight(<WorkbenchPage />, { user: "admin" });
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenCalledWith(undefined));
+    await act(async () => { finishConfig({ code: "BUSINESS_PERIOD", options: [{ value: "start_day", label: "10" }] } as never); });
+    await waitFor(() => expect(workbenchApi.summary).toHaveBeenLastCalledWith(currentReportPeriod(undefined, 10)));
+    const orders = screen.getByTestId("workbench-personal-orders");
+    expect(within(orders).queryByText("99")).not.toBeInTheDocument();
+    expect(within(orders).getByText("-")).toBeInTheDocument();
+    await act(async () => { finishFresh(workbenchSummary({ period: currentReportPeriod(undefined, 10), personal_orders: 8 })); });
+    expect(await within(orders).findByText("8")).toBeInTheDocument();
+  });
+
 it("旧周期汇总晚返回时不覆盖新周期的数据", async () => {
     let finishOld!: (value: Awaited<ReturnType<typeof workbenchApi.summary>>) => void;
     const oldRequest = new Promise<Awaited<ReturnType<typeof workbenchApi.summary>>>((resolve) => { finishOld = resolve; });
@@ -85,6 +138,7 @@ it("切换周期加载期间隐藏旧统计并暂停旧周期跳转", async () =
 
 it("工作台展示业务总览指标和业务提醒", async () => {
     vi.mocked(workbenchApi.summary).mockResolvedValue(workbenchSummary({
+      period: currentReportPeriod(),
       orders: { total_count: 2 },
       inventory: { account_count: 1, aging_count: 1, overdue_count: 1 },
       installments: { total_count: 1, overdue_count: 1 },

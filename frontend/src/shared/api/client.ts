@@ -1,4 +1,5 @@
 import axios, { type AxiosAdapter, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
+import { trackPageLoadRequest } from "../lib/pageLoadTiming";
 
 /** 后端基址：本地联调 8123（8000 被 Docker 占用）；后端绑 0.0.0.0，局域网可直连。 */
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8123/api";
@@ -29,6 +30,29 @@ api.interceptors.request.use((config) => {
     else config.headers["X-Dev-User"] = currentDevUser();
   }
   return config;
+});
+
+// 注册在缓存拦截器之前，使计时包装最终实际使用的 adapter，包括缓存和并发去重。
+api.interceptors.request.use((config) => {
+  const finish = trackPageLoadRequest();
+  if (!finish) return config;
+  try {
+    const adapter = axios.getAdapter(config.adapter ?? api.defaults.adapter);
+    config.adapter = async (requestConfig) => {
+      try {
+        const response = await adapter(requestConfig);
+        finish(false);
+        return response;
+      } catch (error) {
+        finish(true);
+        throw error;
+      }
+    };
+    return config;
+  } catch (error) {
+    finish(true);
+    throw error;
+  }
 });
 
 // ---- GET 轻量缓存：并发去重 + 陈旧重验（真 SWR） ----

@@ -15,29 +15,22 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import ColumnElement
+from sqlalchemy import ColumnElement, cast, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.core.security import CurrentUser
 from app.domain.users import User
 
 
 def owner_scope_ids(session: Any, user: CurrentUser) -> set[int] | None:
-    """Resolve the owner ids visible to a user, including TEAM membership.
-
-    Team membership is intentionally resolved in Python for now: the membership
-    list is stored as JSON during this incremental rollout and remains portable
-    across SQLite and PostgreSQL.
-    """
+    """Resolve the owner ids visible to a user, including TEAM membership."""
     if user.is_admin or user.owner_scope == "ALL":
         return None
     if user.owner_scope != "TEAM" or not user.team_ids:
         return {user.id}
 
-    visible = {user.id}
-    for owner_id, team_ids in session.query(User.id, User.team_ids).all():
-        if set(team_ids or []).intersection(user.team_ids):
-            visible.add(owner_id)
-    return visible
+    matching_team = or_(*(cast(User.team_ids, JSONB).contains([team_id]) for team_id in user.team_ids))
+    return {user.id, *session.scalars(select(User.id).where(matching_team)).all()}
 
 
 def owner_scope_filter(

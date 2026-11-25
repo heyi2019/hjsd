@@ -233,6 +233,18 @@ export async function changePassword(oldPassword: string, newPassword: string): 
   }
 }
 
+export async function changeUsername(username: string, currentPassword: string): Promise<SessionUser> {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const generation = authGeneration;
+  const { data } = await api.post<{ access_token: string; user: SessionUser }>("/auth/change-username", {
+    username, current_password: currentPassword,
+  });
+  if (generation === authGeneration && token && localStorage.getItem(ACCESS_TOKEN_KEY) === token) {
+    localStorage.setItem(ACCESS_TOKEN_KEY, data.access_token);
+  }
+  return data.user;
+}
+
 export async function logout(): Promise<void> {
   authGeneration += 1;
   const token = localStorage.getItem(ACCESS_TOKEN_KEY);

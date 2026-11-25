@@ -49,7 +49,7 @@ class TestAuditLogApi:
         request_id = "audit-trace-20261017"
         response = seeded_client.post(
             "/api/pools",
-            json={"code": "TRACE_POOL", "name": "审计追踪池"},
+            json={"name": "审计追踪池"},
             headers={**headers, "X-Request-ID": request_id},
         )
         assert response.status_code == 201, response.text

@@ -227,10 +227,9 @@
 }
 
 @media (max-width: 640px) {
-  /* 移动端只保留页面标题与用户中心；主题、角色和退出登录收进用户中心，降低顶栏噪音。 */
+  /* 移动顶栏的账号操作集中在用户中心和退出登录。 */
   .topbar .theme-switch,
-  .topbar .topbar-role,
-  .topbar .topbar-action--logout { display: none; }
+  .topbar .topbar-role { display: none; }
   .topbar .topbar-actions { justify-content: flex-end; }
 
   /* 移动端账户与管理入口使用底部 Sheet 语义，减少遮挡并贴合单手操作区域。 */

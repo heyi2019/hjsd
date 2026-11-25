@@ -14,13 +14,13 @@ from typing import Any
 from app.shared.audit import record_audit
 from app.shared.business_numbering import installment_no as order_installment_no
 from app.core.security import CurrentUser
-from app.domain.users import User
 from app.shared.order_access import get_order
 from app.shared.form_values import set_extra_values
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.errors import Conflict, ErrorCode, Validation
 from app.shared.operation_operators import upsert_operation_operators
+from app.shared.user_identity import user_id_for_actor
 from app.core.state_machine import ACCOUNT_TRANSITIONS, ORDER_TRANSITIONS, transition
 from app.domain.enums import (
     AccountStatus, AuditAction, EventType,
@@ -212,7 +212,7 @@ def create_installment(
     session.add(installment)
     session.flush()
     if contract_type == InstallmentContractType.STOCK_SALE.value:
-        actor_id = session.scalar(select(User.id).where(User.username == actor))
+        actor_id = user_id_for_actor(session, actor)
         if actor_id is not None:
             for allocation in session.scalars(select(OrderProfitAllocation).where(OrderProfitAllocation.order_id == order.id, OrderProfitAllocation.allocation_type == "SELL")).all():
                 allocation.user_id = actor_id

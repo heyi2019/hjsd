@@ -17,6 +17,7 @@ from app.settings.auth.session import (
     require_permissions,
 )
 from app.domain.foundation import AuditLog
+from app.shared.user_identity import actor_names
 from app.settings.audit import schemas
 
 router = APIRouter(tags=["audit"])
@@ -46,7 +47,7 @@ def list_audit_logs(
     if action:
         stmt = stmt.where(AuditLog.action == action.upper())
     if actor:
-        stmt = stmt.where(AuditLog.actor == actor)
+        stmt = stmt.where(AuditLog.actor.in_(actor_names(db, [actor])))
     if from_date:
         stmt = stmt.where(AuditLog.occurred_at >= datetime.combine(from_date, datetime.min.time()))
     if to_date:

@@ -4,13 +4,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.user_identity import user_id_for_actor
 from app.core.errors import AuthError, Conflict, Validation
 from app.core.security import ALL_ROLES, OWNER_SCOPES, hash_password, verify_password
 from app.domain.enums import AuditAction, OrderStatus
+from app.domain.foundation import AuditLog
 from app.domain.trade import Order
 from app.domain.users import RevokedToken, User
 from app.settings.users._validation import (
@@ -26,6 +28,13 @@ from app.settings.users._validation import (
     _validate_handover_target,
     _validate_id_list,
 )
+
+
+def _claim_username(session: Session, username: str) -> None:
+    # 新建和改名共用命名空间。历史用户名仍标识原操作人，不能分配给其他登录账号。
+    session.execute(select(func.pg_advisory_xact_lock(1212831575, 1)))
+    if username.casefold() == "system" or user_id_for_actor(session, username) is not None:
+        raise Conflict("用户名已存在")
 
 
 def create_user(
@@ -51,8 +60,7 @@ def create_user(
     password = _required_password(password)
     pool_ids = _validate_id_list(pool_ids, label="资金账户") or []
     team_ids = _validate_id_list(team_ids, label="团队") or []
-    if session.scalar(select(User).where(User.username == normalized_username)):
-        raise Conflict("用户名已存在")
+    _claim_username(session, normalized_username)
     phone = _optional_phone(phone)
     _check_phone_unique(session, phone)
     _check_pool_ids(session, pool_ids)
@@ -197,6 +205,34 @@ def update_user(
             after=_user_snapshot(user),
         )
     return user
+
+
+def change_username(session: Session, user_id: int, *, username: str, current_password: str) -> User:
+    normalized = _required_text(username, message="用户名不能为空")
+    if not 2 <= len(normalized) <= 64:
+        raise Validation("用户名须为 2 至 64 个字符")
+    account = session.scalar(
+        select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True)
+    )
+    if account is None or not account.is_active or not verify_password(current_password, account.password_hash):
+        raise Validation("当前密码不正确")
+    _claim_username(session, normalized)
+    if session.scalar(select(AuditLog.id).where(AuditLog.actor == normalized).limit(1)) is not None:
+        raise Conflict("用户名已存在")
+    before = _user_snapshot(account)
+    actor = account.username
+    account.username = normalized
+    session.flush()
+    record_audit(
+        session,
+        action=AuditAction.USER_UPDATE,
+        entity_type="user",
+        entity_id=account.id,
+        actor=actor,
+        before=before,
+        after=_user_snapshot(account),
+    )
+    return account
 
 
 def change_password(

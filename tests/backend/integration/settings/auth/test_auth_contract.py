@@ -9,12 +9,16 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 import pytest
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.core.security import CurrentUser, build_access_token, AuthError
 from app.settings.auth.session import get_current_user
 from app.core.settings import Settings
+from app.domain.trade import Account
 from app.domain.users import RevokedToken, User
+from app.business.inventory._common import scope_filter
+from app.shared.user_identity import actor_names, user_id_for_actor
 
 def _create_user(client: TestClient, *, username: str = "alice", password: str = "password123",
                  role: str = "VIEWER") -> dict:
@@ -53,10 +57,13 @@ def test_employee_code_is_sequential_and_independent_of_login_name(client: TestC
     )
     assert changed_password.status_code == 200
     token = changed_password.json()["access_token"]
-    current = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
-    assert current.status_code == 200
-    assert current.json()["employee_code"] == first["employee_code"]
-    assert _login(client, "alice", "newpassword1")
+    renamed = client.post(
+        "/api/auth/change-username", headers={"Authorization": f"Bearer {token}"},
+        json={"username": "alice-new", "current_password": "newpassword1"},
+    )
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["user"]["employee_code"] == first["employee_code"]
+    assert _login(client, "alice-new", "newpassword1")
 
 
 def test_team_code_is_automatically_assigned_and_stable(client: TestClient):
@@ -232,6 +239,51 @@ def test_change_password_success_then_login_with_new_password(client: TestClient
         ).status_code
         == 401
     )
+
+
+def test_change_username_preserves_account_identity_and_history(client: TestClient, seeded_db: Session):
+    account = _create_user(client, role="OPERATOR")
+    existing = _create_user(client, username="taken")
+    token = _login(client, "alice", "password123")
+    header = {"Authorization": f"Bearer {token}"}
+    password = client.post("/api/auth/change-password", headers=header, json={
+        "old_password": "password123", "new_password": "newpassword1",
+    })
+    header = {"Authorization": f"Bearer {password.json()['access_token']}"}
+
+    assert client.post("/api/auth/change-username", headers=header, json={
+        "username": "alice-new", "current_password": "wrong",
+    }).status_code == 422
+    assert client.post("/api/auth/change-username", headers=header, json={
+        "username": existing["username"], "current_password": "newpassword1",
+    }).status_code == 409
+    changed = client.post("/api/auth/change-username", headers=header, json={
+        "username": " alice-new ", "current_password": "newpassword1",
+    })
+    assert changed.status_code == 200, changed.text
+    result = changed.json()
+    assert result["user"]["id"] == account["id"]
+    assert result["user"]["username"] == "alice-new"
+    assert client.get("/api/auth/me", headers=header).status_code == 401
+    assert client.get("/api/auth/me", headers={
+        "Authorization": f"Bearer {result['access_token']}",
+    }).json()["username"] == "alice-new"
+    assert client.post("/api/auth/login", json={"username": "alice", "password": "newpassword1"}).status_code == 401
+    assert _login(client, "alice-new", "newpassword1")
+    assert client.post("/api/users", headers={"X-Dev-User": "admin"}, json={
+        "username": "alice", "display_name": "其他用户", "password": "password123",
+    }).status_code == 409
+
+    assert user_id_for_actor(seeded_db, "alice") == account["id"]
+    assert set(actor_names(seeded_db, ["alice-new"])) == {"alice", "alice-new"}
+    stock = Account(game_account="legacy-inventory", created_by="alice")
+    unowned = Account(game_account="other-inventory", created_by="taken")
+    seeded_db.add_all([stock, unowned])
+    seeded_db.flush()
+    renamed = CurrentUser.build(id=account["id"], username="alice-new", roles=["OPERATOR"])
+    visible = set(seeded_db.scalars(select(Account.id).where(scope_filter(seeded_db, renamed))))
+    assert stock.id in visible and unowned.id not in visible
+    assert stock.created_by == "alice"
 
 
 def test_password_change_is_required_and_invalidates_old_sessions(client: TestClient):

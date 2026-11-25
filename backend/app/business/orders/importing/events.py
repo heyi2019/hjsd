@@ -16,6 +16,7 @@ from app.core.security import CurrentUser, PERM_ORDER_EVENT_POST
 from app.domain.trade import Order, OrderEvent
 from app.domain.foundation import Pool
 from app.domain.users import User
+from app.shared.user_identity import user_id_for_actor
 
 from .parser import ImportTable, detail_records
 
@@ -31,7 +32,11 @@ def _operators(session: Session, raw: str, details: dict) -> list[int] | None:
         return None
     users = session.scalars(select(User).where(User.is_active.is_(True))).all()
     def matches(value: str) -> set[int]:
-        return {user.id for user in users if user.username == value or user.display_name == value}
+        ids = {user.id for user in users if user.username == value or user.display_name == value}
+        actor_id = user_id_for_actor(session, value, active_only=True)
+        if actor_id is not None:
+            ids.add(actor_id)
+        return ids
     full = matches(name)
     parts = [name] if len(full) == 1 else [part.strip() for part in re.split(r"[、,，]", name) if part.strip()]
     result = []

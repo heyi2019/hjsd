@@ -32,6 +32,11 @@ class PasswordChange(RequestModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class UsernameChange(RequestModel):
+    username: str = Field(min_length=2, max_length=64)
+    current_password: str = Field(min_length=1, max_length=128)
+
+
 class PasswordResetRequest(RequestModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -161,6 +166,15 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _login_result(user: User) -> LoginOut:
+    current = CurrentUser.build(
+        id=user.id, username=user.username, display_name=user.display_name,
+        roles=[user.role], owner_scope=user.owner_scope,
+        pool_ids=frozenset(user.pool_ids or []), team_ids=frozenset(user.team_ids or []),
+    )
+    return {"access_token": build_access_token(current, password_hash=user.password_hash), "token_type": "bearer", "user": _public(user)}
+
+
 @router.post("/login", response_model=LoginOut)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> LoginOut:
     # 登录限流：仅在生产生效（app_env=production），避免打断开发与 k6 压测。
@@ -174,12 +188,7 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     user = db.scalar(select(User).where(User.username == payload.username.strip()))
     if not user or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise AuthError("用户名或密码错误")
-    current = CurrentUser.build(
-        id=user.id, username=user.username, display_name=user.display_name,
-        roles=[user.role], owner_scope=user.owner_scope,
-        pool_ids=frozenset(user.pool_ids or []), team_ids=frozenset(user.team_ids or []),
-    )
-    return {"access_token": build_access_token(current, password_hash=user.password_hash), "token_type": "bearer", "user": _public(user)}
+    return _login_result(user)
 
 
 @router.get("/me", response_model=PublicUserOut)
@@ -203,6 +212,18 @@ def change_password(payload: PasswordChange, user: CurrentUser = Depends(get_cur
     )
     account = db.get(User, user.id)
     return {"ok": True, "access_token": build_access_token(user, password_hash=account.password_hash)}
+
+
+@router.post("/change-username", response_model=LoginOut)
+def change_username(
+    payload: UsernameChange,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> LoginOut:
+    account = service.change_username(
+        db, user.id, username=payload.username, current_password=payload.current_password,
+    )
+    return _login_result(account)
 
 
 @router.post("/logout", response_model=OkOut)

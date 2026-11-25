@@ -12,6 +12,7 @@ from app.core.errors import Validation
 from app.core.money import to_money
 from app.domain.enums import AllocationRole, AuditAction
 from app.domain.trade import Installment, Order, OrderEvent, OrderProfitAllocation
+from app.shared.user_identity import user_id_for_actor
 from app.domain.users import User
 
 from .action_rows import ACTION_TYPES
@@ -67,9 +68,7 @@ def _resolve_action_actor_ids(
                 )
                 candidates = [uid for uid in candidates if uid in existing]
             if not candidates:
-                actor_id = session.scalar(
-                    select(User.id).where(User.username == action.created_by)
-                )
+                actor_id = user_id_for_actor(session, action.created_by)
                 if actor_id is None:
                     raise Validation(
                         f"{action_type} 动作执行人不存在，无法绑定收益人",
@@ -86,14 +85,14 @@ def _resolve_action_actor_ids(
                 )
             )
             if contract is not None:
-                actor_id = session.scalar(select(User.id).where(User.username == contract.created_by))
+                actor_id = user_id_for_actor(session, contract.created_by)
                 if actor_id is None:
                     raise Validation("售出动作执行人不存在，无法绑定收益人")
                 action_actor_ids[action_type] = [int(actor_id)]
         elif action_type == "BUY" and order.order_type in {"HS", "TH", "DG"}:
             # 回收、提号、代挂都属于买号业务动作；DG 沿用标准 SELL
             # 资金事件，因此其买号收益人取建单操作人员。
-            creator_id = session.scalar(select(User.id).where(User.username == order.created_by))
+            creator_id = user_id_for_actor(session, order.created_by)
             if creator_id is not None:
                 action_actor_ids[action_type] = [int(creator_id)]
     return action_actor_ids

@@ -43,6 +43,7 @@ REGISTRY: dict[str, str] = {
     "order_access": "订单只读访问，business/finance 共用",
     "order_amounts": "订单收入/支出/利润唯一权威，business/customers/finance/operations 共用",
     "scope": "数据范围判定，六个业务域全量共用",
+    "user_identity": "登录改名前后的历史操作人归属，供 business、customers、finance、settings、workbench 共用",
 }
 
 # 2026-11-19 域归并后与 .importlinter 的 L3 业务域对齐（对齐前端 6 导航 key）。

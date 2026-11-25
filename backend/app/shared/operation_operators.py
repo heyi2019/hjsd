@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import Validation
 from app.core.time import now_second
 from app.domain.foundation import BusinessOperationOperator
+from app.shared.user_identity import user_id_for_actor
 from app.domain.users import User
 
 
@@ -43,9 +44,7 @@ def _resolve_operator_ids(
 ) -> list[int]:
     ids = list(operator_user_ids) if operator_user_ids is not None else []
     if operator_user_ids is None:
-        current_id = session.scalar(
-            select(User.id).where(User.username == actor, User.is_active.is_(True))
-        )
+        current_id = user_id_for_actor(session, actor, active_only=True)
         if current_id is None:
             raise Validation("当前操作人不存在或已停用", details={"field": "operator_user_ids"})
         ids = [current_id]

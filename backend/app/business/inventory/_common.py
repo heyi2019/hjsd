@@ -16,6 +16,7 @@ from app.domain.enums import (
     InventoryType,
     WalletRealName,
 )
+from app.shared.user_identity import actor_names
 from app.domain.trade import Account, Order
 
 # 只按独立库存状态统计；分期状态属于 installments，不再占用库存口径。
@@ -162,7 +163,7 @@ def scope_filter(session: Session, user: CurrentUser | None):
     linked_to_visible_order = select(Order.account_id).where(
         Order.account_id.is_not(None), Order.owner_id.in_(visible_owner_ids)
     )
-    return or_(Account.created_by == user.username, Account.id.in_(linked_to_visible_order))
+    return or_(Account.created_by.in_(actor_names(session, [user.username])), Account.id.in_(linked_to_visible_order))
 
 
 def account_is_visible(session: Session, account: Account, user: CurrentUser | None) -> bool:

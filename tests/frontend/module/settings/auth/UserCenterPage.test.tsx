@@ -1,5 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { appMessage as message } from "@/shared/ui/appFeedback";
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +21,7 @@ vi.mock("@/shared/api/client", async (importOriginal) => ({
   logout: vi.fn(),
   setDevUser: vi.fn(),
   changePassword: vi.fn(),
+  changeUsername: vi.fn(),
   checkBackendHealth: vi.fn(),
 }));
 
@@ -57,20 +57,20 @@ describe("UserCenterPage：账号信息与修改密码", () => {
   it("展示当前角色与权限点列表", () => {
     renderLight(<UserCenterPage />, { user: "admin" });
     expect(screen.getByText("系统管理员", { exact: true })).toBeTruthy();
-    expect(screen.queryByText("admin", { exact: true })).toBeNull();
+    expect(screen.getByText("admin", { exact: true })).toBeInTheDocument();
     // admin 拥有全部权限点（以「权限点列表」区域为准，避免撞顶栏同名按钮）
     const list = screen.getByLabelText("权限点列表");
     expect(list.querySelectorAll("li").length).toBeGreaterThan(0);
     expect(list.textContent).not.toMatch(/[a-z-]+\.[a-z-]+/);
-    expect(document.querySelector(".user-center__password-form")).toBeTruthy();
+    expect(document.querySelectorAll(".user-center__form")).toHaveLength(2);
     expect(screen.getByRole("button", { name: /修改密码/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /保存新密码/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /退出登录/ })).toHaveClass("user-center__logout");
+    expect(screen.queryByRole("button", { name: /退出登录/ })).not.toBeInTheDocument();
   });
 
   it("两次新密码不一致时不发请求，错误落入横幅", async () => {
     renderLight(<UserCenterPage />, { user: "admin" });
-    fireEvent.change(screen.getByLabelText("当前密码"), { target: { value: "old-pass-123" } });
+    fireEvent.change(within(screen.getByLabelText("新密码").closest("form")!).getByLabelText("当前密码"), { target: { value: "old-pass-123" } });
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "different-999" } });
     fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
@@ -80,7 +80,7 @@ describe("UserCenterPage：账号信息与修改密码", () => {
 
   it("改密成功调用 API 并提示（不清空需后端确认的场景由后端把关）", async () => {
     renderLight(<UserCenterPage />, { user: "admin" });
-    fireEvent.change(screen.getByLabelText("当前密码"), { target: { value: "old-pass-123" } });
+    fireEvent.change(within(screen.getByLabelText("新密码").closest("form")!).getByLabelText("当前密码"), { target: { value: "old-pass-123" } });
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
@@ -91,25 +91,39 @@ describe("UserCenterPage：账号信息与修改密码", () => {
   it("FE-046：错误旧密码留在用户中心，保留表单并恢复提交按钮", async () => {
     vi.mocked(changePasswordApi).mockRejectedValueOnce(new Error("原密码错误"));
     renderLight(<UserCenterPage />, { user: "admin" });
-    fireEvent.change(screen.getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
+    fireEvent.change(within(screen.getByLabelText("新密码").closest("form")!).getByLabelText("当前密码"), { target: { value: "wrong-old-pass" } });
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "new-pass-12345" } });
     fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
 
     expect(await screen.findByText(/原密码错误/)).toBeInTheDocument();
-    expect(screen.getByLabelText("当前密码")).toHaveValue("wrong-old-pass");
+    expect(within(screen.getByLabelText("新密码").closest("form")!).getByLabelText("当前密码")).toHaveValue("wrong-old-pass");
     expect(screen.getByRole("button", { name: /修改密码/ })).toBeEnabled();
     expect(screen.queryByText("登录工作台")).not.toBeInTheDocument();
   });
 
-  it("退出登录需二次确认，确认后才登出（L1611）", async () => {
-    const ui = userEvent.setup();
+  it("修改登录用户名成功后立即更新账号信息，错误时留在表单", async () => {
+    vi.mocked(client.changeUsername)
+      .mockRejectedValueOnce(new Error("用户名已存在"))
+      .mockResolvedValueOnce({ id: 1, username: "admin-new", role: "ADMIN", display_name: "系统管理员" });
     renderLight(<UserCenterPage />, { user: "admin" });
-    await ui.click(screen.getByRole("button", { name: /退出登录/ }));
-    // 先弹出确认层，未确认前不登出
-    expect(await screen.findByText("确认退出登录？")).toBeInTheDocument();
-    expect(client.logout).not.toHaveBeenCalled();
-    await ui.click(screen.getByRole("button", { name: /确认退出/ }));
-    await waitFor(() => expect(client.logout).toHaveBeenCalled());
+    const input = screen.getByLabelText("更改用户名");
+    const form = within(input.closest("form")!);
+    const current = form.getByText("admin", { exact: true });
+    expect(current).toHaveClass("user-center__username");
+    expect(current).not.toHaveAttribute("tabindex");
+    expect(form.queryByRole("textbox", { name: "当前用户名" })).not.toBeInTheDocument();
+    expect([...input.closest("form")!.querySelectorAll("label")].map((label) => label.textContent)).toEqual([
+      "当前用户名", "更改用户名", "当前密码",
+    ]);
+    fireEvent.change(input, { target: { value: " admin-new " } });
+    fireEvent.change(form.getByLabelText("当前密码"), { target: { value: "current-pass" } });
+    fireEvent.click(form.getByRole("button", { name: "修改用户名" }));
+    expect(await screen.findByText(/用户名已存在/)).toBeInTheDocument();
+    expect(input).toHaveValue(" admin-new ");
+    expect(screen.getByText("admin", { exact: true })).toBeInTheDocument();
+    fireEvent.click(form.getByRole("button", { name: "修改用户名" }));
+    expect(await form.findByText("admin-new", { exact: true })).toBeInTheDocument();
+    expect(client.changeUsername).toHaveBeenLastCalledWith("admin-new", "current-pass");
   });
 });

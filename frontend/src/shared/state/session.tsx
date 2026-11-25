@@ -2,7 +2,7 @@
  * 前端只用它控制按钮显隐；后端仍会二次鉴权，隐藏菜单不构成权限控制。 */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, setDevUser as persistDevUser } from "../api/client";
+import { ACCESS_TOKEN_KEY, changePassword as changePasswordApi, changeUsername as changeUsernameApi, currentDevUser, currentUser as currentUserApi, login as loginApi, logout as logoutApi, setDevUser as persistDevUser } from "../api/client";
 
 export const ALL_PERMISSIONS = [
   "customer.read",
@@ -105,6 +105,7 @@ interface SessionValue {
   login: (username: string, password: string) => Promise<void>;
   mustChangePassword: boolean;
   sessionError: string | null;
+  changeUsername: (username: string, currentPassword: string) => Promise<void>;
   changePassword: (oldPassword: string, newPassword: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -216,6 +217,14 @@ export function SessionProvider({
     setMustChangePassword(Boolean(loggedIn.must_change_password));
     setAuthenticated(true);
   }, []);
+  const changeUsername = useCallback(async (nextUsername: string, currentPassword: string) => {
+    const generation = sessionGeneration.current;
+    const updated = await changeUsernameApi(nextUsername, currentPassword);
+    if (generation !== sessionGeneration.current) return;
+    userRefreshVersion.current += 1;
+    setUsername(updated.username);
+    setDisplayName(updated.display_name ?? null);
+  }, []);
   const changePassword = useCallback(async (oldPassword: string, newPassword: string) => {
     await changePasswordApi(oldPassword, newPassword);
     setMustChangePassword(false);
@@ -238,8 +247,8 @@ export function SessionProvider({
   const value = useMemo<SessionValue>(() => {
     const permissions = new Set<string>(ROLE_PERMISSIONS[role] ?? []);
     const dataOwnerKey = import.meta.env.DEV ? currentDevUser() : username;
-    return { role, username, displayName, dataOwnerKey, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout };
-  }, [role, username, displayName, switchUser, authenticated, mustChangePassword, sessionError, changePassword, login, logout]);
+    return { role, username, displayName, dataOwnerKey, permissions, can: (code: string) => permissions.has(code), switchUser, authenticated, mustChangePassword, sessionError, changeUsername, changePassword, login, logout };
+  }, [role, username, displayName, switchUser, authenticated, mustChangePassword, sessionError, changeUsername, changePassword, login, logout]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

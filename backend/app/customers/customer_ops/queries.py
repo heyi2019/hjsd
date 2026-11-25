@@ -10,6 +10,7 @@ from app.shared.scope import owner_scope_filter, owner_scope_ids
 from app.core.errors import NotFound
 from app.domain.parties import Customer
 from app.business.orders.queries import order_customer_ids
+from app.shared.user_identity import actor_names
 from app.customers._common import apply_created_range
 
 def _customer_list_stmt(
@@ -28,7 +29,7 @@ def _customer_list_stmt(
     if status:
         stmt = stmt.where(Customer.status == status)
     if created_by:
-        stmt = stmt.where(Customer.created_by.in_(created_by))
+        stmt = stmt.where(Customer.created_by.in_(actor_names(session, created_by)))
     if keyword:
         pattern, escape = like_contains(keyword)
         stmt = stmt.where(

@@ -17,6 +17,7 @@ from app.shared.scope import owner_scope_filter
 from app.domain.enums import CashflowLedgerType
 from app.domain.trade import Cashflow, Order
 from app.shared.form_values import get_extra_values_bulk
+from app.shared.user_identity import actor_names
 from app.shared.amount_search import amount_keyword
 
 def _like_pattern(keyword: str) -> str:
@@ -91,7 +92,7 @@ def _apply_cashflow_filters(
     if category is not None:
         stmt = stmt.where(Cashflow.category == category)
     if created_by is not None:
-        stmt = stmt.where(Cashflow.created_by == created_by)
+        stmt = stmt.where(Cashflow.created_by.in_(actor_names(session, [created_by])))
     if keyword is not None and keyword.strip():
         pattern = _like_pattern(keyword)
         amount = amount_keyword(keyword)

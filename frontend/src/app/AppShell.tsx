@@ -338,7 +338,7 @@ export function AppShell() {
         onCancel={() => setUserCenterOpen(false)}
         className="user-center-modal"
       >
-        <UserCenterPage onClose={() => setUserCenterOpen(false)} />
+        <UserCenterPage />
       </Modal>
       <Modal
         open={moreOpen}

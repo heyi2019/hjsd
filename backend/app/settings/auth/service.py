@@ -11,6 +11,7 @@ from __future__ import annotations
 from app.settings.users.teams import create_team, update_team
 from app.settings.users.users import (
     change_password,
+    change_username,
     create_user,
     reset_password,
     revoke_token,
@@ -19,6 +20,7 @@ from app.settings.users.users import (
 
 __all__ = [
     "change_password",
+    "change_username",
     "create_team",
     "create_user",
     "revoke_token",

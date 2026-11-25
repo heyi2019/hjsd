@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.domain.enums import OrderStatus
 from app.domain.trade import Order, OrderEvent, OrderProfitAllocation
 from app.domain.users import User
+from app.shared.user_identity import user_id_for_actor
 from app.workbench.reminder_config import read_reminder_config
 
 from .service import PROFIT_ALLOCATED, PROFIT_PENDING, create_notification, ensure_notification
@@ -43,7 +44,7 @@ def notify_seller_to_allocate(
         if isinstance(uid, int) and not isinstance(uid, bool) and uid > 0
     }
     if not candidates:
-        actor_id = session.scalar(select(User.id).where(User.username == actor))
+        actor_id = user_id_for_actor(session, actor)
         if actor_id is not None:
             candidates.add(int(actor_id))
     created = 0

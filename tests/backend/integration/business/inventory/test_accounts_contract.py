@@ -255,7 +255,8 @@ class TestCreateAccountGuards:
         assert scoped["facet_total"] == 3
         assert scoped["type_counts"] == {"RECOVERY": 2}
         assert scoped["stats"] == result["stats"]
-        assert len([sql for sql in statements if " from users " in f" {' '.join(sql.lower().split())} "]) == 1
+        assert sum("users.team_ids" in sql.lower() for sql in statements) == 1
+        assert sum(" from audit_logs " in f" {' '.join(sql.lower().split())} " for sql in statements) == 1
 
     def test_inventory_order_summary_reuses_loaded_accounts(self, seeded_db):
         from sqlalchemy import event

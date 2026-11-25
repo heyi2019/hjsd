@@ -57,7 +57,8 @@ export function BusinessReminderSettingsPanel() {
       <BusinessRegistrationForm
         layout="horizontal"
         labelAlign="left"
-        labelCol={{ flex: "108px" }}
+        labelWrap
+        labelCol={{ flex: "192px" }}
         wrapperCol={{ flex: "auto" }} form={form} onFinish={save} initialValues={DEFAULT_BUSINESS_REMINDER_CONFIG} disabled={loading || write.pending || Boolean(error)}>
         <PermissionGate permission="option-set.manage">
           <FieldConfigScope scope="SYSREMIND" active={true}>

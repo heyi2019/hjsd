@@ -31,6 +31,7 @@ from ._common import (
     _required_text,
     apply_created_range,
 )
+from app.shared.user_identity import actor_names
 from app.shared.form_values import _validate_required_extras, set_extra_values
 
 # --------------------------------------------------------------------- 合作方
@@ -125,7 +126,7 @@ def list_counterparties(
     if status:
         stmt = stmt.where(Counterparty.status == status)
     if created_by:
-        stmt = stmt.where(Counterparty.created_by.in_(created_by))
+        stmt = stmt.where(Counterparty.created_by.in_(actor_names(session, created_by)))
     if limit is not None:
         stmt = stmt.limit(limit).offset(offset)
     return list(session.scalars(stmt.order_by(Counterparty.created_at.desc() if sort_desc else Counterparty.created_at.asc(), Counterparty.id.desc() if sort_desc else Counterparty.id.asc())).all())
@@ -143,7 +144,7 @@ def count_counterparties(
     if status:
         stmt = stmt.where(Counterparty.status == status)
     if created_by:
-        stmt = stmt.where(Counterparty.created_by.in_(created_by))
+        stmt = stmt.where(Counterparty.created_by.in_(actor_names(session, created_by)))
     return int(session.scalar(stmt) or 0)
 
 

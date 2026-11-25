@@ -12,13 +12,12 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from sqlalchemy import select  # noqa: E402
-
 from app.core.database import get_engine, get_session_factory  # noqa: E402
 from app.domain.base import Base
 from app.core.security import hash_password  # noqa: E402
 from app.domain import foundation, parties, trade, users  # noqa: E402
 from app.domain.users import User  # noqa: E402
+from app.shared.user_identity import user_id_for_actor  # noqa: E402
 
 # pyflakes 不认 `# noqa`，用 __all__ 声明这些副作用导入是有意保留的（触发 ORM 模型注册）。
 __all__ = ["foundation", "parties", "trade", "users"]
@@ -31,7 +30,8 @@ def main() -> None:
     Base.metadata.create_all(get_engine())
     session = get_session_factory()()
     try:
-        user = session.scalar(select(User).where(User.username == "admin"))
+        admin_id = user_id_for_actor(session, "admin")
+        user = session.get(User, admin_id) if admin_id is not None else None
         if user is None:
             user = User(username="admin", display_name="系统管理员", role="ADMIN", owner_scope="ALL", password_hash=hash_password(password))
             session.add(user)
@@ -40,7 +40,7 @@ def main() -> None:
             user.is_active = True
             user.role = "ADMIN"
         session.commit()
-        print("管理员账号已就绪：admin")
+        print(f"管理员账号已就绪：{user.username}")
     finally:
         session.close()
 

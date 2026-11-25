@@ -76,6 +76,8 @@ def get_current_user(
                 team_ids=frozenset(account.team_ids or []),
                 owner_scope=account.owner_scope,
             )
+        if account is not None and payload.get("credential_stamp") is not None:
+            raise AuthError("登录用户名已变更，请重新登录", code=ErrorCode.SESSION_INVALIDATED)
         if settings.is_development:
             # 开发/测试环境允许用签名 token 模拟尚未落库的角色，便于权限链路验证。
             return user_from_payload(payload)

@@ -82,16 +82,18 @@ test.describe("UI visual baseline", () => {
   test("工作台 desktop", async ({ page }) => {
     // 周期选择器显示当前日期区间；固定截图日期，避免跨月后视觉测试误报。
     await page.clock.setFixedTime(new Date("2026-11-23T12:00:00Z"));
+    const currentUserResponse = page.waitForResponse((response) => response.url().endsWith("/api/auth/me") && response.ok());
     await page.goto("/");
+    const currentUser = await (await currentUserResponse).json();
     const greeting = page.getByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ });
-    await expect(greeting).toBeVisible();
-    // 问候随时间和账号变化，截图继续使用固定标题比对布局。
-    await greeting.evaluate((heading) => { heading.textContent = "今天从这里开始"; });
+    await expect(greeting).toContainText(currentUser.display_name?.trim() || currentUser.username);
     await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
     // 页脚版本随发布变化，实际文案由 AppShell 用例校验。截图沿用固定文本比对布局。
     await page.locator(".sidebar-foot").evaluate((footer) => {
       footer.textContent = "宜游轩 · 经营工作台";
     });
+    // 用户资料加载完成后再固定标题，避免会话更新覆盖截图文案。
+    await greeting.evaluate((heading) => { heading.textContent = "今天从这里开始"; });
     await expect(page).toHaveScreenshot("workbench-desktop.png", {
       animations: "disabled",
       caret: "hide",
@@ -112,11 +114,11 @@ test.describe("UI visual baseline", () => {
   test("工作台 mobile", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.clock.setFixedTime(new Date("2026-11-23T12:00:00Z"));
+    const currentUserResponse = page.waitForResponse((response) => response.url().endsWith("/api/auth/me") && response.ok());
     await page.goto("/");
+    const currentUser = await (await currentUserResponse).json();
     const greeting = page.getByRole("heading", { name: /^(凌晨好|上午好|中午好|晚上好)，.+$/ });
-    await expect(greeting).toBeVisible();
-    // 问候随时间和账号变化，截图继续使用固定标题比对布局。
-    await greeting.evaluate((heading) => { heading.textContent = "今天从这里开始"; });
+    await expect(greeting).toContainText(currentUser.display_name?.trim() || currentUser.username);
     const brand = page.getByRole("heading", { name: "宜游轩", exact: true });
     await expect(brand).toBeVisible();
     await expect(brand.locator(".app-brand__mark")).toBeVisible();
@@ -126,6 +128,10 @@ test.describe("UI visual baseline", () => {
       title.querySelector<HTMLElement>(".topbar__page")!.style.display = "block";
     });
     await expect(page.getByRole("button", { name: "本期", exact: true })).toBeEnabled();
+    // 退出入口在移动端导航用例单独验证，布局基线沿用原工具栏。
+    await page.locator(".topbar-action--logout").evaluate((button) => { button.style.display = "none"; });
+    // 用户资料加载完成后再固定标题，避免会话更新覆盖截图文案。
+    await greeting.evaluate((heading) => { heading.textContent = "今天从这里开始"; });
     await expect(page).toHaveScreenshot("workbench-mobile.png", {
       animations: "disabled",
       caret: "hide",
@@ -144,6 +150,7 @@ test.describe("UI visual baseline", () => {
   test("移动端更多导航可达", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
+    await expect(page.locator(".topbar").getByRole("button", { name: "退出登录" })).toBeVisible();
     await page.getByRole("button", { name: "更多导航" }).click();
     await expect(page.getByRole("dialog", { name: "更多" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "经营中心" })).toBeVisible();

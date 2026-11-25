@@ -10,9 +10,6 @@ from app.business.orders.create import create_order
 from app.business.orders.events import post_event
 from app.domain.trade import OrderEvent
 
-pytestmark = pytest.mark.db
-
-
 def test_new_unlisting_requires_valid_active_listing_and_stores_event_id(seeded_client, seeded_db, headers):
     account = create_account(seeded_db, game_account="select-active-listing", business_mode="DISTRIBUTION", inventory_type="CONSIGNMENT", actor="pytest")
     order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)

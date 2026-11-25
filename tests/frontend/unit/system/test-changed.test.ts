@@ -26,6 +26,31 @@ describe("前端变更选测", () => {
     expect(selected("backend/app/main.py", "--ci")).toContain("npm run test:quick");
   });
 
+  it("仅修改测试文件时，只运行这些文件，包括 CI 选测", () => {
+    const reports = "tests/frontend/module/operations/reports/ReportsPage.deep.test.tsx";
+    const workbench = "tests/frontend/module/workbench/WorkbenchPage.deep.test.tsx";
+    for (const args of [[], ["--ci"]]) {
+      const output = selected(`${reports},${workbench}`, ...args);
+      expect(output).toContain(reports);
+      expect(output).toContain(workbench);
+      expect(output).not.toMatch(/tests\/frontend\/(?:unit|module)\/(?:operations|workbench)(?:\s|$)/m);
+      expect(output).not.toContain("npm run test:quick");
+    }
+  });
+
+  it("源码按区域选测时，其他区域的测试变更只增加对应文件", () => {
+    const workbench = "tests/frontend/module/workbench/WorkbenchPage.deep.test.tsx";
+    const output = selected(`frontend/src/operations/DataCenterPanel.tsx,${workbench}`);
+    expect(output).toContain("tests/frontend/module/operations");
+    expect(output).toContain(workbench);
+    expect(output).not.toMatch(/tests\/frontend\/(?:unit|module)\/workbench(?:\s|$)/m);
+  });
+
+  it("被删除的测试文件仍选其所属区域", () => {
+    expect(selected("tests/frontend/module/finance/removed.test.tsx"))
+      .toContain("tests/frontend/module/finance");
+  });
+
   it("资金收支变更同时覆盖使用它的业务和资金测试", () => {
     const output = selected("frontend/src/finance/cashflow/cashflow-modal.tsx");
     expect(output).toContain("tests/frontend/module/business");

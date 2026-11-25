@@ -2,7 +2,7 @@ name: frontend-gate
 
 # 前端门禁三档（2026-11-11 裁决，替代「每次 push 都跑全量」）：
 #   ① full_suite=true → 前端全量含 deep + 真实后端浏览器联动
-#   ② 本次提交有前端/测试变更 → npm run test:changed，按变更区域选测；公共层/分层配置运行完整前端测试
+#   ② 本次提交有前端/测试变更 → npm run test:changed，按变更文件或区域选测；公共层/分层配置运行完整前端测试
 #   ③ 无前端/测试变更 → npm run test:quick 冒烟，不静默跳过
 #   E2E 规格及关键源码变更运行受影响规格；E2E 共享配置变更或全量档运行完整浏览器测试。
 # 变更路径由 workflow 计算并经 TEST_CHANGED_PATHS 注入：CI checkout 后 git status 恒为空，

@@ -18,7 +18,7 @@
  *
  * 选档规则（2026-11-04 起测试家在仓库根 tests/frontend/）：
  *   - 变更落在 `frontend/src/<domain>/` → 跑该 domain 对应的区域（tests/frontend/<kind>/<区域>）
- *   - 变更落在 `tests/frontend/**`       → 跑变更所在的区域
+ *   - 变更落在 `tests/frontend/**`       → 已存在的测试文件只跑该文件；删除或非测试文件变更跑所在区域
  *   - 变更落在 `tests/fixtures|config/`  → 夹具/配置影响全部用例，运行完整前端测试
  *   - 变更落在壳层 `frontend/src/app/`、公共层 `frontend/src/shared/` → 运行完整前端测试
  *   - 变更落在分层/构建配置（vitest.config.ts、scripts/test-*.mjs、vite.config.ts、
@@ -99,7 +99,7 @@ if (head.includes("--help")) {
     [
       "用法：node scripts/test-changed.mjs [--list] [--ci] [-- <额外 vitest 参数>]",
       "",
-      "按 git 工作区变更自动选择要跑的区域（tests/frontend/<kind>/<区域>）。",
+      "按 git 工作区变更自动选择测试文件或区域（tests/frontend/<kind>/<区域>）。",
       "改动涉及 app/shared、夹具、分层配置或工作区依赖时运行完整前端测试。",
       "--ci 在无可定位的前端变更时运行 quick 测试。",
     ].join("\n"),
@@ -150,6 +150,7 @@ if (repoChanges.length === 0 && !ci) {
 }
 
 const regions = new Set();
+const changedTests = new Set();
 let globalReason = null;
 
 for (const path of repoChanges) {
@@ -166,11 +167,17 @@ for (const path of repoChanges) {
     break;
   }
 
-  // 测试文件自身：跑它所在区域。
+  // 已存在的测试文件自身只需跑该文件；删除的测试及区域内辅助文件保留原有区域选测。
   if (!inFrontend && path.startsWith("tests/frontend/")) {
     const parts = path.split("/"); // tests / frontend / <kind> / <区域> / file
     const region = parts[3];
-    if (region && KINDS.includes(parts[2])) regions.add(region);
+    if (region && KINDS.includes(parts[2])) {
+      if (/\.(?:test|spec)\.(?:ts|tsx)$/.test(path) && existsSync(resolve(REPO, path))) {
+        changedTests.add(path);
+      } else {
+        regions.add(region);
+      }
+    }
     continue;
   }
 
@@ -246,18 +253,22 @@ const runNpm = (script, label, reason) => {
 
 if (globalReason) {
   runNpm("test:full:all", "完整前端测试", globalReason);
-} else if (ci && regions.size === 0) {
+} else if (ci && regions.size === 0 && changedTests.size === 0) {
   runNpm("test:quick", "quick 测试", "无可定位的前端变更");
-} else if (regions.size === 0) {
+} else if (regions.size === 0 && changedTests.size === 0) {
   console.log(
     `前端变更未落在测试可定位的区域（${repoChanges.slice(0, 5).join(", ")}${repoChanges.length > 5 ? " …" : ""}），无需跑板块测试。`,
   );
   process.exit(0);
 } else {
   const selected = [...regions].sort();
-  const targets = targetsOf(selected);
+  const regionTargets = targetsOf(selected);
+  const testTargets = [...changedTests].sort().filter((file) =>
+    !regionTargets.some((directory) => file.startsWith(`${directory}/`)),
+  );
+  const targets = [...regionTargets, ...testTargets];
   const args = ["run", ...targets, ...passthrough];
-  console.log(`按变更选中区域：${selected.join(", ")}  →  ${targets.join(" ")}`);
+  console.log(`按变更选中测试：${targets.join(" ")}`);
   if (listOnly) {
     console.log(`\n将执行：${bin} ${args.join(" ")}`);
     process.exit(0);

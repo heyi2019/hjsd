@@ -5,7 +5,7 @@ from threading import Barrier, Event
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, inspect, select
 from sqlalchemy.orm import sessionmaker
 
 from app.core.errors import AppError, Validation
@@ -28,7 +28,75 @@ from app.finance.rebates import create_rebate, update_rebate
 pytestmark = pytest.mark.db
 
 
-def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
+@pytest.fixture(scope="module")
+def concurrency_schema_template(v1_engine):
+    """为并发测试创建可复制的临时数据库模板。"""
+    database = f"heijin_cashflow_template_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    created = False
+    try:
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        created = True
+        template_engine = create_engine(v1_engine.url.set(database=database))
+        try:
+            Base.metadata.create_all(template_engine)
+        finally:
+            # PostgreSQL 不允许复制仍有活动连接的模板库。
+            template_engine.dispose()
+        yield database
+    finally:
+        try:
+            if created:
+                with admin.connect() as connection:
+                    connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        finally:
+            admin.dispose()
+
+
+def test_concurrency_template_creates_independent_databases(v1_engine, concurrency_schema_template):
+    """复制后的测试库包含完整结构，提交数据不会流入其他测试库或模板。"""
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    databases = [f"heijin_cashflow_probe_test_{uuid4().hex}" for _ in range(3)]
+    created = []
+    engines = []
+    try:
+        for database in databases[:2]:
+            with admin.connect() as connection:
+                connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
+            created.append(database)
+            engines.append(create_engine(v1_engine.url.set(database=database)))
+
+        assert inspect(engines[0]).has_table("users")
+        assert inspect(engines[1]).has_table("users")
+        factory = sessionmaker(bind=engines[0])
+        with factory() as session:
+            session.add(User(username="isolation-probe", display_name="测试", password_hash="unused"))
+            session.commit()
+        factory = sessionmaker(bind=engines[1])
+        with factory() as session:
+            assert session.scalar(select(User).where(User.username == "isolation-probe")) is None
+
+        # 一份库写入后再次从模板复制，不能继承先前测试的数据。
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'CREATE DATABASE "{databases[2]}" TEMPLATE "{concurrency_schema_template}"')
+        created.append(databases[2])
+        engines.append(create_engine(v1_engine.url.set(database=databases[2])))
+        factory = sessionmaker(bind=engines[2])
+        with factory() as session:
+            assert session.scalar(select(User).where(User.username == "isolation-probe")) is None
+    finally:
+        for engine in engines:
+            engine.dispose()
+        try:
+            with admin.connect() as connection:
+                for database in reversed(created):
+                    connection.exec_driver_sql(f'DROP DATABASE "{database}"')
+        finally:
+            admin.dispose()
+
+
+def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine, concurrency_schema_template):
     from app.business.shared.order_detail.editing.editor import edit_execution_detail
     from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
     from app.core.security import CurrentUser
@@ -36,10 +104,9 @@ def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
     database = f"heijin_rebate_date_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -86,7 +153,7 @@ def test_rebate_service_and_order_date_edit_keep_latest_data(v1_engine):
 
 @pytest.mark.parametrize("first_action", ["edit", "reconcile"])
 @pytest.mark.parametrize("edit_kind", ["order", "rebate"])
-def test_reconciliation_and_amount_edit_serialize(v1_engine, first_action, edit_kind):
+def test_reconciliation_and_amount_edit_serialize(v1_engine, concurrency_schema_template, first_action, edit_kind):
     from app.business.orders.events import post_event
     from app.business.shared.order_detail.editing.editor import edit_execution_detail
     from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
@@ -96,10 +163,9 @@ def test_reconciliation_and_amount_edit_serialize(v1_engine, first_action, edit_
     database = f"heijin_recon_edit_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -199,14 +265,13 @@ def test_reconciliation_and_amount_edit_serialize(v1_engine, first_action, edit_
         admin.dispose()
 
 
-def test_rebate_edit_and_rejected_reversal_serialize(v1_engine):
+def test_rebate_edit_and_rejected_reversal_serialize(v1_engine, concurrency_schema_template):
     database = f"heijin_rebate_reverse_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -273,14 +338,13 @@ def test_rebate_edit_and_rejected_reversal_serialize(v1_engine):
         admin.dispose()
 
 
-def test_concurrent_rebate_edits_keep_record_event_and_flow_consistent(v1_engine):
+def test_concurrent_rebate_edits_keep_record_event_and_flow_consistent(v1_engine, concurrency_schema_template):
     database = f"heijin_rebate_concurrency_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -335,14 +399,13 @@ def test_concurrent_rebate_edits_keep_record_event_and_flow_consistent(v1_engine
 
 
 @pytest.mark.parametrize("same_account", [True, False])
-def test_concurrent_reconciliation_creation_keeps_one_snapshot(v1_engine, same_account):
+def test_concurrent_reconciliation_creation_keeps_one_snapshot(v1_engine, concurrency_schema_template, same_account):
     database = f"heijin_recon_concurrency_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
@@ -396,14 +459,13 @@ def test_concurrent_reconciliation_creation_keeps_one_snapshot(v1_engine, same_a
 
 
 @pytest.mark.parametrize("action", ["return", "partial", "loss", "cancel", "edit", "cancel_first", "resolve"])
-def test_deposit_and_reconciliation_competing_actions_are_serialized(v1_engine, action):
+def test_deposit_and_reconciliation_competing_actions_are_serialized(v1_engine, concurrency_schema_template, action):
     database = f"heijin_fund_concurrency_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -494,14 +556,13 @@ def test_deposit_and_reconciliation_competing_actions_are_serialized(v1_engine, 
         admin.dispose()
 
 
-def test_concurrent_transfer_repairs_only_create_one_counterpart(v1_engine):
+def test_concurrent_transfer_repairs_only_create_one_counterpart(v1_engine, concurrency_schema_template):
     database = f"heijin_repair_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
@@ -565,14 +626,13 @@ def test_concurrent_transfer_repairs_only_create_one_counterpart(v1_engine):
 
 
 @pytest.mark.parametrize("action", ["reverse", "edit", "delete"])
-def test_concurrent_actions_cannot_change_reversed_flow(v1_engine, action):
+def test_concurrent_actions_cannot_change_reversed_flow(v1_engine, concurrency_schema_template, action):
     database = f"heijin_cashflow_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
@@ -637,14 +697,13 @@ def test_concurrent_actions_cannot_change_reversed_flow(v1_engine, action):
         admin.dispose()
 
 
-def test_concurrent_transfers_remain_paired_with_negative_balance(v1_engine):
+def test_concurrent_transfers_remain_paired_with_negative_balance(v1_engine, concurrency_schema_template):
     database = f"heijin_transfer_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
@@ -702,16 +761,15 @@ def test_concurrent_transfers_remain_paired_with_negative_balance(v1_engine):
         admin.dispose()
 
 
-def test_concurrent_default_pool_switches_keep_one_default(v1_engine):
+def test_concurrent_default_pool_switches_keep_one_default(v1_engine, concurrency_schema_template):
     from app.settings.field_definitions.pools import create_pool, update_pool
 
     database = f"heijin_default_pool_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         with factory() as session:
             seed_foundation(session, actor="pytest", include_example_data=True)
@@ -760,17 +818,16 @@ def test_concurrent_default_pool_switches_keep_one_default(v1_engine):
 
 @pytest.mark.parametrize("kind", ["manual", "order_event"])
 @pytest.mark.parametrize("first_action", ["disable", "write"])
-def test_pool_disable_serializes_with_new_cashflows(v1_engine, kind, first_action):
+def test_pool_disable_serializes_with_new_cashflows(v1_engine, concurrency_schema_template, kind, first_action):
     from app.business.orders.events import post_event
     from app.settings.field_definitions.pools import set_pool_status
 
     database = f"heijin_pool_disable_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -839,7 +896,7 @@ def test_pool_disable_serializes_with_new_cashflows(v1_engine, kind, first_actio
         admin.dispose()
 
 
-def test_pool_disable_and_order_cashflow_edit_do_not_deadlock(v1_engine):
+def test_pool_disable_and_order_cashflow_edit_do_not_deadlock(v1_engine, concurrency_schema_template):
     from app.business.shared.order_detail.editing.editor import edit_execution_detail
     from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
     from app.core.security import CurrentUser
@@ -848,10 +905,9 @@ def test_pool_disable_and_order_cashflow_edit_do_not_deadlock(v1_engine):
     database = f"heijin_pool_edit_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -917,16 +973,15 @@ def test_pool_disable_and_order_cashflow_edit_do_not_deadlock(v1_engine):
         admin.dispose()
 
 
-def test_order_date_shift_and_new_deposit_keep_matching_dates(v1_engine):
+def test_order_date_shift_and_new_deposit_keep_matching_dates(v1_engine, concurrency_schema_template):
     from app.business.orders.mutations import update_order
 
     database = f"heijin_order_deposit_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         old_day, new_day = date(2026, 11, 1), date(2026, 11, 11)
         with factory() as session:
@@ -987,16 +1042,15 @@ def test_order_date_shift_and_new_deposit_keep_matching_dates(v1_engine):
         admin.dispose()
 
 
-def test_order_date_shift_and_deposit_return_do_not_deadlock(v1_engine):
+def test_order_date_shift_and_deposit_return_do_not_deadlock(v1_engine, concurrency_schema_template):
     from app.business.orders.mutations import update_order
 
     database = f"heijin_order_return_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         old_day, new_day = date(2026, 11, 1), date(2026, 11, 11)
         with factory() as session:
@@ -1059,17 +1113,16 @@ def test_order_date_shift_and_deposit_return_do_not_deadlock(v1_engine):
         admin.dispose()
 
 
-def test_order_date_shift_keeps_concurrent_rebate_date_edit(v1_engine):
+def test_order_date_shift_keeps_concurrent_rebate_date_edit(v1_engine, concurrency_schema_template):
     from datetime import timedelta
     from app.business.orders.mutations import update_order
 
     database = f"heijin_order_rebate_shift_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         old_day, new_day = date(2026, 11, 1), date(2026, 11, 11)
         with factory() as session:
@@ -1114,16 +1167,15 @@ def test_order_date_shift_keeps_concurrent_rebate_date_edit(v1_engine):
         admin.dispose()
 
 
-def test_order_date_shift_and_cashflow_reversal_do_not_deadlock(v1_engine):
+def test_order_date_shift_and_cashflow_reversal_do_not_deadlock(v1_engine, concurrency_schema_template):
     from app.business.orders.mutations import update_order
 
     database = f"heijin_order_reverse_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         old_day, new_day = date(2026, 11, 1), date(2026, 11, 11)
         with factory() as session:
@@ -1186,17 +1238,16 @@ def test_order_date_shift_and_cashflow_reversal_do_not_deadlock(v1_engine):
 
 
 @pytest.mark.parametrize("kind", ["manual", "deposit"])
-def test_order_write_and_pool_disable_keep_consistent_lock_order(v1_engine, kind):
+def test_order_write_and_pool_disable_keep_consistent_lock_order(v1_engine, concurrency_schema_template, kind):
     from app.domain.trade import Order
     from app.settings.field_definitions.pools import assert_pool_usable, set_pool_status
 
     database = f"heijin_order_pool_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=5)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         with factory() as session:
@@ -1283,7 +1334,7 @@ def test_order_write_and_pool_disable_keep_consistent_lock_order(v1_engine, kind
         admin.dispose()
 
 
-def test_reconciliation_sees_one_committed_order_date_shift(v1_engine):
+def test_reconciliation_sees_one_committed_order_date_shift(v1_engine, concurrency_schema_template):
     from datetime import timedelta
     from app.business.orders.mutations import update_order
     from app.finance.reconciliation.service import _system_balance_as_of
@@ -1291,10 +1342,9 @@ def test_reconciliation_sees_one_committed_order_date_shift(v1_engine):
     database = f"heijin_shift_recon_test_{uuid4().hex}"
     admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
     with admin.connect() as connection:
-        connection.exec_driver_sql(f'CREATE DATABASE "{database}"')
+        connection.exec_driver_sql(f'CREATE DATABASE "{database}" TEMPLATE "{concurrency_schema_template}"')
     engine = create_engine(v1_engine.url.set(database=database), pool_size=4)
     try:
-        Base.metadata.create_all(engine)
         factory = sessionmaker(bind=engine, autoflush=False)
         day = date(2026, 11, 1)
         cutoff, new_day = day + timedelta(days=5), day + timedelta(days=10)

@@ -119,3 +119,55 @@ def test_different_game_type_is_not_a_duplicate(seeded_db):
     )
 
     assert seeded_db.get(Account, other.account_id).game_type == "和平精英"
+
+
+def test_ten_concurrent_orders_for_same_account_create_one_inventory(v1_engine):
+    """并发判重必须在库存提交后重新检查，不能产生多个未售库存。"""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from uuid import uuid4
+
+    from sqlalchemy import create_engine, func, select
+    from sqlalchemy.orm import sessionmaker
+    from app.domain.base import Base
+    from app.domain.trade import Order
+    from app.settings.field_definitions.seeds import seed_foundation
+
+    name = f"heijin_order_duplicate_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+
+        def worker(index):
+            with factory() as session:
+                barrier.wait()
+                try:
+                    _create(session, "concurrent-shared")
+                    session.commit()
+                    return "success"
+                except Validation as exc:
+                    session.rollback()
+                    return exc.code
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            results = list(executor.map(worker, range(10)))
+        assert results.count("success") == 1
+        assert results.count(ErrorCode.INVENTORY_ACCOUNT_IN_STOCK) == 9
+        with factory() as session:
+            assert session.scalar(select(func.count()).select_from(Account).where(Account.game_account == "concurrent-shared")) == 1
+            assert session.scalar(select(func.count()).select_from(Order)) == 1
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as connection:
+            connection.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()

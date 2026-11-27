@@ -1,7 +1,9 @@
 """建单守卫：库存账号判重。"""
 from __future__ import annotations
 
-from sqlalchemy import select
+from hashlib import sha256
+
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import ErrorCode, Validation
@@ -25,6 +27,10 @@ def _assert_no_duplicate_inventory_account(
 
     缺 ``game_type`` 时按账号单键判重，避免调用方通过省略产品类型绕过库存保护。
     """
+    # 缺游戏类型时按账号判重，因此锁也只按账号分组，覆盖有无类型的并发请求。
+    # 事务结束自动释放；不同账号无需互相等待。
+    lock_key = int.from_bytes(sha256(f"order-inventory:{game_account}".encode()).digest()[:8], "big", signed=True)
+    session.execute(select(func.pg_advisory_xact_lock(lock_key)))
     filters = [
         Account.game_account == game_account,
         Account.status != AccountStatus.VOID.value,

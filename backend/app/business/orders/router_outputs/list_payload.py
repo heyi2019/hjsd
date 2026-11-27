@@ -19,6 +19,8 @@ from app.business.inventory.collaboration import register_order_list_payload_bui
 from app.business.orders.output_labels import _elapsed_label, _form_responsible_label, _selected_operator_label
 from app.business.orders.amount_summaries import order_amount_summaries
 from app.business.orders.router_outputs._shared import _operator_names
+from app.business.shared.order_detail.timestamps import historical_sale_timestamp
+from app.settings.field_definitions.classification import classification_for_order_type
 
 
 def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | None = None) -> list[dict]:
@@ -118,19 +120,22 @@ def _order_list_payload(db: Session, orders: list, *, accounts: list[Account] | 
         )
         party = parties.get(order.id)
         installment = installments.get(order.id)
-        # 售卖时间取卖出事件的业务发生日（occurred_on），不用记录创建时刻 created_at；
-        # created_at 是入库写入时间，用它会让历史导入单全部显示成导入当天。
+        # 导入时保留精确售卖时刻；普通仅有业务日期的事件仍按当天零点显示。
         sale_at = (
-            datetime.combine(sale_event.occurred_on, datetime.min.time())
+            historical_sale_timestamp(sale_event) or datetime.combine(sale_event.occurred_on, datetime.min.time())
             if sale_event
             else installment.created_at if installment else None
         )
         sale_operator = (_selected_operator_label(sale_event, operator_names) or None) if sale_event else None
         inventory_entry_at = account.inventory_entry_at if account else None
+        classification = classification_for_order_type(order.order_type) or {}
         payloads.append({
             "id": order.id,
             "order_no": order.order_no,
             "order_type": order.order_type,
+            "business_mode": classification.get("business_mode"),
+            "business_type": classification.get("business_type"),
+            "value_added_service": classification.get("value_added_service"),
             "trade_date": order.trade_date,
             "account_id": order.account_id,
             "status": order.status,

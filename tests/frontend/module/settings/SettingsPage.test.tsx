@@ -57,6 +57,33 @@ beforeEach(() => {
   vi.mocked(client.api).get.mockResolvedValue({ data: [] });
 });
 
+it("订单导入记录展示批次并在撤回后更新状态", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  let reverted = false;
+  vi.mocked(client.api).get.mockImplementation((path) => {
+    if (path === "/order-imports/history") return Promise.resolve({ data: [{
+      id: 18, file_name: "历史订单.csv", actor: "admin", imported_at: "2026-07-30T10:00:00",
+      created: 2, updated: 0, skipped: 0, inventories_created: 2,
+      status: reverted ? "reverted" : "imported", reversible: !reverted, reason: null,
+    }] }) as never;
+    return Promise.resolve({ data: [] }) as never;
+  });
+  vi.mocked(client.api).post.mockImplementation((path) => {
+    if (path === "/order-imports/history/18/revert") {
+      reverted = true;
+      return Promise.resolve({ data: {} }) as never;
+    }
+    return Promise.resolve({ data: {} }) as never;
+  });
+  renderLight(<SettingsPage />, { user: "admin" });
+  await ui.click(screen.getByRole("tab", { name: "订单导入" }));
+  expect(await screen.findByText("历史订单.csv")).toBeInTheDocument();
+  await ui.click(screen.getByRole("button", { name: "撤回" }));
+  await ui.click(await screen.findByRole("button", { name: "确认撤回" }));
+  expect(await screen.findByText("已撤回")).toBeInTheDocument();
+  expect(vi.mocked(client.api).post).toHaveBeenCalledWith("/order-imports/history/18/revert");
+});
+
 it("业务字典按账号流转、资金动作和账务动作三层结构渲染", async () => {
   renderLight(<SettingsPage />, { user: "admin" });
 
@@ -127,13 +154,35 @@ it("订单导入预检与所选文件和选项绑定，改变选项后必须重�
   expect(screen.getByRole("button", { name: "确认导入" })).toBeDisabled();
 });
 
+it("已有订单可单独预检补库存，且不会附带明细导入", async () => {
+  const ui = userEvent.setup({ pointerEventsCheck: 0 });
+  vi.mocked(client.api).post.mockResolvedValueOnce({ data: {
+    rows: [{ sheet: "主订单信息", row: 2, order_no: "HS0981", action: "inventory", errors: [], warnings: ["不重复生成流水"] }],
+    available_sections: {}, selected_sections: [], detail_errors: [],
+  } });
+  renderLight(<SettingsPage />, { user: "admin" });
+  await ui.click(screen.getByRole("tab", { name: "订单导入" }));
+  await ui.click(screen.getByRole("radio", { name: "带详情导入" }));
+  await ui.click(screen.getByRole("checkbox", { name: "操作明细" }));
+  await ui.click(screen.getByRole("radio", { name: "已有订单补库存" }));
+  expect(screen.getByRole("radio", { name: "台账展示列" })).toBeChecked();
+  expect(screen.queryByRole("checkbox", { name: "操作明细" })).not.toBeInTheDocument();
+  await ui.upload(screen.getByLabelText("选择订单文件"), new File(["订单号"], "订单.csv", { type: "text/csv" }));
+  await ui.click(screen.getByRole("button", { name: "预检文件" }));
+  expect(await screen.findByText("补库存")).toBeInTheDocument();
+  const calls = vi.mocked(client.api).post.mock.calls;
+  const form = calls[calls.length - 1]?.[1] as FormData;
+  expect(form.get("existing")).toBe("inventory");
+  expect(form.getAll("sections")).toEqual([]);
+});
+
 it("订单导入展示预检错误并禁止执行，通过后显示实际写入结果", async () => {
   const ui = userEvent.setup({ pointerEventsCheck: 0 });
   const row = { sheet: "主订单信息", row: 2, order_no: "DG0981", action: "error", errors: ["业务日期无效"], warnings: [] };
   vi.mocked(client.api).post
     .mockResolvedValueOnce({ data: { rows: [row], available_sections: {}, selected_sections: [], detail_errors: [] } })
     .mockResolvedValueOnce({ data: { rows: [{ ...row, action: "create", errors: [] }], available_sections: {}, selected_sections: [], detail_errors: [] } })
-    .mockResolvedValueOnce({ data: { created: 1, updated: 0, skipped: 0, events_created: 0, events_matched: 0, cashflows_created: 0, cashflows_matched: 0, cashflows_renumbered: [], rebates_created: 0, rebates_updated: 0 } });
+    .mockResolvedValueOnce({ data: { created: 1, updated: 0, skipped: 0, inventories_created: 0, events_created: 0, events_matched: 0, cashflows_created: 0, cashflows_matched: 0, cashflows_renumbered: [], rebates_created: 0, rebates_updated: 0 } });
   renderLight(<SettingsPage />, { user: "admin" });
   await ui.click(screen.getByRole("tab", { name: "订单导入" }));
   await ui.upload(screen.getByLabelText("选择订单文件"), new File(["订单号"], "订单.csv", { type: "text/csv" }));

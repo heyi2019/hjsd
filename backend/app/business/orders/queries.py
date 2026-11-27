@@ -30,6 +30,7 @@ from app.domain.trade import (
     OrderEvent,
 )
 from app.shared.amount_search import amount_keyword
+from app.settings.field_definitions.classification import BUSINESS_CLASSIFICATION
 
 def list_orders(
     session: Session, *, order_type: str | None = None, status: str | None = None,
@@ -348,9 +349,12 @@ def _order_list_stmt(
     if trade_date_to is not None:
         stmt = stmt.where(Order.trade_date <= trade_date_to)
     if business_mode:
-        stmt = stmt.where(
-            or_(Order.business_mode == business_mode, Account.business_mode == business_mode)
+        mode_by_order_type = case(
+            {code: classification["business_mode"] for code, classification in BUSINESS_CLASSIFICATION.items()},
+            value=Order.order_type,
+            else_=None,
         )
+        stmt = stmt.where(func.coalesce(mode_by_order_type, Account.business_mode) == business_mode)
     if game_type:
         stmt = stmt.where(
             func.coalesce(Account.game_type, Order.account_snapshot["game_type"].as_string()) == game_type

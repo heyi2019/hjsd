@@ -131,9 +131,9 @@ export function InventoryLedger({ controller, createAction }: { controller: Inve
           <QuestionCircleOutlined aria-label="库存类型数量说明" tabIndex={0} />
         </Tooltip>
         <Segmented
-          aria-label="库存业务筛选"
+          aria-label="库存业务模式筛选"
           value={businessMode ?? "all"}
-          options={[{ value: "all", label: "全部业务" }, ...(businessOptions ?? []).map((item) => ({ value: item.value, label: item.label }))]}
+          options={[{ value: "all", label: "全部模式" }, ...(businessOptions ?? []).map((item) => ({ value: item.value, label: item.label }))]}
           onChange={(value) => { setBusinessMode(value === "all" ? undefined : String(value)); setPage(1); }}
         />
         <TimeOrderControl descending={sortDesc} onChange={(value) => { setSortDesc(value); setPage(1); }} />

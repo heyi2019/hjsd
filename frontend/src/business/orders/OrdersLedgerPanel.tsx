@@ -147,6 +147,7 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
             onChange={(values) => { setMineOrders(false); setSaleOperatorIds((values as number[]).map(Number)); setPage(1); }}
           />
           <Segmented
+            aria-label="业务类型筛选"
             value={orderTypeFilter}
             options={[
               { value: "all", label: `全部 ${typeCount("all")}` },
@@ -155,8 +156,9 @@ export function OrdersLedgerPanel({ controller, onNavigate, createAction }: {
             onChange={(value) => { setOrderTypeFilter(value as BusinessFilterKey); setPage(1); }}
           />
           <Segmented
+            aria-label="业务模式筛选"
             value={businessModeFilter}
-            options={[{ value: "all", label: "全部业务" }, ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label }))]}
+            options={[{ value: "all", label: "全部模式" }, ...orderBusinessModeOptions.map((item) => ({ value: item.value, label: item.label }))]}
             onChange={(value) => { setBusinessModeFilter(value as BusinessModeFilterKey); setPage(1); }}
           />
           <TimeOrderControl descending={ledgerSortDesc} onChange={(value) => { setLedgerSortDesc(value); setPage(1); }} />

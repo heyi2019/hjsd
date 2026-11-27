@@ -1,29 +1,18 @@
 """把导入文件里的游戏与渠道名称解析为已配置的稳定编码。"""
 from __future__ import annotations
 
-from sqlalchemy import String, and_, cast, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import Validation
-from app.domain.enums import AuditAction
-from app.domain.foundation import AuditLog, GameTypeOption, Pool
+from app.domain.foundation import GameTypeOption, Pool
 
 
 def resolve_pool_code(session: Session, code: str) -> Pool | None:
-    """按当前编码或迁移前审计记录定位资金账户；存在歧义时拒绝导入。"""
+    """按当前编码定位资金账户。"""
     if not code:
         return None
-    previous_ids = select(AuditLog.entity_id).where(or_(
-        and_(AuditLog.entity_type == "pool_code_migration",
-             AuditLog.action == AuditAction.FIELD_DEFINITION_CHANGE.value,
-             AuditLog.before_json["code"].as_string() == code),
-        and_(AuditLog.entity_type == "Pool", AuditLog.action == AuditAction.POOL_CREATE.value,
-             AuditLog.after_json["code"].as_string() == code),
-    ))
-    matches = session.scalars(select(Pool).where(or_(Pool.code == code, cast(Pool.id, String).in_(previous_ids)))).all()
-    if len(matches) > 1:
-        raise Validation("资金账户编码对应多个账户，请核对导入文件", details={"code": code})
-    return matches[0] if matches else None
+    return session.scalar(select(Pool).where(Pool.code == code))
 
 
 def resolve_new_account_references(session: Session, game_type: str, channel: object) -> tuple[str, str | None]:

@@ -20,11 +20,22 @@ from .parser import MAX_FILE_BYTES, parse_order_import
 from .custom_columns import configured_order_columns
 from .execute import execute_order_import
 from .preview import preview_order_import
-from .schemas import ImportPreviewOut, ImportResultOut
+from .schemas import ImportHistoryOut, ImportPreviewOut, ImportResultOut
+from .history import list_imports, revert_import
 from .template import build_order_import_template
 
 router = APIRouter(prefix="/order-imports", tags=["订单导入"])
 _create_orders = require_permissions(PERM_ORDER_CREATE)
+
+
+@router.get("/history", response_model=list[ImportHistoryOut])
+def order_import_history(db: Session = Depends(get_db), user: CurrentUser = _create_orders):
+    return list_imports(db, user)
+
+
+@router.post("/history/{batch_id}/revert", response_model=ImportHistoryOut)
+def order_import_revert(batch_id: int, db: Session = Depends(get_db), user: CurrentUser = _create_orders):
+    return revert_import(db, batch_id, user)
 
 
 @router.get("/template.xlsx")
@@ -57,7 +68,7 @@ def order_import_template(
 @router.post("/preview", response_model=ImportPreviewOut, response_model_exclude_none=True)
 async def order_import_preview(
     file: UploadFile = File(...),
-    existing: Literal["skip", "update"] = Form(...),
+    existing: Literal["skip", "update", "inventory"] = Form(...),
     sections: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
     user: CurrentUser = _create_orders,
@@ -74,7 +85,7 @@ async def order_import_preview(
 @router.post("/execute", response_model=ImportResultOut)
 async def order_import_execute(
     file: UploadFile = File(...),
-    existing: Literal["skip", "update"] = Form(...),
+    existing: Literal["skip", "update", "inventory"] = Form(...),
     sections: list[str] = Form(default=[]),
     db: Session = Depends(get_db),
     user: CurrentUser = _create_orders,
@@ -82,7 +93,8 @@ async def order_import_execute(
     try:
         content = await file.read(MAX_FILE_BYTES + 1)
         return await run_in_threadpool(
-            lambda: execute_order_import(db, parse_order_import(file.filename or "", content), existing=existing, sections=set(sections), user=user)
+            lambda: execute_order_import(db, parse_order_import(file.filename or "", content), existing=existing,
+                                         sections=set(sections), user=user, file_name=file.filename or "订单文件")
         )
     finally:
         await file.close()

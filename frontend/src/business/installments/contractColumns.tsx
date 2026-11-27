@@ -55,12 +55,12 @@ export function buildContractColumns(deps: ContractColumnsDeps): {
       render: (_v, row) => row.order.order_no,
     },
     {
-      title: "业务",
+      title: "业务模式",
       key: "business",
       render: (_v, row) => BUSINESS_MODE_LABEL[row.order.account_business_mode ?? ""] || "-",
     },
     {
-      title: "类型",
+      title: "业务类型",
       key: "order_type",
       render: (_v, row) => {
         return orderTypeLabel(row.order.order_type, { ...ORDER_TYPE_LABEL });

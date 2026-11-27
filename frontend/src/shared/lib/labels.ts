@@ -104,6 +104,7 @@ export const ENTITY_TYPE_LABEL: Record<string, string> = {
   cashflow: "资金流水",
   lead: "需求",
   counterparty: "合作方",
+  order_import_batch: "订单导入批次",
   // 订单详情页内编辑动作使用的细分实体类型（写点在 order_detail/editing/*）
   inventory_order_edit: "订单编辑",
   inventory_event_edit: "订单事件编辑",
@@ -212,6 +213,8 @@ export const AUDIT_ACTION_LABEL: Record<string, string> = {
   ORDER_CREATE: "新建订单",
   ORDER_UPDATE: "编辑订单",
   ORDER_CANCEL: "取消",
+  ORDER_IMPORT: "导入订单",
+  ORDER_IMPORT_REVERT: "撤回订单导入",
   LIST_EXPORT: "导出列表",
   EVENT_CREATE: "登记订单事件",
   EVENT_POST: "过账订单事件",

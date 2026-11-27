@@ -1,4 +1,4 @@
-"""固定业务分类口径：业务归属、业务类型与增值服务分层。"""
+"""固定业务分类口径：业务模式、业务类型与增值服务分层。"""
 from __future__ import annotations
 
 from typing import TypedDict

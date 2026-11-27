@@ -12,12 +12,18 @@ from app.domain.trade import Cashflow, Order, OrderEvent
 from app.domain.users import User
 from app.business.orders import schemas
 from app.business.orders.output_labels import _selected_operator_label
+from app.settings.field_definitions.classification import classification_for_order_type
 
 
 def _apply_common_output(output: schemas.OrderOut, order: Order) -> schemas.OrderOut:
     """回显订单表单扩展值与账号快照。"""
     # 表单字段自定义值落订单 form_extra 列，读取直接回显（BAS-04-03 历史值可查）。
     output.extra_values = dict(order.form_extra or {})
+    classification = classification_for_order_type(order.order_type)
+    if classification:
+        output.business_mode = classification["business_mode"]
+        output.business_type = classification["business_type"]
+        output.value_added_service = classification["value_added_service"]
     return output
 
 

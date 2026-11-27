@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -78,6 +78,7 @@ def post_event(
     allow_installment_delivery: bool = False,
     historical_import: bool = False,
     historical_cashflows_supplied: bool = False,
+    historical_sale_at: datetime | None = None,
 ) -> tuple[OrderEvent, Cashflow | None]:
     """登记：状态校验 → 池路由 → 事件落库 → 现金流派生 → 账号/订单状态，同一事务。
 
@@ -88,6 +89,11 @@ def post_event(
 
     if historical_cashflows_supplied and (not historical_import or event_type not in {"BUY", "SELL", "CANCEL"}):
         raise Validation("仅历史导入的资金事件可以使用独立流水明细")
+    if historical_sale_at is not None and (
+        not historical_import or event_type != "SELL" or historical_sale_at.tzinfo is not None
+        or historical_sale_at.date() != occurred_on
+    ):
+        raise Validation("历史售卖时间无效")
 
     (
         sale_mode,
@@ -246,6 +252,8 @@ def post_event(
         form_extra_context=field_context,
         actor=actor,
     )
+    if historical_sale_at is not None:
+        event_form_extra["historical_sale_at"] = historical_sale_at.isoformat()
     platforms = (event_form_extra or {}).get("consignment_platforms")
     if event_type == EventType.OPERATE.value and isinstance(platforms, list) and platforms:
         labels = option_label_maps(session, {"INTERMEDIARY_PLATFORM"})
@@ -360,6 +368,7 @@ def post_event(
             "amount": str(money),
             "pool_id": event.pool_id,
             "flow_no": flow.flow_no if flow is not None else None,
+            **({"historical_sale_at": historical_sale_at.isoformat()} if historical_sale_at else {}),
         },
         reason=reason,
     )

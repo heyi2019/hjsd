@@ -1,4 +1,4 @@
-"""生成与订单台账导出列兼容的空白导入模板。"""
+"""生成订单导入使用的空白模板。"""
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -18,9 +18,15 @@ from app.domain.enums import AccountingAttribute
 from app.settings.lists.export import UI_ONLY_KEYS
 from app.settings.lists.scopes import LIST_SCOPES
 from app.settings.lists.xlsx import new_workbook, write_sheet, xlsx_bytes
+from .parser import MAX_COLUMNS, MAX_ROWS
 
-_REQUIRED = ("order_no", "trade_date", "inventory_type")
+_REQUIRED = ("stock_no", "order_no", "business_mode", "inventory_type")
 _SECTIONS = frozenset({"details", "events", "cashflows", "rebates"})
+_FINANCE_COLUMNS = (
+    ("inventory_entry_at", "入库时间"), ("recovery_price", "回收价"), ("pickup_price", "提号价"),
+    ("sale_at", "售卖时间"), ("sale_operator", "售卖操作人"), ("sale_amount", "售出金额"),
+    ("account_status", "库存状态"), ("profit_base", "代挂利润"),
+)
 
 
 def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: set[str], *,
@@ -31,15 +37,27 @@ def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: 
         raise Validation("导入明细类型无效", details={"sections": sorted(unknown)})
     ledger = next(scope for scope in LIST_SCOPES if scope.code == "LEDGER")
     defaults = {column.key: column.label for column in ledger.columns}
-    defaults["trade_date"] = "业务日期"
     configured = {str(column["key"]): column for column in columns}
-    required = [(key, str(configured.get(key, {}).get("label") or defaults[key]), True) for key in _REQUIRED]
-    required.append(("business_operator", "业务操作人", True))
-    visible = [
-        (str(column["key"]), str(column["label"]), True)
-        for column in columns
-        if column.get("is_visible") and column["key"] not in UI_ONLY_KEYS and column["key"] not in {*_REQUIRED, "business_operator"}
-    ]
+    required = [(key, str(defaults[key] if key in {"stock_no", "business_mode"}
+                          else configured.get(key, {}).get("label") or defaults[key]), True) for key in _REQUIRED]
+    required.append(("inventory_operator", "入库操作人", True))
+    visible = []
+    finance_labels = dict(_FINANCE_COLUMNS)
+    for column in columns:
+        key = str(column["key"])
+        if not column.get("is_visible") or key in UI_ONLY_KEYS or key in {*_REQUIRED, "trade_date", "business_operator", "inventory_operator", "account_status", "in_hand_time"}:
+            continue
+        if key == "cost_amount":
+            visible.extend((("recovery_price", "回收价", True), ("pickup_price", "提号价", True)))
+        elif key in finance_labels:
+            visible.append((key, finance_labels[key], True))
+        else:
+            visible.append((key, str(column["label"]), True))
+    included = {key for key, _label, _visible in required + visible}
+    for key, label in _FINANCE_COLUMNS:
+        if key not in included:
+            index = next((i for i, item in enumerate(visible) if item[0] == "profit_base"), len(visible)) if key == "account_status" else len(visible)
+            visible.insert(index, (key, label, True))
     labels = [label for _key, label, _visible in required + visible]
     if len(labels) != len(set(labels)):
         raise Validation("导入模板的列名重复，请先调整列表自定义列")
@@ -59,30 +77,8 @@ def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: 
     ):
         if key in sections:
             write_sheet(workbook, title=title, rows=[], columns=definitions)
-    notes = workbook.create_sheet("填写说明")
-    for line in (
-        "订单导入模板填写说明",
-        "主订单信息：订单号、业务日期、业务类型用于识别新订单；日期填写 YYYY-MM-DD。",
-        "示例：订单号 HS0001；业务日期 2026-10-17；业务类型 回收。",
-        "业务操作人或入库操作人填写实际员工姓名或用户名，多个操作人用顿号分隔。",
-        "台账自定义列按当前订单表单字段配置还原；选择项填写编码或不重名的名称，多选填写 JSON 数组。",
-        "数值型自定义列支持整数；无法无损还原的值请通过订单页面录入。",
-        "业务日期不等同于入库时间；旧导出未包含业务日期时请补充。",
-        "操作、资金和返点明细按订单号关联；每条记录独立占一行。",
-        "账号描述适用于回收和代挂；修改已有账号资料请在订单详情中操作。",
-        "已有订单的图片、附件、审计等只读详情仅核对原值，不通过导入更改。",
-        "新订单中无法还原的详情请先清空对应单元格，图片和附件须在导入后补充原文件。",
-        "返点新增时请填写实际资金账户编码；返点会同步生成对应事件和收入流水。",
-        "手工资金明细请填写流水号、业务类别编码、核算属性、资金账户编码及来源类型 MANUAL。",
-        "运营事件请填写事件号、运营动作、运营详情 JSON；下架需填写关联上架事件号。",
-        "同一订单涉及多个明细时，请在各明细表分别填写，不要将汇总值当作明细。",
-        "导入前会展示预检结果；不自动匹配或绑定库存账号。",
-    ):
-        notes.append([line])
-    notes.column_dimensions["A"].width = 90
-    notes.append(["带下拉箭头的单元格可选择系统选项；多名操作人仍可手工用顿号分隔。"])
     choices = {
-        "主订单信息": {"业务类型": ["回收", "提号", "代挂"], "业务操作人": operators},
+        "主订单信息": {"业务模式": ["自营", "分销"], "业务类型": ["回收", "提号", "代挂"], "入库操作人": operators},
         "详情信息": {"有无二次": ["有", "无"]},
         "操作明细": {"动作": ["买入", "售出", "交付", "取消", "运营", "返点"],
                      "运营动作": ["寄售", "下架", "更新图片", "更新描述"],
@@ -96,8 +92,7 @@ def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: 
                      "操作人": operators},
     }
     choices["主订单信息"].update(custom_choices or {})
-    options = workbook.create_sheet("下拉选项")
-    options.sheet_state = "hidden"
+    options = workbook["主订单信息"]
     for sheet_name, fields in choices.items():
         if sheet_name not in workbook:
             continue
@@ -108,12 +103,19 @@ def build_order_import_template(columns: Sequence[Mapping[str, Any]], sections: 
             values = list(dict.fromkeys(value for value in values if value))
             if label not in headers or not values:
                 continue
-            option_column = options.max_column if options.cell(1, 1).value is None else options.max_column + 1
-            for row, value in enumerate(values, 1):
+            option_column = options.max_column + 1
+            first_row = 2
+            if option_column > MAX_COLUMNS or len(values) > MAX_ROWS:
+                raise Validation("模板下拉选项超过工作表容量")
+            options.cell(row=1, column=option_column, value=f"__import_options_{option_column}__")
+            options.column_dimensions[get_column_letter(option_column)].hidden = True
+            for row, value in enumerate(values, first_row):
                 options.cell(row=row, column=option_column, value=value)
             name = f"import_options_{option_column}"
             letter = get_column_letter(option_column)
-            workbook.defined_names.add(DefinedName(name, attr_text=f"'下拉选项'!${letter}$1:${letter}${len(values)}"))
+            workbook.defined_names.add(DefinedName(
+                name, attr_text=f"'{options.title}'!${letter}${first_row}:${letter}${first_row + len(values) - 1}",
+            ))
             validation = DataValidation(type="list", formula1=name, allow_blank=True, showErrorMessage=False)
             sheet.add_data_validation(validation)
             col = get_column_letter(headers[label])

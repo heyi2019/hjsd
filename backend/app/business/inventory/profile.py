@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import re
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -32,7 +33,7 @@ _ACCOUNT_FORM_SCOPE = {"RECOVERY": "HS", "PICKUP": "TH", "CONSIGNMENT": "DG"}
 def create_account(
     session: Session,
     *,
-    game_account: str,
+    game_account: str | None,
     actor: str,
     game_type: str | None = None,
     business_mode: str | None = None,
@@ -50,10 +51,16 @@ def create_account(
     account_images: list[str] | None = None,
     note: str | None = None,
     extra_values: Mapping[str, Any] | None = None,
+    historical_import: bool = False,
+    imported_stock_no: str | None = None,
 ) -> Account:
     identifier = game_account.strip() if isinstance(game_account, str) else ""
-    if not identifier:
+    if not identifier and not historical_import:
         raise Validation("库存编号必填", details={"field": "game_account"})
+    if imported_stock_no is not None and (
+        not historical_import or not re.fullmatch(r"KU_(?!00000)\d{5}", imported_stock_no)
+    ):
+        raise Validation("导入库存编号应为 KU_ 加五位数字", details={"field": "stock_no"})
     # 2026-10-28 口径：game_account 不唯一——同一游戏账号可反复回购，
     # 每次收购都是独立库存实体（各自成本与生命周期），不做查重限制。
     validate_inventory_context(business_mode, inventory_type)
@@ -62,7 +69,7 @@ def create_account(
             "增值服务无效",
             details={"field": "value_added_service", "value": value_added_service},
         )
-    stock_no = allocate_number(session, SequenceKey.STOCK_NO)
+    stock_no = imported_stock_no or allocate_number(session, SequenceKey.STOCK_NO)
     has_secondary = validate_optional_bool(has_secondary, field="has_secondary")
     camp_account = validate_camp_account(camp_account)
     validated_secondary_images = validate_secondary_images(secondary_images)
@@ -76,7 +83,7 @@ def create_account(
         inventory_type=inventory_type,
         value_added_service=value_added_service,
         stock_no=stock_no,
-        game_account=identifier,
+        game_account=identifier or None,
         camp_account=camp_account,
         game_password=game_password,
         channel_region=channel_region,
@@ -99,7 +106,7 @@ def create_account(
         entity_type="account",
         entity_id=account.id,
         values=(extra_values or {}).items(),
-        require_all=True,
+        require_all=not historical_import,
         scope=_ACCOUNT_FORM_SCOPE.get(inventory_type),
     )
     record_audit(

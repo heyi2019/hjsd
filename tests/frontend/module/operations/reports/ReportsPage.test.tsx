@@ -477,6 +477,17 @@ describe("ReportsPage：经营中心报表", () => {
 // —— 原 ReportsPage.details.test.tsx ——
 // 同一报表页与同一份接口 mock，详情断言合并到主文件以避免重复启动 jsdom+antd。
 describe("ReportsPage：各报表渲染与错误态", () => {
+  it("业务级损益分别展示业务模式与业务类型", async () => {
+    resolveMock(vi.mocked(reportsApi.businessPnl), reportResponse([
+      { order_type: "TH", business_mode: "DISTRIBUTION", business_type: "PICKUP", main_income: "800.00", cost: "300.00", main_profit: "500.00" },
+    ], {}));
+    renderLight(<BusinessPnl range={{ params: {}, picker: null }} />, { user: "admin" });
+    expect(await screen.findByText("提号（TH）")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "业务模式" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "业务类型" })).toBeInTheDocument();
+    expect(screen.getByText("分销")).toBeInTheDocument();
+  });
+
   it("经营损益：同时渲染月度趋势与业务拆分", async () => {
     resolveMockOnce(vi.mocked(reportsApi.monthlyPnl), reportResponse([
       { month: "2026-09", sales_income: "2000.00", studio_other_income: "75.00", cost: "500.00", operating_expense: "100.00", rebate_income: "50.00", operating_profit: "1475.00" },

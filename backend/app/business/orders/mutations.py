@@ -64,9 +64,10 @@ def _shift_accounting_dates(
 
     for event in events:
         event.occurred_on = event.occurred_on + shift
-        if event.event_type == "OPERATE" and event.form_extra:
+        if event.event_type in {"OPERATE", "SELL"} and event.form_extra:
             extra = dict(event.form_extra)
-            for key in ("listed_at", "platform_unlisted_at"):
+            keys = ("listed_at", "platform_unlisted_at") if event.event_type == "OPERATE" else ("historical_sale_at",)
+            for key in keys:
                 value = extra.get(key)
                 if isinstance(value, str):
                     try:

@@ -33,6 +33,7 @@ export interface Order {
   account_channel_region?: string | null;
   account_channel_region_label?: string | null;
   account_business_mode?: string | null;
+  business_operator?: string | null;
   account_status?: string | null;
   party_name?: string | null;
   party_role?: string | null;

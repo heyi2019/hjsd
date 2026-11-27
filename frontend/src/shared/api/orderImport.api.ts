@@ -1,13 +1,13 @@
 import { api, type CacheAwareRequestConfig } from "./client";
 
 export type ImportSection = "details" | "events" | "cashflows" | "rebates";
-export type ExistingOrderAction = "skip" | "update";
+export type ExistingOrderAction = "skip" | "update" | "inventory";
 
 export interface ImportRow {
   sheet: string;
   row: number;
   order_no: string;
-  action: "create" | "update" | "skip" | "error";
+  action: "create" | "update" | "inventory" | "skip" | "error";
   errors: string[];
   warnings: string[];
 }
@@ -20,9 +20,11 @@ export interface ImportPreview {
 }
 
 export interface ImportResult {
+  batch_id: number;
   created: number;
   updated: number;
   skipped: number;
+  inventories_created: number;
   events_created: number;
   events_matched: number;
   cashflows_created: number;
@@ -30,6 +32,20 @@ export interface ImportResult {
   cashflows_renumbered: { source: string; current: string }[];
   rebates_created: number;
   rebates_updated: number;
+}
+
+export interface ImportHistory {
+  id: number;
+  file_name: string;
+  actor: string;
+  imported_at: string;
+  created: number;
+  updated: number;
+  skipped: number;
+  inventories_created: number;
+  status: "imported" | "reverted";
+  reversible: boolean;
+  reason: string | null;
 }
 
 function importForm(file: File, existing: ExistingOrderAction, sections: ImportSection[]): FormData {
@@ -41,6 +57,8 @@ function importForm(file: File, existing: ExistingOrderAction, sections: ImportS
 }
 
 export const orderImportApi = {
+  history: () => api.get<ImportHistory[]>("/order-imports/history").then((response) => response.data),
+  revert: (id: number) => api.post<ImportHistory>(`/order-imports/history/${id}/revert`).then((response) => response.data),
   template: (sections: ImportSection[]) => {
     const config: CacheAwareRequestConfig = {
       params: { sections }, paramsSerializer: { indexes: null }, responseType: "blob", bypassCache: true,

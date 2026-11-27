@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 from pydantic import ValidationError as PydanticValidationError
-from app.business.orders.schemas import OrderAccountSnapshot
+from app.business.orders.schemas import ImportedOrderAccountSnapshot, OrderAccountSnapshot
 from app.business.inventory.profile import create_account
 from sqlalchemy.orm import Session
 from app.core.errors import (
@@ -73,9 +73,10 @@ def _validate_existing_account_context(
         )
 
 
-def _normalize_account_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+def _normalize_account_snapshot(snapshot: dict[str, Any], *, allow_missing_account: bool = False) -> dict[str, Any]:
     try:
-        return OrderAccountSnapshot.model_validate(snapshot).model_dump(exclude_none=True)
+        schema = ImportedOrderAccountSnapshot if allow_missing_account else OrderAccountSnapshot
+        return schema.model_validate(snapshot).model_dump(exclude_none=True)
     except PydanticValidationError as exc:
         raise Validation(
             "订单账号快照字段校验失败",

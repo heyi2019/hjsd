@@ -409,7 +409,7 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.getAllByText("库存状态").length).toBeGreaterThanOrEqual(1);
 
     // 入库 / 售卖责任时间列，且行内取数正确
-    for (const label of ["入库操作人", "入库时间", "售卖操作人", "售卖时间", "业务", "业务类型"]) {
+    for (const label of ["入库操作人", "入库时间", "售卖操作人", "售卖时间", "业务模式", "业务类型"]) {
       expect(screen.getByRole("columnheader", { name: label })).toBeInTheDocument();
     }
     const dutyRow = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
@@ -428,13 +428,24 @@ describe("OrdersPage：四类订单台账", () => {
     expect(screen.queryByRole("columnheader", { name: "日期" })).toBeNull();
     expect(document.querySelector(".orders-ledger .ant-table-content > table")).toHaveStyle({ tableLayout: "fixed" });
     const ledgerColumnWidths = Array.from(document.querySelectorAll(".orders-ledger .ant-table-content > table col")).map((column) => column.getAttribute("style"));
-    expect(ledgerColumnWidths).toContain("width: var(--col-w-60);");
+    expect(ledgerColumnWidths).toContain("width: var(--col-w-80);");
     expect(ledgerColumnWidths).toContain("width: var(--col-w-70);");
     for (const value of ["原神", "seller-001", "¥1,234.00", "在库"]) {
       expect(screen.getAllByText(value).length).toBeGreaterThan(0);
     }
     const waitingCostRow = screen.getAllByRole("row").find((item) => within(item).queryByText("HS-2026-0001") !== null)!;
     expect(within(waitingCostRow).getByText("¥100.00")).toBeInTheDocument();
+  });
+
+  it("未关联库存的已完成历史订单仍展示业务模式、业务类型和利润", async () => {
+    setupLedgerApi([{ ...orders[1], account_id: null, account_status: null, status: "COMPLETED", profit_base: "50.00", business_operator: "历史入库员", business_mode: "DISTRIBUTION", business_type: "PICKUP", account_business_mode: null }]);
+    renderLight(<OrdersPage initialTab="ledger" />, { user: "admin" });
+    await screen.findByText("TH-2026-0002");
+    const row = screen.getAllByRole("row").find((item) => within(item).queryByText("TH-2026-0002") !== null)!;
+    expect(within(row).getByText("分销")).toBeInTheDocument();
+    expect(within(row).getByText("提号")).toBeInTheDocument();
+    expect(within(row).getByText("历史入库员")).toBeInTheDocument();
+    expect(within(row).getByText("¥50.00")).toBeInTheDocument();
   });
 
   it("订单台账顶部展示当前筛选结果的订单统计卡", async () => {

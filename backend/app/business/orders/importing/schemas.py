@@ -1,4 +1,5 @@
 """订单导入预检与执行的响应契约。"""
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -8,7 +9,7 @@ class ImportRowOut(BaseModel):
     sheet: str
     row: int
     order_no: str
-    action: Literal["create", "update", "skip", "error"]
+    action: Literal["create", "update", "inventory", "skip", "error"]
     errors: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
@@ -32,9 +33,11 @@ class ImportRenumberedCashflowOut(BaseModel):
 
 
 class ImportResultOut(BaseModel):
+    batch_id: int
     created: int
     updated: int
     skipped: int
+    inventories_created: int = 0
     events_created: int
     events_matched: int
     cashflows_created: int
@@ -43,3 +46,17 @@ class ImportResultOut(BaseModel):
     rebates_created: int
     rebates_updated: int
     rows: list[ImportRowOut]
+
+
+class ImportHistoryOut(BaseModel):
+    id: int
+    file_name: str
+    actor: str
+    imported_at: datetime
+    created: int
+    updated: int
+    skipped: int
+    inventories_created: int
+    status: Literal["imported", "reverted"]
+    reversible: bool
+    reason: str | None = None

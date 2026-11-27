@@ -82,6 +82,17 @@ describe("AuditPanel：审计记录", () => {
     }
   });
 
+  it("订单导入和撤回的审计记录展示中文动作与批次类型", async () => {
+    vi.mocked(auditApi.list).mockResolvedValue(listResponse([
+      { ...rows[0], id: 2, action: "ORDER_IMPORT", entity_type: "order_import_batch" },
+      { ...rows[0], id: 3, action: "ORDER_IMPORT_REVERT", entity_type: "order_import_batch" },
+    ]));
+    renderLight(<AuditPanel />, { user: "admin" });
+    expect(await screen.findByText("导入订单")).toBeInTheDocument();
+    expect(screen.getByText("撤回订单导入")).toBeInTheDocument();
+    expect(screen.getAllByText("订单导入批次")).toHaveLength(2);
+  });
+
   it("展示配置项列并支持按配置项筛选", async () => {
     vi.mocked(auditApi.list).mockResolvedValue(listResponse([{ ...rows[0], entity_type: "Pool", action: "POOL_DISABLE" }]));
     vi.mocked(auditApi.actions).mockResolvedValue(["POOL_DISABLE"]);

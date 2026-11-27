@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..timestamps import business_timestamp
+from ..timestamps import business_timestamp, historical_sale_timestamp
 
 from app.domain.enums import CashflowSourceType, EventType
 from app.domain.foundation import Pool
@@ -32,6 +32,9 @@ class DetailEventContext:
 
 def _event_occurrence(event: OrderEvent) -> tuple[datetime, dict[str, object]]:
     extra = dict(event.form_extra or {})
+    sale_at = historical_sale_timestamp(event)
+    if sale_at is not None:
+        return sale_at, extra
     operation_type = extra.get("operation_type")
     key = {"CONSIGNMENT": "listed_at", "UNLIST": "platform_unlisted_at"}.get(operation_type) if isinstance(operation_type, str) else None
     value = extra.get(key) if key else None

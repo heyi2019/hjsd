@@ -13,6 +13,7 @@ from xml.etree.ElementTree import ParseError
 from zipfile import BadZipFile, ZipFile
 
 from openpyxl import load_workbook
+from openpyxl.utils.cell import range_boundaries
 from openpyxl.utils.exceptions import InvalidFileException
 
 from app.core.errors import Validation
@@ -30,6 +31,7 @@ _SHEETS = {
     "返点明细": ("rebates", 1),
 }
 _CONTINUATION = re.compile(r"（(?:[2-9]|[1-9]\d+)）$")
+_OPTION_HEADER = re.compile(r"__import_options_([1-9]\d*)__$")
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,28 @@ def _rows(items: Iterable[tuple[int, Sequence[str]]], headers: tuple[str, ...], 
     return tuple(rows)
 
 
+def _option_columns(workbook, sheet, headers: Sequence[str]) -> set[int]:
+    """只忽略模板自己的下拉辅助列，避免把同名自定义列当作辅助数据。"""
+    result = set()
+    for index, value in enumerate(headers):
+        match = _OPTION_HEADER.fullmatch(value)
+        if not match or match.group(1) != str(index + 1):
+            continue
+        name = workbook.defined_names.get(f"import_options_{index + 1}")
+        if name is None:
+            continue
+        try:
+            destinations = list(name.destinations)
+            if len(destinations) != 1 or destinations[0][0] != sheet.title:
+                continue
+            min_col, min_row, max_col, max_row = range_boundaries(destinations[0][1])
+            if min_col == max_col == index + 1 and min_row == 2 and max_row is not None and max_row >= 2:
+                result.add(index)
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return result
+
+
 def _csv_table(content: bytes) -> dict[str, ImportTable]:
     try:
         text = content.decode("utf-8-sig")
@@ -131,6 +155,14 @@ def _xlsx_tables(content: bytes) -> dict[str, ImportTable]:
                 table_rows.append((index, tuple(_text(cell.value) for cell in cells)))
             if len(table_rows) < header_row:
                 raise Validation("导入工作表缺少表头", details={"sheet": sheet.title})
+            # 单工作表模板把下拉选项放在隐藏辅助列；这些值不是订单数据。
+            if key == "main":
+                option_columns = _option_columns(workbook, sheet, table_rows[header_row - 1][1])
+                if option_columns:
+                    table_rows = [
+                        (number, tuple(value for index, value in enumerate(values) if index not in option_columns))
+                        for number, values in table_rows
+                    ]
             headers = _headers(table_rows[header_row - 1][1], sheet.title)
             rows = _rows(table_rows[header_row:], headers, sheet.title)
             previous = result.get(key)

@@ -48,7 +48,7 @@ export function useInventoryColumns(params: {
     },
     { title: "游戏/产品类型", key: "account_game_type", width: 80, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_type ? gameLabel(row.account_game_type) : null) },
     { title: "游戏账号/产品", key: "account_game_account", width: 120, ellipsis: true, render: (_v, row) => inventoryCellValue(row.account_game_account) },
-    { title: "业务", key: "business_mode", width: 56, ellipsis: true, render: (_v, row) => row.account_business_mode ? BUSINESS_MODE_LABEL[row.account_business_mode] ?? row.account_business_mode : inventoryCellValue(null)},
+    { title: "业务模式", key: "business_mode", width: 80, ellipsis: true, render: (_v, row) => row.account_business_mode ? BUSINESS_MODE_LABEL[row.account_business_mode] ?? row.account_business_mode : inventoryCellValue(null)},
     { title: "业务类型", dataIndex: "inventory_type", width: 68, ellipsis: true, render: (v: string | null) => v ? INVENTORY_TYPE_LABEL[v] ?? v : inventoryCellValue(v) },
     {
       title: "在手时间",

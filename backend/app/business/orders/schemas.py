@@ -96,6 +96,12 @@ class OrderAccountSnapshot(BaseModel):
     extra_values: dict[str, object] | None = None
 
 
+class ImportedOrderAccountSnapshot(OrderAccountSnapshot):
+    """历史导入允许账号缺失，其他已提供的资料仍须通过相同校验。"""
+
+    game_account: str | None = Field(default=None, min_length=1, max_length=128)
+
+
 class InitialBuyCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -219,6 +225,7 @@ class OrderListOut(OrderOut):
     party_created_at: datetime | None = None
     inventory_entry_at: datetime | None = None
     inventory_operator: str | None = None
+    business_operator: str | None = None
     sale_at: datetime | None = None
     sale_operator: str | None = None
     in_hand_time: str | None = None

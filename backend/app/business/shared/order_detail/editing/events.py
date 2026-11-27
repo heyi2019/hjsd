@@ -260,6 +260,8 @@ def apply_event_edits(db: Session, changes: list[tuple[OrderEvent, Cashflow | No
                 event.form_extra = {**(event.form_extra or {}), "listed_at": occurred_at.isoformat()}
             elif event.event_type == "OPERATE" and operation_type == "UNLIST":
                 event.form_extra = {**(event.form_extra or {}), "platform_unlisted_at": occurred_at.isoformat()}
+            elif event.event_type == "SELL" and "historical_sale_at" in (event.form_extra or {}):
+                event.form_extra = {**event.form_extra, "historical_sale_at": occurred_at.isoformat()}
             if flow is not None:
                 flow.occurred_on = occurred_at.date()
                 flow.created_at = occurred_at

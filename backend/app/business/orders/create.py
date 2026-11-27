@@ -61,8 +61,11 @@ def create_order(
     form_extra: Mapping[str, Any] | None = None,
     user: CurrentUser | None = None,
     imported_order_no: str | None = None,
+    historical_import_reference: Mapping[str, str] | None = None,
     bind_inventory: bool = True,
 ) -> Order:
+    if historical_import_reference and imported_order_no is None:
+        raise Validation("历史导入参考资料仅适用于导入订单")
     if imported_order_no is not None:
         if bind_inventory or account_id is not None or not re.fullmatch(r"(?:HS|TH|DG)(?!0000)\d{4}", imported_order_no) or not imported_order_no.startswith(order_type):
             raise Validation("导入订单编号或库存关联无效")
@@ -88,7 +91,9 @@ def create_order(
     if account_snapshot is not None and definition.code not in {"HS", "TH", "DG"}:
         raise Validation(f"业务类型 {definition.code} 不支持订单账号快照")
     if account_snapshot is not None:
-        account_snapshot = _normalize_account_snapshot(account_snapshot)
+        account_snapshot = _normalize_account_snapshot(
+            account_snapshot, allow_missing_account=imported_order_no is not None
+        )
         game_labels, channel_labels = game_reference_labels(session)
         game_value = account_snapshot.get("game_type")
         channel_value = account_snapshot.get("channel_region")
@@ -219,7 +224,7 @@ def create_order(
     has_secondary = None
     if account_snapshot is not None and definition.code in {"HS", "TH", "DG"}:
         snap = account_snapshot
-        game_account = snap["game_account"]
+        game_account = snap.get("game_account")
         game_type = snap.get("game_type")
         game_password = snap.get("game_password")
         camp_account = snap.get("camp_account")
@@ -344,14 +349,19 @@ def create_order(
         require_all=True,
     )
 
+    audit_after: dict[str, Any] = {
+        "order_type": order.order_type, "status": order.status, "roles": role_records,
+        "imported": imported_order_no is not None,
+    }
+    if historical_import_reference:
+        audit_after["historical_import_reference"] = dict(historical_import_reference)
     record_audit(
         session,
         action=AuditAction.ORDER_CREATE,
         entity_type="order",
         entity_id=order.order_no,
         actor=actor,
-        after={"order_type": order.order_type, "status": order.status, "roles": role_records,
-               "imported": imported_order_no is not None},
+        after=audit_after,
     )
     return order
 

@@ -5,7 +5,7 @@ from datetime import date, datetime
 import json
 import re
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.business.orders.events import post_event
@@ -30,7 +30,11 @@ def _operators(session: Session, raw: str, details: dict) -> list[int] | None:
     name = raw.strip()
     if not name or name in {"-", "—"}:
         return None
-    users = session.scalars(select(User).where(User.is_active.is_(True))).all()
+    split_names = [part.strip() for part in re.split(r"[、,，]", name) if part.strip()]
+    candidates = {name, *split_names}
+    users = session.execute(select(User.id, User.username, User.display_name).where(
+        User.is_active.is_(True), or_(User.username.in_(candidates), User.display_name.in_(candidates)),
+    )).all()
     def matches(value: str) -> set[int]:
         ids = {user.id for user in users if user.username == value or user.display_name == value}
         actor_id = user_id_for_actor(session, value, active_only=True)
@@ -38,7 +42,7 @@ def _operators(session: Session, raw: str, details: dict) -> list[int] | None:
             ids.add(actor_id)
         return ids
     full = matches(name)
-    parts = [name] if len(full) == 1 else [part.strip() for part in re.split(r"[、,，]", name) if part.strip()]
+    parts = [name] if len(full) == 1 else split_names
     result = []
     for part in parts:
         ids = full if part == name else matches(part)

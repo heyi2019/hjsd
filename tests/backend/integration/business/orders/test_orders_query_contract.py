@@ -58,6 +58,23 @@ def _scoped_user() -> CurrentUser:
 
 
 class TestGetAndListOrders:
+    def test_unbound_imported_orders_expose_and_filter_business_modes(self, seeded_client, seeded_db):
+        for number in ("HS0980", "TH0980", "DG0980"):
+            create_order(seeded_db, order_type=number[:2], trade_date=D, actor="pytest",
+                         imported_order_no=number, bind_inventory=False)
+        seeded_db.commit()
+        expected = {"SELF": {"HS0980"}, "DISTRIBUTION": {"TH0980", "DG0980"}}
+        for mode, numbers in expected.items():
+            result = seeded_client.get("/api/orders", headers={"X-Dev-User": "admin"}, params={"business_mode": mode})
+            assert result.status_code == 200, result.text
+            assert result.json()["total"] == len(numbers)
+            assert {row["order_no"] for row in result.json()["items"]} == numbers
+            assert all(row["business_mode"] == mode for row in result.json()["items"])
+        item = seeded_client.get("/api/orders", headers={"X-Dev-User": "admin"}, params={"keyword": "TH0980"}).json()["items"][0]
+        detail = seeded_client.get(f"/api/orders/{item['id']}", headers={"X-Dev-User": "admin"})
+        assert detail.status_code == 200 and detail.json()["business_mode"] == "DISTRIBUTION"
+        assert detail.json()["business_type"] == "PICKUP"
+
     def test_order_reader_receives_plaintext_password_within_data_scope(self, seeded_client, seeded_db):
         from app.settings.auth.session import get_current_user
 

@@ -10,7 +10,7 @@ import { money } from "../../shared/lib/format";
 import { DataTable, ErrorBanner } from "../../shared/ui";
 import { useGameReferences } from "../../shared/hooks/useGameReferences";
 
-/** 历史订单不自动绑定库存，但订单自身的事实仍须可查询。 */
+/** 未关联库存的订单仍可查询自身的业务事实。 */
 export function UnboundOrderDetail({ orderId }: { orderId: number }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<NormalizedError | null>(null);

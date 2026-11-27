@@ -19,10 +19,16 @@ export function BusinessPnl({ range, showPicker = true }: { range: ReportRange; 
   const { arrange: arrangeBusinessPnl } = useListViewColumns("RPT_BUSINESS_PNL");
   const columns: ColumnsType<BusinessPnlRow> = [
     {
-      title: "业务",
+      title: "业务模式",
+      dataIndex: "business_mode",
+      width: 90,
+      render: (v: string | null) => BUSINESS_MODE_LABEL[v ?? ""] ?? "-",
+    },
+    {
+      title: "业务类型",
       dataIndex: "order_type",
-      width: 150,
-      render: (v: string, row) => `${BUSINESS_MODE_LABEL[row.business_mode ?? ""] ?? "-"}·${BUSINESS_TYPE_LABEL[row.business_type ?? ""] ?? ORDER_TYPE_LABEL[v] ?? v}（${v}）`,
+      width: 120,
+      render: (v: string, row) => `${BUSINESS_TYPE_LABEL[row.business_type ?? ""] ?? ORDER_TYPE_LABEL[v] ?? v}（${v}）`,
     },
     { title: "主营收入", dataIndex: "main_income", align: "right", render: (v: string) => <MoneyText value={v} /> },
     { title: "成本", dataIndex: "cost", align: "right", render: (v: string) => <MoneyText value={v} />},

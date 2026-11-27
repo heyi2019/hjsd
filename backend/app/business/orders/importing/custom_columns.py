@@ -17,7 +17,7 @@ from app.shared.form_field_value import validate_field_value, validate_field_val
 
 _RESERVED = {column.label for column in SCOPE_MAP["LEDGER"].columns} | {
     label for _key, label, _visible in ORDER_DETAIL_EXPORT_COLUMNS
-} | {"行类型", "业务日期", "业务操作人"}
+} | {"行类型", "业务日期", "业务操作人", "代挂利润"}
 
 
 def configured_order_columns(session: Session) -> dict[tuple[str, str], tuple[ListCustomColumn, OrderFormField] | None]:

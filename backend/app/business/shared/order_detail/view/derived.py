@@ -32,6 +32,7 @@ INTERNAL_EXTRA_KEYS = frozenset({
     "listed_at",
     "platform_unlisted_at",
     "platform_unlist_scope",
+    "historical_sale_at",
 })
 
 ENTRY_ACTION = {"HS": "回收入库", "TH": "提号入库", "DG": "代挂入库"}

@@ -16,7 +16,7 @@ from app.settings.lists.service import get_value_labels
 
 _KEYS = frozenset({
     "stock_no", "inventory_entry_at", "cost_amount", "business_mode", "sale_at",
-    "sale_operator", "sale_amount", "in_hand_time", "status", "account_status", "profit_base",
+    "sale_operator", "sale_amount", "status", "account_status", "profit_base",
 })
 _COLUMNS = [(column.key, column.label, True) for column in SCOPE_MAP["LEDGER"].columns if column.key in _KEYS]
 _LABELS = {label: key for key, label, _visible in _COLUMNS}

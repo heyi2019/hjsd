@@ -45,15 +45,16 @@ function EntryGroup({ title, children, stacked = false }: { title: string; child
 export function BusinessDictionaryPanel() {
   return (
     <Card className="glass business-dictionary" title="业务分类口径">
+      <Typography.Paragraph type="secondary">业务模式说明如何经营；业务类型说明经营什么。</Typography.Paragraph>
       <Descriptions bordered size="small" column={1} styles={{ label: { width: 96 } }}>
-        <Descriptions.Item label="业务">
+        <Descriptions.Item label="业务模式">
           <EntryLine name="自营" desc="本方承担资金、库存和利润。" />
           <EntryLine name="分销" desc="向供货方提号后销售或帮客户代售（代挂）游戏账号，提号可使用本方资金。" />
         </Descriptions.Item>
         <Descriptions.Item label="业务类型">
           <EntryLine name="回收" desc="自营买入账号。" />
           <EntryLine name="提号" desc="分销取得账号。" />
-          <EntryLine name="代挂" desc="受委托挂售账号，付款和收款按实际发生登记。" />
+          <EntryLine name="代挂" desc="分销受委托挂售账号，付款和收款按实际发生登记。" />
         </Descriptions.Item>
         <Descriptions.Item label="产品">
           具体的游戏账号，是可以进入库存中心的产品实例，包含游戏账号、账号密码、渠道/区服等信息。

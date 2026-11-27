@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { idempotencyConfig } from "./idempotency";
 import type { Rebate } from "./types/finance";
 
 export const rebatesApi = {
@@ -13,8 +14,8 @@ export const rebatesApi = {
     channel?: string;
     note?: string;
     form_extra?: Record<string, unknown>;
-  }) =>
-    api.post<Rebate>("/rebates", payload).then((r) => r.data),
+  }, key?: string) =>
+    api.post<Rebate>("/rebates", payload, idempotencyConfig(key)).then((r) => r.data),
   update: (id: number, payload: { amount?: string; collected_on?: string; note?: string | null; operator_user_ids?: number[]; form_extra?: Record<string, unknown> }) =>
     api.patch<Rebate>(`/rebates/${id}`, payload).then((r) => r.data),
 };

@@ -401,3 +401,14 @@ def test_order_event_retry_replays_and_different_key_is_new_operation(seeded_cli
     assert len(flows) == 2
     assert {flow.flow_no for flow in flows} == {first.json()["cashflow_no"], other.json()["cashflow_no"]}
     assert all(flow.amount == Decimal("100.00") for flow in flows)
+
+
+def test_stock_sale_retry_returns_same_event(seeded_db, seeded_client, headers):
+    order = create_order(seeded_db, order_type="DG", trade_date=D, actor="pytest", account_snapshot={"game_account": "sale-retry", "game_type": "王者荣耀"})
+    seeded_db.commit()
+    payload = {"amount": "100", "occurred_on": D.isoformat()}
+    request_headers = {**headers, "Idempotency-Key": "sale-retry"}
+    first = seeded_client.post(f"/api/orders/{order.id}/stock-sale", json=payload, headers=request_headers)
+    second = seeded_client.post(f"/api/orders/{order.id}/stock-sale", json=payload, headers=request_headers)
+    assert first.status_code == second.status_code == 201, (first.text, second.text)
+    assert first.json()["event"]["id"] == second.json()["event"]["id"]

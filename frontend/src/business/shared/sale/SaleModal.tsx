@@ -21,6 +21,7 @@ import { collectFullPayment, collectInstallmentPayment } from "./receiver";
 import { SaleFinanceCard } from "./SaleFinanceCard";
 import { useAsyncAction } from "../../../shared/hooks/useAsyncAction";
 import { useRequestSession } from "../../../shared/hooks/useLatestRequest";
+import { useIdempotencyDraft } from "../../../shared/hooks/useIdempotencyDraft";
 import { compareMoney } from "../../../shared/lib/money";
 import { optionHasBehavior } from "../../../shared/lib/optionSets";
 import "./SaleModal.css";
@@ -67,6 +68,7 @@ function InventorySaleModalBase(props: InventorySaleModalProps) {
   const write = useAsyncAction();
   const submitting = write.pending;
   const session = useRequestSession(account);
+  const idempotency = useIdempotencyDraft();
   const [form] = Form.useForm();
   const { username } = useSession();
   const open = Boolean(props.account);
@@ -228,7 +230,7 @@ function InventorySaleModalBase(props: InventorySaleModalProps) {
           await collectInstallmentPayment({ sourceOrderId, values, customerInput, deliveryFormExtra });
           appMessage.success("分期售出已创建，账号已进入分期中");
         } else {
-          await collectFullPayment({ sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra });
+          await collectFullPayment({ sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra, idempotencyKey: idempotency.get(submittedSession).key });
           appMessage.success("账号已售出");
         }
         if (session.isCurrent(submittedSession)) {

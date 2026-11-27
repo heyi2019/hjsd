@@ -680,7 +680,7 @@ it("不填写客户时仍可售出", async () => {
   await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
   await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({
     amount: "350", delivery_form_extra: expect.objectContaining({ intermediary_platform: "盼之", intermediary_platform_other: null }),
-  })));
+  }), expect.any(String)));
   expect(customersApi.create).not.toHaveBeenCalled();
 });
 
@@ -693,7 +693,7 @@ it("填写客户时无需预先加载完整客户名单", async () => {
   await saleUi.click(screen.getByLabelText("资金账户"));
   await saleUi.click(await screen.findByText(/利润池/));
   await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
-  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({ customer_input: expect.objectContaining({ display_name: "买家A", role: "BUYER" }) })));
+  await waitFor(() => expect(ordersApi.stockSale).toHaveBeenCalledWith(21, expect.objectContaining({ customer_input: expect.objectContaining({ display_name: "买家A", role: "BUYER" }) }), expect.any(String)));
   expect(customersApi.page).not.toHaveBeenCalled();
 });
 
@@ -717,7 +717,7 @@ it("售出时把新买家关联到来源单而非新建订单", async () => {
   await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
     customer_input: expect.objectContaining({ display_name: "新买家", role: "BUYER" }),
     amount: "350", pool_id: 3, operator_user_ids: [1],
-  })));
+  }), expect.any(String)));
   expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
   expect(vi.mocked(customersApi.create)).not.toHaveBeenCalled();
   expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
@@ -772,7 +772,7 @@ describe("库存售出三表单分支", () => {
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
       amount: "200", pool_id: 3, sale_amount: "1000", form_extra: { sale_receipt: "全款凭据" }, customer_input: expect.objectContaining({ display_name: "买家A", role: "CONSIGNOR" }),
-    }));
+    }), expect.any(String));
   });
 
   it("代挂售出复用买号交付信息块，交付操作人提交落库到来源单", async () => {
@@ -800,7 +800,7 @@ describe("库存售出三表单分支", () => {
     await saleUi.click(screen.getByRole("button", { name: /确认售出/ }));
     await waitFor(() => expect(vi.mocked(ordersApi.stockSale)).toHaveBeenCalledWith(21, expect.objectContaining({
       delivery_form_extra: expect.objectContaining({ delivery_responsible_ids: [1], intermediary_platform: "其他", intermediary_platform_other: "星河平台" }),
-    })));
+    }), expect.any(String)));
   });
 
   it("分期售出金额字段拒绝超过两位小数", async () => {

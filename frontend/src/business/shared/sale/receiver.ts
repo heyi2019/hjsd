@@ -21,11 +21,12 @@ interface CollectPaymentInput {
   isConsignment: boolean;
   customerInput?: SaleCustomerInput;
   deliveryFormExtra?: Record<string, unknown>;
+  idempotencyKey?: string;
 }
 
 /** 全款收款：登记 SELL 事件，金额作为 PROFIT 份额入账。 */
 export async function collectFullPayment(input: CollectPaymentInput): Promise<void> {
-  const { sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra } = input;
+  const { sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra, idempotencyKey } = input;
   await ordersApi.stockSale(sourceOrderId, {
     amount: values.amount as string,
     occurred_on: today(),
@@ -38,7 +39,7 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
     customer_input: customerInput,
     delivery_form_extra: deliveryFormExtra,
     form_extra: formExtraOrUndefined(values.form_extra),
-  });
+  }, idempotencyKey);
 }
 
 /** 分期收款：建立库存分期出售合同（STOCK_SALE），并在确立时收首付（期次 0）。 */

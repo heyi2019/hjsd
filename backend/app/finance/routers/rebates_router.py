@@ -1,5 +1,6 @@
 """返点登记与查询 API。"""
-from fastapi import APIRouter, Depends, Query
+from typing import Annotated
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -20,6 +21,7 @@ from app.finance.rebates import (
     update_rebate as finance_update_rebate,
 )
 from app.shared.order_access import get_order
+from app.shared.idempotency import reserve_idempotency, complete_idempotency
 
 from ..router_output import _actor, _rebate_out
 
@@ -52,8 +54,12 @@ def create_rebate(
     payload: schemas.RebateCreate,
     db: Session = Depends(get_db),
     user: CurrentUser = post_rebate,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> schemas.RebateOut:
     get_order(db, payload.source_order_id, user)
+    record, replay = reserve_idempotency(db, user_id=user.id, scope="rebates", key=idempotency_key, payload=payload)
+    if replay is not None:
+        return schemas.RebateOut.model_validate(replay)
     item = finance_create_rebate(
         db,
         source_order_id=payload.source_order_id,
@@ -67,7 +73,9 @@ def create_rebate(
         form_extra=payload.form_extra,
         user=user,
     )
-    return _rebate_out(item)
+    result = _rebate_out(item)
+    complete_idempotency(record, result)
+    return result
 
 
 @router.patch("/rebates/{rebate_id}", response_model=schemas.RebateOut)

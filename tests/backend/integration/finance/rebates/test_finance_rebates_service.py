@@ -412,3 +412,15 @@ def test_update_rebate_without_action_event_still_updates_record(seeded_db):
     assert updated.amount == Decimal("300")
     # 无回指则事件金额未被联动，流水保持原值
     assert event.amount == Decimal("800")
+
+
+def test_rebate_retry_with_same_key_returns_original_record(seeded_db, seeded_client, headers):
+    order_id = _order_with_buy(seeded_db)
+    seeded_db.commit()
+    payload = {"source_order_id": order_id, "rebate_type": "SELL", "amount": "30", "collected_on": TODAY.isoformat()}
+    request_headers = {**headers, "Idempotency-Key": "rebate-retry-test"}
+    first = seeded_client.post("/api/rebates", json=payload, headers=request_headers)
+    second = seeded_client.post("/api/rebates", json=payload, headers=request_headers)
+    assert first.status_code == second.status_code == 201
+    assert first.json()["id"] == second.json()["id"]
+    assert len(seeded_db.scalars(select(RebateRecord).where(RebateRecord.source_order_id == order_id)).all()) == 1

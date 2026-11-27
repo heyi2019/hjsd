@@ -101,7 +101,7 @@ describe("详情编辑保存载荷", () => {
     const original = [{ order_id: 21, created_at: "2026-11-14T01:00:00", occurred_at: "2026-09-10T01:00:00", note: "旧备注" }];
     expect(buildOrderEdits(original, {
       21: { order_id: 21, occurred_at: "2026-09-10T01:00:00", note: "新备注", form_extra: {} },
-    })).toEqual([{ order_id: 21, note: "新备注" }]);
+    })).toEqual([{ order_id: 21, expected: { note: "旧备注" }, note: "新备注" }]);
   });
   it("会提交事件和订单实际修改的文本、时间和操作人", () => {
     const payload = buildEventEdits(
@@ -131,10 +131,10 @@ describe("详情编辑保存载荷", () => {
     const original = [{ order_id: 21, created_at: "2026-11-14T01:00:00", note: "旧备注" }];
     expect(buildOrderEdits(original, {
       21: { order_id: 21, occurred_at: "2026-11-14T01:00:00", note: "旧备注", form_extra: { sell_bound_phone: "139" } },
-    })).toEqual([{ order_id: 21, form_extra: { sell_bound_phone: "139" } }]);
+    })).toEqual([{ order_id: 21, expected: { form_extra: { sell_bound_phone: null } }, form_extra: { sell_bound_phone: "139" } }]);
     expect(buildOrderEdits(original, {
       21: { order_id: 21, occurred_at: "2026-11-14T02:00:00", note: "新备注", form_extra: {} },
-    })).toEqual([{ order_id: 21, occurred_at: "2026-11-14T02:00:00", note: "新备注" }]);
+    })).toEqual([{ order_id: 21, expected: { occurred_at: "2026-11-14T01:00:00", note: "旧备注" }, occurred_at: "2026-11-14T02:00:00", note: "新备注" }]);
   });
 
   it("运营动作修改平台后，操作明细使用同一份事件草稿", () => {

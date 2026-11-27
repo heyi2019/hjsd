@@ -176,3 +176,170 @@ def test_simultaneous_offsale_has_one_result(v1_engine):
         with admin.connect() as connection:
             connection.exec_driver_sql(f'DROP DATABASE "{database_name}"')
         admin.dispose()
+
+
+def test_ten_plain_cancellations_only_one_succeeds(v1_engine):
+    from app.business.shared.cancellation_model import cancel_order
+    name = f"heijin_cancel_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "cancel-race", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+        def worker(_):
+            with factory() as session:
+                barrier.wait()
+                try:
+                    cancel_order(session, order_id, actor="pytest", reason="并发取消")
+                    session.commit()
+                    return "success"
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            results = list(pool.map(worker, range(10)))
+        assert results.count("success") == 1
+        assert results.count("rejected") == 9
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+def test_ten_concurrent_order_note_edits_preserve_first_save(v1_engine):
+    from app.business.shared.order_detail.editing.editor import edit_execution_detail
+    from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
+    from app.domain.trade import Order
+    name = f"heijin_edit_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest", note="原备注", account_snapshot={"game_account": "edit-race", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+        def worker(index):
+            with factory() as session:
+                payload = ExecutionEditRequest.model_validate({"events": [], "orders": [{"order_id": order_id, "note": f"修改{index}", "expected": {"note": "原备注"}}]})
+                barrier.wait()
+                try:
+                    edit_execution_detail(session, order_id, payload, DEV_USERS["admin"])
+                    session.commit()
+                    return f"修改{index}"
+                except AppError:
+                    session.rollback()
+                    return None
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            results = list(pool.map(worker, range(10)))
+        successes = [result for result in results if result is not None]
+        assert len(successes) == 1
+        with factory() as session:
+            assert session.get(Order, order_id).note == successes[0]
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+def test_ten_rebate_retries_with_same_key_create_one_record(v1_engine):
+    from app.finance.routers.rebates_router import create_rebate
+    from app.finance.schemas import RebateCreate
+    from app.domain.trade import RebateRecord
+    from sqlalchemy import func
+    name = f"heijin_rebate_retry_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "rebate-race", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+        def worker(_):
+            with factory() as session:
+                payload = RebateCreate(source_order_id=order_id, rebate_type="SELL", amount="30", collected_on=date(2026, 11, 1))
+                barrier.wait()
+                result = create_rebate(payload, session, DEV_USERS["admin"], "same-rebate-request")
+                session.commit()
+                return result.id
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            ids = list(pool.map(worker, range(10)))
+        assert len(set(ids)) == 1
+        with factory() as session:
+            assert session.scalar(select(func.count()).select_from(RebateRecord)) == 1
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+def test_ten_users_sell_one_stock_only_once(v1_engine):
+    from app.business.orders.routers.order_events_router import stock_sale
+    from app.domain.trade import OrderEvent
+    from sqlalchemy import func
+    name = f"heijin_sale_race_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "sale-race", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+        def worker(index):
+            with factory() as session:
+                payload = schemas.StockSaleIn(amount="100", occurred_on=date(2026, 11, 1))
+                barrier.wait()
+                try:
+                    stock_sale(order_id, payload, session, DEV_USERS["admin"], f"sale-request-{index}")
+                    session.commit()
+                    return "success"
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            results = list(pool.map(worker, range(10)))
+        assert results.count("success") == 1
+        assert results.count("rejected") == 9
+        with factory() as session:
+            assert session.scalar(select(func.count()).select_from(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")) == 1
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()

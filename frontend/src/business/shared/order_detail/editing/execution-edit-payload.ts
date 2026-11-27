@@ -37,7 +37,7 @@ export type ExecutionOperationCreate = {
 
 /** 只提交真正修改的订单字段，编辑交付信息时保留原备注和入库时间。 */
 export function buildOrderEdits(
-  orders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "occurred_at" | "note">>,
+  orders: Array<Pick<AccountExecutionOrder, "order_id" | "created_at" | "occurred_at" | "note" | "extra_values">>,
   drafts: Record<number, OrderDraft>,
 ) {
   const originals = new Map(orders.map((order) => [order.order_id, order]));
@@ -50,6 +50,11 @@ export function buildOrderEdits(
     if (!timeChanged && !noteChanged && !hasExtra) return [];
     return [{
       order_id: draft.order_id,
+      expected: {
+        ...(timeChanged ? { occurred_at: original.occurred_at ?? original.created_at } : {}),
+        ...(noteChanged ? { note: original.note ?? null } : {}),
+        ...(hasExtra ? { form_extra: Object.fromEntries(Object.keys(draft.form_extra).map((key) => [key, original.extra_values?.[key] ?? null])) } : {}),
+      },
       ...(timeChanged ? { occurred_at: draft.occurred_at } : {}),
       ...(noteChanged ? { note: draft.note } : {}),
       ...(hasExtra ? { form_extra: draft.form_extra } : {}),

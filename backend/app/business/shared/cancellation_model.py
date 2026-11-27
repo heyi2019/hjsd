@@ -200,6 +200,7 @@ def cancel_order(
     """取消没有已登记业务/资金事件的订单。"""
     reason = _required_text(reason, field="reason", message="取消必须填写原因")
     order = get_order(session, order_id, user)
+    order = session.scalar(select(Order).where(Order.id == order.id).with_for_update().execution_options(populate_existing=True))
     posted_events = list(
         session.scalars(
             select(OrderEvent).where(

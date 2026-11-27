@@ -193,7 +193,7 @@ describe("InventoryRebateModal", () => {
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
     await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledWith(expect.objectContaining({
       source_order_id: 21, rebate_type: "SELL", amount: "80",
-    })));
+    }), expect.any(String)));
   });
 
   it("返点配置仅保留卖号选项时默认并提交卖号返点", async () => {
@@ -207,6 +207,6 @@ describe("InventoryRebateModal", () => {
     await ui.click(screen.getByRole("button", { name: "确认登记" }));
     await waitFor(() => expect(rebatesApi.create).toHaveBeenCalledWith(expect.objectContaining({
       source_order_id: 21, rebate_type: "SELL", amount: "80",
-    })));
+    }), expect.any(String)));
   });
 });

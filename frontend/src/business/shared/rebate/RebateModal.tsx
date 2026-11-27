@@ -23,6 +23,7 @@ import { useListViewColumns } from "../../../shared/lib/listColumns";
 import { InventoryAccountSummary } from "../inventory/InventoryAccountSummary";
 import "./RebateModal.css";
 import { indexEmployeeNames } from "../employee-names";
+import { useIdempotencyDraft } from "../../../shared/hooks/useIdempotencyDraft";
 
 type RebateKind = "BUY" | "SELL";
 
@@ -60,6 +61,7 @@ export function InventoryRebateModal(props: {
   const detailsRequest = useLatestRequest();
   const employeesRequest = useLatestRequest();
   const session = useRequestSession(props.account);
+  const idempotency = useIdempotencyDraft();
   const open = Boolean(props.account);
   const { config, ready: configReady, error: configError, retry: retryConfig } = useOrderFormConfig(open ? "INVREBATE" : undefined);
   const { labels } = useOrderFormSectionLabels(open ? "INVREBATE" : undefined);
@@ -149,7 +151,7 @@ export function InventoryRebateModal(props: {
           note: REBATE_KIND_LABEL[kind],
           operator_user_ids: values.operator_user_ids,
           form_extra: formExtraOrUndefined(values.form_extra),
-        });
+        }, idempotency.get(submittedSession).key);
         appMessage.success("返点已登记");
         if (session.isCurrent(submittedSession)) {
           form.resetFields();

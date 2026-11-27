@@ -147,7 +147,12 @@ def stock_sale(
     payload: schemas.StockSaleIn,
     db: Session = Depends(get_db),
     user: CurrentUser = post_events,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> schemas.EventPostResult:
+    orders_get_order(db, order_id, user)
+    record, replay = reserve_idempotency(db, user_id=user.id, scope=f"orders/{order_id}/stock-sale", key=idempotency_key, payload=payload)
+    if replay is not None:
+        return schemas.EventPostResult.model_validate(replay)
     apply_sale_details(db, order_id, customer_input=payload.customer_input,
                        delivery_form_extra=payload.delivery_form_extra, user=user)
     field_context = sale_form_context(payload.customer_input, payload.delivery_form_extra)
@@ -166,8 +171,10 @@ def stock_sale(
         user=user,
     )
     events = list(db.scalars(select(OrderEvent).where(OrderEvent.order_id == event.order_id)).all())
-    return schemas.EventPostResult(event=_event_output(event, _operator_names(db, [event]), cancellable_by_event(events)),
-                                   cashflow_no=flow.flow_no if flow else None)
+    result = schemas.EventPostResult(event=_event_output(event, _operator_names(db, [event]), cancellable_by_event(events)),
+                                      cashflow_no=flow.flow_no if flow else None)
+    complete_idempotency(record, result)
+    return result
 
 
 @router.post("/orders/{order_id}/events", response_model=schemas.EventPostResult, status_code=201)

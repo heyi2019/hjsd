@@ -1044,3 +1044,17 @@ def test_order_detail_does_not_use_creator_as_inventory_operator(seeded_client, 
 
     assert detail.status_code == 200
     assert detail.json()["orders"][0]["operator"] == "-"
+
+
+def test_order_note_edit_rejects_stale_original(seeded_client, seeded_db, headers):
+    account = create_account(seeded_db, game_account="stale-order-note", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id, note="原备注")
+    seeded_db.commit()
+    url = f"/api/orders/{order.id}/execution-edit"
+    def save(note):
+        return seeded_client.patch(url, headers=headers, json={"events": [], "orders": [{"order_id": order.id, "note": note, "expected": {"note": "原备注"}}]})
+    assert save("甲修改").status_code == 200
+    conflict = save("乙修改")
+    assert conflict.status_code == 409, conflict.text
+    seeded_db.refresh(order)
+    assert order.note == "甲修改"

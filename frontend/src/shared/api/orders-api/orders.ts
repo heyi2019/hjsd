@@ -30,7 +30,7 @@ export type OrderExecutionEditPayload = {
   events: { id: number; expected_amount: string; amount: string; note: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
   new_events?: { operation_type: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST"; occurred_at: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[]; note?: string }[];
   cashflows?: { flow_no: string; amount?: string; pool_id?: number; occurred_at?: string; note?: string | null; operator_user_ids?: number[] }[];
-  orders?: { order_id: number; occurred_at?: string; note?: string | null; form_extra?: Record<string, unknown> }[];
+  orders?: { order_id: number; expected?: Record<string, unknown>; occurred_at?: string; note?: string | null; form_extra?: Record<string, unknown> }[];
   parties?: { order_id: number; entity_type: "customer" | "counterparty"; entity_id: number; role: string; operation?: "add" | "remove" }[];
 };
 
@@ -50,7 +50,7 @@ export const ordersApi = {
     amount: string; occurred_on: string; pool_id?: number; operator_user_ids?: number[];
     note?: string; bound_phone?: string; bound_phone_owner?: string; sale_amount?: string;
     customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown>; form_extra?: Record<string, unknown>;
-  }) => api.post<EventPostResult>(`/orders/${orderId}/stock-sale`, payload).then((r) => r.data),
+  }, key?: string) => api.post<EventPostResult>(`/orders/${orderId}/stock-sale`, payload, idempotencyConfig(key)).then((r) => r.data),
   ledgerSummary: (params?: {
     mine?: boolean;
     trade_date_from?: string;

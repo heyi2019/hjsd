@@ -108,6 +108,12 @@ def apply_cashflow_edits(db: Session, account_id: int, target_order: Order, item
         # 编排入口已锁定目标订单与账号，复用该事务中的订单，不逐条重新查询。
         if flow.order_id != target_order.id or target_order.account_id != account_id:
             raise NotFound("资金明细不存在")
+        if item.expected is not None:
+            from ..timestamps import business_timestamp
+            from .expected import check_expected
+            check_expected(item.expected, {"amount": flow.amount, "pool_id": flow.pool_id,
+                           "note": flow.note or "", "occurred_at": business_timestamp(flow.occurred_on, flow.created_at),
+                           "operator_user_ids": flow.operator_user_ids or []}, "资金明细")
         amount_changed = item.amount is not None and item.amount != flow.amount
         pool_changed = item.pool_id is not None and item.pool_id != flow.pool_id
         date_changed = item.occurred_at is not None and item.occurred_at.date() != flow.occurred_on

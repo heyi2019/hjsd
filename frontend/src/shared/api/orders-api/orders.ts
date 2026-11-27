@@ -27,9 +27,9 @@ type OrderExportParams = Omit<OrderListParams, "limit" | "offset">;
 export type OrderExecutionEditPayload = {
   profile: object;
   expected_profile?: Record<string, unknown>;
-  events: { id: number; expected_amount: string; amount: string; note: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
+  events: { id: number; expected?: Record<string, unknown>; expected_amount: string; amount: string; note: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }[];
   new_events?: { operation_type: "IMAGE" | "DESCRIPTION" | "CONSIGNMENT" | "UNLIST"; occurred_at: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[]; note?: string }[];
-  cashflows?: { flow_no: string; amount?: string; pool_id?: number; occurred_at?: string; note?: string | null; operator_user_ids?: number[] }[];
+  cashflows?: { flow_no: string; expected?: Record<string, unknown>; amount?: string; pool_id?: number; occurred_at?: string; note?: string | null; operator_user_ids?: number[] }[];
   orders?: { order_id: number; expected?: Record<string, unknown>; occurred_at?: string; note?: string | null; form_extra?: Record<string, unknown> }[];
   parties?: { order_id: number; entity_type: "customer" | "counterparty"; entity_id: number; role: string; operation?: "add" | "remove" }[];
 };

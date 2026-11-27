@@ -17,6 +17,7 @@ from app.business.inventory.schemas import AccountProfileUpdate
 
 class ExecutionEditItem(RequestModel):
     id: int = Field(gt=0)
+    expected: dict[str, object] | None = None
     expected_amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
     amount: Decimal = Field(ge=0, max_digits=18, decimal_places=2)
     note: str | None = None
@@ -36,6 +37,7 @@ class ExecutionOperationCreateItem(RequestModel):
 
 class ExecutionCashflowEditItem(RequestModel):
     flow_no: str = Field(min_length=1, max_length=32)
+    expected: dict[str, object] | None = None
     amount: Decimal | None = Field(default=None, ge=0, max_digits=18, decimal_places=2)
     pool_id: int | None = Field(default=None, gt=0)
     occurred_at: datetime | None = None

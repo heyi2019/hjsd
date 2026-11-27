@@ -44,11 +44,20 @@ export function useOrderDetailEditor(params: {
   const { items: pools, error: poolError, reload: reloadPools } = useReferenceList("pools", poolsApi.list, false);
   const [invEditExtraForm] = Form.useForm();
   const originalAccount = useRef<Account | null>(null);
+  const originalDetail = useRef<AccountExecutionDetail | null>(null);
   const originalAccountExtras = useRef<Record<string, unknown>>({});
   const saveAction = useAsyncAction();
   const savingAccount = saveAction.pending;
   const openVersion = useLatestRequest();
   const openingEditor = useRef(false);
+
+  function getOriginalDetail(accountId: number): AccountExecutionDetail | undefined {
+    if (!originalDetail.current) {
+      const detail = getExecutionDetail(accountId);
+      if (detail) originalDetail.current = JSON.parse(JSON.stringify(detail)) as AccountExecutionDetail;
+    }
+    return originalDetail.current ?? undefined;
+  }
 
   async function ensureEmployees(fresh = false): Promise<EmployeeOption[]> {
     if (employees.length) {
@@ -81,6 +90,7 @@ export function useOrderDetailEditor(params: {
     setOrderDrafts({});
     setPartyDrafts({});
     originalAccount.current = null;
+    originalDetail.current = null;
     originalAccountExtras.current = {};
     invEditExtraForm.resetFields();
   }
@@ -101,6 +111,8 @@ export function useOrderDetailEditor(params: {
     setPartyDrafts({});
     invEditExtraForm.resetFields();
     originalAccount.current = JSON.parse(JSON.stringify(account)) as Account;
+    const detail = getExecutionDetail(account.id);
+    originalDetail.current = detail ? JSON.parse(JSON.stringify(detail)) as AccountExecutionDetail : null;
     originalAccountExtras.current = { ...(account.extra_values ?? {}) };
     invEditExtraForm.setFieldsValue({ form_extra: account.extra_values ?? {} });
     await Promise.all([ensureEmployees(true), ensurePools()]);
@@ -135,6 +147,7 @@ export function useOrderDetailEditor(params: {
 
   function updateEventDraft(event: AccountExecutionEvent, changes: { amount?: string; note?: string | null; occurred_at?: string; form_extra?: Record<string, unknown>; operator_user_ids?: number[] }) {
     if (saveAction.isPending()) return;
+    if (editingAccount) getOriginalDetail(editingAccount.id);
     setEventDrafts((current) => ({
       ...current,
       [event.id]: {
@@ -182,6 +195,7 @@ export function useOrderDetailEditor(params: {
 
   function updateFinanceDraft(flowNo: string, changes: Partial<Omit<FinanceDraft, "flow_no">>) {
     if (saveAction.isPending()) return;
+    if (editingAccount) getOriginalDetail(editingAccount.id);
     setFinanceDrafts((current) => ({
       ...current,
       [flowNo]: { ...(current[flowNo] ?? { flow_no: flowNo, occurred_at: "", note: "" }), ...changes },
@@ -195,7 +209,7 @@ export function useOrderDetailEditor(params: {
 
   function updateOrderDraft(orderId: number, changes: Partial<Omit<OrderDraft, "order_id">>) {
     if (saveAction.isPending()) return;
-    const detail = editingAccount ? getExecutionDetail(editingAccount.id) : undefined;
+    const detail = editingAccount ? getOriginalDetail(editingAccount.id) : undefined;
     const sharedOrderIds = sharedOrderIdsForEdit(detail, orderId);
     const originalOrders = detail?.orders ?? [];
     const originalOrder = originalOrders.find((order) => order.order_id === orderId);
@@ -252,7 +266,7 @@ export function useOrderDetailEditor(params: {
           ...(changedAccountKeys.length ? { extra_values: Object.fromEntries(changedAccountKeys.map((key) => [key, originalAccountExtras.current[key] ?? null])) } : {}),
           form_extra: Object.fromEntries(changedFormKeys.map((key) => [key, originalAccountExtras.current[key] ?? null])),
         };
-        const detail = getExecutionDetail(id);
+        const detail = getOriginalDetail(id);
         const originalEvents = detail?.orders.flatMap((order) => order.events) ?? [];
         const events = buildEventEdits(originalEvents, eventDrafts);
         if (events.some((item) => editedMoneyError(item.amount))) { appMessage.error("请填写有效的金额"); return; }

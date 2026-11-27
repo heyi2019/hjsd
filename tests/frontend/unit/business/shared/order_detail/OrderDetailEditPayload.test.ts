@@ -39,7 +39,7 @@ describe("详情编辑保存载荷", () => {
     }]));
     const result = buildFinanceEdits(rows, drafts);
     expect(result).toHaveLength(200);
-    expect(result?.[0]).toEqual({ flow_no: "CF200", amount: "120", pool_id: 2, occurred_at: "2026-11-01T10:00", note: "新备注", operator_user_ids: [2] });
+    expect(result?.[0]).toEqual({ flow_no: "CF200", expected: { amount: "100", pool_id: 1, occurred_at: "", note: "原备注", operator_user_ids: [1] }, amount: "120", pool_id: 2, occurred_at: "2026-11-01T10:00", note: "新备注", operator_user_ids: [2] });
     expect(result?.[199].flow_no).toBe("CF1");
     expect(reads).toBeLessThanOrEqual(400);
   });
@@ -56,11 +56,11 @@ describe("详情编辑保存载荷", () => {
   });
 
   it.each([
-    [{ amount: "120" }, { flow_no: "CF1", amount: "120", note: "原备注" }],
-    [{ pool_id: 2 }, { flow_no: "CF1", pool_id: 2, note: "原备注" }],
-    [{ occurred_at: "2026-11-01T10:00" }, { flow_no: "CF1", occurred_at: "2026-11-01T10:00", note: "原备注" }],
-    [{ note: "新备注" }, { flow_no: "CF1", note: "新备注" }],
-    [{ operator_user_ids: [2] }, { flow_no: "CF1", note: "原备注", operator_user_ids: [2] }],
+    [{ amount: "120" }, { flow_no: "CF1", expected: { note: "原备注", amount: "100" }, amount: "120", note: "原备注" }],
+    [{ pool_id: 2 }, { flow_no: "CF1", expected: { note: "原备注", pool_id: 1 }, pool_id: 2, note: "原备注" }],
+    [{ occurred_at: "2026-11-01T10:00" }, { flow_no: "CF1", expected: { note: "原备注", occurred_at: null }, occurred_at: "2026-11-01T10:00", note: "原备注" }],
+    [{ note: "新备注" }, { flow_no: "CF1", expected: { note: "原备注" }, note: "新备注" }],
+    [{ operator_user_ids: [2] }, { flow_no: "CF1", expected: { note: "原备注", operator_user_ids: [1] }, note: "原备注", operator_user_ids: [2] }],
   ])("资金明细单项修改时正确生成载荷 %#", (change, expected) => {
     const rows = [{ flow_no: "CF1", amount: "100", pool_id: 1, occurred_at: null, note: "原备注", operator_user_ids: [1] }];
     expect(buildFinanceEdits(rows, { CF1: { flow_no: "CF1", occurred_at: "", note: "原备注", ...change } })).toEqual([expected]);
@@ -94,7 +94,7 @@ describe("详情编辑保存载荷", () => {
     const time = "2026-09-10T12:00:00";
     expect(buildEventEdits([{ id: 7, amount: "100", note: "旧备注", occurred_at: time }], {
       7: { id: 7, expected_amount: "100", amount: "100", note: "新备注", occurred_at: time },
-    })).toEqual([{ id: 7, expected_amount: "100", amount: "100", note: "新备注" }]);
+    })).toEqual([{ id: 7, expected: { note: "旧备注" }, expected_amount: "100", amount: "100", note: "新备注" }]);
   });
 
   it("订单编辑对照业务时间而非建档时间", () => {
@@ -121,6 +121,7 @@ describe("详情编辑保存载荷", () => {
     expect(payload).toEqual([
       {
         id: 7,
+        expected: { note: "旧备注", occurred_at: "2026-11-14T01:00:00", operator_user_ids: [] },
         expected_amount: "100.00",
         amount: "100.00",
         note: "新备注",

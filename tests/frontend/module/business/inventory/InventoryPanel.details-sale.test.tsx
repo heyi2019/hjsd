@@ -904,7 +904,7 @@ describe("库存售出三表单分支", () => {
     await waitFor(() => expect(vi.mocked(installmentsApi.stockSale)).toHaveBeenCalledWith(expect.objectContaining({
       order_id: 21, principal: "1200", down_payment: "300", pool_id: 3, operator_user_ids: [1], form_extra: { sale_receipt: "分期凭据" },
       delivery_form_extra: expect.objectContaining({ intermediary_platform: "其他", intermediary_platform_other: "分期平台" }),
-    })));
+    }), expect.any(String)));
     expect(vi.mocked(ordersApi.create)).not.toHaveBeenCalled();
     expect(vi.mocked(ordersApi.postEvent)).not.toHaveBeenCalled();
     expect(vi.mocked(installmentsApi.pay)).not.toHaveBeenCalled();

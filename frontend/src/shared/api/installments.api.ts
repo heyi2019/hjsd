@@ -1,4 +1,5 @@
 import { api } from "./client";
+import { idempotencyConfig } from "./idempotency";
 import type { PageResponse } from "./types/common";
 import type { Installment, InstallmentCancelResult, InstallmentDisposition, InstallmentScheduleInput, InstallmentTotals, Schedule } from "./types/installments";
 import type { SaleCustomerInput } from "./orders-api/orders";
@@ -32,8 +33,8 @@ export const installmentsApi = {
         responseType: "blob",
       })
       .then((r) => r.data),
-  stockSale: (payload: Partial<Installment> & { order_id: number; first_due_on: string; paid_on: string; pool_id?: number; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[]; customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown>; form_extra?: Record<string, unknown> }) =>
-    api.post<Installment>("/installments/stock-sale", payload).then((r) => r.data),
+  stockSale: (payload: Partial<Installment> & { order_id: number; first_due_on: string; paid_on: string; pool_id?: number; adjust_final_period?: boolean; schedule?: InstallmentScheduleInput[]; operator_user_ids?: number[]; customer_input?: SaleCustomerInput; delivery_form_extra?: Record<string, unknown>; form_extra?: Record<string, unknown> }, key?: string) =>
+    api.post<Installment>("/installments/stock-sale", payload, idempotencyConfig(key)).then((r) => r.data),
   pay: (
     id: number,
     payload: { amount: string; paid_on: string; period_no?: number; pool_id?: number; note?: string; operator_user_ids?: number[]; form_extra?: Record<string, unknown> },

@@ -227,7 +227,7 @@ function InventorySaleModalBase(props: InventorySaleModalProps) {
           : [];
         if (deliveryResponsibleIds.length > 0) deliveryFormExtra.delivery_responsible_ids = deliveryResponsibleIds;
         if (values.payment_method === "INSTALLMENT") {
-          await collectInstallmentPayment({ sourceOrderId, values, customerInput, deliveryFormExtra });
+          await collectInstallmentPayment({ sourceOrderId, values, customerInput, deliveryFormExtra, idempotencyKey: idempotency.get(submittedSession).key });
           appMessage.success("分期售出已创建，账号已进入分期中");
         } else {
           await collectFullPayment({ sourceOrderId, values, isConsignment, customerInput, deliveryFormExtra, idempotencyKey: idempotency.get(submittedSession).key });

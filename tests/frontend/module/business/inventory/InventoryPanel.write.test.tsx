@@ -246,7 +246,7 @@ describe("InventoryPanel：写入与长路径", () => {
     await ui.click(screen.getByRole("button", { name: "保留" }));
     await ui.click(screen.getByRole("button", { name: "保存" }));
     await waitFor(() => expect(ordersApi.updateExecution).toHaveBeenCalledWith(21, expect.objectContaining({
-      cashflows: [{ flow_no: "CF1", amount: "120.00", pool_id: 3, note: "新备注", operator_user_ids: [2] }],
+      cashflows: [{ flow_no: "CF1", expected: { amount: "100.00", pool_id: 1, note: "原备注", operator_user_ids: [1] }, amount: "120.00", pool_id: 3, note: "新备注", operator_user_ids: [2] }],
     })));
   });
 

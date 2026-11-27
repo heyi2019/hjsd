@@ -343,3 +343,194 @@ def test_ten_users_sell_one_stock_only_once(v1_engine):
         with admin.connect() as conn:
             conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
         admin.dispose()
+
+
+def test_sale_and_cancel_compete_on_same_order(v1_engine):
+    from app.business.orders.routers.order_events_router import stock_sale
+    from app.business.shared.cancellation_model import cancel_order
+    from app.domain.trade import Order, OrderEvent
+    name = f"heijin_sale_cancel_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=2)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "sale-cancel-race", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(2, timeout=30)
+        def worker(action):
+            with factory() as session:
+                barrier.wait()
+                try:
+                    if action == "sale":
+                        stock_sale(order_id, schemas.StockSaleIn(amount="100", occurred_on=date(2026, 11, 1)), session, DEV_USERS["admin"], "sale-cross")
+                    else:
+                        cancel_order(session, order_id, actor="pytest", reason="取消")
+                    session.commit()
+                    return action
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(worker, ("sale", "cancel")))
+        assert results.count("rejected") == 1
+        with factory() as session:
+            order = session.get(Order, order_id)
+            sells = session.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")).all()
+            assert (order.status == "CANCELLED" and not sells) or (order.status != "CANCELLED" and len(sells) == 1)
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+@pytest.mark.parametrize("kind", ["event", "cashflow"])
+def test_ten_users_edit_same_record_without_overwrite(v1_engine, kind):
+    from app.business.shared.order_detail.editing.editor import edit_execution_detail
+    from app.business.shared.order_detail.editing.schemas import ExecutionEditRequest
+    from app.domain.trade import Cashflow
+    name = f"heijin_edit_race_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "record-edit-race", "game_type": "王者荣耀"})
+            event, flow = post_event(session, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest", note="原备注")
+            order_id, event_id, flow_no = order.id, event.id, flow.flow_no
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+        def worker(index):
+            with factory() as session:
+                item = {"note": f"修改{index}", "expected": {"note": "原备注"}}
+                payload = {"events": [], "cashflows": []}
+                if kind == "event":
+                    payload["events"] = [{**item, "id": event_id, "expected_amount": "100", "amount": "100"}]
+                else:
+                    payload["cashflows"] = [{**item, "flow_no": flow_no}]
+                barrier.wait()
+                try:
+                    edit_execution_detail(session, order_id, ExecutionEditRequest.model_validate(payload), DEV_USERS["admin"])
+                    session.commit()
+                    return f"修改{index}"
+                except AppError:
+                    session.rollback()
+                    return None
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            successes = [item for item in pool.map(worker, range(10)) if item is not None]
+        assert len(successes) == 1
+        with factory() as session:
+            record = session.get(OrderEvent, event_id) if kind == "event" else session.scalar(select(Cashflow).where(Cashflow.flow_no == flow_no))
+            assert record.note == successes[0]
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+def test_ten_installment_sale_retries_create_one_contract(v1_engine):
+    from app.business.installments.routers.contracts_router import create_stock_sale
+    from app.business.installments.schemas import StockSaleIn
+    from app.domain.foundation import Pool
+    from app.domain.trade import Installment
+    from app.domain.users import User
+    from sqlalchemy import func
+    name = f"heijin_installment_retry_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=10)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            session.add(User(id=1, username="admin", display_name="管理员", password_hash="test", role="ADMIN", owner_scope="ALL", pool_ids=[], team_ids=[], is_active=True))
+            session.flush()
+            order = create_order(session, order_type="HS", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "installment-race", "game_type": "王者荣耀"})
+            post_event(session, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 11, 1), actor="pytest")
+            order_id = order.id
+            pool_id = session.scalar(select(Pool.id).where(Pool.status == "ACTIVE").limit(1))
+            session.commit()
+        barrier = Barrier(10, timeout=30)
+        def worker(_):
+            with factory() as session:
+                payload = StockSaleIn(order_id=order_id, principal="200", down_payment="50", periods=1, per_period="150", first_due_on=date(2026, 11, 1), paid_on=date(2026, 11, 1), pool_id=pool_id)
+                barrier.wait()
+                result = create_stock_sale(payload, session, DEV_USERS["admin"], "installment-retry")
+                session.commit()
+                return result.id
+        with ThreadPoolExecutor(max_workers=10) as pool:
+            results = list(pool.map(worker, range(10)))
+        assert len(set(results)) == 1
+        with factory() as session:
+            assert session.scalar(select(func.count()).select_from(Installment)) == 1
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()
+
+
+def test_sale_and_inventory_offsale_compete_on_same_order(v1_engine):
+    from datetime import datetime
+    from app.business.orders.routers.order_events_router import stock_sale
+    from app.domain.trade import Order, OrderEvent
+    name = f"heijin_sale_offsale_test_{uuid4().hex}"
+    admin = create_engine(v1_engine.url, isolation_level="AUTOCOMMIT")
+    engine = None
+    try:
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'CREATE DATABASE "{name}"')
+        engine = create_engine(v1_engine.url.set(database=name), pool_size=2)
+        Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine, autoflush=False)
+        with factory() as session:
+            seed_foundation(session, actor="pytest", include_example_data=True)
+            order = create_order(session, order_type="DG", trade_date=date(2026, 11, 1), actor="pytest", account_snapshot={"game_account": "sale-offsale-race", "game_type": "王者荣耀"})
+            order_id = order.id
+            session.commit()
+        barrier = Barrier(2, timeout=30)
+        def worker(action):
+            with factory() as session:
+                barrier.wait()
+                try:
+                    if action == "sale":
+                        stock_sale(order_id, schemas.StockSaleIn(amount="100", occurred_on=date(2026, 11, 1)), session, DEV_USERS["admin"], "sale-cross")
+                    else:
+                        inventory_offsale(order_id, schemas.InventoryOffsaleIn(reason="出库", occurred_on=date(2026, 11, 1), unlisted_at=datetime(2026, 11, 1, 12)), session, DEV_USERS["admin"])
+                    session.commit()
+                    return action
+                except AppError:
+                    session.rollback()
+                    return "rejected"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(worker, ("sale", "offsale")))
+        assert results.count("rejected") == 1
+        with factory() as session:
+            order = session.get(Order, order_id)
+            sells = session.scalars(select(OrderEvent).where(OrderEvent.order_id == order_id, OrderEvent.event_type == "SELL")).all()
+            assert (order.status == "CANCELLED" and not sells) or (order.status != "CANCELLED" and len(sells) == 1)
+    finally:
+        if engine is not None:
+            engine.dispose()
+        with admin.connect() as conn:
+            conn.exec_driver_sql(f'DROP DATABASE IF EXISTS "{name}" WITH (FORCE)')
+        admin.dispose()

@@ -1217,3 +1217,20 @@ class TestInstallmentsApi:
         assert order_cashflow_profit_by_order(seeded_db, order_ids=[new_order_id])[new_order_id] == Decimal("-100.00")
         dispositions = seeded_client.get(f"/api/installments/{contract.id}/dispositions", headers=headers).json()
         assert sum(row["action"] == "RESELL" and row["related_order_id"] == new_order_id for row in dispositions) == 1
+
+
+def test_stock_installment_retry_returns_same_contract(seeded_client, seeded_db, headers):
+    account = _account(seeded_db, "installment-retry")
+    order = _order(seeded_db, order_type="HS", account_id=account.id)
+    _buy(seeded_db, order.id, "100")
+    pool = seeded_db.scalar(select(Pool).where(Pool.status == "ACTIVE"))
+    seeded_db.commit()
+    payload = {"order_id": order.id, "principal": "200", "down_payment": "50", "periods": 1,
+               "per_period": "150", "first_due_on": TODAY.isoformat(), "paid_on": TODAY.isoformat(),
+               "pool_id": pool.id, "operator_user_ids": [1]}
+    request_headers = {**headers, "Idempotency-Key": "installment-sale-retry"}
+    first = seeded_client.post("/api/installments/stock-sale", headers=request_headers, json=payload)
+    second = seeded_client.post("/api/installments/stock-sale", headers=request_headers, json=payload)
+    assert first.status_code == second.status_code == 201, (first.text, second.text)
+    assert first.json()["id"] == second.json()["id"]
+    assert len(seeded_db.scalars(select(Installment).where(Installment.order_id == order.id)).all()) == 1

@@ -13,6 +13,7 @@ export type ExecutionEventDraft = {
 
 export type ExecutionEventEdit = {
   id: number;
+  expected?: Record<string, unknown>;
   expected_amount: string;
   amount: string;
   note: string | null;
@@ -103,6 +104,12 @@ export function buildEventEdits(
     ));
   }).map((draft) => ({
     id: draft.id,
+    expected: {
+      note: originals.get(draft.id)?.note ?? null,
+      ...(draft.occurred_at && draft.occurred_at !== (originals.get(draft.id)?.occurred_at ?? "") ? { occurred_at: originals.get(draft.id)?.occurred_at } : {}),
+      ...(draft.operator_user_ids !== undefined ? { operator_user_ids: originals.get(draft.id)?.operator_user_ids ?? [] } : {}),
+      ...(draft.form_extra !== undefined ? { form_extra: originals.get(draft.id)?.form_extra ?? {} } : {}),
+    },
     expected_amount: draft.expected_amount,
     amount: draft.amount,
     note: draft.note,
@@ -133,6 +140,13 @@ export function buildFinanceEdits(
     );
   }).map((draft) => ({
     flow_no: draft.flow_no,
+    expected: {
+      note: originals.get(draft.flow_no)?.note ?? "",
+      ...(draft.amount !== undefined ? { amount: originals.get(draft.flow_no)?.amount } : {}),
+      ...(draft.pool_id !== undefined ? { pool_id: originals.get(draft.flow_no)?.pool_id } : {}),
+      ...(draft.occurred_at ? { occurred_at: originals.get(draft.flow_no)?.occurred_at } : {}),
+      ...(draft.operator_user_ids !== undefined ? { operator_user_ids: originals.get(draft.flow_no)?.operator_user_ids ?? [] } : {}),
+    },
     ...(draft.amount !== undefined ? { amount: draft.amount } : {}),
     ...(draft.pool_id !== undefined ? { pool_id: draft.pool_id } : {}),
     ...(draft.occurred_at ? { occurred_at: draft.occurred_at } : {}),

@@ -1058,3 +1058,25 @@ def test_order_note_edit_rejects_stale_original(seeded_client, seeded_db, header
     assert conflict.status_code == 409, conflict.text
     seeded_db.refresh(order)
     assert order.note == "甲修改"
+
+
+@pytest.mark.parametrize("kind", ["event", "cashflow"])
+def test_execution_edit_rejects_stale_record_note(seeded_client, seeded_db, headers, kind):
+    account = create_account(seeded_db, game_account=f"stale-{kind}-note", business_mode="SELF", inventory_type="RECOVERY", actor="pytest")
+    order = create_order(seeded_db, order_type="HS", trade_date=date(2026, 10, 1), actor="pytest", account_id=account.id)
+    event, flow = post_event(seeded_db, order.id, event_type="BUY", amount="100", occurred_on=date(2026, 10, 1), actor="pytest", note="原备注")
+    seeded_db.commit()
+    def save(note):
+        item = {"note": note, "expected": {"note": "原备注"}}
+        payload = {"events": [], "cashflows": []}
+        if kind == "event":
+            payload["events"] = [{**item, "id": event.id, "expected_amount": "100", "amount": "100"}]
+        else:
+            payload["cashflows"] = [{**item, "flow_no": flow.flow_no}]
+        return seeded_client.patch(f"/api/orders/{order.id}/execution-edit", headers=headers, json=payload)
+    first = save("甲修改")
+    assert first.status_code == 200, first.text
+    second = save("乙修改")
+    assert second.status_code == 409, second.text
+    seeded_db.refresh(event if kind == "event" else flow)
+    assert (event if kind == "event" else flow).note == "甲修改"

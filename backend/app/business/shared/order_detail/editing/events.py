@@ -140,6 +140,12 @@ def validate_event_edits(
         order = get_order(db, event.order_id, user) if event else None
         if event is None or order is None or order.id != order_id or order.account_id != account.id or not event.is_posted:
             raise NotFound("执行记录不存在")
+        if item.expected is not None:
+            from ..view.events import _event_occurrence
+            from .expected import check_expected
+            occurred_at, extra = _event_occurrence(event)
+            check_expected(item.expected, {"note": event.note, "occurred_at": occurred_at,
+                           "operator_user_ids": event.operator_user_ids or [], "form_extra": extra}, "执行记录")
         if event.source_type == "INSTALLMENT_RECOVERY":
             if (item.expected_amount != Decimal(str(event.amount)) or item.amount != Decimal(str(event.amount))
                 or (item.occurred_at is not None and item.occurred_at.replace(tzinfo=None) != (event.posted_at or event.created_at))

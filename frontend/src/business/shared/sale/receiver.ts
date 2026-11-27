@@ -44,7 +44,7 @@ export async function collectFullPayment(input: CollectPaymentInput): Promise<vo
 
 /** 分期收款：建立库存分期出售合同（STOCK_SALE），并在确立时收首付（期次 0）。 */
 export async function collectInstallmentPayment(input: Omit<CollectPaymentInput, "isConsignment">): Promise<void> {
-  const { sourceOrderId, values, customerInput, deliveryFormExtra } = input;
+  const { sourceOrderId, values, customerInput, deliveryFormExtra, idempotencyKey } = input;
   const schedule = serializeInstallmentSchedule(
     values.installment_schedule as Array<{ due_on?: unknown }> | undefined,
     (value) => value && typeof value === "object" && "format" in value
@@ -72,5 +72,5 @@ export async function collectInstallmentPayment(input: Omit<CollectPaymentInput,
     customer_input: customerInput,
     delivery_form_extra: deliveryFormExtra,
     form_extra: formExtraOrUndefined(values.form_extra),
-  });
+  }, idempotencyKey);
 }

@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Response
 from sqlalchemy.orm import Session
 
 from app.shared.audit import record_audit
+from app.shared.idempotency import reserve_idempotency, complete_idempotency
+from app.shared.order_access import get_order
 from app.core.database import get_db
 from app.core.schemas import PageOut
 from app.core.errors import PermissionDenied
@@ -160,10 +163,15 @@ def create_stock_sale(
     payload: schemas.StockSaleIn,
     db: Session = Depends(get_db),
     user: CurrentUser = manage,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> schemas.InstallmentOut:
     """售出、建立合约与首付款在同一个请求事务中完成。"""
     if not (user.has(PERM_ORDER_EVENT_POST) or user.has(PERM_FINANCE_ORDER_EVENT_POST)):
         raise PermissionDenied("当前角色无权登记售出及分期收款")
+    get_order(db, payload.order_id, user)
+    record, replay = reserve_idempotency(db, user_id=user.id, scope=f"orders/{payload.order_id}/installment-stock-sale", key=idempotency_key, payload=payload)
+    if replay is not None:
+        return schemas.InstallmentOut.model_validate(replay)
     apply_sale_details(db, payload.order_id, customer_input=payload.customer_input,
                        delivery_form_extra=payload.delivery_form_extra, user=user)
     field_context = sale_form_context(payload.customer_input, payload.delivery_form_extra)
@@ -193,7 +201,9 @@ def create_stock_sale(
         inst_pay(db, item.id, amount=payload.down_payment, paid_on=payload.paid_on, period_no=0,
                  pool_id=payload.pool_id, actor=_actor(user), operator_user_ids=payload.operator_user_ids,
                  validate_form_fields=False, user=user)
-    return _installment_output(db, item)
+    result = _installment_output(db, item)
+    complete_idempotency(record, result)
+    return result
 
 
 @router.post("/installments", response_model=schemas.InstallmentOut, status_code=201)

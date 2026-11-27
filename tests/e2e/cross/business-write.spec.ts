@@ -23,7 +23,7 @@ test("设置中下载订单模板并预检导入，重复订单可跳过", async
   await page.getByLabel("选择订单文件").setInputFiles({
     name: "历史订单.csv",
     mimeType: "text/csv",
-    buffer: Buffer.from(`订单号,业务日期,业务类型,入库操作人,游戏账号/产品,订单备注\n${number},2026-10-17,代挂,${currentUser.username},导入测试账号,导入联调\n`),
+    buffer: Buffer.from(`订单号,入库时间,业务类型,入库操作人,游戏账号/产品,订单备注\n${number},2026-10-17,代挂,${currentUser.username},导入测试账号,导入联调\n`),
   });
   await page.getByRole("button", { name: "预检文件" }).click();
   await expect(page.getByRole("row").filter({ hasText: number })).toContainText("新建");

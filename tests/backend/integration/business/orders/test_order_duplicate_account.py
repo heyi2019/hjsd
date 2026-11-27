@@ -9,6 +9,8 @@ from datetime import date
 
 import pytest
 
+pytestmark = pytest.mark.db
+
 from app.core.errors import ErrorCode, Validation
 from app.domain.trade import Account
 from app.business.shared.cancellation_model import cancel_order

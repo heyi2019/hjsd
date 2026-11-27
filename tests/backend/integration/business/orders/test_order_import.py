@@ -11,6 +11,8 @@ from app.business.orders.importing.parser import parse_order_import
 from app.business.orders.importing.template import build_order_import_template
 from app.core.errors import Validation
 
+pytestmark = pytest.mark.db
+
 
 def test_import_template_hides_order_business_date_even_when_configured_visible():
     columns = [{"key": "trade_date", "label": "业务日期", "is_visible": True}]

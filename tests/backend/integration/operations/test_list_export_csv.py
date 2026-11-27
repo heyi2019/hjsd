@@ -867,3 +867,15 @@ def test_installments_export_all_query_params_explicitly_none(seeded_client, hea
     """
     resp = seeded_client.get("/api/installments/export.csv", headers=headers)
     assert resp.status_code == 200, resp.text
+
+
+def test_import_existing_order_rejects_changed_business_date(seeded_client, headers, seeded_db):
+    from app.business.orders.create import create_order
+
+    order = create_order(seeded_db, order_type="DG", trade_date=date(2026, 1, 1), actor="pytest")
+    seeded_db.commit()
+    content = f"订单号,业务日期,业务类型\n{order.order_no},2026-01-02,代挂\n".encode()
+    response = seeded_client.post("/api/order-imports/preview", headers=headers, data={"existing": "update"},
+                                  files={"file": ("订单.csv", content, "text/csv")})
+    assert response.status_code == 200
+    assert "业务日期与系统当前值不一致" in " ".join(response.json()["rows"][0]["errors"])

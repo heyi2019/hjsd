@@ -43,7 +43,10 @@ const emptyMeta: OrderDetailMeta = {
   note: "-", orderNotes: "-", orderParties: null, orderExtras: [],
 };
 
-afterEach(() => {
+afterEach(async () => {
+  await act(async () => {
+    await Promise.resolve();
+  });
   vi.restoreAllMocks();
 });
 

@@ -545,12 +545,13 @@ def test_upgrade_0002_keeps_custom_option_names_in_detail_and_export(migration_0
         assert field.options[-1]["value"] == "legacy_quality_tag_04"
 
 
-def test_upgrade_0002_allows_old_pool_code_in_finance_import(migration_0001_db):
+def test_upgrade_0002_finance_import_requires_current_pool_code(migration_0001_db):
     from datetime import date
     from sqlalchemy import select
     from sqlalchemy.orm import Session
     from app.business.orders.importing.cashflows import import_cashflows
     from app.business.orders.importing.parser import ImportRow, ImportTable
+    from app.core.errors import Validation
     from app.core.security import CurrentUser, ROLE_ADMIN
     from app.domain.foundation import Pool
     from app.domain.trade import Cashflow, Order
@@ -571,6 +572,10 @@ def test_upgrade_0002_allows_old_pool_code_in_finance_import(migration_0001_db):
     user = CurrentUser.build(id=1, username="pytest", roles=[ROLE_ADMIN], owner_scope="ALL")
     with Session(engine) as session:
         assert session.get(Pool, pool_id).code == "pool_01"
+        with pytest.raises(Validation, match="资金账户不存在或无权使用"):
+            import_cashflows(session, tables, [], {"HS9982": "update"}, user)
+        values = (*values[:6], "pool_01", *values[7:])
+        tables = {"cashflows": ImportTable(headers, (ImportRow("资金明细", 2, values),))}
         assert import_cashflows(session, tables, [], {"HS9982": "update"}, user)[0] == 1
         flow = session.scalar(select(Cashflow).where(Cashflow.flow_no == "SR09982"))
         assert flow.pool_id == pool_id and str(flow.amount) == "12.50"

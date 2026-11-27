@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import StringIO
 
@@ -18,7 +19,9 @@ _KEYS = frozenset({
     "stock_no", "inventory_entry_at", "cost_amount", "business_mode", "sale_at",
     "sale_operator", "sale_amount", "status", "account_status", "profit_base",
 })
-_COLUMNS = [(column.key, column.label, True) for column in SCOPE_MAP["LEDGER"].columns if column.key in _KEYS]
+_COLUMNS = [("trade_date", "业务日期", True)] + [
+    (column.key, column.label, True) for column in SCOPE_MAP["LEDGER"].columns if column.key in _KEYS
+]
 _LABELS = {label: key for key, label, _visible in _COLUMNS}
 _MONEY = frozenset({"cost_amount", "sale_amount", "profit_base"})
 
@@ -49,6 +52,12 @@ def reference_errors(record: dict[str, str], reference: dict[str, str]) -> list[
                 actual_amount, expected_amount = Decimal(raw), Decimal(expected)
                 equal = actual_amount.is_finite() and expected_amount.is_finite() and actual_amount == expected_amount
             except InvalidOperation:
+                equal = False
+        elif key == "trade_date":
+            try:
+                actual_date = date.fromisoformat(raw) if len(raw) == 10 else datetime.fromisoformat(raw).date()
+                equal = actual_date.isoformat() == expected
+            except ValueError:
                 equal = False
         else:
             equal = raw == expected

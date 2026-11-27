@@ -92,7 +92,7 @@ export function useOptionSetResource(code: string, enabled = true) {
 
 /** 组件用：按 code 取单个选项列表（加载中为 null）。 */
 export function useOptionSet(code: string): OptionItem[] | null {
-  return useOptionSetResource(code).options;
+  return useOptionSetResource(code, Boolean(code)).options;
 }
 
 /** 历史单据需要展示已删除选项，编辑时这些选项不可重新选择。 */

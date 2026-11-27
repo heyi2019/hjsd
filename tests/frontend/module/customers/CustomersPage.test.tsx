@@ -991,9 +991,9 @@ describe("CustomersPage：行内动作", () => {
     const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
     const revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
-    const successSpy = vi.spyOn(appMessage, "success").mockImplementation(() => ({} as never));
+    const successSpy = vi.spyOn(appMessage, "success");
     const keeper = userEvent.setup({ pointerEventsCheck: 0 });
-    renderLight(<CustomerPanel />, { user: "admin" });
+    renderLight(<CustomersPage />, { user: "admin" });
 
     await screen.findByText("CUS-0001");
     expect(screen.getByRole("button", { name: "导出客户数据" }).closest(".customer-list-filters")).not.toBeNull();
@@ -1147,17 +1147,6 @@ describe("CustomersPage：权限门控与写操作", () => {
     await waitFor(() => expect(vi.mocked(customersApi.page)).toHaveBeenCalledWith({ keyword: "张三", created_from: currentReportPeriod().from, created_to: currentReportPeriod().to, limit: 10, offset: 0 }));
   });
 
-  it("客户 CSV 导出完成后给出成功反馈", async () => {
-    const successSpy = vi.spyOn(appMessage, "success");
-    vi.mocked(customersApi.exportCsv).mockResolvedValueOnce(new Blob(["csv"]));
-    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:customer");
-    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
-    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
-    renderLight(<CustomersPage />, { user: "admin" });
-    await screen.findByText("CUS-0001");
-    await ui.click(screen.getByRole("button", { name: "导出客户数据" }));
-    await waitFor(() => expect(successSpy).toHaveBeenCalledWith("客户数据已导出"));
-  });
 });
 
 // —— 原 CustomersPage.live-fields.test.tsx ——

@@ -4,9 +4,11 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -18,6 +20,7 @@ from sqlalchemy.engine import make_url
 ROOT = Path(__file__).resolve().parents[2]
 MARKER = "heijin-ephemeral-test-db-v1"
 RETENTION_SECONDS = 24 * 60 * 60
+ATTACHMENT_MARKER = ".heijin-e2e-owner"
 
 
 def make_database_name(kind: str) -> str:
@@ -70,7 +73,9 @@ def database_urls(kind: str, env: dict[str, str]) -> tuple[str, str]:
 def cleanup_expired_e2e(conn: psycopg.Connection) -> None:
     with conn.cursor() as cur:
         cur.execute("SELECT oid, datname, shobj_description(oid, 'pg_database') FROM pg_database WHERE datname LIKE 'heijin_tmp_e2e_%'")
-        for _, name, comment in cur.fetchall():
+        rows = cur.fetchall()
+        existing = {name for _, name, _ in rows}
+        for _, name, comment in rows:
             if not validate_owned_database(name, "e2e") or comment != MARKER:
                 continue
             created = int(name.split("_")[-2])
@@ -79,6 +84,26 @@ def cleanup_expired_e2e(conn: psycopg.Connection) -> None:
             cur.execute("SELECT 1 FROM pg_stat_activity WHERE datname = %s LIMIT 1", (name,))
             if not cur.fetchone():
                 cur.execute(sql.SQL("DROP DATABASE {} ").format(sql.Identifier(name)))
+                existing.discard(name)
+    pattern = re.compile(r"heijin-e2e-attachments-(heijin_tmp_e2e_[0-9]{10}_[0-9a-f]{12})-[a-z0-9_]{8}")
+    with os.scandir(tempfile.gettempdir()) as entries:
+        for entry in entries:
+            match = pattern.fullmatch(entry.name)
+            if not match or not entry.is_dir(follow_symlinks=False):
+                continue
+            name = match.group(1)
+            if name in existing or time.time() - int(name.split("_")[-2]) < RETENTION_SECONDS:
+                continue
+            try:
+                marker = Path(entry.path) / ATTACHMENT_MARKER
+                if ((os.name == "posix" and entry.stat(follow_symlinks=False).st_uid != os.getuid())
+                        or marker.is_symlink() or not marker.is_file()):
+                    continue
+                if marker.read_text(encoding="utf-8") != f"{MARKER}:{name}":
+                    continue
+                shutil.rmtree(entry.path)
+            except (OSError, UnicodeError) as exc:
+                print(f"无法清理过期 E2E 附件目录 {entry.path}：{exc}", file=sys.stderr, flush=True)
 
 
 def run(kind: str, command: list[str]) -> int:
@@ -104,28 +129,51 @@ def run(kind: str, command: list[str]) -> int:
         rc = 1
         child = None
         previous = {}
+        attachments = None
+        received_signal = 0
         try:
-            child = subprocess.Popen(command, env=env)
+            if kind == "e2e":
+                attachments = tempfile.mkdtemp(prefix=f"heijin-e2e-attachments-{name}-")
+                (Path(attachments) / ATTACHMENT_MARKER).write_text(f"{MARKER}:{name}", encoding="utf-8")
+                env["ATTACHMENT_STORAGE_DIR"] = attachments
+            child = subprocess.Popen(command, env=env, start_new_session=os.name == "posix")
             def forward(sig, _frame):
+                nonlocal received_signal
+                received_signal = sig
                 if child and child.poll() is None:
-                    child.send_signal(sig)
+                    try:
+                        if os.name == "posix":
+                            os.killpg(child.pid, sig)
+                        else:
+                            child.send_signal(sig)
+                    except ProcessLookupError:
+                        pass
             for sig in (signal.SIGINT, signal.SIGTERM):
                 previous[sig] = signal.signal(sig, forward)
             rc = child.wait()
+            if received_signal:
+                rc = 128 + received_signal
         finally:
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
-            if should_retain(kind, rc):
-                print(f"E2E 失败，保留 {name} 供排查；至少 24 小时后在下次 E2E 启动时清理。", flush=True)
-            else:
-                with conn.cursor() as cur:
-                    # xdist workers append _gwN to this unpredictable, per-run name.
-                    cur.execute("SELECT datname FROM pg_database WHERE datname LIKE %s", (name + "\\_gw%",))
-                    worker_names = [row[0] for row in cur.fetchall() if re.fullmatch(re.escape(name) + r"_gw[0-9]+", row[0])]
-                    for db in [*worker_names, name]:
-                        cur.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()", (db,))
-                        cur.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(db)))
-                print(f"临时 {kind} 库已清理：{name}", flush=True)
+            try:
+                if should_retain(kind, rc):
+                    print(f"E2E 失败，保留 {name} 供排查；至少 24 小时后在下次 E2E 启动时清理。", flush=True)
+                else:
+                    with conn.cursor() as cur:
+                        # xdist workers append _gwN to this unpredictable, per-run name.
+                        cur.execute("SELECT datname FROM pg_database WHERE datname LIKE %s", (name + "\\_gw%",))
+                        worker_names = [row[0] for row in cur.fetchall() if re.fullmatch(re.escape(name) + r"_gw[0-9]+", row[0])]
+                        for db in [*worker_names, name]:
+                            cur.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()", (db,))
+                            cur.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(db)))
+                    print(f"临时 {kind} 库已清理：{name}", flush=True)
+            finally:
+                if attachments is not None:
+                    if should_retain(kind, rc) and child is not None:
+                        print(f"E2E 附件保留供排查：{attachments}", flush=True)
+                    else:
+                        shutil.rmtree(attachments)
         return rc if rc >= 0 else 128 - rc
 
 

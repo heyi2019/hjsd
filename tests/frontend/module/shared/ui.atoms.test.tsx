@@ -5,7 +5,7 @@
  * 合并动因：文件级 import+transform 是固定成本（约 2s/文件，与用例数无关），
  * 这些小文件各自只有 1~10 条用例。用例与断言逐条保留，各自 describe 隔离。
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
@@ -13,7 +13,9 @@ import { renderLight } from "@fixtures/render";
 import { TimeOrderControl } from "@/shared/ui/TimeOrderControl";
 import { MoneyText } from "@/shared/ui/MoneyText";
 import { StatusTag } from "@/shared/ui/StatusTag";
+import { optionSetsApi } from "@/shared/api/options.api";
 import { statusColor } from "@/shared/lib/format";
+import { clearOptionSetsCache } from "@/shared/lib/optionSets";
 import { PageHeader } from "@/shared/ui/PageHeader";
 import { EntryCard, EntryRow } from "@/shared/ui/EntryCard";
 import { StatCard, StatRow } from "@/shared/ui/StatCard";
@@ -62,9 +64,31 @@ describe("MoneyText：金额只展示，不做浮点运算", () => {
 });
 
 describe("StatusTag：文案承载语义，颜色只是辅助", () => {
-  it("已知状态渲染中文标签", () => {
-    render(<StatusTag status="ACTIVE" />);
-    expect(screen.getByText("进行中")).toBeInTheDocument();
+  it("已知状态渲染中文标签", async () => {
+    clearOptionSetsCache();
+    const fetchOptions = vi.spyOn(optionSetsApi, "list").mockResolvedValue({
+      items: [{ id: 1, code: "ORDER_STATUS", label: "订单状态", group: "ORDER", editable: true,
+        options: [{ value: "ACTIVE", label: "自定义进行中" }] }],
+    });
+    const { rerender, unmount } = render(<StatusTag status="ACTIVE" />);
+    try {
+      await act(async () => {});
+      expect(screen.getByText("进行中")).toBeInTheDocument();
+      expect(fetchOptions, "未指定词典时不应请求选项").not.toHaveBeenCalled();
+
+      rerender(<StatusTag status="ACTIVE" optionSet="ORDER_STATUS" />);
+      expect(await screen.findByText("自定义进行中")).toBeInTheDocument();
+      expect(fetchOptions).toHaveBeenCalledTimes(1);
+
+      rerender(<StatusTag status="ACTIVE" />);
+      expect(screen.getByText("进行中")).toBeInTheDocument();
+      act(() => clearOptionSetsCache());
+      expect(fetchOptions, "移除词典后不应继续订阅刷新").toHaveBeenCalledTimes(1);
+    } finally {
+      unmount();
+      fetchOptions.mockRestore();
+      clearOptionSetsCache();
+    }
   });
 
   it("通用 PENDING 只表示待结算，不再表示账号待入库", () => {

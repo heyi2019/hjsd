@@ -194,6 +194,232 @@ def test_failed_e2e_retention_is_not_used_for_other_runs():
     assert not should_retain("test", 1)
 
 
+@pytest.mark.parametrize("returncode", [0, 1])
+def test_e2e_attachments_are_isolated_and_follow_run_outcome(tmp_path, monkeypatch, returncode):
+    """E2E 文件不能污染原目录；失败时保留附件以便排查。"""
+    import sys
+    import tempfile
+    from pathlib import Path
+    from scripts import ephemeral_test_db
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def execute(self, *_args):
+            pass
+
+        def fetchall(self):
+            return []
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def cursor(self):
+            return Cursor()
+
+    monkeypatch.setattr(ephemeral_test_db, "database_urls", lambda *_: (
+        "postgresql://localhost/postgres",
+        "postgresql://localhost/heijin_tmp_e2e_1234567890_abcdef123456",
+    ))
+    monkeypatch.setattr(ephemeral_test_db.psycopg, "connect", lambda *_args, **_kwargs: Connection())
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    original = tmp_path / "original-attachments"
+    original.mkdir()
+    (original / "keep.txt").write_text("keep")
+    monkeypatch.setenv("ATTACHMENT_STORAGE_DIR", str(original))
+    seen = tmp_path / "seen.txt"
+    child = (
+        "import os, pathlib, sys; "
+        "p = pathlib.Path(os.environ['ATTACHMENT_STORAGE_DIR']); "
+        "(p / 'upload.txt').write_text('test'); "
+        "pathlib.Path(sys.argv[1]).write_text(str(p)); "
+        "sys.exit(int(sys.argv[2]))"
+    )
+
+    assert ephemeral_test_db.run("e2e", [sys.executable, "-c", child, str(seen), str(returncode)]) == returncode
+    used = Path(seen.read_text())
+    assert used.parent == tmp_path and used != original
+    if returncode:
+        assert (used / "upload.txt").read_text() == "test"
+    else:
+        assert not used.exists()
+    assert list(original.iterdir()) == [original / "keep.txt"]
+
+
+def test_interrupted_e2e_retains_evidence_even_if_child_exits_zero(tmp_path):
+    """子进程优雅退出也不能把被中断的 E2E 当作成功清理。"""
+    import signal
+    import sys
+    import time
+
+    controller = """
+import sys, tempfile
+from pathlib import Path
+from scripts import ephemeral_test_db as runner
+root = Path(sys.argv[1])
+class Cursor:
+    def __enter__(self): return self
+    def __exit__(self, *_): pass
+    def execute(self, *_): pass
+    def fetchall(self): return []
+class Connection:
+    def __enter__(self): return self
+    def __exit__(self, *_): pass
+    def cursor(self): return Cursor()
+runner.database_urls = lambda *_: ('postgresql://localhost/postgres', 'postgresql://localhost/heijin_tmp_e2e_1234567890_abcdef123456')
+runner.psycopg.connect = lambda *_args, **_kwargs: Connection()
+tempfile.tempdir = str(root)
+child = '''
+import os, pathlib, signal, subprocess, sys, time
+root = pathlib.Path(sys.argv[1])
+def stop(*_): sys.exit(0)
+signal.signal(signal.SIGTERM, stop)
+grandchild = '; '.join([
+    'import os, pathlib, signal, sys',
+    'root = pathlib.Path(sys.argv[1])',
+    "signal.signal(signal.SIGTERM, lambda *_: ((root / 'grandchild-stopped').touch(), os._exit(0)))",
+    "(root / 'grandchild-pid').write_text(str(os.getpid()))",
+    'signal.pause()',
+])
+subprocess.Popen([sys.executable, '-c', grandchild, str(root)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+while not (root / 'grandchild-pid').exists(): time.sleep(0.01)
+pathlib.Path(os.environ['ATTACHMENT_STORAGE_DIR'], 'upload').write_text('test')
+(root / 'child-pid').write_text(str(os.getpid()))
+(root / 'ready').touch()
+while True: time.sleep(0.05)
+'''
+sys.exit(runner.run('e2e', [sys.executable, '-c', child, str(root)]))
+"""
+    process = subprocess.Popen([sys.executable, "-c", controller, str(tmp_path)],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 10
+        while not (tmp_path / "ready").exists() and time.monotonic() < deadline:
+            assert process.poll() is None
+            time.sleep(0.02)
+        assert (tmp_path / "ready").exists()
+        process.terminate()
+        stdout, stderr = process.communicate(timeout=10)
+        assert process.returncode == 143, stderr
+        assert "E2E 失败，保留" in stdout
+        assert [p.read_text() for p in tmp_path.glob("heijin-e2e-attachments-*/upload")] == ["test"]
+        deadline = time.monotonic() + 2
+        while not (tmp_path / "grandchild-stopped").exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert (tmp_path / "grandchild-stopped").exists()
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+            pid = tmp_path / "child-pid"
+            if pid.exists():
+                try:
+                    os.kill(int(pid.read_text()), signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        pid = tmp_path / "grandchild-pid"
+        if pid.exists() and not (tmp_path / "grandchild-stopped").exists():
+            try:
+                os.kill(int(pid.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def test_expired_e2e_cleanup_removes_only_owned_attachment_directories(tmp_path, monkeypatch):
+    """过期的隔离库和附件一起回收，其他目录与符号链接保持不变。"""
+    import tempfile
+    from scripts import ephemeral_test_db
+
+    old = "heijin_tmp_e2e_1234567890_abcdef123456"
+    recent = "heijin_tmp_e2e_1999999999_abcdef123456"
+    stale_dir = tmp_path / f"heijin-e2e-attachments-{old}-abcdefgh"
+    live_dir = tmp_path / f"heijin-e2e-attachments-{recent}-abcdefgh"
+    orphan_name = "heijin_tmp_e2e_1234567890_deadbeef1234"
+    orphan = tmp_path / f"heijin-e2e-attachments-{orphan_name}-abcdefgh"
+    unowned = tmp_path / f"heijin-e2e-attachments-{orphan_name}-ijklmnop"
+    outside = tmp_path / "outside"
+    for directory in (stale_dir, live_dir, orphan, unowned, outside):
+        directory.mkdir()
+        (directory / "keep").touch()
+    for directory, name in ((stale_dir, old), (live_dir, recent), (orphan, orphan_name)):
+        (directory / ".heijin-e2e-owner").write_text(f"{ephemeral_test_db.MARKER}:{name}")
+    link = tmp_path / f"heijin-e2e-attachments-{old}-ijklmnop"
+    link.symlink_to(outside, target_is_directory=True)
+
+    class Cursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def execute(self, *_args):
+            pass
+
+        def fetchall(self):
+            return [(1, old, ephemeral_test_db.MARKER), (2, recent, ephemeral_test_db.MARKER)]
+
+        def fetchone(self):
+            return None
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setattr(ephemeral_test_db.time, "time", lambda: 2_000_000_000)
+    ephemeral_test_db.cleanup_expired_e2e(Connection())
+    assert not stale_dir.exists()
+    assert not orphan.exists()
+    assert (live_dir / "keep").exists()
+    assert (unowned / "keep").exists()
+    assert link.is_symlink() and (outside / "keep").exists()
+
+
+def test_expired_e2e_attachment_cleanup_can_retry_after_failure(tmp_path, monkeypatch):
+    """附件删除失败不阻断后续测试，下次可以根据所有权标记重试。"""
+    import tempfile
+    from scripts import ephemeral_test_db
+
+    name = "heijin_tmp_e2e_1234567890_abcdef123456"
+    directory = tmp_path / f"heijin-e2e-attachments-{name}-abcdefgh"
+    directory.mkdir()
+    (directory / ".heijin-e2e-owner").write_text(f"{ephemeral_test_db.MARKER}:{name}")
+
+    class Cursor:
+        def __enter__(self): return self
+        def __exit__(self, *_args): pass
+        def execute(self, *_args): pass
+        def fetchall(self): return []
+
+    class Connection:
+        def cursor(self): return Cursor()
+
+    original = ephemeral_test_db.shutil.rmtree
+    attempts = []
+    def remove(path):
+        attempts.append(path)
+        if len(attempts) == 1:
+            raise OSError("simulated cleanup failure")
+        original(path)
+
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setattr(ephemeral_test_db.time, "time", lambda: 2_000_000_000)
+    monkeypatch.setattr(ephemeral_test_db.shutil, "rmtree", remove)
+    ephemeral_test_db.cleanup_expired_e2e(Connection())
+    assert directory.exists()
+    ephemeral_test_db.cleanup_expired_e2e(Connection())
+    assert not directory.exists()
+
+
 def test_temporary_database_rejects_development_and_remote_targets():
     from scripts.ephemeral_test_db import database_urls
 

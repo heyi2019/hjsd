@@ -11,10 +11,13 @@ import re
 import secrets
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
 import tempfile
+import time
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
@@ -273,6 +276,42 @@ def check_production_schema(env: dict[str, str]) -> str:
     return after
 
 
+def start_parallel_gate(cwd: Path, args: list[str], env: dict[str, str]) -> subprocess.Popen:
+    return subprocess.Popen(args, cwd=cwd, env=env, start_new_session=True)
+
+
+def stop_parallel_gates(processes: list[subprocess.Popen]) -> None:
+    """只终止本次启动的进程组，并给临时测试库清理留出时间。"""
+    groups = []
+    for process in processes:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+            groups.append(process.pid)
+        except ProcessLookupError:
+            pass
+    deadline = time.monotonic() + 15
+    while groups and time.monotonic() < deadline:
+        for process in processes:
+            process.poll()
+        remaining = []
+        for group in groups:
+            try:
+                os.killpg(group, 0)
+                remaining.append(group)
+            except ProcessLookupError:
+                pass
+        groups = remaining
+        if groups:
+            time.sleep(0.05)
+    for group in groups:
+        try:
+            os.killpg(group, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    for process in processes:
+        process.wait()
+
+
 def run_gates(commit: str, version: str) -> tuple[list[str], str]:
     base_env = dict(os.environ)
     for key in ("PYTHONPATH", "DATABASE_URL", "TEST_DATABASE_URL", "E2E_DATABASE_URL", "BASE_URL", "BASELINE_DB"):
@@ -290,30 +329,130 @@ def run_gates(commit: str, version: str) -> tuple[list[str], str]:
 
     commands = gate_commands()
     gates = ["依赖锁文件一致性", *[entry[0] for entry in commands], "线上结构恢复演练"]
-    completed: list[str] = []
-    failed = gates[0]
-    try:
-        print(f"\n==> {failed}", flush=True)
-        check_locks(base_env)
-        completed.append(failed)
-        for title, cwd, args in commands:
-            failed = title
-            print(f"\n==> {title}", flush=True)
-            call(args, cwd=cwd, env=env if title in {"迁移基线", "后端全量"} else base_env)
-            if git("rev-parse", "HEAD") != commit or git("status", "--porcelain", "--untracked-files=normal"):
-                raise RuntimeError("门禁期间代码发生变化，发布中止")
-            completed.append(title)
-        failed = gates[-1]
-        print(f"\n==> {failed}", flush=True)
-        schema_digest = check_production_schema(env)
+    statuses = {gate: "未执行" for gate in gates}
+    durations: dict[str, float] = {}
+    by_title = {title: (cwd, args) for title, cwd, args in commands}
+    backend_titles = ["后端静态检查", "导入分层", "共享层检查", "迁移基线", "后端全量"]
+    frontend_titles = ["前端类型检查", "前端全量", "浏览器 E2E"]
+
+    def check_candidate() -> None:
         if git("rev-parse", "HEAD") != commit or git("status", "--porcelain", "--untracked-files=normal"):
             raise RuntimeError("门禁期间代码发生变化，发布中止")
-        completed.append(failed)
-        failed = ""
-        return completed, schema_digest
+
+    def run_step(title: str, action):
+        print(f"\n==> {title}", flush=True)
+        statuses[title] = "运行中"
+        start = time.time()
+        try:
+            result = action()
+            check_candidate()
+            statuses[title] = "通过"
+            return result
+        except BaseException as exc:
+            statuses[title] = "中断" if isinstance(exc, KeyboardInterrupt) else "失败"
+            raise
+        finally:
+            durations[title] = max(0.0, time.time() - start)
+
+    def run_command(title: str) -> None:
+        cwd, args = by_title[title]
+        call(args, cwd=cwd, env=env if title in {"迁移基线", "后端全量"} else base_env)
+
+    def run_parallel() -> None:
+        lanes = [deque(backend_titles), deque(frontend_titles)]
+        running: dict[int, tuple[str, subprocess.Popen, float]] = {}
+        interrupted = 0
+
+        def terminate(signum, _frame):
+            nonlocal interrupted
+            if not interrupted:
+                interrupted = signum
+
+        previous_signals = {sig: signal.signal(sig, terminate) for sig in (signal.SIGINT, signal.SIGTERM)}
+        try:
+            while running or any(lanes):
+                if interrupted:
+                    raise SystemExit(128 + interrupted)
+                for lane, titles in enumerate(lanes):
+                    if interrupted:
+                        raise SystemExit(128 + interrupted)
+                    if lane in running or not titles:
+                        continue
+                    title = titles.popleft()
+                    cwd, args = by_title[title]
+                    print(f"\n==> {title}", flush=True)
+                    statuses[title] = "运行中"
+                    start = time.time()
+                    try:
+                        process = start_parallel_gate(cwd, args, env if title in {"迁移基线", "后端全量"} else base_env)
+                    except BaseException as exc:
+                        statuses[title] = "中断" if isinstance(exc, KeyboardInterrupt) else "失败"
+                        durations[title] = max(0.0, time.time() - start)
+                        raise
+                    running[lane] = (title, process, start)
+                    if interrupted:
+                        raise SystemExit(128 + interrupted)
+                progressed = False
+                for lane, (title, process, start) in list(running.items()):
+                    code = process.poll()
+                    if code is None:
+                        continue
+                    progressed = True
+                    durations[title] = max(0.0, time.time() - start)
+                    if code:
+                        statuses[title] = "失败"
+                        raise subprocess.CalledProcessError(code, process.args)
+                    try:
+                        check_candidate()
+                    except BaseException as exc:
+                        statuses[title] = "中断" if isinstance(exc, KeyboardInterrupt) else "失败"
+                        raise
+                    statuses[title] = "通过"
+                    del running[lane]
+                    print(f"✓ {title} ({durations[title]:.1f}s)", flush=True)
+                if running and not progressed:
+                    time.sleep(0.05)
+            if interrupted:
+                raise SystemExit(128 + interrupted)
+        except BaseException:
+            active = []
+            for title, process, start in running.values():
+                code = process.poll()
+                durations[title] = max(0.0, time.time() - start)
+                if statuses[title] in {"失败", "中断"}:
+                    active.append(process)
+                elif code is None:
+                    statuses[title] = "中断"
+                    active.append(process)
+                else:
+                    statuses[title] = "通过" if code == 0 else "失败"
+                    if code:
+                        active.append(process)
+            stop_parallel_gates(active)
+            raise
+        finally:
+            for sig, handler in previous_signals.items():
+                signal.signal(sig, handler)
+
+    succeeded = False
+    try:
+        scheduled = ["测试依赖", *backend_titles, *frontend_titles, "前端生产构建"]
+        if len(commands) != len(scheduled) or set(by_title) != set(scheduled):
+            raise RuntimeError("发布门禁与执行计划不匹配")
+        run_step(gates[0], lambda: check_locks(base_env))
+        run_step("测试依赖", lambda: run_command("测试依赖"))
+        if os.environ.get("HEIJIN_RELEASE_PARALLEL") == "1":
+            run_parallel()
+        else:
+            for title, _, _ in commands[1:-1]:
+                run_step(title, lambda title=title: run_command(title))
+        run_step("前端生产构建", lambda: run_command("前端生产构建"))
+        schema_digest = run_step("线上结构恢复演练", lambda: check_production_schema(env))
+        succeeded = True
+        return [gate for gate in gates if statuses[gate] == "通过"], schema_digest
     finally:
         finished = datetime.now(timezone.utc)
-        result = "失败" if failed else "通过"
+        result = "通过" if succeeded else "失败"
         report = [
             "# ERP 发布前全量测试报告",
             "",
@@ -331,8 +470,11 @@ def run_gates(commit: str, version: str) -> tuple[list[str], str]:
             "| --- | --- |",
         ]
         for gate in gates:
-            status = "通过" if gate in completed else "失败" if gate == failed else "未执行"
-            report.append(f"| {gate} | {status} |")
+            report.append(f"| {gate} | {statuses[gate]} |")
+        report += ["", "| 阶段耗时 | 秒 |", "| --- | ---: |"]
+        for gate in gates:
+            if gate in durations:
+                report.append(f"| {gate} | {durations[gate]:.1f} |")
         path.write_text("\n".join(report) + "\n", encoding="utf-8")
         print(f"\n全量测试报告：{path}", flush=True)
 

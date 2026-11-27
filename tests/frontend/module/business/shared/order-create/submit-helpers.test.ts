@@ -1,3 +1,5 @@
+// @vitest-environment jsdom
+// 选项字典在加载时会注册浏览器 storage 事件监听器。
 import { describe, expect, it } from "vitest";
 import { buildCounterpartyInput, buildCustomerInput, buildOrderNote, resolveCustomerSource, splitFormExtra } from "@/business/shared/order-create/create/submit-helpers";
 import type { FieldConfigMap } from "@/shared/forms/ConfigurableField";

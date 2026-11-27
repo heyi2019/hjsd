@@ -12,8 +12,8 @@
  *   node scripts/test-timing.mjs                    # 跑 react 层并出报告
  *   node scripts/test-timing.mjs --project quick
  *   node scripts/test-timing.mjs --top 50           # 最慢用例取前 50（默认 30）
- *   node scripts/test-timing.mjs --from /tmp/x.json # 不重跑，直接分析已有 json 报告
- *   node scripts/test-timing.mjs --since <commit>   # 只跑上次提交以来改动的文件
+ *   node scripts/test-timing.mjs --from /tmp/x.json # 不重跑、只读分析已有 json 报告
+ *   node scripts/test-timing.mjs --since <commit>   # 只跑指定提交以来变更的测试文件
  *   node scripts/test-timing.mjs -- --maxWorkers=1 src/x.test.tsx   # A/B 对比固定串行
  *
  * 负载口径：机器上常有别的会话在抢 CPU（实测 load 5/8 核时同一份代码墙钟差 20%+），
@@ -36,7 +36,8 @@ const argOf = (name, fallback = null) => {
 };
 const hasFlag = (name) => argv.includes(name);
 
-const project = argOf("--project", "react");
+const requestedProject = argOf("--project");
+let project = requestedProject ?? "react";
 const topN = Number(argOf("--top", "30"));
 const fromFile = argOf("--from", null);
 const since = argOf("--since", null);
@@ -50,7 +51,6 @@ const reportPath = fromFile ?? join(tmpdir(), `vitest-timing-${project}-${Date.n
 //         这是唯一不受其它会话抢 CPU 影响的对比量。取不到就退化为只有墙钟。
 const TIME_BIN = "/usr/bin/time";
 const canMeasureCpu = existsSync(TIME_BIN);
-const timeFlag = process.platform === "darwin" ? "-l" : "-v";
 
 // ---- 1. 取数据：已有报告直接解析，否则跑一次目标 project ----
 let wallSeconds = null;
@@ -62,14 +62,18 @@ if (!fromFile) {
     "--reporter=default", "--reporter=json", `--outputFile.json=${reportPath}`,
   ];
   const changed = since ? changedFiles(since) : null;
+  if (changed?.length === 0) {
+    console.log("没有更改的前端测试文件；源码变更请使用 npm run test:changed 选测。");
+    process.exit(0);
+  }
   if (changed) vitestArgs.push(...changed);
   vitestArgs.push(...passthrough);
   process.stderr.write(`[timing] 运行 ${project} 层${changed ? `（${changed.length} 个改动文件）` : ""}…\n`);
   if (process.env.TIMING_DEBUG) process.stderr.write(`[timing] vitest ${vitestArgs.join(" ")}\n`);
   const cmd = canMeasureCpu ? TIME_BIN : npx;
-  const cmdArgs = canMeasureCpu ? [timeFlag, npx, ...vitestArgs] : vitestArgs;
+  const cmdArgs = canMeasureCpu ? ["-p", npx, ...vitestArgs] : vitestArgs;
   const started = performance.now();
-  // stderr 不直出：/usr/bin/time -l 会打上百行 rusage，只在失败时摘尾部。
+  // stderr 不直出，只在失败时摘尾部。
   const child = spawn(cmd, cmdArgs, { stdio: ["ignore", "pipe", "pipe"] });
   let out = "";
   let err = "";
@@ -89,20 +93,20 @@ if (!fromFile) {
 
 function parseCpuSeconds(text) {
   if (!canMeasureCpu) return null;
-  if (process.platform === "darwin") {
-    // "        0.12 real         0.50 user         0.10 sys"
-    const m = text.match(/^\s*([\d.]+)\s+real\s+([\d.]+)\s+user\s+([\d.]+)\s+sys\s*$/m);
-    return m ? Number(m[2]) + Number(m[3]) : null;
-  }
-  const u = text.match(/User time \(seconds\):\s*([\d.]+)/);
-  const s = text.match(/System time \(seconds\):\s*([\d.]+)/);
+  const u = text.match(/^\s*user\s+([\d.]+)\s*$/m);
+  const s = text.match(/^\s*sys\s+([\d.]+)\s*$/m);
   return u && s ? Number(u[1]) + Number(s[1]) : null;
 }
 
 if (fromFile) {
-  const side = fromFile.replace(/\.json$/, ".summary.json");
+  const side = fromFile.endsWith(".json") ? fromFile.replace(/\.json$/, ".summary.json") : `${fromFile}.summary.json`;
   if (existsSync(side)) {
-    try { cpuSeconds = JSON.parse(readFileSync(side, "utf8")).cpuSeconds ?? null; } catch { /* 忽略 */ }
+    try {
+      const summary = JSON.parse(readFileSync(side, "utf8"));
+      cpuSeconds = summary.cpuSeconds ?? null;
+      wallSeconds = summary.wallSeconds ?? null;
+      if (!requestedProject && typeof summary.project === "string") project = summary.project;
+    } catch { /* 忽略损坏的可选汇总文件 */ }
   }
 }
 
@@ -188,16 +192,25 @@ console.log(`TIMING_TOTAL files=${rows.length} tests=${testCount} wall=${wallSec
   `parallelism=${wallSeconds ? (sumMs / 1000 / wallSeconds).toFixed(2) : "n/a"} ` +
   `cpu_ratio=${cpuSeconds ? (sumMs / 1000 / cpuSeconds).toFixed(2) : "n/a"}`);
 
-writeFileSync(
-  reportPath.replace(/\.json$/, ".summary.json"),
-  JSON.stringify({ project, wallSeconds, cpuSeconds, sumSeconds: sumMs / 1000, rows, generatedAt: new Date().toISOString() }, null, 2),
-);
+if (!fromFile) {
+  writeFileSync(
+    reportPath.replace(/\.json$/, ".summary.json"),
+    JSON.stringify({ project, wallSeconds, cpuSeconds, sumSeconds: sumMs / 1000, rows, generatedAt: new Date().toISOString() }, null, 2),
+  );
+}
 
 function changedFiles(commit) {
-  if (!existsSync(join(process.cwd(), "src"))) return null;
-  const r = spawnSync("git", ["diff", "--name-only", commit, "--", "src"], { encoding: "utf8" });
-  if (r.status !== 0) return null;
-  const files = r.stdout.split("\n").map((s) => s.trim())
-    .filter((f) => /\.(test|spec)\.(ts|tsx)$/.test(f));
-  return files.length ? files : null;
+  const paths = ":(top)tests/frontend";
+  const commands = [
+    ["diff", "--name-only", "--diff-filter=ACMRT", "-z", commit, "--", paths],
+    ["ls-files", "--others", "--exclude-standard", "-z", "--", paths],
+  ];
+  const files = commands.flatMap((args) => {
+    const result = spawnSync("git", args, { encoding: "utf8" });
+    if (result.status !== 0) {
+      throw new Error(`无法获取变更：${result.stderr.trim() || result.error?.message || "git 命令失败"}`);
+    }
+    return result.stdout.split("\0");
+  });
+  return [...new Set(files.filter((file) => /\.(test|spec)\.(ts|tsx)$/.test(file)))];
 }

@@ -7,6 +7,9 @@ test("设置中下载订单模板并预检导入，重复订单可跳过", async
   const sequences = await (await request.get(`${apiBase}/sequences`, { headers })).json();
   const number = sequences.find((item: { prefix: string }) => item.prefix === "DG")?.next_number as string;
   expect(number).toMatch(/^DG\d{4}$/);
+  const currentUser = await (await request.get(`${apiBase}/auth/me`, { headers })).json();
+  expect(currentUser.id).toBeGreaterThan(0);
+  expect(currentUser.username).toBeTruthy();
 
   await page.goto("/#/settings");
   await page.getByRole("tab", { name: "订单导入" }).click();
@@ -20,7 +23,7 @@ test("设置中下载订单模板并预检导入，重复订单可跳过", async
   await page.getByLabel("选择订单文件").setInputFiles({
     name: "历史订单.csv",
     mimeType: "text/csv",
-    buffer: Buffer.from(`订单号,业务日期,业务类型,业务操作人,游戏账号/产品,订单备注\n${number},2026-10-17,代挂,admin,导入测试账号,导入联调\n`),
+    buffer: Buffer.from(`订单号,业务日期,业务类型,入库操作人,游戏账号/产品,订单备注\n${number},2026-10-17,代挂,${currentUser.username},导入测试账号,导入联调\n`),
   });
   await page.getByRole("button", { name: "预检文件" }).click();
   await expect(page.getByRole("row").filter({ hasText: number })).toContainText("新建");
@@ -31,6 +34,7 @@ test("设置中下载订单模板并预检导入，重复订单可跳过", async
   expect(order.account_id).toBeNull();
   const detail = await (await request.get(`${apiBase}/orders/${order.id}`, { headers })).json();
   expect(detail.account_snapshot.game_account).toBe("导入测试账号");
+  expect(detail.form_extra.business_responsible_ids).toEqual([currentUser.id]);
   expect(detail.note).toBe("导入联调");
 
   await page.getByRole("button", { name: "预检文件" }).click();

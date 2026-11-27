@@ -38,6 +38,7 @@ def test_local_release_rejects_same_version_or_different_commit():
 def test_local_full_release_retains_versioned_report(tmp_path, monkeypatch, fail_e2e):
     """全量门禁成功或失败，均按批次保留含 ERP 版本、候选提交与阶段状态的报告。"""
     import importlib.util
+    import re
 
     path = PROJECT_ROOT / "scripts" / "ops" / "local_release.py"
     spec = importlib.util.spec_from_file_location("local_release_report", path)
@@ -46,6 +47,8 @@ def test_local_full_release_retains_versioned_report(tmp_path, monkeypatch, fail
     spec.loader.exec_module(module)
     commit = "a" * 40
     monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.delenv("HEIJIN_RELEASE_PARALLEL", raising=False)
+    monkeypatch.setattr(module, "start_parallel_gate", lambda *_: pytest.fail("默认发布不得并行"))
     monkeypatch.setattr(module, "check_locks", lambda _env: None)
     monkeypatch.setattr(module, "check_production_schema", lambda _env: "b" * 64)
     monkeypatch.setattr(module, "git", lambda operation, *_: commit if operation == "rev-parse" else "")
@@ -84,14 +87,221 @@ def test_local_full_release_retains_versioned_report(tmp_path, monkeypatch, fail
         assert f"候选提交 | `{commit}`" in report
         assert "| 后端全量 | 通过 |" in report
         assert "| 前端全量 | 通过 |" in report
+        assert "| 阶段耗时 | 秒 |" in report
+        assert re.search(r"\| 后端全量 \| \d+\.\d \|", report)
+        assert re.search(r"\| 前端全量 \| \d+\.\d \|", report)
         if fail_e2e:
             assert "| 结果 | 失败 |" in report
             assert "| 浏览器 E2E | 失败 |" in report
             assert "| 前端生产构建 | 未执行 |" in report
+            assert not re.search(r"\| 前端生产构建 \| \d+\.\d \|", report)
         else:
             assert "| 结果 | 通过 |" in report
             assert "| 浏览器 E2E | 通过 |" in report
             assert "| 线上结构恢复演练 | 通过 |" in report
+
+
+def test_release_overlaps_backend_with_browser_but_waits_before_build(tmp_path, monkeypatch):
+    """后端与浏览器门禁可重叠，生产构建及线上演练必须等两边都完成。"""
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location("local_release_overlap", PROJECT_ROOT / "scripts/ops/local_release.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    commit = "a" * 40
+    original_commands = module.gate_commands()
+    script = """
+import pathlib, sys, time
+root, role = pathlib.Path(sys.argv[1]), sys.argv[2]
+if role == 'backend':
+    (root / 'backend-started').touch()
+    deadline = time.monotonic() + 5
+    while not (root / 'browser-started').exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if not (root / 'browser-started').exists():
+        sys.exit(9)
+    (root / 'backend-done').touch()
+elif role == 'browser':
+    deadline = time.monotonic() + 5
+    while not (root / 'backend-started').exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    if not (root / 'backend-started').exists():
+        sys.exit(8)
+    (root / 'browser-started').touch()
+    (root / 'browser-done').touch()
+elif role == 'build':
+    if not (root / 'backend-done').exists() or not (root / 'browser-done').exists():
+        sys.exit(7)
+    (root / 'build-done').touch()
+"""
+    roles = {"后端全量": "backend", "浏览器 E2E": "browser", "前端生产构建": "build"}
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setenv("HEIJIN_RELEASE_PARALLEL", "1")
+    monkeypatch.setattr(module, "gate_commands", lambda: [
+        (title, tmp_path, [sys.executable, "-c", script, str(tmp_path), roles.get(title, "other")])
+        for title, _, _ in original_commands
+    ])
+    monkeypatch.setattr(module, "check_locks", lambda _env: None)
+    monkeypatch.setattr(module, "git", lambda operation, *_: commit if operation == "rev-parse" else "")
+
+    def drill(_env):
+        assert (tmp_path / "build-done").exists()
+        return "b" * 64
+
+    monkeypatch.setattr(module, "check_production_schema", drill)
+    completed, digest = module.run_gates(commit, "1.0.1")
+    assert completed == module.required_gates()[:-1]
+    assert digest == "b" * 64
+
+
+def test_release_failure_stops_parallel_gate_and_blocks_build(tmp_path, monkeypatch):
+    """一条门禁失败后中止另一条正在运行的门禁，并在报告中区分中断和未执行。"""
+    import importlib.util
+    import signal
+    import sys
+
+    spec = importlib.util.spec_from_file_location("local_release_cancel", PROJECT_ROOT / "scripts/ops/local_release.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    commit = "a" * 40
+    original_commands = module.gate_commands()
+    script = """
+import pathlib, signal, subprocess, sys, time
+root, role = pathlib.Path(sys.argv[1]), sys.argv[2]
+if role == 'backend':
+    def stop(*_):
+        (root / 'backend-stopped').touch()
+        sys.exit(0)
+    signal.signal(signal.SIGTERM, stop)
+    (root / 'backend-started').touch()
+    time.sleep(5)
+    sys.exit(9)
+elif role == 'browser':
+    deadline = time.monotonic() + 4
+    while not (root / 'backend-started').exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    child = '''
+import os, pathlib, signal, sys, time
+root = pathlib.Path(sys.argv[1])
+def stop(*_):
+    (root / 'browser-child-stopped').touch()
+    sys.exit(0)
+signal.signal(signal.SIGTERM, stop)
+(root / 'browser-child-pid').write_text(str(os.getpid()))
+while True:
+    time.sleep(0.05)
+'''
+    subprocess.Popen([sys.executable, '-c', child, str(root)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    deadline = time.monotonic() + 4
+    while not (root / 'browser-child-pid').exists() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    sys.exit(7 if (root / 'backend-started').exists() else 8)
+elif role == 'build':
+    (root / 'build-ran').touch()
+"""
+    roles = {"后端全量": "backend", "浏览器 E2E": "browser", "前端生产构建": "build"}
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setenv("HEIJIN_RELEASE_PARALLEL", "1")
+    monkeypatch.setattr(module, "gate_commands", lambda: [
+        (title, tmp_path, [sys.executable, "-c", script, str(tmp_path), roles.get(title, "other")])
+        for title, _, _ in original_commands
+    ])
+    monkeypatch.setattr(module, "check_locks", lambda _env: None)
+    monkeypatch.setattr(module, "git", lambda operation, *_: commit if operation == "rev-parse" else "")
+    monkeypatch.setattr(module, "check_production_schema", lambda _env: pytest.fail("不应执行线上演练"))
+
+    try:
+        with pytest.raises(subprocess.CalledProcessError) as error:
+            module.run_gates(commit, "1.0.1")
+        assert error.value.returncode == 7
+        assert (tmp_path / "backend-stopped").exists()
+        assert (tmp_path / "browser-child-stopped").exists()
+        assert not (tmp_path / "build-ran").exists()
+        report = next((tmp_path / "outputs/local-release/reports").glob("*/release-test-report.md")).read_text()
+        assert "| 浏览器 E2E | 失败 |" in report
+        assert "| 后端全量 | 中断 |" in report
+        assert "| 前端生产构建 | 未执行 |" in report
+    finally:
+        pid = tmp_path / "browser-child-pid"
+        if pid.exists() and not (tmp_path / "browser-child-stopped").exists():
+            try:
+                os.kill(int(pid.read_text()), signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+
+
+def test_release_interrupt_terminates_both_process_groups(tmp_path):
+    """发布进程收到终止信号时，不留下运行中的测试子进程。"""
+    import signal
+    import sys
+    import time
+
+    controller = """
+import importlib.util, pathlib, sys
+root, project, python = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.executable
+spec = importlib.util.spec_from_file_location('release_interrupt', project / 'scripts/ops/local_release.py')
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+commands = module.gate_commands()
+worker = '''
+import os, pathlib, signal, sys, time
+root, role = pathlib.Path(sys.argv[1]), sys.argv[2]
+if role != 'other':
+    def stop(*_):
+        (root / (role + '-stopping')).touch()
+        time.sleep(0.4)
+        (root / (role + '-stopped')).touch()
+        sys.exit(0)
+    signal.signal(signal.SIGTERM, stop)
+    (root / (role + '-pid')).write_text(str(os.getpid()))
+    while True:
+        time.sleep(0.05)
+'''
+roles = {'后端全量': 'backend', '浏览器 E2E': 'browser'}
+module.ROOT = root
+import os
+os.environ['HEIJIN_RELEASE_PARALLEL'] = '1'
+module.gate_commands = lambda: [(name, root, [python, '-c', worker, str(root), roles.get(name, 'other')]) for name, _, _ in commands]
+module.check_locks = lambda _env: None
+module.git = lambda operation, *_: 'a' * 40 if operation == 'rev-parse' else ''
+module.check_production_schema = lambda _env: (_ for _ in ()).throw(AssertionError('unexpected drill'))
+module.run_gates('a' * 40, '1.0.1')
+"""
+    process = subprocess.Popen([sys.executable, "-c", controller, str(tmp_path), str(PROJECT_ROOT)],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not all((tmp_path / f"{role}-pid").exists() for role in ("backend", "browser")):
+            assert process.poll() is None
+            time.sleep(0.02)
+        assert all((tmp_path / f"{role}-pid").exists() for role in ("backend", "browser"))
+        process.terminate()
+        deadline = time.monotonic() + 5
+        while not (tmp_path / "backend-stopping").exists() and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert (tmp_path / "backend-stopping").exists()
+        os.kill(process.pid, signal.SIGINT)
+        process.wait(timeout=10)
+        assert process.returncode == 143
+        assert all((tmp_path / f"{role}-stopped").exists() for role in ("backend", "browser"))
+        report = next((tmp_path / "outputs/local-release/reports").glob("*/release-test-report.md")).read_text()
+        assert "| 后端全量 | 中断 |" in report
+        assert "| 浏览器 E2E | 中断 |" in report
+        assert "| 前端生产构建 | 未执行 |" in report
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        for role in ("backend", "browser"):
+            pid = tmp_path / f"{role}-pid"
+            if pid.exists() and not (tmp_path / f"{role}-stopped").exists():
+                try:
+                    os.killpg(int(pid.read_text()), signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
 
 
 def test_local_cd_accepts_intact_bundle_then_rejects_tampering(tmp_path):

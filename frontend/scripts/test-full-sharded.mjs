@@ -7,6 +7,42 @@ import { fastTests, quickTests, matchesAny } from "./test-layers.mjs";
 import { runParallelJobs } from "./test-full-sharded-scheduling.mjs";
 
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+const activeChildren = new Set();
+const stopTimers = new Map();
+let interruptedBy = "";
+const signalChild = (child, signal) => {
+  try {
+    if (process.platform !== "win32" && child.pid) process.kill(-child.pid, signal);
+    else child.kill(signal);
+  } catch (error) {
+    if (error.code !== "ESRCH") throw error;
+  }
+};
+const stopChild = (child) => {
+  signalChild(child, "SIGTERM");
+  if (!stopTimers.has(child)) {
+    stopTimers.set(child, setTimeout(() => signalChild(child, "SIGKILL"), 5000));
+  }
+};
+const waitForGroupExit = async (child) => {
+  if (process.platform === "win32" || !child.pid) return;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    try { process.kill(-child.pid, 0); } catch (error) {
+      if (error.code === "ESRCH" || error.code === "EPERM") return;
+      throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  signalChild(child, "SIGKILL");
+};
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    if (interruptedBy) return;
+    interruptedBy = signal;
+    for (const child of activeChildren) stopChild(child);
+  });
+}
 const rawArgs = process.argv.slice(2);
 const mode = rawArgs.includes("--deep-only") ? "deep-only" : rawArgs.includes("--all") ? "all" : "default";
 // 模式标志不传给 vitest，其余参数（如 --reporter）原样透传。
@@ -64,14 +100,20 @@ if (existsSync(TEST_ROOTS[0].directory) && !allTestFiles.some((file) => file.sta
 
 // 单 job 超时保护：jsdom+antd 测试中偶发「waitFor 永远等不到元素」会让 worker 进程卡死，
 // 若不保护会冻结整个脚本（2026-10-27 实测 test:full 卡 9 分钟无退出）。
-// 用 Node 内部 setTimeout + child.kill 兜底（macOS 无系统 timeout 命令）。
+// 用 Node 内部 setTimeout 兜底，超时时终止本层整个进程组。
 // buffered=true 时把子进程输出攒起来、结束后整段带前缀打印：层间并发时 stdio:"inherit"
 // 会让两层日志逐行交错，读不出哪条属于哪层（并发只用于 fast/quick，故只这两层走缓冲）。
 const run = (name, args, timeoutMs = 0, { buffered = false } = {}) => new Promise((resolve, reject) => {
+  if (interruptedBy) {
+    reject(new Error(`${name} 因 ${interruptedBy} 中断`));
+    return;
+  }
   const child = spawn(npm, args, {
     stdio: buffered ? ["ignore", "pipe", "pipe"] : "inherit",
     env: process.env,
+    detached: process.platform !== "win32",
   });
+  activeChildren.add(child);
   let captured = "";
   if (buffered) {
     child.stdout.on("data", (chunk) => { captured += chunk; });
@@ -79,21 +121,30 @@ const run = (name, args, timeoutMs = 0, { buffered = false } = {}) => new Promis
   }
   const startedAt = performance.now();
   let timer;
+  let timedOut = false;
   if (timeoutMs > 0) {
     timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      reject(new Error(`${name} 超时（${Math.round(timeoutMs / 1000)}s），已 SIGTERM 终止`));
+      timedOut = true;
+      stopChild(child);
     }, timeoutMs);
   }
   child.on("error", reject);
-  child.on("close", (code, signal) => {
+  child.on("close", async (code, signal) => {
     if (timer) clearTimeout(timer);
+    if (timedOut || interruptedBy) await waitForGroupExit(child);
+    if (stopTimers.has(child)) clearTimeout(stopTimers.get(child));
+    stopTimers.delete(child);
+    activeChildren.delete(child);
     const elapsed = ((performance.now() - startedAt) / 1000).toFixed(1);
     if (captured) {
       // 只在结束时整段吐出，避免与另一层交错。
       process.stdout.write(`┌── ${name} ──\n${captured.replace(/^/gm, "│ ")}\n└── ${name} ──\n`);
     }
-    if (code === 0) {
+    if (timedOut) {
+      reject(new Error(`${name} 超时（${Math.round(timeoutMs / 1000)}s），已终止进程组`));
+    } else if (interruptedBy) {
+      reject(new Error(`${name} 因 ${interruptedBy} 中断`));
+    } else if (code === 0) {
       console.log(`✓ ${name} 完成 (${elapsed}s)`);
       resolve();
     } else {
@@ -137,9 +188,13 @@ const failures = [];
 const parallelJobs = mode === "deep-only" ? [] : jobs.splice(0, 2);
 if (parallelJobs.length > 0) {
   failures.push(...await runParallelJobs(parallelJobs, run));
-  console.log("✓ fast + quick 并行完成");
+  if (failures.length === 0) console.log("✓ fast + quick 并行完成");
 }
-for (const [name, args, timeout] of jobs) {
+for (const [index, [name, args, timeout]] of jobs.entries()) {
+  if (failures.length > 0 || interruptedBy) {
+    console.error(`已有测试层失败，跳过后续层：${jobs.slice(index).map(([title]) => title).join("、")}`);
+    break;
+  }
   try {
     await run(name, args, timeout);
   } catch (error) {
@@ -147,9 +202,9 @@ for (const [name, args, timeout] of jobs) {
   }
 }
 
-if (failures.length > 0) {
+if (failures.length > 0 || interruptedBy) {
   for (const { name, error } of failures) console.error(`${name} 失败：${error.message}`);
-  process.exitCode = 1;
+  process.exitCode = interruptedBy ? (interruptedBy === "SIGINT" ? 130 : 143) : 1;
 } else {
   console.log(`回归通过（${mode}），总耗时 ${((performance.now() - startedAt) / 1000).toFixed(2)} 秒`);
 }
